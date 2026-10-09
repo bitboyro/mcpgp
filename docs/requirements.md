@@ -91,6 +91,7 @@ Every configurable thing, grouped by concern.
 | Per-user identity (token exchange, URL elicitation) | B | P2 |
 | Secrets only as references (`env:`, `file:`); keychain | R | P0 |
 | Secret fields marked in the config schema; plain values rejected unless `allowInlineSecrets` | R | P0 |
+| Runtime config in YAML or JSON (by file extension) | R | P0 |
 | Every config key settable by env var, including list items by index (`…_INSTANCES_0__…`); config file optional | R | P0 |
 | Vault secret references | R | P2 |
 | Redaction policy | B→R | P0 |

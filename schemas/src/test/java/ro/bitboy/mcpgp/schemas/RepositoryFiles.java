@@ -96,11 +96,14 @@ final class RepositoryFiles {
             if (relative.startsWith("examples/client/mcp-clients/")) {
                 return Classification.skip("MCP client configuration (client-owned format)");
             }
-            if (name.endsWith(".yaml")) {
+            if (name.endsWith(".yaml") || name.endsWith(".json")) {
                 return Classification.validate(SchemaKind.RUNTIME_CONFIG);
             }
         }
 
+        if (relative.contains("/contracts/")) {
+            return Classification.skip("OpenAPI contract");
+        }
         if (relative.contains("/overlays/")) {
             return Classification.skip("OpenAPI Overlay document");
         }
