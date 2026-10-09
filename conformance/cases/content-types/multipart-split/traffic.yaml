@@ -1,0 +1,55 @@
+mcpRevision: "2025-11-25"
+steps:
+  - name: JSON tool sends application/json
+    mcp:
+      method: tools/call
+      params:
+        name: orders_customer_create
+        arguments:
+          body: { name: "Ana", accountId: "a-1" }
+    upstream:
+      method: POST
+      path: /api/v2/customers
+      headers:
+        Content-Type: { startsWith: "application/json" }
+        Accept: "application/json"
+      json: { name: "Ana", accountId: "a-1" }
+    respond: { status: 201, json: { id: "c-1", name: "Ana" } }
+    expect:
+      isError: false
+      structuredContent: { id: "c-1", name: "Ana" }
+
+  - name: multipart tool sends a JSON part and a PDF part
+    mcp:
+      method: tools/call
+      params:
+        name: orders_customer_create_multipart
+        arguments:
+          body:
+            payload: { name: "Ana", accountId: "a-1" }
+            document: { base64: "JVBERi0xLjQK", filename: "c.pdf", contentType: "application/pdf" }
+    upstream:
+      method: POST
+      path: /api/v2/customers
+      headers:
+        Content-Type: { startsWith: "multipart/form-data; boundary=" }
+      parts:
+        - { name: payload, contentType: application/json, json: { name: "Ana", accountId: "a-1" } }
+        - { name: document, contentType: application/pdf, filename: c.pdf, sizeBytes: 9 }
+    respond: { status: 201, json: { id: "c-2", name: "Ana" } }
+    expect:
+      isError: false
+
+  - name: wrong file content type is rejected before sending
+    mcp:
+      method: tools/call
+      params:
+        name: orders_customer_create_multipart
+        arguments:
+          body:
+            payload: { name: "Ana", accountId: "a-1" }
+            document: { base64: "iVBORw0K", filename: "c.png", contentType: "image/png" }
+    upstream: none
+    expect:
+      isError: true
+      code: INPUT_VALIDATION

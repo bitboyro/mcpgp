@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitboyro.github.io/mcpgp/schemas/names-lock.schema.json",
+  "title": "mcpgp name lock file",
+  "description": "mcp-names.lock. See docs/spec/naming.md section 7.",
+  "type": "object",
+  "properties": {
+    "version": { "const": 1 },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*:[A-Z]+:/.*$" },
+          "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,128}$" },
+          "since": { "type": "string" }
+        },
+        "required": ["id", "name"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["version", "tools"],
+  "additionalProperties": false
+}

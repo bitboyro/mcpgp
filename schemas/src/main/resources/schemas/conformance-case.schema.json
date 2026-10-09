@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitboyro.github.io/mcpgp/schemas/conformance-case.schema.json",
+  "title": "mcpgp conformance case",
+  "description": "case.yaml of a conformance case. See docs/spec/conformance.md.",
+  "type": "object",
+  "properties": {
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "area": { "enum": ["resolve", "naming", "rules", "schemas", "content-types", "files", "auth", "instances", "exposure", "errors", "security", "compat"] },
+    "specs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "mcpRevisions": { "type": "array", "items": { "type": "string" } },
+    "expect": { "enum": ["manifest", "diagnostics"] }
+  },
+  "required": ["name", "area", "specs", "expect"],
+  "additionalProperties": false
+}

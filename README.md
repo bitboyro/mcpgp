@@ -4,8 +4,8 @@
 package, and ship it to your customers. They run it on their own infrastructure, connected
 only to their own systems. It never calls back to the platform or to you.
 
-> Status: **design phase.** This repository holds the specification, examples and process.
-> There is no implementation yet. See [docs/process/roadmap.md](docs/process/roadmap.md).
+> Status: **early implementation.** Specs, examples and process are in place; the JSON Schemas
+> (milestone M1) are being built. See [docs/process/roadmap.md](docs/process/roadmap.md).
 
 ## What it does
 

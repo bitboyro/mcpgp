@@ -1,6 +1,6 @@
 # Spec: manifest
 
-Status: **draft v1 — accepted** · Owner: core · Schema: `schemas/manifest.schema.json` (M1)
+Status: **draft v1 — accepted** · Owner: core · Schema: [manifest.schema.json](../../schemas/src/main/resources/schemas/manifest.schema.json)
 Decision: [ADR-0002](../decisions/0002-language-neutral-manifest.md)
 
 The manifest is the compiler's output and the only input a runtime needs besides the operator's

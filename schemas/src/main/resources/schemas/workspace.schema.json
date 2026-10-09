@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitboyro.github.io/mcpgp/schemas/workspace.schema.json",
+  "title": "mcpgp local workspace mapping",
+  "description": "mcpgp-workspace.yaml: maps mcpgp:// workspace references to local files for CLI use.",
+  "type": "object",
+  "properties": {
+    "workspace": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "servers": { "$ref": "#/$defs/map" },
+    "contracts": { "$ref": "#/$defs/map" },
+    "naming": { "$ref": "#/$defs/map" },
+    "rules": { "$ref": "#/$defs/map" },
+    "packs": { "$ref": "#/$defs/map" },
+    "templates": { "$ref": "#/$defs/map" }
+  },
+  "required": ["workspace"],
+  "additionalProperties": false,
+  "$defs": {
+    "map": { "type": "object", "additionalProperties": { "type": "string" } }
+  }
+}

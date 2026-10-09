@@ -78,4 +78,4 @@ generation:
 build:
   targets: [jar, mcpb, docker]
   docs: [people, agents]
-  sign: true
+  sign: { key: "${env:MCPGP_SIGNING_KEY}" }

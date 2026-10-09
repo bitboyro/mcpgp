@@ -1,0 +1,8 @@
+name: multipart-split
+description: >
+  An operation accepting JSON and multipart becomes two tools; the multipart tool sends
+  multipart/form-data with a JSON part and a file part, never JSON.
+area: content-types
+specs: [tools-contract.md#13-content-types, naming.md#41-content-type-suffixes]
+mcpRevisions: ["2025-11-25"]
+expect: manifest

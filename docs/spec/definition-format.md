@@ -1,6 +1,6 @@
 # Spec: definition format (`*.mcpgp.yaml`)
 
-Status: **draft v1** · Owner: core · Schema: `schemas/definition.schema.json` (M1)
+Status: **draft v1** · Owner: core · Schema: [definition.schema.json](../../schemas/src/main/resources/schemas/definition.schema.json)
 
 The definition is the single source of truth for one MCP server. The web UI, the CLI, the REST API
 and agents all read and write it. Builds are reproducible from a definition version plus its lock file.

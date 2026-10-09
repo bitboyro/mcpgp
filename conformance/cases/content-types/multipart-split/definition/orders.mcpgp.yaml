@@ -1,0 +1,9 @@
+apiVersion: mcpgp/v1
+kind: McpServer
+metadata: { name: orders-mcp }
+apis:
+  - id: orders
+    contracts:
+      - { version: "2.0", spec: contracts/orders-2.0.yaml, default: true }
+instances:
+  mode: single

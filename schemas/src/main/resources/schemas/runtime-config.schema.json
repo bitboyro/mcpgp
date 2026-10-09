@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitboyro.github.io/mcpgp/schemas/runtime-config.schema.json",
+  "title": "mcpgp runtime config (generic)",
+  "description": "The operator's runtime config. Each build generates a narrower server.config.schema.json from this one. See docs/spec/runtime-config.md.",
+  "type": "object",
+  "properties": {
+    "server": { "$ref": "#/$defs/server" },
+    "instance": { "$ref": "#/$defs/instance" },
+    "instances": { "type": "array", "items": { "$ref": "#/$defs/instance" }, "minItems": 1 },
+    "apis": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "instance": { "$ref": "#/$defs/instance" },
+          "instances": { "type": "array", "items": { "$ref": "#/$defs/instance" }, "minItems": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "storage": {
+      "type": "object",
+      "properties": { "root": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "audit": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "path": { "type": "string" },
+            "rotate": { "type": "string", "pattern": "^(daily|hourly|size:[0-9]+)$" },
+            "retainDays": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "arguments": { "enum": ["none", "redacted", "hashed"] }
+      },
+      "additionalProperties": false
+    },
+    "telemetry": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "exporter": { "enum": ["otlp", "prometheus"] },
+        "otlp": {
+          "type": "object",
+          "properties": {
+            "endpoint": { "type": "string" },
+            "protocol": { "enum": ["grpc", "http/protobuf"] },
+            "headers": { "type": "object", "additionalProperties": { "$ref": "#/$defs/secret" } }
+          },
+          "additionalProperties": false
+        },
+        "prometheus": {
+          "type": "object",
+          "properties": { "path": { "type": "string" }, "port": { "$ref": "#/$defs/port" } },
+          "additionalProperties": false
+        },
+        "serviceName": { "type": "string" },
+        "signals": { "type": "array", "items": { "enum": ["traces", "metrics", "logs"] } }
+      },
+      "additionalProperties": false
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "level": { "enum": ["error", "warn", "info", "debug"] },
+        "target": { "enum": ["file", "stderr"] }
+      },
+      "additionalProperties": false
+    },
+    "files": {
+      "type": "object",
+      "properties": {
+        "base64": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" }, "maxKb": { "type": "integer", "minimum": 1 } },
+          "additionalProperties": false
+        },
+        "path": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "root": { "type": "string" },
+            "maxKb": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "errors": {
+      "type": "object",
+      "properties": { "detail": { "enum": ["full", "summary"] } },
+      "additionalProperties": false
+    },
+    "packs": { "type": "object", "additionalProperties": { "type": "object" } },
+    "allowInlineSecrets": { "type": "boolean" }
+  },
+  "additionalProperties": false,
+  "not": { "anyOf": [
+    { "required": ["instance", "instances"] },
+    { "required": ["instance", "apis"] },
+    { "required": ["instances", "apis"] }
+  ] },
+
+  "$defs": {
+    "secret": {
+      "description": "A secret field. Must be a reference (${env:…}, ${file:…}, ${keychain:…}, ${vault:…}) unless allowInlineSecrets is true; enforced by the runtime.",
+      "type": "string",
+      "minLength": 1,
+      "x-mcpgp-secret": true
+    },
+
+    "reference": { "type": "string", "pattern": "^\\$\\{(env|file|keychain|vault):[^}]+\\}$" },
+
+    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+
+    "material": {
+      "description": "Certificate or key material: exactly one of path or base64.",
+      "type": "object",
+      "oneOf": [
+        { "properties": { "path": { "type": "string", "minLength": 1 } }, "required": ["path"], "additionalProperties": false },
+        { "properties": { "base64": { "type": "string", "minLength": 1 } }, "required": ["base64"], "additionalProperties": false }
+      ]
+    },
+
+    "secretMaterial": {
+      "description": "Like material, but base64 holds secret key material.",
+      "type": "object",
+      "oneOf": [
+        { "properties": { "path": { "type": "string", "minLength": 1 } }, "required": ["path"], "additionalProperties": false },
+        { "properties": { "base64": { "$ref": "#/$defs/secret" } }, "required": ["base64"], "additionalProperties": false }
+      ]
+    },
+
+    "server": {
+      "type": "object",
+      "properties": {
+        "transport": { "enum": ["stdio", "http"] },
+        "host": { "type": "string" },
+        "port": { "$ref": "#/$defs/port" },
+        "publicUrl": { "type": "string", "pattern": "^https?://" },
+        "basePath": { "type": "string", "pattern": "^/" },
+        "tls": {
+          "oneOf": [
+            { "const": "proxy" },
+            {
+              "type": "object",
+              "properties": { "cert": { "$ref": "#/$defs/material" }, "key": { "$ref": "#/$defs/secretMaterial" } },
+              "required": ["cert", "key"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "trustProxy": { "type": "array", "items": { "type": "string" } },
+        "allowedOrigins": { "type": "array", "items": { "type": "string" } },
+        "outboundProxy": { "type": "string" },
+        "management": {
+          "type": "object",
+          "properties": { "port": { "$ref": "#/$defs/port" } },
+          "additionalProperties": false
+        },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "mode": { "enum": ["none", "static", "oauth"] },
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": { "name": { "type": "string" }, "value": { "$ref": "#/$defs/secret" } },
+                "required": ["name", "value"],
+                "additionalProperties": false
+              }
+            },
+            "issuer": { "type": "string", "pattern": "^https://" },
+            "introspection": {
+              "type": "object",
+              "properties": {
+                "url": { "type": "string" },
+                "clientId": { "type": "string" },
+                "clientSecret": { "$ref": "#/$defs/secret" }
+              },
+              "required": ["url"],
+              "additionalProperties": false
+            },
+            "scopes": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "access": { "enum": ["read-only", "read-write", "all"] },
+                  "tools": { "type": "array", "items": { "type": "string" } }
+                },
+                "additionalProperties": false
+              }
+            },
+            "allowInsecure": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "instance": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,39}$" },
+        "baseUrl": { "type": "string", "minLength": 1 },
+        "contract": { "type": "string", "minLength": 1 },
+        "readOnly": { "type": "boolean" },
+        "timeoutSeconds": { "type": "integer", "minimum": 1 },
+        "auth": { "$ref": "#/$defs/downstreamAuth" },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "ca": { "$ref": "#/$defs/material" },
+            "trust": { "enum": ["ca-only", "ca-and-system", "system"] },
+            "clientCert": { "$ref": "#/$defs/secretMaterial" },
+            "clientKey": { "$ref": "#/$defs/secretMaterial" },
+            "password": { "$ref": "#/$defs/secret" },
+            "insecureSkipHostnameVerify": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["baseUrl"],
+      "additionalProperties": false
+    },
+
+    "downstreamAuth": {
+      "type": "object",
+      "required": ["type"],
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "basic" },
+            "username": { "type": "string" },
+            "password": { "$ref": "#/$defs/secret" }
+          },
+          "required": ["type", "username", "password"],
+          "additionalProperties": false
+        },
+        {
+          "properties": { "type": { "const": "bearer" }, "token": { "$ref": "#/$defs/secret" } },
+          "required": ["type", "token"],
+          "additionalProperties": false
+        },
+        {
+          "properties": { "type": { "const": "apiKey" }, "value": { "$ref": "#/$defs/secret" } },
+          "required": ["type", "value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "oauth2ClientCredentials" },
+            "tokenUrl": { "type": "string", "pattern": "^https?://" },
+            "clientId": { "type": "string" },
+            "clientSecret": { "$ref": "#/$defs/secret" },
+            "clientAuth": { "enum": ["basic", "post"] },
+            "scopes": { "type": "array", "items": { "type": "string" } },
+            "audience": { "type": ["string", "null"] }
+          },
+          "required": ["type", "tokenUrl", "clientId", "clientSecret"],
+          "additionalProperties": false
+        },
+        {
+          "properties": { "type": { "const": "none" } },
+          "required": ["type"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

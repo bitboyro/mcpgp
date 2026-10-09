@@ -1,6 +1,6 @@
 # Spec: audit events, error codes, telemetry
 
-Status: **draft v1** · Owner: runtime · Schema: `schemas/audit-event.schema.json` (M1)
+Status: **draft v1** · Owner: runtime · Schema: [audit-event.schema.json](../../schemas/src/main/resources/schemas/audit-event.schema.json)
 
 The same event format and error codes in every language runtime.
 

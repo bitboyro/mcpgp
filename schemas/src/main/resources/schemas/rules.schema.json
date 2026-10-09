@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitboyro.github.io/mcpgp/schemas/rules.schema.json",
+  "title": "mcpgp rule file",
+  "description": "A file of override rules (overrides/*.yaml). See docs/spec/definition-format.md section 5.",
+  "type": "object",
+  "properties": {
+    "rules": { "type": "array", "items": { "$ref": "definition.schema.json#/$defs/rule" } }
+  },
+  "required": ["rules"],
+  "additionalProperties": false
+}
