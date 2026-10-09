@@ -1,0 +1,7 @@
+apiVersion: mcpgp/v1
+kind: McpServer
+metadata: { name: escape-test }
+apis:
+  - id: orders
+    contracts:
+      - { version: "1.0", spec: ../../outside/orders.yaml }

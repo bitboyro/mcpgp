@@ -5,7 +5,7 @@
         {
           "basePath": "/api/v1",
           "default": false,
-          "digest": "sha256:7c02aa11bb22cc33dd44ee55ff66778899aabbccddeeff00112233445566778",
+          "digest": "sha256:7c02aa11bb22cc33dd44ee55ff66778899aabbccddeeff001122334455667780",
           "format": "swagger-2.0",
           "version": "1.0"
         },

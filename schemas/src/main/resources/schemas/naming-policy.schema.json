@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitboyro.github.io/mcpgp/schemas/naming-policy.schema.json",
+  "title": "mcpgp naming policy",
+  "description": "Naming pipeline settings, inline in a definition or as a shared policy file. See docs/spec/naming.md.",
+  "type": "object",
+  "properties": {
+    "extends": { "type": "string" },
+    "source": { "enum": ["operationId", "methodPath", "tagSummary"] },
+    "fallback": { "enum": ["operationId", "methodPath", "tagSummary"] },
+    "normalize": {
+      "type": "object",
+      "properties": {
+        "split": { "type": "array", "items": { "enum": ["camel", "pascal", "kebab", "dot", "slash"] } },
+        "dropWords": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "shape": {
+      "type": "object",
+      "properties": {
+        "order": { "enum": ["object_verb", "verb_object"] },
+        "case": { "enum": ["snake", "camel", "kebab"] },
+        "number": { "enum": ["singular", "keep"] }
+      },
+      "additionalProperties": false
+    },
+    "vocabulary": { "type": "object", "additionalProperties": { "type": "string" } },
+    "namespace": {
+      "type": "object",
+      "properties": {
+        "server": { "type": "string" },
+        "perApi": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "profile": { "enum": ["strict", "mcp"] },
+        "onTooLong": { "enum": ["shorten-then-hash", "error"] }
+      },
+      "additionalProperties": false
+    },
+    "collisions": { "enum": ["error", "suffix-number", "suffix-contract"] }
+  },
+  "additionalProperties": false
+}

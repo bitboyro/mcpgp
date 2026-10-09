@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitboyro.github.io/mcpgp/schemas/conformance-traffic.schema.json",
+  "title": "mcpgp conformance traffic",
+  "description": "traffic.yaml of a conformance case. See docs/spec/conformance.md section 2.",
+  "type": "object",
+  "properties": {
+    "mcpRevision": { "type": "string" },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "mcp": {
+            "type": "object",
+            "properties": { "method": { "type": "string" }, "params": { "type": "object" } },
+            "required": ["method"],
+            "additionalProperties": false
+          },
+          "upstream": {
+            "oneOf": [
+              { "const": "none" },
+              {
+                "type": "object",
+                "properties": {
+                  "method": { "type": "string" },
+                  "path": { "type": "string" },
+                  "query": { "type": "object" },
+                  "headers": { "type": "object" },
+                  "json": {},
+                  "parts": { "type": "array", "items": { "type": "object" } }
+                },
+                "required": ["method", "path"],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "respond": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "integer" },
+              "headers": { "type": "object" },
+              "json": {},
+              "body": { "type": "string" }
+            },
+            "required": ["status"],
+            "additionalProperties": false
+          },
+          "expect": { "type": "object" }
+        },
+        "required": ["name", "mcp", "expect"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["steps"],
+  "additionalProperties": false
+}

@@ -16,7 +16,7 @@ conformance/
 │     ├─ definition/               a small definition project (root .mcpgp.yaml, contracts, rules)
 │     ├─ expected/
 │     │  ├─ manifest.json          the manifest the compiler must produce (or)
-│     │  └─ diagnostics.json       the errors/warnings it must report
+│     │  └─ diagnostics.json       the errors/warnings it must report (schema: conformance-diagnostics)
 │     ├─ runtime.yaml              runtime config used for the traffic part (instances point to `mock`)
 │     ├─ mock.yaml                 how the mock target answers
 │     └─ traffic.yaml              steps: MCP request → expected upstream request → expected MCP response

@@ -1,0 +1,43 @@
+openapi: 3.1.0
+info: { title: Orders, version: "2.0" }
+servers: [{ url: https://orders.example/api/v2 }]
+paths:
+  /customers:
+    post:
+      operationId: createCustomer
+      tags: [customers]
+      summary: Create customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerInput' }
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                payload: { $ref: '#/components/schemas/CustomerInput' }
+                document: { type: string, format: binary }
+              required: [payload]
+            encoding:
+              payload: { contentType: application/json }
+              document: { contentType: application/pdf }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+components:
+  schemas:
+    CustomerInput:
+      type: object
+      properties:
+        name: { type: string }
+        accountId: { type: string }
+      required: [name, accountId]
+    Customer:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }

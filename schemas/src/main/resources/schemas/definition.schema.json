@@ -1,0 +1,479 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitboyro.github.io/mcpgp/schemas/definition.schema.json",
+  "title": "mcpgp definition",
+  "description": "Root build definition (*.mcpgp.yaml). See docs/spec/definition-format.md.",
+  "type": "object",
+  "properties": {
+    "apiVersion": { "const": "mcpgp/v1" },
+    "kind": { "const": "McpServer" },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}$" },
+        "title": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "extends": { "type": "string", "minLength": 1 },
+    "api": { "$ref": "#/$defs/api" },
+    "apis": { "type": "array", "items": { "$ref": "#/$defs/api" }, "minItems": 1 },
+    "instances": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["single", "multi"] },
+        "mixedContracts": { "enum": ["union", "namespaced", "forbid"] },
+        "max": { "type": ["integer", "null"], "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "naming": { "$ref": "naming-policy.schema.json" },
+    "overrides": {
+      "type": "object",
+      "properties": {
+        "include": { "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }] },
+        "rules": { "type": "array", "items": { "$ref": "#/$defs/rule" } }
+      },
+      "additionalProperties": false
+    },
+    "exposure": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["plain", "discovery", "toolsets", "hybrid"] },
+        "discoveryStyle": { "enum": ["search", "catalog"] },
+        "pinned": { "type": "array", "items": { "type": "string" } },
+        "plainSearch": { "type": "boolean" },
+        "toolsets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "match": { "$ref": "#/$defs/selector" },
+              "description": { "type": "string" }
+            },
+            "required": ["match"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "safety": {
+      "type": "object",
+      "properties": {
+        "confirmDestructive": { "type": "boolean" },
+        "responseLimitKb": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "schemas": {
+      "type": "object",
+      "properties": { "input": { "enum": ["full", "lean"] } },
+      "additionalProperties": false
+    },
+    "files": {
+      "type": "object",
+      "properties": {
+        "forms": { "type": "array", "items": { "enum": ["base64", "path"] }, "uniqueItems": true }
+      },
+      "additionalProperties": false
+    },
+    "resources": {
+      "type": "object",
+      "properties": { "uriScheme": { "type": "string", "pattern": "^[a-z][a-z0-9+.-]*$" } },
+      "additionalProperties": false
+    },
+    "prompts": { "type": "array", "items": { "$ref": "#/$defs/prompt" } },
+    "packs": {
+      "type": "object",
+      "additionalProperties": { "type": ["object", "null"] }
+    },
+    "runtimeDefaults": { "$ref": "#/$defs/runtimeDefaults" },
+    "generation": { "$ref": "#/$defs/generation" },
+    "extensions": { "$ref": "#/$defs/extensions" },
+    "build": { "$ref": "#/$defs/build" }
+  },
+  "required": ["apiVersion", "kind", "metadata"],
+  "additionalProperties": false,
+  "allOf": [
+    { "not": { "required": ["api", "apis"] } },
+    {
+      "if": { "not": { "required": ["extends"] } },
+      "then": {
+        "anyOf": [{ "required": ["api"] }, { "required": ["apis"] }],
+        "properties": {
+          "api": { "required": ["id", "contracts"] },
+          "apis": { "items": { "required": ["id", "contracts"] } }
+        }
+      }
+    }
+  ],
+
+  "$defs": {
+    "api": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,31}$" },
+        "title": { "type": "string" },
+        "toolPrefix": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+        "contracts": { "type": "array", "items": { "$ref": "#/$defs/contract" }, "minItems": 1 },
+        "detect": {
+          "type": "object",
+          "properties": {
+            "method": { "enum": ["GET", "HEAD", "POST"] },
+            "path": { "type": "string", "pattern": "^/" },
+            "pattern": { "type": "string" },
+            "onFailure": { "enum": ["useDefault", "refuse"] }
+          },
+          "required": ["path", "pattern"],
+          "additionalProperties": false
+        },
+        "select": {
+          "type": "object",
+          "properties": {
+            "access": { "enum": ["read-only", "read-write", "all"] },
+            "include": { "$ref": "#/$defs/selectorList" },
+            "exclude": { "$ref": "#/$defs/selectorList" },
+            "deprecated": { "enum": ["hide", "show", "mark"] }
+          },
+          "additionalProperties": false
+        },
+        "downstreamAuth": {
+          "type": "object",
+          "properties": {
+            "supported": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  { "enum": ["basic", "apiKey", "bearer", "oauth2ClientCredentials", "mtls"] },
+                  { "type": "string", "pattern": "^custom:[a-z][a-z0-9-]*$" }
+                ]
+              },
+              "uniqueItems": true
+            },
+            "identity": { "enum": ["service-account", "per-user"] },
+            "unsatisfiedTools": { "enum": ["hide", "error"] }
+          },
+          "additionalProperties": false
+        },
+        "requestBody": {
+          "type": "object",
+          "properties": {
+            "multiple": { "enum": ["split", "prefer"] },
+            "prefer": { "type": "array", "items": { "type": "string" } },
+            "suffixes": { "type": "object", "additionalProperties": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" } }
+          },
+          "additionalProperties": false
+        },
+        "pagination": {
+          "type": ["object", "null"],
+          "properties": {
+            "style": { "enum": ["offset", "page", "cursor", "link-header", "client"] },
+            "request": { "type": "object", "additionalProperties": { "type": "string" } },
+            "response": { "type": "object", "additionalProperties": { "type": "string" } },
+            "defaultLimit": { "type": "integer", "minimum": 1 },
+            "maxLimit": { "type": "integer", "minimum": 1 }
+          },
+          "required": ["style"],
+          "additionalProperties": false
+        },
+        "$remove": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+
+    "contract": {
+      "type": "object",
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "spec": { "type": "string", "minLength": 1 },
+        "overlays": { "type": "array", "items": { "type": "string" } },
+        "default": { "type": "boolean" },
+        "$remove": { "type": "boolean" }
+      },
+      "required": ["version"],
+      "additionalProperties": false
+    },
+
+    "selectorList": {
+      "oneOf": [
+        { "$ref": "#/$defs/selector" },
+        { "type": "array", "items": { "$ref": "#/$defs/selector" } }
+      ]
+    },
+
+    "stringOrList": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      ]
+    },
+
+    "selector": {
+      "type": "object",
+      "properties": {
+        "api": { "type": "string" },
+        "tag": { "$ref": "#/$defs/stringOrList" },
+        "method": {
+          "oneOf": [
+            { "$ref": "#/$defs/httpMethod" },
+            { "type": "array", "items": { "$ref": "#/$defs/httpMethod" }, "minItems": 1 }
+          ]
+        },
+        "path": { "$ref": "#/$defs/stringOrList" },
+        "operationId": { "type": "string" },
+        "contract": { "type": "string" },
+        "extension": { "type": "object" }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+
+    "httpMethod": { "enum": ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH", "TRACE", "QUERY"] },
+
+    "textOp": {
+      "type": "object",
+      "oneOf": [
+        { "properties": { "set": { "type": "string" } }, "required": ["set"], "additionalProperties": false },
+        { "properties": { "prepend": { "type": "string" } }, "required": ["prepend"], "additionalProperties": false },
+        { "properties": { "append": { "type": "string" } }, "required": ["append"], "additionalProperties": false },
+        { "properties": { "template": { "type": "string" } }, "required": ["template"], "additionalProperties": false },
+        {
+          "properties": {
+            "replace": {
+              "type": "object",
+              "properties": { "pattern": { "type": "string" }, "with": { "type": "string" } },
+              "required": ["pattern", "with"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["replace"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "annotations": {
+      "type": "object",
+      "properties": {
+        "readOnlyHint": { "type": "boolean" },
+        "destructiveHint": { "type": "boolean" },
+        "idempotentHint": { "type": "boolean" },
+        "openWorldHint": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+
+    "rule": {
+      "type": "object",
+      "properties": {
+        "match": { "$ref": "#/$defs/selector" },
+        "name": { "$ref": "#/$defs/textOp" },
+        "title": { "$ref": "#/$defs/textOp" },
+        "description": { "$ref": "#/$defs/textOp" },
+        "params": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": { "description": { "$ref": "#/$defs/textOp" } },
+            "additionalProperties": false
+          }
+        },
+        "parts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "contentType": { "type": "string" },
+              "secret": { "type": "boolean" },
+              "required": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "annotations": { "$ref": "#/$defs/annotations" },
+        "hidden": { "type": "boolean" },
+        "sensitive": { "type": "boolean" },
+        "confirm": { "type": "boolean" },
+        "contentType": { "type": "string" },
+        "accept": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "expose": { "enum": ["tool", "resource"] }
+      },
+      "required": ["match"],
+      "additionalProperties": false,
+      "minProperties": 2
+    },
+
+    "prompt": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "description": { "type": "string" },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "required": { "type": "boolean" },
+              "enum": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": ["name"],
+            "additionalProperties": false
+          }
+        },
+        "messages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": { "enum": ["user", "assistant"] },
+              "content": { "type": "string" }
+            },
+            "required": ["role", "content"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["name", "messages"],
+      "additionalProperties": false
+    },
+
+    "allowedDefault": {
+      "type": "object",
+      "properties": {
+        "allowed": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "default": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "runtimeDefaults": {
+      "type": "object",
+      "properties": {
+        "transports": { "$ref": "#/$defs/allowedDefault" },
+        "inboundAuth": { "$ref": "#/$defs/allowedDefault" },
+        "timeouts": {
+          "type": "object",
+          "properties": {
+            "defaultSeconds": { "type": "integer", "minimum": 1 },
+            "maxSeconds": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "baseUrlAllowlist": { "type": "array", "items": { "type": "string" } },
+        "redaction": {
+          "type": "object",
+          "properties": { "fields": { "type": "array", "items": { "type": "string" } } },
+          "additionalProperties": false
+        },
+        "audit": { "type": "object" },
+        "telemetry": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+
+    "generation": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["runtime", "codegen", "both"] },
+        "runtime": { "type": "string" },
+        "client": { "type": "object" },
+        "codegen": {
+          "type": "object",
+          "properties": {
+            "output": { "enum": ["build", "repo"] },
+            "extend": { "enum": ["subclass", "hooks", "regions"] },
+            "classes": { "enum": ["per-tag", "per-tool"] }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "extensions": {
+      "type": "object",
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "path": { "type": "string" } },
+            "required": ["path"],
+            "additionalProperties": false
+          }
+        },
+        "customTools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "title": { "type": "string" },
+              "description": { "type": "string" },
+              "inputSchema": { "type": "object" },
+              "annotations": { "$ref": "#/$defs/annotations" },
+              "handler": { "type": "string" }
+            },
+            "required": ["name", "description", "inputSchema", "handler"],
+            "additionalProperties": false
+          }
+        },
+        "enrichers": { "type": "array", "items": { "$ref": "#/$defs/handlerRef" } },
+        "callFilters": { "type": "array", "items": { "$ref": "#/$defs/handlerRef" } }
+      },
+      "additionalProperties": false
+    },
+
+    "handlerRef": {
+      "type": "object",
+      "properties": {
+        "handler": { "type": "string" },
+        "order": { "type": "integer" },
+        "match": { "$ref": "#/$defs/selector" }
+      },
+      "required": ["handler"],
+      "additionalProperties": false
+    },
+
+    "build": {
+      "type": "object",
+      "properties": {
+        "targets": { "type": "array", "items": { "enum": ["jar", "mcpb", "docker"] }, "uniqueItems": true },
+        "docs": { "type": "array", "items": { "enum": ["people", "agents"] }, "uniqueItems": true },
+        "sign": {
+          "type": ["object", "boolean", "null"],
+          "properties": { "key": { "type": "string" } },
+          "additionalProperties": false
+        },
+        "jarSigning": {
+          "type": "object",
+          "properties": {
+            "keystore": { "type": "string" },
+            "alias": { "type": "string" },
+            "password": { "type": "string" }
+          },
+          "required": ["keystore", "alias"],
+          "additionalProperties": false
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "base": { "type": "string" },
+            "registry": { "type": "string" },
+            "push": { "type": "boolean" },
+            "tar": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

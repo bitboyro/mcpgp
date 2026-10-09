@@ -4,7 +4,7 @@ Status: **draft v1** · Owner: runtime
 
 The operator's config for a delivered server. File: `<server>.yaml` next to the jar (or mounted into
 the container), secrets in `.env` or a keychain. Every package ships `server.config.schema.json`,
-**generated for that build**: it only contains what the build supports.
+**generated for that build** from the generic [runtime-config.schema.json](../../schemas/src/main/resources/schemas/runtime-config.schema.json): it only contains what the build supports.
 
 ## 1. Precedence
 

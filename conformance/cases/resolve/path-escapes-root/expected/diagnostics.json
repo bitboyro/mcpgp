@@ -1,0 +1,8 @@
+[
+  {
+    "level": "error",
+    "code": "PATH_OUTSIDE_ROOT",
+    "location": { "file": "escape.mcpgp.yaml", "pointer": "/apis/0/contracts/0/spec" },
+    "messageContains": "../../outside/orders.yaml"
+  }
+]

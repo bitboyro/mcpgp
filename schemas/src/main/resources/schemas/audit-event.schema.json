@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitboyro.github.io/mcpgp/schemas/audit-event.schema.json",
+  "title": "mcpgp audit event",
+  "description": "One line of the audit file (JSON Lines). See docs/spec/audit-and-errors.md.",
+  "type": "object",
+  "properties": {
+    "ts": { "type": "string", "format": "date-time" },
+    "v": { "const": 1 },
+    "type": {
+      "type": "string",
+      "pattern": "^(server\\.(start|stop)|session\\.(start|end)|auth\\.inbound|tool\\.(call|confirm)|instance\\.health|config\\.reload|pack\\.[a-z][a-z0-9-]*\\.[a-z][a-z0-9_]*)$"
+    },
+    "server": { "type": "string" },
+    "build": { "type": "string" },
+    "actor": {
+      "type": "object",
+      "properties": {
+        "kind": { "enum": ["user", "client", "system"] },
+        "id": { "type": "string" },
+        "auth": { "type": "string" }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    },
+    "tool": { "type": "string" },
+    "api": { "type": "string" },
+    "instance": { "type": "string" },
+    "contract": { "type": "string" },
+    "outcome": { "enum": ["ok", "error", "denied"] },
+    "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "upstream": {
+      "type": "object",
+      "properties": {
+        "method": { "type": "string" },
+        "path": { "type": "string" },
+        "status": { "type": ["integer", "null"] },
+        "body": { "type": "string", "description": "Redacted upstream error body (kept in full for troubleshooting)." }
+      },
+      "additionalProperties": false
+    },
+    "latencyMs": { "type": "integer", "minimum": 0 },
+    "args": {
+      "oneOf": [
+        { "enum": ["none", "redacted"] },
+        { "type": "object", "properties": { "sha256": { "type": "string" } }, "required": ["sha256"], "additionalProperties": false },
+        { "type": "object" }
+      ]
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": { "name": { "type": "string" }, "sizeBytes": { "type": "integer" }, "sha256": { "type": "string" } },
+        "additionalProperties": false
+      }
+    },
+    "confirm": { "enum": ["asked", "given", "refused", "expired"] },
+    "inlineSecrets": { "type": "boolean" },
+    "configHash": { "type": "string" },
+    "cid": { "type": "string" }
+  },
+  "required": ["ts", "v", "type", "server", "outcome", "cid"],
+  "additionalProperties": false,
+  "allOf": [
+    { "if": { "properties": { "outcome": { "enum": ["error", "denied"] } } }, "then": { "required": ["code"] } },
+    { "if": { "properties": { "type": { "const": "tool.call" } } }, "then": { "required": ["tool", "latencyMs"] } }
+  ]
+}

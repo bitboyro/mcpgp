@@ -55,7 +55,7 @@ sources ─► resolve files ─► parse contracts ─► normalize ─► sele
 mcpgp/
 ├─ docs/                  specs, decisions, process (this)
 ├─ examples/              platform-side definitions and client-side configs
-├─ schemas/               JSON Schemas: definition, runtime config, manifest, audit event   (M1)
+├─ schemas/               Maven module: JSON Schemas for every format + validator          (M1)
 ├─ conformance/           fixtures + expected manifests + expected MCP traffic             (M1)
 ├─ core/                  compiler: model, resolver, naming, rules, validation   (Java)    (M2)
 ├─ runtime-java/          manifest interpreter, HTTP invoker, MCP adapter        (Java)    (M3)
@@ -70,8 +70,8 @@ mcpgp/
 
 | Contract | Format | Owned by |
 |---|---|---|
-| Definition | YAML, JSON Schema `schemas/definition.schema.json` | [spec/definition-format.md](spec/definition-format.md) |
-| Manifest | JSON, `schemas/manifest.schema.json` | this document + conformance suite |
+| Definition | YAML, JSON Schema [definition.schema.json](../schemas/src/main/resources/schemas/definition.schema.json) | [spec/definition-format.md](spec/definition-format.md) |
+| Manifest | JSON, [manifest.schema.json](../schemas/src/main/resources/schemas/manifest.schema.json) | this document + conformance suite |
 | Runtime config | YAML, schema generated per build from the manifest | [spec/runtime-config.md](spec/runtime-config.md) |
 | Tool contract | MCP `tools/list` / `tools/call` shapes | [spec/tools-contract.md](spec/tools-contract.md) |
 | Audit event, error codes | JSON Lines, enum | [spec/audit-and-errors.md](spec/audit-and-errors.md) |

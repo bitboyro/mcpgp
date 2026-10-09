@@ -1,0 +1,5 @@
+name: path-escapes-root
+description: A contract path that leaves the project root is rejected.
+area: resolve
+specs: [definition-format.md#7-multi-file-resolution, security.md]
+expect: diagnostics
