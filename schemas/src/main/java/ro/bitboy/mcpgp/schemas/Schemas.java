@@ -3,13 +3,13 @@ package ro.bitboy.mcpgp.schemas;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.PathType;
+import com.networknt.schema.Error;
+import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaLocation;
-import com.networknt.schema.SchemaValidatorsConfig;
-import com.networknt.schema.SpecVersion;
-import com.networknt.schema.ValidationMessage;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SchemaRegistryConfig;
+import com.networknt.schema.SpecificationVersion;
+import com.networknt.schema.path.PathType;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -33,17 +33,17 @@ public final class Schemas {
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    private final JsonSchemaFactory factory;
-    private final SchemaValidatorsConfig config;
-    private final Map<SchemaKind, JsonSchema> cache = new EnumMap<>(SchemaKind.class);
+    private final SchemaRegistry registry;
+    private final Map<SchemaKind, Schema> cache = new EnumMap<>(SchemaKind.class);
 
     public Schemas() {
-        this.factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012,
-                builder -> builder.schemaMappers(mappers -> mappers.mapPrefix(BASE_URI, "classpath:schemas/")));
-        this.config = SchemaValidatorsConfig.builder()
+        SchemaRegistryConfig config = SchemaRegistryConfig.builder()
                 .formatAssertionsEnabled(true)
                 .pathType(PathType.JSON_POINTER)
                 .build();
+        this.registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12, builder -> builder
+                .schemaRegistryConfig(config)
+                .schemaIdResolvers(resolvers -> resolvers.mapPrefix(BASE_URI, "classpath:schemas/")));
     }
 
     /** One schema violation: a JSON pointer into the document and a message. */
@@ -61,11 +61,10 @@ public final class Schemas {
 
     /** Validates a parsed document; returns the violations sorted by location, empty when valid. */
     public synchronized List<Problem> problems(SchemaKind kind, JsonNode document) {
-        JsonSchema schema = cache.computeIfAbsent(kind,
-                k -> factory.getSchema(SchemaLocation.of(k.id()), config));
+        Schema schema = cache.computeIfAbsent(kind, k -> registry.getSchema(SchemaLocation.of(k.id())));
         List<Problem> problems = new ArrayList<>();
-        for (ValidationMessage message : schema.validate(document)) {
-            problems.add(new Problem(message.getInstanceLocation().toString(), message.getMessage()));
+        for (Error error : schema.validate(document)) {
+            problems.add(new Problem(error.getInstanceLocation().toString(), error.getMessage()));
         }
         problems.sort(Comparator.naturalOrder());
         return problems;
