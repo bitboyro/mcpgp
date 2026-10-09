@@ -32,6 +32,17 @@ public final class Codes {
     public static final String OVERLAY_INVALID = "OVERLAY_INVALID";
     public static final String OVERLAY_TARGET_MATCHES_NOTHING = "OVERLAY_TARGET_MATCHES_NOTHING";
 
+    // tools
+    public static final String LOCK_INVALID = "LOCK_INVALID";
+    public static final String OPERATION_EXCLUDED = "OPERATION_EXCLUDED";
+    public static final String NAME_COLLISION = "NAME_COLLISION";
+    public static final String NAME_TOO_LONG = "NAME_TOO_LONG";
+    public static final String NAME_DRIFT = "NAME_DRIFT";
+    public static final String NAME_DRIFT_FROZEN = "NAME_DRIFT_FROZEN";
+    public static final String RULE_MATCHES_NOTHING = "RULE_MATCHES_NOTHING";
+    public static final String CONTENT_TYPE_UNKNOWN = "CONTENT_TYPE_UNKNOWN";
+    public static final String DESCRIPTION_TRUNCATED = "DESCRIPTION_TRUNCATED";
+
     private Codes() {
     }
 }

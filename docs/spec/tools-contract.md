@@ -96,7 +96,7 @@ against the selected instance's contract:
 | POST, PATCH | none |
 | DELETE | `destructiveHint: true`, `idempotentHint: true` |
 
-All tools: `openWorldHint: true`. Rules may override; `x-mcp-annotations` in the spec is honoured.
+All tools: `openWorldHint: true`. Rules may override (`annotations` in a rule).
 
 ## 6. Results
 
@@ -220,7 +220,7 @@ All off by default.
 ## 12. Sensitive tools (optional)
 
 A tool is sensitive when it moves secrets through the conversation (returns keys or tokens, takes
-passwords). Marking is opt-in: a rule with `sensitive: true` or `x-mcp-sensitive: true` in the spec.
+passwords). Marking is opt-in: a rule with `sensitive: true`.
 For a sensitive tool:
 
 - its description starts with `SENSITIVE:` and tells the agent to call it only on an explicit user request;

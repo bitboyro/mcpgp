@@ -224,9 +224,22 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 | `DEFAULT_CONTRACT_AMBIGUOUS` | error | more than one contract of an API is marked `default` |
 | `INCLUDE_MATCHES_NOTHING` | warning | an `include` pattern matches no file |
 | `MERGE_TYPE_CONFLICT` | warning | a later file replaces a map with a list (or similar) |
-
-Further codes (collisions, limits, rules matching nothing) are added with the compiler stages that
-produce them.
+| `SPEC_INVALID` | error | a contract is not a Swagger 2.0 / OpenAPI 3.x document, or is malformed |
+| `SPEC_VERSION_UNSUPPORTED` | error | OpenAPI 3.2 (planned) |
+| `REF_UNRESOLVED` | error | a `$ref` inside a contract points nowhere |
+| `OVERLAY_INVALID` | error | an overlay is not Overlay 1.x, or an action has no target |
+| `OVERLAY_TARGET_MATCHES_NOTHING` | warning | an overlay action's target selects nothing |
+| `OPERATION_ID_DUPLICATE` | warning | two operations in one contract share an `operationId` |
+| `UNSUPPORTED_FEATURE` | info | webhooks, callbacks, links and similar are ignored (once per feature) |
+| `OPERATION_EXCLUDED` | info | an operation becomes no tool, with the reason (access, include/exclude, deprecated, hidden) |
+| `RULE_MATCHES_NOTHING` | warning | a rule matches no tool |
+| `CONTENT_TYPE_UNKNOWN` | error | a rule binds a content type the operation doesn't accept |
+| `DESCRIPTION_TRUNCATED` | warning | a description was shortened to 1024 characters |
+| `NAME_TOO_LONG` | error | a name exceeds the limit and `onTooLong: error` |
+| `NAME_COLLISION` | error | two tools get the same name and `collisions: error` |
+| `NAME_DRIFT` | warning | a name would change; the locked name is kept |
+| `NAME_DRIFT_FROZEN` | error | the same with `--frozen-lock` (CLI exit code 3) |
+| `LOCK_INVALID` | error | `mcp-names.lock` doesn't match its schema |
 
 ## 10. Versioning
 

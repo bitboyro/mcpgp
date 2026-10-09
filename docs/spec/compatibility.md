@@ -87,7 +87,7 @@ compiler:
 | `links` | not supported | info: ignored |
 | 3.2 `QUERY` method, `additionalOperations`, streaming media types | planned | error until supported, naming the feature |
 | Unknown `x-` extensions | passed through to provenance | — |
-| `x-mcp-*` extensions | supported (names, annotations, hidden) | — |
+| `x-mcp-*` extensions | not used (rules in the definition do this) | passed through like other `x-` fields |
 
 Rule: **no silent drops**. Anything not supported produces a diagnostic with the operation and the
 spec location; the build report lists them.

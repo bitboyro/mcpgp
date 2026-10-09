@@ -25,7 +25,7 @@ apis:
     select:
       access: read-write                       # no DELETE tools
       exclude:
-        - { tag: [users-roles, system-settings] }
+        - { tag: [users-roles, system] }
         - { path: "/internal/**" }
       deprecated: hide
     downstreamAuth:
