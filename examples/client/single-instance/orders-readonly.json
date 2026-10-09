@@ -1,0 +1,31 @@
+{
+  "instance": {
+    "baseUrl": "orders.acme.internal",
+    "contract": "auto",
+    "auth": {
+      "type": "basic",
+      "username": "${env:ORDERS_USER}",
+      "password": "${env:ORDERS_PASS}"
+    },
+    "tls": {
+      "ca": {
+        "path": "./certs/acme-ca.pem"
+      }
+    },
+    "timeoutSeconds": 30
+  },
+  "audit": {
+    "file": {
+      "path": "./audit/audit.jsonl",
+      "rotate": "daily",
+      "retainDays": 30
+    },
+    "arguments": "redacted"
+  },
+  "telemetry": {
+    "enabled": false
+  },
+  "logging": {
+    "level": "info"
+  }
+}

@@ -1,0 +1,287 @@
+openapi: 3.1.0
+info:
+  title: Example Orders API
+  version: "2.0.3"
+  description: A fictional orders API used by the mcpgp examples.
+servers:
+  - url: https://orders.example.com/api/v2
+tags:
+  - { name: customers }
+  - { name: customer-contacts }
+  - { name: accounts }
+  - { name: orders }
+  - { name: invoices }
+  - { name: users-roles }
+  - { name: system }
+security:
+  - basicAuth: []
+  - apiKey: []
+  - oauth: [orders.read]
+paths:
+  /version:
+    get:
+      operationId: getVersion
+      tags: [system]
+      summary: API version
+      responses:
+        "200":
+          description: Version
+          content:
+            application/json:
+              schema: { type: object, properties: { version: { type: string } } }
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: List customers
+      description: Lists customers in an account, newest first.
+      parameters:
+        - { name: accountId, in: query, required: true, schema: { type: string }, description: Account id. }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 500 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Customers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Customer' } }
+                  next: { type: [string, "null"] }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createCustomer
+      tags: [customers]
+      summary: Create customer
+      description: Creates a customer in the given account and returns it with its new id.
+      security:
+        - basicAuth: []
+        - apiKey: []
+        - oauth: [orders.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerInput' }
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                payload: { $ref: '#/components/schemas/CustomerInput' }
+                document: { type: string, format: binary }
+              required: [payload]
+            encoding:
+              payload: { contentType: application/json }
+              document: { contentType: application/pdf }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        default: { $ref: '#/components/responses/Problem' }
+  /customers/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string }, description: Customer id. }
+    get:
+      operationId: getCustomerAccountByIdV2
+      tags: [customers]
+      summary: Get customer
+      description: Gets one customer by id.
+      parameters:
+        - { name: expand, in: query, schema: { type: string, enum: [accounts, orders] }, description: Include related data. }
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        default: { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: updateCustomer
+      tags: [customers]
+      summary: Update customer
+      security:
+        - basicAuth: []
+        - apiKey: []
+        - oauth: [orders.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerInput' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteCustomer
+      tags: [customers]
+      summary: Delete customer
+      security:
+        - basicAuth: []
+        - oauth: [orders.admin]
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: '#/components/responses/Problem' }
+  /customers/{id}/contacts:
+    get:
+      operationId: listCustomerContacts
+      tags: [customer-contacts]
+      summary: Customer contacts
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Contacts
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, properties: { name: { type: string }, email: { type: string } } } }
+  /accounts:
+    get:
+      operationId: listAccounts
+      tags: [accounts]
+      summary: List accounts
+      responses:
+        "200":
+          description: Accounts
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, properties: { id: { type: string }, name: { type: string } } } }
+  /orders:
+    get:
+      operationId: searchOrders
+      tags: [orders]
+      summary: Search orders
+      description: Search orders by customer, status and time range. Newest first.
+      parameters:
+        - { name: customerId, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [open, paid, refunded, cancelled] } }
+        - { name: since, in: query, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Order' } }
+  /orders/{id}/refund:
+    post:
+      operationId: refundOrder
+      tags: [orders]
+      summary: Refund order
+      description: Refunds a paid order.
+      security:
+        - basicAuth: []
+        - oauth: [orders.write]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: notify, in: query, schema: { type: boolean, default: true }, description: Email the customer. }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount: { type: number, minimum: 0 }
+                reason: { type: string }
+                paymentToken: { type: string, writeOnly: true }
+              required: [amount]
+      responses:
+        "200":
+          description: Refunded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        default: { $ref: '#/components/responses/Problem' }
+  /invoices/overdue:
+    get:
+      operationId: listOverdueInvoices
+      tags: [invoices]
+      summary: Overdue invoices
+      responses:
+        "200":
+          description: Invoices
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, properties: { id: { type: string }, dueDate: { type: string, format: date } } } }
+  /invoices/{id}/document:
+    get:
+      operationId: getInvoiceDocument
+      tags: [invoices]
+      summary: Download invoice PDF
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The invoice document
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        default: { $ref: '#/components/responses/Problem' }
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users-roles]
+      summary: List users
+      responses:
+        "200": { description: Users }
+  /internal/metrics:
+    get:
+      operationId: getInternalMetrics
+      tags: [system]
+      summary: Internal metrics
+      responses:
+        "200": { description: Metrics }
+components:
+  securitySchemes:
+    basicAuth: { type: http, scheme: basic }
+    apiKey: { type: apiKey, in: header, name: X-Api-Key }
+    oauth:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://login.example.com/oauth2/token
+          scopes:
+            orders.read: Read orders and customers
+            orders.write: Create and change orders and customers
+            orders.admin: Delete data
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    CustomerInput:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        accountId: { type: string }
+      required: [name, accountId]
+    Customer:
+      type: object
+      properties:
+        id: { type: string, readOnly: true }
+        name: { type: string }
+        email: { type: string, format: email }
+        accountId: { type: string }
+        createdAt: { type: string, format: date-time, readOnly: true }
+    Order:
+      type: object
+      properties:
+        id: { type: string }
+        customerId: { type: string }
+        status: { type: string, enum: [open, paid, refunded, cancelled] }
+        total: { type: number }
+    Problem:
+      type: object
+      properties:
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }

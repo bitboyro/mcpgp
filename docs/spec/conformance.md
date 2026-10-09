@@ -60,7 +60,16 @@ steps:
 Matchers: exact values, `{ startsWith }`, `{ matches: <regex> }`, `{ absent: true }`, `{ any: true }`.
 A step may expect **no** upstream request (`upstream: none`), e.g. for validation or confirmation.
 
-## 3. Rules
+## 3. Compiler part
+
+The compiler is run on `definition/` with fixed build inputs, so expected manifests change only when
+behaviour does: `build.createdAt` is `1970-01-01T00:00:00Z` (`SOURCE_DATE_EPOCH=0`), the compiler
+version is reported as `0.0.0`, and there is no build number or source. The produced manifest, as
+canonical JSON pretty-printed with two spaces, must equal `expected/manifest.json` byte for byte.
+The Java runner regenerates expected files with `mvn verify -Dmcpgp.updateExpected=true`; the diff is
+reviewed like code.
+
+## 4. Rules
 
 - Every spec change that changes behaviour adds or updates cases in the same PR.
 - Every error code, every content-type rule, every auth type and every exposure mode has at least one

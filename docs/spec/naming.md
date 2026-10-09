@@ -64,6 +64,10 @@ naming:
   collisions: error          # error | suffix-number | suffix-contract
 ```
 
+Defaults when a key is not set: `source: operationId`, `fallback: methodPath`, `split` as above,
+no `dropWords`, `order: object_verb`, `case: snake`, `number: singular`, no vocabulary, `server: ""`,
+`perApi: true`, `profile: strict`, `onTooLong: shorten-then-hash`, `collisions: error`.
+
 ## 3. Normalization details
 
 - Splitting: `getCustomerAccountByIdV2` → `get Customer Account By Id V2`; `customer-account.get` → `customer account get`.

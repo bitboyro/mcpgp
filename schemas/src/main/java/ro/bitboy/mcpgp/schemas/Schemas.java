@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.PathType;
 import com.networknt.schema.SchemaLocation;
 import com.networknt.schema.SchemaValidatorsConfig;
 import com.networknt.schema.SpecVersion;
@@ -41,19 +42,38 @@ public final class Schemas {
                 builder -> builder.schemaMappers(mappers -> mappers.mapPrefix(BASE_URI, "classpath:schemas/")));
         this.config = SchemaValidatorsConfig.builder()
                 .formatAssertionsEnabled(true)
+                .pathType(PathType.JSON_POINTER)
                 .build();
     }
 
-    /** Validates a parsed document; returns human-readable problems, empty when valid. */
-    public synchronized List<String> validate(SchemaKind kind, JsonNode document) {
+    /** One schema violation: a JSON pointer into the document and a message. */
+    public record Problem(String pointer, String message) implements Comparable<Problem> {
+        @Override
+        public int compareTo(Problem other) {
+            return Comparator.comparing(Problem::pointer).thenComparing(Problem::message).compare(this, other);
+        }
+
+        @Override
+        public String toString() {
+            return (pointer.isEmpty() ? "/" : pointer) + ": " + message;
+        }
+    }
+
+    /** Validates a parsed document; returns the violations sorted by location, empty when valid. */
+    public synchronized List<Problem> problems(SchemaKind kind, JsonNode document) {
         JsonSchema schema = cache.computeIfAbsent(kind,
                 k -> factory.getSchema(SchemaLocation.of(k.id()), config));
-        List<String> problems = new ArrayList<>();
+        List<Problem> problems = new ArrayList<>();
         for (ValidationMessage message : schema.validate(document)) {
-            problems.add(message.getInstanceLocation() + ": " + message.getMessage());
+            problems.add(new Problem(message.getInstanceLocation().toString(), message.getMessage()));
         }
         problems.sort(Comparator.naturalOrder());
         return problems;
+    }
+
+    /** Validates a parsed document; returns human-readable problems, empty when valid. */
+    public List<String> validate(SchemaKind kind, JsonNode document) {
+        return problems(kind, document).stream().map(Problem::toString).toList();
     }
 
     /**

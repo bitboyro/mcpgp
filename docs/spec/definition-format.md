@@ -203,11 +203,46 @@ build: { targets: [mcpb] }
 `mcp-names.lock` maps a stable operation identity (`api`, `method`, `path`, contract-independent
 `operationId`) to the published tool name. Builds write it; it is committed. See [naming.md](naming.md) §7.
 
-## 9. Validation
+## 9. Validation and diagnostic codes
 
-A definition is valid when it matches the JSON Schema **and** the compiler reports no errors:
-duplicate API ids, missing default contract, unresolved files, name collisions, limits exceeded,
-selectors that match nothing (warning), rules that match nothing (warning).
+A definition is valid when every file matches its JSON Schema **and** the compiler reports no errors.
+Diagnostics carry a stable code, the file (relative to the project root) and a JSON pointer.
+
+| Code | Level | When |
+|---|---|---|
+| `DEFINITION_INVALID` | error | the root definition (or the merged result) doesn't match the schema; a contract has no spec |
+| `RULES_INVALID` | error | a rule file doesn't match the schema |
+| `NAMING_POLICY_INVALID` | error | a naming policy file doesn't match the schema |
+| `WORKSPACE_INVALID` | error | the workspace mapping file doesn't match the schema |
+| `FILE_NOT_FOUND` | error | a referenced file doesn't exist |
+| `FILE_UNREADABLE` | error | a file can't be parsed |
+| `PATH_OUTSIDE_ROOT` | error | a path is absolute, or leaves the project root (directly or through a link) |
+| `REMOTE_REFERENCE_NOT_ALLOWED` | error | a reference is an `http(s)` URL |
+| `WORKSPACE_REFERENCE_UNRESOLVED` | error | an `mcpgp://` reference isn't mapped |
+| `REFERENCE_CYCLE` | error | `$ref`, `extends` or naming `extends` loop back; the message shows the chain |
+| `DUPLICATE_KEY` | error | two APIs in one file share an `id` |
+| `DEFAULT_CONTRACT_AMBIGUOUS` | error | more than one contract of an API is marked `default` |
+| `INCLUDE_MATCHES_NOTHING` | warning | an `include` pattern matches no file |
+| `MERGE_TYPE_CONFLICT` | warning | a later file replaces a map with a list (or similar) |
+| `SPEC_INVALID` | error | a contract is not a Swagger 2.0 / OpenAPI 3.x document, or is malformed |
+| `SPEC_VERSION_UNSUPPORTED` | error | OpenAPI 3.2 (planned) |
+| `REF_UNRESOLVED` | error | a `$ref` inside a contract points nowhere |
+| `OVERLAY_INVALID` | error | an overlay is not Overlay 1.x, or an action has no target |
+| `OVERLAY_TARGET_MATCHES_NOTHING` | warning | an overlay action's target selects nothing |
+| `OPERATION_ID_DUPLICATE` | warning | two operations in one contract share an `operationId` |
+| `UNSUPPORTED_FEATURE` | info | webhooks, callbacks, links and similar are ignored (once per feature) |
+| `OPERATION_EXCLUDED` | info | an operation becomes no tool, with the reason (access, include/exclude, deprecated, hidden) |
+| `RULE_MATCHES_NOTHING` | warning | a rule matches no tool |
+| `CONTENT_TYPE_UNKNOWN` | error | a rule binds a content type the operation doesn't accept |
+| `DESCRIPTION_TRUNCATED` | warning | a description was shortened to 1024 characters |
+| `NAME_TOO_LONG` | error | a name exceeds the limit and `onTooLong: error` |
+| `NAME_COLLISION` | error | two tools get the same name and `collisions: error` |
+| `NAME_DRIFT` | warning | a name would change; the locked name is kept |
+| `NAME_DRIFT_FROZEN` | error | the same with `--frozen-lock` (CLI exit code 3) |
+| `LOCK_INVALID` | error | `mcp-names.lock` doesn't match its schema |
+| `PINNED_TOOL_UNKNOWN` | error | in `hybrid` mode, `exposure.pinned` names a tool the build doesn't produce (ignored in other modes) |
+| `PACK_UNKNOWN` | warning | a pack isn't available in this version; it is left out of the build |
+| `MANIFEST_INVALID` | error | internal: the produced manifest doesn't match its schema (a compiler bug; please report it) |
 
 ## 10. Versioning
 

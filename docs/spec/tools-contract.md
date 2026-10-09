@@ -96,7 +96,7 @@ against the selected instance's contract:
 | POST, PATCH | none |
 | DELETE | `destructiveHint: true`, `idempotentHint: true` |
 
-All tools: `openWorldHint: true`. Rules may override; `x-mcp-annotations` in the spec is honoured.
+All tools: `openWorldHint: true`. Rules may override (`annotations` in a rule).
 
 ## 6. Results
 
@@ -131,8 +131,12 @@ request) are JSON-RPC errors.
 | `describe_schema` | `packs.schema` enabled | request/response schemas on demand (§11) |
 | pack tools | pack enabled (and configured) | see [packaging.md](packaging.md) §4 |
 
-Built-in tools follow the same naming pipeline (prefix included), except `instances_list` keeps the
-prefix only in multi-API servers (`orders_instances_list`).
+Built-in tools go through the same casing and limit steps as API tools. Prefixes:
+- `instances_list`: unprefixed in single-API servers; one per API, with the API prefix, in multi-API
+  servers (`orders_instances_list`, `jira_instances_list`).
+- Discovery and toolset tools: never an API prefix (they span all APIs).
+- Pack tools: the API prefix in single-API servers (`orders_audit_list`), none in multi-API servers.
+- `naming.namespace.server`, when set, prefixes all of them.
 
 ## 8. Confirmation
 
@@ -220,7 +224,7 @@ All off by default.
 ## 12. Sensitive tools (optional)
 
 A tool is sensitive when it moves secrets through the conversation (returns keys or tokens, takes
-passwords). Marking is opt-in: a rule with `sensitive: true` or `x-mcp-sensitive: true` in the spec.
+passwords). Marking is opt-in: a rule with `sensitive: true`.
 For a sensitive tool:
 
 - its description starts with `SENSITIVE:` and tells the agent to call it only on an explicit user request;

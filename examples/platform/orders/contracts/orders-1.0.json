@@ -1,0 +1,92 @@
+{
+  "swagger": "2.0",
+  "info": { "title": "Example Orders API", "version": "1.0.1" },
+  "host": "orders.example.com",
+  "basePath": "/api/v1",
+  "schemes": ["https"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "securityDefinitions": {
+    "basicAuth": { "type": "basic" },
+    "apiKey": { "type": "apiKey", "in": "header", "name": "X-Api-Key" }
+  },
+  "security": [{ "basicAuth": [] }, { "apiKey": [] }],
+  "paths": {
+    "/version": {
+      "get": {
+        "operationId": "getVersion", "tags": ["system"], "summary": "API version",
+        "responses": { "200": { "description": "Version", "schema": { "type": "object", "properties": { "version": { "type": "string" } } } } }
+      }
+    },
+    "/customers": {
+      "get": {
+        "operationId": "listCustomers", "tags": ["customers"], "summary": "List customers",
+        "parameters": [
+          { "name": "accountId", "in": "query", "required": true, "type": "string" },
+          { "name": "limit", "in": "query", "type": "integer", "default": 50 }
+        ],
+        "responses": { "200": { "description": "Customers", "schema": { "type": "array", "items": { "$ref": "#/definitions/Customer" } } } }
+      },
+      "post": {
+        "operationId": "createCustomer", "tags": ["customers"], "summary": "Create customer",
+        "parameters": [{ "name": "body", "in": "body", "required": true, "schema": { "$ref": "#/definitions/CustomerInput" } }],
+        "responses": { "201": { "description": "Created", "schema": { "$ref": "#/definitions/Customer" } } }
+      }
+    },
+    "/customers/{id}": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "type": "string" }],
+      "get": {
+        "operationId": "getCustomerAccountByIdV2", "tags": ["customers"], "summary": "Get customer",
+        "responses": { "200": { "description": "Customer", "schema": { "$ref": "#/definitions/Customer" } } }
+      },
+      "put": {
+        "operationId": "updateCustomer", "tags": ["customers"], "summary": "Update customer",
+        "parameters": [{ "name": "body", "in": "body", "required": true, "schema": { "$ref": "#/definitions/CustomerInput" } }],
+        "responses": { "200": { "description": "Updated", "schema": { "$ref": "#/definitions/Customer" } } }
+      },
+      "delete": {
+        "operationId": "deleteCustomer", "tags": ["customers"], "summary": "Delete customer",
+        "security": [{ "basicAuth": [] }],
+        "responses": { "204": { "description": "Deleted" } }
+      }
+    },
+    "/accounts": {
+      "get": {
+        "operationId": "listAccounts", "tags": ["accounts"], "summary": "List accounts",
+        "responses": { "200": { "description": "Accounts" } }
+      }
+    },
+    "/orders": {
+      "get": {
+        "operationId": "searchOrders", "tags": ["orders"], "summary": "Search orders",
+        "parameters": [{ "name": "customerId", "in": "query", "type": "string" }],
+        "responses": { "200": { "description": "Orders", "schema": { "type": "array", "items": { "$ref": "#/definitions/Order" } } } }
+      }
+    },
+    "/orders/{id}/refund": {
+      "post": {
+        "operationId": "refundOrder", "tags": ["orders"], "summary": "Refund order",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "type": "string" },
+          { "name": "body", "in": "body", "required": true, "schema": { "type": "object", "properties": { "amount": { "type": "number" } }, "required": ["amount"] } }
+        ],
+        "responses": { "200": { "description": "Refunded", "schema": { "$ref": "#/definitions/Order" } } }
+      }
+    }
+  },
+  "definitions": {
+    "CustomerInput": {
+      "type": "object",
+      "properties": { "name": { "type": "string" }, "accountId": { "type": "string" } },
+      "required": ["name", "accountId"]
+    },
+    "Customer": {
+      "type": "object",
+      "properties": { "id": { "type": "string", "readOnly": true }, "name": { "type": "string" }, "accountId": { "type": "string" } }
+    },
+    "Order": {
+      "type": "object",
+      "properties": { "id": { "type": "string" }, "customerId": { "type": "string" }, "status": { "type": "string" }, "total": { "type": "number" } }
+    }
+  }
+}

@@ -7,7 +7,7 @@ Secrets always go in `.env` (or a keychain), never in the YAML. Copy `.env.examp
 
 | Example | Shows |
 |---|---|
-| [single-instance](single-instance) | One target server, stdio, secrets from `.env` |
+| [single-instance](single-instance) | One target server, stdio, secrets from `.env`; the same config as YAML and as JSON |
 | [multi-instance](multi-instance) | Three target servers, mixed auth, TLS material as path and base64, file inputs |
 | [multi-api](multi-api) | Instances grouped per API |
 | [env-only](env-only) | The same server configured with environment variables only, list items by index |

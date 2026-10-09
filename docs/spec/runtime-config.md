@@ -2,8 +2,12 @@
 
 Status: **draft v1** · Owner: runtime
 
-The operator's config for a delivered server. File: `<server>.yaml` next to the jar (or mounted into
-the container), secrets in `.env` or a keychain. Every package ships `server.config.schema.json`,
+The operator's config for a delivered server, in **YAML or JSON**: `<server>.yaml`, `<server>.yml` or
+`<server>.json` next to the jar (or mounted into the container), or any file given with `--config`;
+the format follows the file extension. Secrets go in `.env` or a keychain. The two formats are
+equivalent: every example in this spec can be written as JSON with the same keys. If more than one
+of the default file names exists, startup fails rather than guessing. `init` writes YAML by default,
+JSON with `--format json`. Every package ships `server.config.schema.json`,
 **generated for that build** from the generic [runtime-config.schema.json](../../schemas/src/main/resources/schemas/runtime-config.schema.json): it only contains what the build supports.
 
 ## 1. Precedence
