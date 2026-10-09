@@ -240,6 +240,9 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 | `NAME_DRIFT` | warning | a name would change; the locked name is kept |
 | `NAME_DRIFT_FROZEN` | error | the same with `--frozen-lock` (CLI exit code 3) |
 | `LOCK_INVALID` | error | `mcp-names.lock` doesn't match its schema |
+| `PINNED_TOOL_UNKNOWN` | error | in `hybrid` mode, `exposure.pinned` names a tool the build doesn't produce (ignored in other modes) |
+| `PACK_UNKNOWN` | warning | a pack isn't available in this version; it is left out of the build |
+| `MANIFEST_INVALID` | error | internal: the produced manifest doesn't match its schema (a compiler bug; please report it) |
 
 ## 10. Versioning
 

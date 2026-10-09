@@ -131,8 +131,12 @@ request) are JSON-RPC errors.
 | `describe_schema` | `packs.schema` enabled | request/response schemas on demand (§11) |
 | pack tools | pack enabled (and configured) | see [packaging.md](packaging.md) §4 |
 
-Built-in tools follow the same naming pipeline (prefix included), except `instances_list` keeps the
-prefix only in multi-API servers (`orders_instances_list`).
+Built-in tools go through the same casing and limit steps as API tools. Prefixes:
+- `instances_list`: unprefixed in single-API servers; one per API, with the API prefix, in multi-API
+  servers (`orders_instances_list`, `jira_instances_list`).
+- Discovery and toolset tools: never an API prefix (they span all APIs).
+- Pack tools: the API prefix in single-API servers (`orders_audit_list`), none in multi-API servers.
+- `naming.namespace.server`, when set, prefixes all of them.
 
 ## 8. Confirmation
 

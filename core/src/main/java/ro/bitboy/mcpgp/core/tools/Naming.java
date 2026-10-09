@@ -56,9 +56,9 @@ final class Naming {
         List<String> drop = new ArrayList<>();
         policy.path("normalize").path("dropWords").forEach(n -> drop.add(n.asText().toLowerCase(Locale.ROOT)));
         dropWords = Set.copyOf(drop);
-        order = policy.path("shape").path("order").asText("verb_object");
+        order = policy.path("shape").path("order").asText("object_verb");
         casing = policy.path("shape").path("case").asText("snake");
-        singular = policy.path("shape").path("number").asText("keep").equals("singular");
+        singular = policy.path("shape").path("number").asText("singular").equals("singular");
         policy.path("vocabulary").fields().forEachRemaining(f -> vocabulary.put(
                 Pattern.compile("(?<=^|_)(?:" + f.getKey() + ")(?=_|$)"), f.getValue().asText()));
         serverPrefix = policy.path("namespace").path("server").asText("");

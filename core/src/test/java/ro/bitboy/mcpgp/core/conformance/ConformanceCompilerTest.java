@@ -3,8 +3,10 @@ package ro.bitboy.mcpgp.core.conformance;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
+import ro.bitboy.mcpgp.core.Compiler;
 import ro.bitboy.mcpgp.core.diag.Diagnostic;
-import ro.bitboy.mcpgp.core.resolve.DefinitionResolver;
+import ro.bitboy.mcpgp.core.manifest.CanonicalJson;
+import ro.bitboy.mcpgp.core.manifest.ManifestWriter;
 import ro.bitboy.mcpgp.core.resolve.Documents;
 import ro.bitboy.mcpgp.core.resolve.Workspace;
 import ro.bitboy.mcpgp.schemas.Schemas;
@@ -12,6 +14,7 @@ import ro.bitboy.mcpgp.schemas.Schemas;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -19,15 +22,19 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Runs the resolution part of every conformance case: cases that expect diagnostics must produce
- * them; cases that expect a manifest must resolve without errors. (Manifest comparison comes with the
- * rest of the compiler.)
+ * Runs the compiler part of every conformance case (conformance.md §3): cases that expect diagnostics
+ * must produce them; cases that expect a manifest must produce exactly {@code expected/manifest.json}.
+ *
+ * <p>Run with {@code -Dmcpgp.updateExpected=true} to (re)write the expected manifests; review the diff.
  */
-class ConformanceResolveTest {
+class ConformanceCompilerTest {
 
     private static final Path CASES = Path.of("..", "conformance", "cases").toAbsolutePath().normalize();
+    /** Fixed build inputs, so expected manifests don't change with the time or the compiler version. */
+    static final ManifestWriter.Build BUILD = new ManifestWriter.Build(Instant.EPOCH, "0.0.0", null, null, null);
+    private static final boolean UPDATE = Boolean.getBoolean("mcpgp.updateExpected");
 
-    private final DefinitionResolver resolver = new DefinitionResolver(new Schemas());
+    private final Compiler compiler = new Compiler(new Schemas());
 
     @TestFactory
     Stream<DynamicTest> cases() throws IOException {
@@ -43,7 +50,7 @@ class ConformanceResolveTest {
     private void run(Path caseDir) throws IOException {
         JsonNode spec = Documents.YAML.readTree(caseDir.resolve("case.yaml").toFile());
         Path definition = rootDefinition(caseDir.resolve("definition"));
-        var result = resolver.resolve(definition, Workspace.none());
+        Compiler.Result result = compiler.compile(definition, new Compiler.Options(Workspace.none(), false, BUILD));
 
         if (spec.path("expect").asText().equals("diagnostics")) {
             JsonNode expected = Documents.JSON.readTree(caseDir.resolve("expected/diagnostics.json").toFile());
@@ -57,7 +64,14 @@ class ConformanceResolveTest {
             }
         } else {
             assertThat(result.diagnostics()).filteredOn(d -> d.level() == Diagnostic.Level.ERROR).isEmpty();
-            assertThat(result.definition()).isPresent();
+            String actual = CanonicalJson.pretty(result.manifest().orElseThrow());
+            Path expected = caseDir.resolve("expected/manifest.json");
+            if (UPDATE) {
+                Files.createDirectories(expected.getParent());
+                Files.writeString(expected, actual);
+            }
+            assertThat(expected).as("expected/manifest.json (run with -Dmcpgp.updateExpected=true to create it)").exists();
+            assertThat(actual).isEqualTo(Files.readString(expected));
         }
     }
 

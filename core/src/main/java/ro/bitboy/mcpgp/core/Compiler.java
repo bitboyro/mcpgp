@@ -1,8 +1,11 @@
 package ro.bitboy.mcpgp.core;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import ro.bitboy.mcpgp.core.diag.Codes;
 import ro.bitboy.mcpgp.core.diag.Diagnostic;
 import ro.bitboy.mcpgp.core.diag.Diagnostics;
 import ro.bitboy.mcpgp.core.openapi.ApiModel.Contract;
+import ro.bitboy.mcpgp.core.manifest.ManifestWriter;
 import ro.bitboy.mcpgp.core.openapi.ContractLoader;
 import ro.bitboy.mcpgp.core.resolve.DefinitionResolver;
 import ro.bitboy.mcpgp.core.resolve.ResolvedDefinition;
@@ -11,28 +14,43 @@ import ro.bitboy.mcpgp.core.resolve.Workspace;
 import ro.bitboy.mcpgp.core.tools.NamesLock;
 import ro.bitboy.mcpgp.core.tools.ToolPlan;
 import ro.bitboy.mcpgp.core.tools.ToolPlanner;
+import ro.bitboy.mcpgp.schemas.SchemaKind;
 import ro.bitboy.mcpgp.schemas.Schemas;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** The compiler's entry point: definition project → tool plans (and, in later stages, the manifest). */
+/** The compiler's entry point: definition project → tool plans → manifest. */
 public final class Compiler {
 
-    /** @param frozenLock fail instead of warning when a tool name would differ from the lock file */
-    public record Options(Workspace workspace, boolean frozenLock) {
+    /** The compiler's own version, recorded in manifests. */
+    public static final String VERSION = "0.1.0-SNAPSHOT";
+
+    /**
+     * @param frozenLock fail instead of warning when a tool name would differ from the lock file
+     * @param build      build inputs that don't come from the definition (time, version, source)
+     */
+    public record Options(Workspace workspace, boolean frozenLock, ManifestWriter.Build build) {
+        public Options(Workspace workspace, boolean frozenLock) {
+            this(workspace, frozenLock, new ManifestWriter.Build(Instant.EPOCH, VERSION, null, null, null));
+        }
+
         public static Options defaults() {
             return new Options(Workspace.none(), false);
         }
     }
 
-    /** What the compiler produced; {@code definition} and {@code tools} are empty when there were errors. */
+    /**
+     * What the compiler produced; {@code definition}, {@code tools} and {@code manifest} are empty when
+     * there were errors.
+     */
     public record Result(Optional<ResolvedDefinition> definition, Map<ContractKey, Contract> contracts,
-                         List<ToolPlan> tools, List<Diagnostic> diagnostics) {
+                         List<ToolPlan> tools, Optional<ObjectNode> manifest, List<Diagnostic> diagnostics) {
         public boolean ok() {
             return definition.isPresent() && diagnostics.stream().noneMatch(d -> d.level() == Diagnostic.Level.ERROR);
         }
@@ -49,7 +67,7 @@ public final class Compiler {
         Diagnostics diagnostics = new Diagnostics();
         List<Diagnostic> collected = new ArrayList<>(resolved.diagnostics());
         if (resolved.definition().isEmpty()) {
-            return new Result(Optional.empty(), Map.of(), List.of(), sorted(collected));
+            return new Result(Optional.empty(), Map.of(), List.of(), Optional.empty(), sorted(collected));
         }
         ResolvedDefinition definition = resolved.definition().get();
 
@@ -63,10 +81,22 @@ public final class Compiler {
             NamesLock lock = NamesLock.load(definition.root(), schemas, diagnostics);
             tools = new ToolPlanner(diagnostics, options.frozenLock()).plan(definition, contracts, lock);
         }
+        ObjectNode manifest = null;
+        if (!diagnostics.hasErrors() && collected.stream().noneMatch(d -> d.level() == Diagnostic.Level.ERROR)) {
+            ManifestWriter writer = new ManifestWriter(diagnostics);
+            manifest = writer.write(definition, contracts, tools, options.build());
+            // the manifest records every warning and info, including the ones the writer reported
+            List<Diagnostic> all = new ArrayList<>(collected);
+            all.addAll(diagnostics.all());
+            manifest = writer.withDiagnostics(manifest, sorted(all));
+            for (Schemas.Problem problem : schemas.problems(SchemaKind.MANIFEST, manifest)) {
+                diagnostics.error(Codes.MANIFEST_INVALID, problem.toString(), null);
+            }
+        }
         collected.addAll(diagnostics.all());
         boolean failed = collected.stream().anyMatch(d -> d.level() == Diagnostic.Level.ERROR);
         return new Result(failed ? Optional.empty() : Optional.of(definition), Map.copyOf(contracts),
-                failed ? List.of() : tools, sorted(collected));
+                failed ? List.of() : tools, failed ? Optional.empty() : Optional.ofNullable(manifest), sorted(collected));
     }
 
     private static List<Diagnostic> sorted(List<Diagnostic> list) {

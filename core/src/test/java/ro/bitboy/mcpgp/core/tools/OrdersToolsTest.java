@@ -36,12 +36,11 @@ class OrdersToolsTest {
     @Test
     void compilesWithoutErrorsOrDrift() {
         assertThat(orders.ok()).isTrue();
-        // the DELETE rule is real but useless here: access read-write already removes DELETE tools
+        // the DELETE rule is real but useless here: access read-write already removes DELETE tools;
+        // the jira pack is P1 and not available yet
         assertThat(orders.diagnostics()).filteredOn(d -> d.level() != Diagnostic.Level.INFO)
-                .singleElement().satisfies(d -> {
-                    assertThat(d.code()).isEqualTo("RULE_MATCHES_NOTHING");
-                    assertThat(d.location().toString()).isEqualTo("overrides/00-global.yaml#/rules/0");
-                });
+                .extracting(d -> d.code() + " " + d.location())
+                .containsExactly("PACK_UNKNOWN orders.mcpgp.yaml#/packs/jira", "RULE_MATCHES_NOTHING overrides/00-global.yaml#/rules/0");
     }
 
     @Test
