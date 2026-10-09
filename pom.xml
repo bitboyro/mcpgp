@@ -21,6 +21,7 @@
 
   <modules>
     <module>schemas</module>
+    <module>core</module>
   </modules>
 
   <properties>
