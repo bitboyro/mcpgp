@@ -11,6 +11,9 @@ versions follow [SemVer](https://semver.org).
   schemas, and a deterministic manifest validated against its schema.
 - `cli` module: `mcpgp validate` and `mcpgp build --manifest-only`.
 - Conformance runner compares produced manifests with `expected/manifest.json`.
+- `runtime` module (Spring Boot, MCP Java SDK): loads the embedded manifest and the operator config
+  (YAML/JSON file, `.env`, environment variables, flags, secret references, startup checks) and
+  serves the tool list over stdio with the `instance` enum filled in; `instances_list`.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.

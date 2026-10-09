@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Operational logs: JSON lines on stderr, never stdout (stdout carries the MCP protocol in stdio mode).
+     Named logback.xml (not logback-spring.xml) so it applies from the first log line, before Spring starts. -->
+<configuration>
+  <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.err</target>
+    <encoder class="ro.bitboy.mcpgp.runtime.logging.JsonLineEncoder"/>
+  </appender>
+  <!-- mcpgp's x- schema keywords are intentional -->
+  <logger name="com.networknt.schema.keyword.UnknownKeywordFactory" level="ERROR"/>
+  <root level="INFO">
+    <appender-ref ref="STDERR"/>
+  </root>
+</configuration>

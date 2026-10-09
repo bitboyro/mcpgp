@@ -1,0 +1,407 @@
+package ro.bitboy.mcpgp.runtime.config;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import ro.bitboy.mcpgp.runtime.manifest.Manifest;
+import ro.bitboy.mcpgp.schemas.SchemaKind;
+import ro.bitboy.mcpgp.schemas.Schemas;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Loads the operator's config (runtime-config.md): build defaults, then the config file (YAML or JSON),
+ * then environment variables (including {@code .env} next to the config), then CLI flags; validates it,
+ * resolves secret references and checks it against what the build allows (§7). Every problem is
+ * collected and reported together.
+ */
+public final class ConfigLoader {
+
+    /**
+     * @param configFile an explicit {@code --config} file
+     * @param workingDir where default config file names and {@code .env} are looked for
+     * @param flags      {@code --a.b.c value} flags, by dotted key
+     */
+    public record Options(Optional<Path> configFile, Path workingDir, Map<String, String> env, Map<String, String> flags) {
+    }
+
+    private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Set<String> LOOPBACK = Set.of("127.0.0.1", "::1", "[::1]", "localhost");
+
+    private final Schemas schemas;
+    private final SchemaNav nav;
+
+    public ConfigLoader(Schemas schemas) {
+        this.schemas = schemas;
+        try (var in = Schemas.class.getResourceAsStream("/schemas/" + SchemaKind.RUNTIME_CONFIG.fileName())) {
+            this.nav = new SchemaNav(JSON.readTree(in));
+        } catch (IOException e) {
+            throw new IllegalStateException("runtime-config schema missing", e);
+        }
+    }
+
+    public RuntimeConfig load(Manifest manifest, Options options) {
+        List<String> problems = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+        String name = manifest.serverName();
+
+        // 1. the file
+        Optional<Path> file = locate(name, options, problems);
+        ObjectNode fromFile = JsonNodeFactory.instance.objectNode();
+        if (file.isPresent()) {
+            fromFile = read(file.get(), problems);
+        }
+        if (!problems.isEmpty()) {
+            throw new ConfigException(problems);
+        }
+        Path baseDir = file.map(f -> f.toAbsolutePath().getParent()).orElse(options.workingDir().toAbsolutePath());
+
+        // 2. environment: real variables win over .env
+        Map<String, String> env = new HashMap<>(dotEnv(baseDir.resolve(".env"), problems));
+        env.putAll(options.env());
+
+        // 3. build defaults < file < environment < flags
+        ObjectNode document = buildDefaults(manifest);
+        mergeInto(document, fromFile);
+        EnvOverrides overrides = new EnvOverrides(nav);
+        EnvOverrides.Result withEnv = overrides.apply(document, env, EnvOverrides.prefix(name));
+        problems.addAll(withEnv.problems());
+        warnings.addAll(withEnv.warnings());
+        // flags use the same mapping as environment variables: --server.port 8080 ~ F_SERVER__PORT=8080
+        Map<String, String> flagEnv = new LinkedHashMap<>();
+        Map<String, String> flagNames = new HashMap<>();
+        options.flags().forEach((key, value) -> {
+            String asEnv = "F_" + key.replace(".", "__").toUpperCase(Locale.ROOT);
+            flagEnv.put(asEnv, value);
+            flagNames.put(asEnv, key);
+        });
+        EnvOverrides.Result withFlags = overrides.apply(withEnv.config(), flagEnv, "F_");
+        withFlags.problems().forEach(p -> problems.add(p.replaceFirst("^F_\\S*", "flag")));
+        for (String warning : withFlags.warnings()) {
+            problems.add("Unknown flag --" + flagNames.getOrDefault(warning.substring(0, warning.indexOf(' ')), warning));
+        }
+        document = withFlags.config();
+
+        // 4. schema
+        for (Schemas.Problem problem : schemas.problems(SchemaKind.RUNTIME_CONFIG, document)) {
+            problems.add(problem.toString());
+        }
+        if (!problems.isEmpty()) {
+            throw new ConfigException(problems);
+        }
+
+        // 5. secrets
+        Secrets.Result secrets = new Secrets(nav, env, baseDir).resolve(document, withEnv.fromEnv());
+        problems.addAll(secrets.problems());
+        boolean allowInline = document.path("allowInlineSecrets").asBoolean(false);
+        if (!secrets.inline().isEmpty()) {
+            if (allowInline) {
+                warnings.add("allowInlineSecrets is on and these secret fields hold plain values: " + String.join(", ", secrets.inline())
+                        + "; use references (${env:…}, ${file:…}) outside local experiments");
+            } else {
+                secrets.inline().forEach(field -> problems.add(field
+                        + ": a secret must be a reference (${env:NAME} or ${file:path}) or an environment variable, not a plain value"));
+            }
+        }
+        JsonNode resolved = secrets.config();
+
+        // 6. what the build allows
+        RuntimeConfig.Server server = server(manifest, resolved.path("server"), problems);
+        Path storage = storageRoot(name, resolved);
+        Map<String, List<RuntimeConfig.Instance>> instances = instances(manifest, resolved, problems, warnings);
+        RuntimeConfig.Files files = files(manifest, resolved.path("files"), storage, baseDir, problems);
+        if (!problems.isEmpty()) {
+            throw new ConfigException(problems);
+        }
+        JsonNode audit = resolved.path("audit");
+        RuntimeConfig.Audit auditConfig = new RuntimeConfig.Audit(
+                audit.path("file").path("enabled").asBoolean(true),
+                audit.path("file").has("path") ? expand(audit.path("file").path("path").asText(), baseDir) : storage.resolve("audit/audit.jsonl"),
+                audit.path("file").path("rotate").asText("daily"),
+                audit.path("file").path("retainDays").asInt(30),
+                audit.path("arguments").asText("redacted"));
+        return new RuntimeConfig(file, resolved, server, instances, storage, auditConfig, files,
+                resolved.path("errors").path("detail").asText("full"),
+                resolved.path("logging").path("level").asText("info"),
+                resolved.path("telemetry"), resolved.path("packs"),
+                Set.copyOf(secrets.secrets()), allowInline && !secrets.inline().isEmpty(), List.copyOf(warnings));
+    }
+
+    // ---------------------------------------------------------------------- sources
+
+    private static Optional<Path> locate(String name, Options options, List<String> problems) {
+        if (options.configFile().isPresent()) {
+            Path file = options.configFile().get();
+            if (!Files.isRegularFile(file)) {
+                problems.add("Config file " + file + " does not exist");
+            }
+            return Optional.of(file);
+        }
+        List<Path> found = new ArrayList<>();
+        for (String extension : List.of(".yaml", ".yml", ".json")) {
+            Path candidate = options.workingDir().resolve(name + extension);
+            if (Files.isRegularFile(candidate)) {
+                found.add(candidate);
+            }
+        }
+        if (found.size() > 1) {
+            problems.add("Several config files found (" + found.stream().map(p -> p.getFileName().toString()).toList()
+                    + "); keep one or choose with --config");
+        }
+        return found.isEmpty() ? Optional.empty() : Optional.of(found.get(0));
+    }
+
+    private static ObjectNode read(Path file, List<String> problems) {
+        String fileName = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        ObjectMapper mapper;
+        if (fileName.endsWith(".json")) {
+            mapper = JSON;
+        } else if (fileName.endsWith(".yaml") || fileName.endsWith(".yml")) {
+            mapper = YAML;
+        } else {
+            problems.add("Config file " + file + " must end in .yaml, .yml or .json");
+            return JsonNodeFactory.instance.objectNode();
+        }
+        try {
+            JsonNode node = mapper.readTree(file.toFile());
+            if (node == null || node.isMissingNode() || node.isNull()) {
+                return JsonNodeFactory.instance.objectNode();
+            }
+            if (!node.isObject()) {
+                problems.add("Config file " + file + " must contain an object at the top level");
+                return JsonNodeFactory.instance.objectNode();
+            }
+            return (ObjectNode) node;
+        } catch (IOException e) {
+            problems.add("Config file " + file + " cannot be parsed: " + firstLine(e.getMessage()));
+            return JsonNodeFactory.instance.objectNode();
+        }
+    }
+
+    /** {@code KEY=value} lines; {@code #} comments; optional {@code export }; quotes around values removed. */
+    static Map<String, String> dotEnv(Path file, List<String> problems) {
+        Map<String, String> values = new LinkedHashMap<>();
+        if (!Files.isRegularFile(file)) {
+            return values;
+        }
+        try {
+            List<String> lines = Files.readAllLines(file);
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i).strip();
+                if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                }
+                if (line.startsWith("export ")) {
+                    line = line.substring("export ".length()).strip();
+                }
+                int eq = line.indexOf('=');
+                if (eq <= 0) {
+                    problems.add(file.getFileName() + " line " + (i + 1) + ": expected NAME=value");
+                    continue;
+                }
+                String value = line.substring(eq + 1).strip();
+                if (value.length() >= 2 && (value.startsWith("\"") && value.endsWith("\"") || value.startsWith("'") && value.endsWith("'"))) {
+                    value = value.substring(1, value.length() - 1);
+                }
+                values.put(line.substring(0, eq).strip(), value);
+            }
+        } catch (IOException e) {
+            problems.add("Cannot read " + file);
+        }
+        return values;
+    }
+
+    private static ObjectNode buildDefaults(Manifest manifest) {
+        ObjectNode defaults = JsonNodeFactory.instance.objectNode();
+        JsonNode runtimeDefaults = manifest.policies().path("runtimeDefaults");
+        for (String key : List.of("audit", "telemetry")) {
+            if (runtimeDefaults.has(key)) {
+                defaults.set(key, runtimeDefaults.get(key).deepCopy());
+            }
+        }
+        return defaults;
+    }
+
+    // ---------------------------------------------------------------------- sections
+
+    private static RuntimeConfig.Server server(Manifest manifest, JsonNode server, List<String> problems) {
+        String transport = server.path("transport").asText(manifest.defaultOf("transports"));
+        if (!manifest.allowed("transports").contains(transport)) {
+            problems.add("/server/transport: '" + transport + "' is not available in this build (allowed: " + manifest.allowed("transports") + ")");
+        }
+        String authMode = server.path("auth").path("mode").asText(manifest.defaultOf("inboundAuth") == null ? "none" : manifest.defaultOf("inboundAuth"));
+        List<String> allowedAuth = manifest.allowed("inboundAuth");
+        if (!allowedAuth.isEmpty() && !allowedAuth.contains(authMode)) {
+            problems.add("/server/auth/mode: '" + authMode + "' is not available in this build (allowed: " + allowedAuth + ")");
+        }
+        String host = server.path("host").asText("127.0.0.1");
+        boolean allowInsecure = server.path("auth").path("allowInsecure").asBoolean(false);
+        if (transport.equals("http") && authMode.equals("none") && !LOOPBACK.contains(host) && !allowInsecure) {
+            problems.add("/server/auth/mode: 'none' on a non-loopback address (" + host
+                    + ") needs server.auth.allowInsecure: true; prefer static or oauth");
+        }
+        List<String> origins = new ArrayList<>();
+        server.path("allowedOrigins").forEach(o -> origins.add(o.asText()));
+        String basePath = server.path("basePath").asText("/mcp");
+        return new RuntimeConfig.Server(transport, host, server.path("port").asInt(8080), basePath,
+                server.path("publicUrl").asText(null), authMode, server.path("auth"), allowInsecure, List.copyOf(origins));
+    }
+
+    private static Map<String, List<RuntimeConfig.Instance>> instances(Manifest manifest, JsonNode doc,
+                                                                         List<String> problems, List<String> warnings) {
+        boolean multiApi = manifest.apis().size() > 1;
+        boolean multi = manifest.multiInstance();
+        Map<String, List<RuntimeConfig.Instance>> result = new LinkedHashMap<>();
+        if (multiApi && (doc.has("instance") || doc.has("instances"))) {
+            problems.add("This server combines several APIs; configure instances per API under apis.<id> ("
+                    + String.join(", ", manifest.apis().keySet()) + ")");
+        }
+        if (!multiApi && doc.has("apis")) {
+            problems.add("/apis: only for servers that combine several APIs; use " + (multi ? "instances" : "instance"));
+        }
+        Set<String> knownApis = manifest.apis().keySet();
+        doc.path("apis").fieldNames().forEachRemaining(id -> {
+            if (multiApi && !knownApis.contains(id)) {
+                problems.add("/apis/" + id + ": unknown API (this server has " + String.join(", ", knownApis) + ")");
+            }
+        });
+        int defaultTimeout = manifest.policies().at("/runtimeDefaults/timeouts/defaultSeconds").asInt(30);
+        int maxTimeout = manifest.policies().at("/runtimeDefaults/timeouts/maxSeconds").asInt(Integer.MAX_VALUE);
+
+        for (Manifest.Api api : manifest.apis().values()) {
+            JsonNode scope = multiApi ? doc.path("apis").path(api.id()) : doc;
+            String at = multiApi ? "/apis/" + api.id() : "";
+            List<JsonNode> configured = new ArrayList<>();
+            if (multi) {
+                if (scope.has("instance")) {
+                    problems.add(at + "/instance: this is a multi-instance build; use instances: [ … ] with an id per instance");
+                }
+                scope.path("instances").forEach(configured::add);
+            } else {
+                if (scope.has("instances")) {
+                    problems.add(at + "/instances: this is a single-instance build; use instance: { … }");
+                }
+                if (scope.has("instance")) {
+                    configured.add(scope.get("instance"));
+                }
+            }
+            if (configured.isEmpty()) {
+                problems.add("No target server configured for " + api.title() + ": set " + at.replaceFirst("^/", "").replace('/', '.')
+                        + (at.isEmpty() ? "" : ".") + (multi ? "instances" : "instance") + " (see runtime-config.md §3)");
+                continue;
+            }
+            List<RuntimeConfig.Instance> list = new ArrayList<>();
+            Set<String> ids = new HashSet<>();
+            for (int i = 0; i < configured.size(); i++) {
+                JsonNode node = configured.get(i);
+                String where = at + (multi ? "/instances/" + i : "/instance");
+                String id = multi ? node.path("id").asText("") : "default";
+                if (multi && id.isEmpty()) {
+                    problems.add(where + "/id: every instance needs an id (the value agents pass as `instance`)");
+                    continue;
+                }
+                if (!ids.add(id)) {
+                    problems.add(where + "/id: '" + id + "' is used twice");
+                }
+                String baseUrl = node.path("baseUrl").asText();
+                try {
+                    if (BaseUrl.parse(baseUrl).getScheme().equalsIgnoreCase("http")) {
+                        warnings.add("Instance " + id + " uses plain HTTP (" + baseUrl + ")");
+                    }
+                } catch (IllegalArgumentException e) {
+                    problems.add(where + "/baseUrl: " + e.getMessage());
+                }
+                String contract = node.path("contract").asText("auto");
+                if (!contract.equals("auto") && !api.contracts().containsKey(contract)) {
+                    problems.add(where + "/contract: '" + contract + "' is not shipped with this server (shipped: "
+                            + String.join(", ", api.contracts().keySet()) + ", or auto)");
+                }
+                JsonNode auth = node.has("auth") ? node.get("auth") : JsonNodeFactory.instance.objectNode().put("type", "none");
+                String authType = auth.path("type").asText("none");
+                if (!authType.equals("none") && !api.supportedAuth().contains(authType)) {
+                    problems.add(where + "/auth/type: '" + authType + "' is not supported by this server (supported: "
+                            + String.join(", ", api.supportedAuth()) + ")");
+                }
+                int timeout = node.path("timeoutSeconds").asInt(defaultTimeout);
+                if (timeout > maxTimeout) {
+                    problems.add(where + "/timeoutSeconds: " + timeout + " is above the build's limit of " + maxTimeout);
+                }
+                JsonNode tls = node.path("tls");
+                if (tls.path("insecureSkipHostnameVerify").asBoolean(false)) {
+                    warnings.add("Instance " + id + " skips the TLS hostname check (insecureSkipHostnameVerify)");
+                }
+                list.add(new RuntimeConfig.Instance(api.id(), id, baseUrl, contract, node.path("readOnly").asBoolean(false),
+                        timeout, auth, tls.isMissingNode() ? JsonNodeFactory.instance.objectNode() : tls));
+            }
+            result.put(api.id(), List.copyOf(list));
+        }
+        return result;
+    }
+
+    private static RuntimeConfig.Files files(Manifest manifest, JsonNode files, Path storage, Path baseDir, List<String> problems) {
+        List<String> forms = new ArrayList<>();
+        manifest.policies().at("/files/forms").forEach(f -> forms.add(f.asText()));
+        boolean base64 = files.path("base64").path("enabled").asBoolean(forms.contains("base64"));
+        boolean path = files.path("path").path("enabled").asBoolean(false);
+        if (base64 && !forms.contains("base64")) {
+            problems.add("/files/base64/enabled: this build doesn't support base64 file inputs");
+        }
+        if (path && !forms.contains("path")) {
+            problems.add("/files/path/enabled: this build doesn't support file inputs by path");
+        }
+        Path root = files.path("path").has("root") ? expand(files.path("path").path("root").asText(), baseDir) : storage.resolve("uploads");
+        return new RuntimeConfig.Files(base64, files.path("base64").path("maxKb").asInt(1024), path, root,
+                files.path("path").path("maxKb").asInt(10240));
+    }
+
+    private static Path storageRoot(String serverName, JsonNode doc) {
+        String configured = doc.path("storage").path("root").asText("");
+        Path home = Path.of(System.getProperty("user.home"));
+        return configured.isEmpty() ? home.resolve("." + serverName) : expand(configured, home);
+    }
+
+    /** {@code ~} → the user's home; relative paths start at {@code base}. */
+    private static Path expand(String path, Path base) {
+        String home = System.getProperty("user.home");
+        if (path.equals("~")) {
+            return Path.of(home);
+        }
+        if (path.startsWith("~/")) {
+            return Path.of(home, path.substring(2));
+        }
+        Path p = Path.of(path);
+        return p.isAbsolute() ? p : base.resolve(p).normalize();
+    }
+
+    private static void mergeInto(ObjectNode base, ObjectNode overlay) {
+        Iterator<Map.Entry<String, JsonNode>> fields = overlay.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> f = fields.next();
+            JsonNode existing = base.get(f.getKey());
+            if (existing instanceof ObjectNode e && f.getValue() instanceof ObjectNode o) {
+                mergeInto(e, o);
+            } else {
+                base.set(f.getKey(), f.getValue().deepCopy());
+            }
+        }
+    }
+
+    private static String firstLine(String message) {
+        return message == null ? "" : message.lines().findFirst().orElse("");
+    }
+}

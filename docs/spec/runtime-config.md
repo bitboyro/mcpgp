@@ -51,6 +51,9 @@ Rules:
   Scalar keys override individually.
 - Single-instance builds use `ORDERS_MCP_INSTANCE__…` (no index).
 - Environment variables set directly like this count as references for the secret rule in §2.
+- A variable with the server's prefix that matches no setting is logged as a warning and ignored
+  (it may be a value used by a `${env:…}` reference); it never stops startup.
+- CLI flags use the same keys with dots: `--server.port 8080`, `--instances.0.timeoutSeconds 60`.
 
 ## 2. Secrets
 
@@ -356,7 +359,7 @@ files:
 
 The server refuses to start, with a message naming the key, when:
 - the config doesn't match the schema;
-- an instance uses an auth type the build doesn't support;
+- an instance uses an auth type the build doesn't support (`type: none`, no credentials, is always accepted);
 - a pinned contract isn't shipped, or `mixedContracts: forbid` is violated;
 - `server.auth.mode: none` on a non-loopback HTTP address without `allowInsecure`;
 - a secret reference can't be resolved, or a secret field holds a plain value without `allowInlineSecrets`;
