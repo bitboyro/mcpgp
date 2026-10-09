@@ -1,0 +1,8 @@
+# Rules that apply to every Orders API tool. Merged first.
+rules:
+  - match: { method: DELETE }
+    description: { append: " Irreversible. You will be asked to confirm." }
+    annotations: { destructiveHint: true }
+
+  - match: { operationId: "~^list" }
+    description: { append: " Results are paged; use limit and cursor." }

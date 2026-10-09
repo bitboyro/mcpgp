@@ -1,0 +1,36 @@
+# ops-assistant: three APIs, multi-instance. Instances are grouped per API.
+server:
+  transport: http
+  port: 8080
+  publicUrl: https://ops-mcp.acme.internal
+  auth: { mode: oauth, issuer: https://login.acme.com }
+
+apis:
+  orders:
+    instances:
+      - id: prod-eu
+        baseUrl: https://orders-eu.acme.internal/api/v2
+        auth:
+          type: basic
+          username: ${env:ORDERS_USER}
+          password: ${env:ORDERS_PASS}
+  jira:
+    instances:
+      - id: acme
+        baseUrl: https://jira.acme.internal
+        auth:
+          type: bearer
+          token: ${env:JIRA_PAT}
+  monitoring:
+    instances:
+      - id: soc
+        baseUrl: https://monitoring.acme.internal/api
+        auth:
+          type: oauth2ClientCredentials
+          tokenUrl: https://login.acme.com/oauth2/token
+          clientId: ${env:MONITORING_CLIENT_ID}
+          clientSecret: ${env:MONITORING_CLIENT_SECRET}
+          scopes: [monitoring.read]
+
+audit:
+  file: { path: ./audit/audit.jsonl }

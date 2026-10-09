@@ -1,0 +1,27 @@
+# A variant: everything not listed here is inherited from orders-mcp.
+apiVersion: mcpgp/v1
+kind: McpServer
+metadata:
+  name: orders-readonly
+  title: Example Orders API (read only)
+extends: mcpgp://acme/servers/orders-mcp@latest   # CLI: --workspace ../workspace
+
+apis:
+  - id: orders
+    select: { access: read-only }
+
+instances:
+  mode: single                            # one target server, no `instance` parameter
+
+exposure:
+  mode: plain
+
+packs:
+  jira: null                              # remove the Jira pack
+  recording: null
+
+runtimeDefaults:
+  transports: { allowed: [stdio], default: stdio }
+
+build:
+  targets: [mcpb, jar]

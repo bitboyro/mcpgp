@@ -1,0 +1,16 @@
+# Run by `mcpgp test` against the mock target (always named `mock`).
+cases:
+  - name: list customers works
+    tool: orders_customer_list
+    args: { instance: mock, query: { account: "a-1", limit: 5 } }
+    expect: { ok: true }
+
+  - name: refund is a write tool and returns the order
+    tool: orders_order_refund
+    args: { instance: mock, path: { id: "o-1001" }, body: { amount: 25, reason: damaged } }
+    expect: { ok: true, structured: { status: refunded } }
+
+  - name: unknown instance is rejected
+    tool: orders_customer_get
+    args: { instance: nope, path: { id: "c-1" } }
+    expect: { code: INSTANCE_UNKNOWN }

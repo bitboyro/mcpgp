@@ -1,0 +1,6 @@
+# Platform side: the Jira pack is included in the build.
+# The operator provides URL, project and token in their runtime config (packs.jira);
+# without that, the pack's tools don't register.
+enabled: true
+tools: [comment_create, comment_list]
+attachRecordings: true          # comments can link a recording or an audit entry

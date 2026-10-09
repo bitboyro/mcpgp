@@ -1,0 +1,46 @@
+# One MCP server combining three APIs. Tools are prefixed per API.
+apiVersion: mcpgp/v1
+kind: McpServer
+metadata:
+  name: ops-assistant
+  title: Integration operations assistant
+
+apis:
+  - id: orders
+    contracts:
+      - { version: "2.0", spec: mcpgp://acme/contracts/orders@2.0, default: true }
+    select:
+      access: read-write
+      include: [{ tag: [orders, customers, invoices] }]
+    downstreamAuth: { supported: [basic, oauth2ClientCredentials] }
+
+  - id: jira
+    contracts:
+      - { version: "3", spec: contracts/jira-cloud-v3.json, default: true }
+    select:
+      include: [{ tag: [issues, issue-comments, issue-search] }]
+    downstreamAuth: { supported: [basic, bearer] }      # API token as basic, or PAT
+
+  - id: monitoring
+    contracts:
+      - { version: "2024-09-01", spec: contracts/monitoring.yaml, default: true }
+    select: { access: read-only }
+    downstreamAuth: { supported: [oauth2ClientCredentials] }
+
+instances:
+  mode: multi
+
+naming:
+  extends: mcpgp://acme/naming/acme-standard@2   # CLI: --workspace ../workspace
+  namespace: { perApi: true }               # orders_*, jira_*, monitoring_*
+
+exposure:
+  mode: discovery                            # many tools across three APIs
+
+packs:
+  audit: {}
+  health: {}
+
+build:
+  targets: [docker, jar]
+  docs: [people, agents]

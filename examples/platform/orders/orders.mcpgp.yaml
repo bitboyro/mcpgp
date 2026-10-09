@@ -1,0 +1,81 @@
+# Platform side: the build definition for orders-mcp.
+apiVersion: mcpgp/v1
+kind: McpServer
+metadata:
+  name: orders-mcp
+  title: Example Orders API
+  description: >
+    Look up and manage customers, accounts, orders and invoices in the Example Orders API.
+
+apis:
+  - id: orders
+    title: Example Orders API
+    toolPrefix: orders
+    contracts:
+      - version: "1.0"
+        spec: contracts/orders-1.0.json          # Swagger 2.0
+      - version: "2.0"
+        spec: contracts/orders-2.0.yaml          # OpenAPI 3.1
+        overlays: [overlays/2.0-descriptions.yaml]
+        default: true
+    detect:
+      method: GET
+      path: /version
+      pattern: '^(\d+\.\d+)'
+    select:
+      access: read-write                       # no DELETE tools
+      exclude:
+        - { tag: [users-roles, system-settings] }
+        - { path: "/internal/**" }
+      deprecated: hide
+    downstreamAuth:
+      supported: [basic, apiKey, oauth2ClientCredentials, mtls]
+      identity: service-account
+      unsatisfiedTools: hide
+
+instances:
+  mode: multi                                  # `instance` required on every tool
+  mixedContracts: union
+
+naming:
+  extends: mcpgp://acme/naming/acme-standard@2   # CLI: --workspace ../workspace
+  vocabulary:
+    customer_account: customer
+    purchase_order: order
+
+overrides:
+  include: overrides/*.yaml                    # 00-global, 10-customers, 20-orders
+
+exposure:
+  mode: hybrid
+  pinned: [orders_customer_list, orders_customer_get, orders_order_search, orders_order_refund]
+
+safety:
+  confirmDestructive: true
+  responseLimitKb: 256
+
+packs:
+  audit: {}
+  introspection: {}
+  health: {}
+  diagnostics: {}
+  recording: { defaultRetentionDays: 14 }
+  jira: { $ref: packs/jira.yaml }
+
+runtimeDefaults:
+  transports: { allowed: [stdio, http], default: stdio }
+  inboundAuth: { allowed: [none, static, oauth], default: none }
+  timeouts: { defaultSeconds: 30, maxSeconds: 120 }
+  baseUrlAllowlist: []                         # empty = any; customers may restrict further
+  redaction: { fields: [password, secret, token, apiKey, paymentToken] }
+  audit: { file: { enabled: true, rotate: daily, retainDays: 30 }, arguments: redacted }
+  telemetry: { enabled: false }
+
+generation:
+  mode: runtime
+  client: { library: jdk, json: jackson }
+
+build:
+  targets: [jar, mcpb, docker]
+  docs: [people, agents]
+  sign: true

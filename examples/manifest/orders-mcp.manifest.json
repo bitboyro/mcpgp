@@ -1,0 +1,756 @@
+{
+  "apis": [
+    {
+      "contracts": [
+        {
+          "basePath": "/api/v1",
+          "default": false,
+          "digest": "sha256:7c02aa11bb22cc33dd44ee55ff66778899aabbccddeeff00112233445566778",
+          "format": "swagger-2.0",
+          "version": "1.0"
+        },
+        {
+          "basePath": "/api/v2",
+          "default": true,
+          "digest": "sha256:55de0011223344556677889900aabbccddeeff00112233445566778899aabbcc",
+          "format": "openapi-3.1",
+          "version": "2.0"
+        }
+      ],
+      "detect": {
+        "method": "GET",
+        "path": "/version",
+        "pattern": "^(\\d+\\.\\d+)"
+      },
+      "downstreamAuth": {
+        "apiKey": {
+          "in": "header",
+          "name": "X-Api-Key"
+        },
+        "identity": "service-account",
+        "supported": [
+          "basic",
+          "apiKey",
+          "oauth2ClientCredentials",
+          "mtls"
+        ],
+        "unsatisfiedTools": "hide"
+      },
+      "id": "orders",
+      "pagination": null,
+      "requestBody": {
+        "multiple": "split",
+        "suffixes": {
+          "application/octet-stream": "binary",
+          "application/x-www-form-urlencoded": "form",
+          "multipart/form-data": "multipart"
+        }
+      },
+      "title": "Example Orders API",
+      "toolPrefix": "orders"
+    }
+  ],
+  "build": {
+    "cli": "0.4.2",
+    "createdAt": "2026-10-09T10:40:00Z",
+    "definition": {
+      "digest": "sha256:4be0c1d27f6a9e3b5c8d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b91d2",
+      "name": "orders-mcp",
+      "source": "git+https://git.acme.internal/integration/mcp-defs.git#9c41e7a"
+    },
+    "extends": null,
+    "lock": {
+      "digest": "sha256:d0c9a1b2c3d4e5f60718293a4b5c6d7e8f9011223344556677889900aabbccdd"
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "RULE_MATCHES_NOTHING",
+      "level": "warning",
+      "location": {
+        "file": "overrides/10-customers.yaml",
+        "line": 14
+      },
+      "message": "Rule matches no operation in contract 1.0"
+    },
+    {
+      "code": "OPERATION_EXCLUDED",
+      "level": "info",
+      "operation": "orders:DELETE:/customers/{id}",
+      "reason": "access: read-write"
+    }
+  ],
+  "exposure": {
+    "mode": "hybrid",
+    "pinned": [
+      "orders_customer_get",
+      "orders_customer_create_multipart"
+    ],
+    "plainSearch": false
+  },
+  "instances": {
+    "max": null,
+    "mixedContracts": "union",
+    "mode": "multi"
+  },
+  "manifestVersion": "1.0",
+  "packs": [
+    {
+      "id": "recording",
+      "requires": {
+        "config": false
+      },
+      "tools": [
+        "orders_recording_start"
+      ],
+      "version": "1"
+    },
+    {
+      "id": "issue-tracker",
+      "requires": {
+        "config": true,
+        "configSchema": "#/packs/issue-tracker/config"
+      },
+      "tools": [],
+      "version": "1"
+    }
+  ],
+  "policies": {
+    "baseUrlAllowlist": [],
+    "confirmDestructive": true,
+    "files": {
+      "forms": [
+        "base64",
+        "path"
+      ]
+    },
+    "redaction": {
+      "fields": [
+        "password",
+        "secret",
+        "token",
+        "apiKey",
+        "paymentToken"
+      ]
+    },
+    "responseLimitKb": 256,
+    "runtimeDefaults": {
+      "audit": {
+        "arguments": "redacted",
+        "file": {
+          "enabled": true,
+          "retainDays": 30,
+          "rotate": "daily"
+        }
+      },
+      "telemetry": {
+        "enabled": false
+      },
+      "timeouts": {
+        "defaultSeconds": 30,
+        "maxSeconds": 120
+      }
+    }
+  },
+  "runtime": {
+    "inboundAuth": {
+      "allowed": [
+        "none",
+        "static",
+        "oauth"
+      ],
+      "default": "none"
+    },
+    "mcpRevisions": [
+      "2025-03-26",
+      "2025-06-18",
+      "2025-11-25"
+    ],
+    "minRuntime": "0.4.0",
+    "transports": {
+      "allowed": [
+        "stdio",
+        "http"
+      ],
+      "default": "stdio"
+    }
+  },
+  "schemas": {
+    "orders@1.0": {
+      "Customer": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "orders@2.0": {
+      "Customer": {
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CustomerUpload": {
+        "properties": {
+          "document": {
+            "format": "binary",
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "payload"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "server": {
+    "instructions": "Look up and manage customers, accounts, orders and invoices in the Example Orders API. Every tool requires `instance`; call orders_instances_list to see the configured servers.",
+    "name": "orders-mcp",
+    "title": "Example Orders API",
+    "version": "2.0.0+3"
+  },
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "api": "orders",
+      "confirm": false,
+      "description": "[Orders] Creates a customer and uploads its documents in one request. The account must exist; call orders_account_list first.",
+      "inputSchema": {
+        "$defs": {
+          "CustomerInput": {
+            "additionalProperties": false,
+            "properties": {
+              "accountId": {
+                "description": "Id of the account the customer belongs to.",
+                "type": "string"
+              },
+              "email": {
+                "format": "email",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "accountId"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "additionalProperties": false,
+            "description": "Request body, sent as multipart/form-data.",
+            "properties": {
+              "document": {
+                "description": "Contract document (PDF).",
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "base64": {
+                        "type": "string"
+                      },
+                      "contentType": {
+                        "enum": [
+                          "application/pdf"
+                        ],
+                        "type": "string"
+                      },
+                      "filename": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "base64"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "payload": {
+                "$ref": "#/$defs/CustomerInput",
+                "description": "Customer data (sent as an application/json part)."
+              }
+            },
+            "required": [
+              "payload"
+            ],
+            "type": "object"
+          },
+          "instance": {
+            "description": "Target Orders API server. Filled in at startup from the runtime config.",
+            "enum": [],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          }
+        },
+        "required": [
+          "instance",
+          "body"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "orders_customer_create_multipart",
+      "operation": {
+        "key": "orders:POST:/customers",
+        "operationId": "createCustomer",
+        "tags": [
+          "customers"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers/post/description",
+            "step": "spec"
+          },
+          {
+            "file": "overrides/10-customers.yaml",
+            "line": 2,
+            "op": "prepend",
+            "step": "rule"
+          },
+          {
+            "file": "overrides/10-customers.yaml",
+            "line": 5,
+            "op": "append",
+            "step": "rule"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "createCustomer"
+          },
+          {
+            "step": "shape",
+            "value": "customer_create"
+          },
+          {
+            "step": "contentTypeSuffix",
+            "value": "customer_create_multipart"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_customer_create_multipart"
+          },
+          {
+            "file": "mcp-names.lock",
+            "since": "1.3.0",
+            "step": "lock"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Create customer with documents",
+      "variants": {
+        "2.0": {
+          "accept": [
+            "application/json",
+            "application/problem+json"
+          ],
+          "body": {
+            "contentType": "multipart/form-data",
+            "parts": [
+              {
+                "contentTypes": [
+                  "application/json"
+                ],
+                "file": false,
+                "name": "payload",
+                "required": true,
+                "secret": false
+              },
+              {
+                "contentTypes": [
+                  "application/pdf"
+                ],
+                "file": true,
+                "name": "document",
+                "required": false,
+                "secret": false
+              }
+            ],
+            "required": true,
+            "schema": {
+              "$ref": "#/schemas/orders@2.0/CustomerUpload"
+            }
+          },
+          "method": "POST",
+          "parameters": [],
+          "path": "/customers",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Customer"
+              },
+              "status": "201"
+            },
+            {
+              "contentType": "application/problem+json",
+              "error": true,
+              "status": "default"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "apiKey"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "orders",
+      "confirm": false,
+      "description": "[Orders] Gets one customer by id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target Orders API server. Filled in at startup from the runtime config.",
+            "enum": [],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "description": "Customer id.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "query": {
+            "additionalProperties": false,
+            "description": "Values sent in the URL query string.",
+            "properties": {
+              "expand": {
+                "description": "Include related data. (2.0 only)",
+                "enum": [
+                  "accounts",
+                  "orders"
+                ],
+                "type": "string",
+                "x-mcpgp-contracts": [
+                  "2.0"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "orders_customer_get",
+      "operation": {
+        "key": "orders:GET:/customers/{id}",
+        "operationId": "getCustomerAccountByIdV2",
+        "tags": [
+          "customers"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers~1{id}/get/summary",
+            "step": "spec"
+          },
+          {
+            "file": "overrides/10-customers.yaml",
+            "line": 2,
+            "op": "prepend",
+            "step": "rule"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "getCustomerAccountByIdV2"
+          },
+          {
+            "step": "normalize",
+            "value": "get customer account"
+          },
+          {
+            "step": "shape",
+            "value": "customer_account_get"
+          },
+          {
+            "file": "mcpgp://acme/naming/acme-standard@2",
+            "step": "vocabulary",
+            "value": "customer_get"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_customer_get"
+          },
+          {
+            "file": "mcp-names.lock",
+            "since": "1.0.0",
+            "step": "lock"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Get customer",
+      "variants": {
+        "1.0": {
+          "accept": [
+            "application/json"
+          ],
+          "body": null,
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            }
+          ],
+          "path": "/customers/{id}",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/orders@1.0/Customer"
+              },
+              "status": "200"
+            },
+            {
+              "contentType": "application/json",
+              "error": true,
+              "status": "404"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ]
+          ]
+        },
+        "2.0": {
+          "accept": [
+            "application/json",
+            "application/problem+json"
+          ],
+          "body": null,
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            },
+            {
+              "explode": true,
+              "in": "query",
+              "name": "expand",
+              "required": false,
+              "schema": {
+                "enum": [
+                  "accounts",
+                  "orders"
+                ],
+                "type": "string"
+              },
+              "style": "form"
+            }
+          ],
+          "path": "/customers/{id}",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Customer"
+              },
+              "status": "200"
+            },
+            {
+              "contentType": "application/problem+json",
+              "error": true,
+              "status": "default"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "apiKey"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "confirm": false,
+      "description": "Lists the configured Orders API servers you can pass as `instance`, with their contract version and status.",
+      "handler": "instances_list",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "kind": "builtin",
+      "name": "orders_instances_list",
+      "outputSchema": null,
+      "provenance": {
+        "name": [
+          {
+            "step": "builtin",
+            "value": "instances_list"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_instances_list"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "List target servers"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "confirm": false,
+      "description": "Starts a named recording session that captures upstream requests and responses (redacted) until orders_recording_stop.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "description": "What this session is for.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "type": "object"
+      },
+      "kind": "pack",
+      "name": "orders_recording_start",
+      "outputSchema": null,
+      "pack": "recording",
+      "provenance": {
+        "name": [
+          {
+            "step": "pack",
+            "value": "recording.start"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_recording_start"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Start recording"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+# Shared naming policy for the Acme Integration workspace.
+# On the platform: mcpgp://acme/naming/acme-standard@2
+source: operationId
+fallback: methodPath
+normalize:
+  split: [camel, pascal, kebab, dot, slash]
+  dropWords: [by, id, api, v1, v2, v3]
+shape:
+  order: object_verb
+  case: snake
+  number: singular
+vocabulary:
+  "retrieve|fetch|read": get
+  "remove|erase": delete
+  "add|new": create
+  "modify|change": update
+  "find|query": search
+limits:
+  profile: strict
+  onTooLong: shorten-then-hash
+collisions: error
