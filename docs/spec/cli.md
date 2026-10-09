@@ -41,7 +41,7 @@ sign:
 | `mcpgp explain <def> <tool>` | Provenance of a tool's name, title, description |
 | `mcpgp diff <def> [--against <tag\|manifest.json\|last-release>] [--format md\|json]` | Added, removed and changed tools, schemas and names (informational) |
 | `mcpgp names accept <def> <tool…\|--all>` | Accept renames into `mcp-names.lock` |
-| `mcpgp build <def…\|--all> [--version <v>] [--frozen-lock] [--out <dir>]` | Compile + package |
+| `mcpgp build <def…\|--all> [--version <v>] [--build-number <n>] [--source <uri>] [--frozen-lock] [--manifest-only] [--out <dir>]` | Compile + package; `--manifest-only` writes only `dist/<name>-<version>.manifest.json` |
 | `mcpgp test <def> [--suite tests/]` | Start the built server against a mock generated from the specs; run smoke + user test cases |
 | `mcpgp sign <dist>` / `verify <zip>` | Sign checksums / verify a package |
 | `mcpgp migrate <def>` | Upgrade a definition to the current `apiVersion` |
@@ -56,6 +56,7 @@ Global flags: `--config`, `--workspace`, `--json` (machine-readable output), `--
 |---|---|
 | 0 | Success |
 | 1 | Validation or build errors |
+| 2 | Usage error (unknown command or option) |
 | 3 | Name drift with `--frozen-lock` (a name would change; run `names accept`) |
 | 4 | Tests failed |
 | 5 | Version mismatch (CLI vs `.mcpgp/config.yaml`) |

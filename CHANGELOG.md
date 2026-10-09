@@ -6,6 +6,11 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- `core` module, the compiler: multi-file definition resolution, Swagger 2.0 / OpenAPI 3.0 / 3.1
+  loading with overlays, selection, rules, the naming pipeline with `mcp-names.lock`, grouped input
+  schemas, and a deterministic manifest validated against its schema.
+- `cli` module: `mcpgp validate` and `mcpgp build --manifest-only`.
+- Conformance runner compares produced manifests with `expected/manifest.json`.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.
