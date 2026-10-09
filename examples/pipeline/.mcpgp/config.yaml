@@ -1,0 +1,11 @@
+cli: 0.4.2
+workspace: workspace
+servers:
+  - servers/orders/orders.mcpgp.yaml
+  - servers/orders-readonly/orders-readonly.mcpgp.yaml
+out: dist
+release:
+  versionFrom: contract       # server version = API version
+  baseline: last-release
+sign:
+  key: ${env:MCPGP_SIGNING_KEY}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "orders": {
+      "command": "java",
+      "args": ["-jar", "/opt/orders-mcp/orders-mcp.jar", "--config", "/opt/orders-mcp/orders-readonly.yaml"]
+    }
+  }
+}

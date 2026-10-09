@@ -1,0 +1,21 @@
+# Shipped in the package as docker/docker-compose.yml.
+# Air-gapped: `docker load -i orders-mcp-1.4.1.image.tar` first.
+services:
+  orders-mcp:
+    image: registry.vendor.example/orders-mcp:1.4.1
+    ports:
+      - "8080:8080"      # MCP
+      - "8081:8081"      # management: /health /ready /metrics
+    env_file: .env
+    environment:
+      ORDERS_MCP_SERVER__PUBLICURL: https://orders-mcp.acme.internal
+    volumes:
+      - ./orders-mcp.yaml:/app/orders-mcp.yaml:ro
+      - ./certs:/app/certs:ro
+      - audit:/var/log/orders-mcp
+    healthcheck:
+      test: ["CMD", "/app/orders-mcp", "doctor", "--quick"]
+      interval: 30s
+    restart: unless-stopped
+volumes:
+  audit: {}

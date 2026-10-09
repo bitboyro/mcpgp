@@ -1,0 +1,10 @@
+# OpenAPI Overlay 1.0: improve descriptions in the vendor's 2.0 spec without editing it.
+overlay: 1.0.0
+info: { title: Orders API 2.0 description fixes, version: 1.0.0 }
+actions:
+  - target: "$.paths['/orders'].get"
+    update:
+      description: Search orders by customer, status and time range. Newest first.
+  - target: "$.paths['/invoices/overdue'].get"
+    update:
+      summary: List overdue invoices

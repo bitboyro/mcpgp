@@ -1,0 +1,14 @@
+rules:
+  - match: { tag: customers }
+    description: { prepend: "[Orders] " }
+
+  - match: { operationId: createCustomer }
+    name: { set: customer_create }
+    title: { set: Create customer }
+    description: { append: " The account must exist; call orders_account_list first." }
+    params:
+      accountId:
+        description: { set: "Id of the account the customer belongs to." }
+
+  - match: { tag: customer-contacts }
+    title: { template: "{{summary}} (2.0 only)" }

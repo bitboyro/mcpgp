@@ -1,0 +1,72 @@
+# orders-mcp: multi-instance build, shared HTTP server.
+# Every tool requires `instance`: one of prod-eu, partner-x, test.
+server:
+  transport: http
+  host: 0.0.0.0
+  port: 8080
+  publicUrl: https://orders-mcp.acme.internal
+  basePath: /mcp
+  tls: proxy                     # TLS terminated by the reverse proxy
+  trustProxy: [10.0.0.0/8]
+  allowedOrigins: []
+  management: { port: 8081 }     # /health, /ready, /metrics
+  auth:
+    mode: oauth                  # none | static | oauth (within what the build allows)
+    issuer: https://login.acme.com
+    scopes:                      # token scope → what the client may use
+      orders.read: { access: read-only }
+      orders.write: { access: read-write }
+
+instances:
+  - id: prod-eu
+    baseUrl: https://orders-eu.acme.internal/api/v2
+    contract: auto
+    auth:
+      type: oauth2ClientCredentials
+      tokenUrl: https://login.acme.com/oauth2/token
+      clientId: ${env:EU_CLIENT_ID}
+      clientSecret: ${env:EU_CLIENT_SECRET}
+      scopes: [orders.read, orders.write]
+
+  - id: partner-x
+    baseUrl: https://orders.partner-x.example/api/v2
+    contract: "1.0"              # pinned; startup fails if the server reports another version
+    auth:
+      type: basic
+      username: ${env:CX_USER}
+      password: ${env:CX_PASS}
+
+  - id: test
+    baseUrl: https://orders-test.acme.internal/api/v2
+    contract: auto
+    readOnly: true
+    auth:
+      type: apiKey
+      value: ${env:TEST_API_KEY}
+    tls:
+      ca: { base64: "${env:TEST_CA_B64}" }       # internal CA, from a secret manager
+      clientCert: { path: ./certs/test-client.p12 }
+      password: ${env:TEST_P12_PASS}
+    timeoutSeconds: 60
+
+files:
+  base64: { enabled: true, maxKb: 2048 }   # remote clients can only send files inline
+  path: { enabled: false }
+
+audit:
+  file: { path: /var/log/orders-mcp/audit.jsonl, rotate: daily, retainDays: 90 }
+  arguments: hashed
+
+telemetry:
+  enabled: true
+  exporter: otlp
+  otlp: { endpoint: http://otel-collector:4317, protocol: grpc }
+  serviceName: orders-mcp
+
+packs:
+  jira:                          # without this block the Jira tools don't register
+    url: https://jira.acme.internal
+    project: ORDERS
+    token: ${env:JIRA_TOKEN}
+  recording:
+    dir: /var/lib/orders-mcp/recordings

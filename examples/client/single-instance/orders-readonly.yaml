@@ -1,0 +1,25 @@
+# orders-readonly: single-instance build, stdio only (desktop bundle or jar).
+# Tools have no `instance` parameter.
+instance:
+  baseUrl: https://orders.acme.internal/api/v2
+  contract: auto                 # auto | "1.0" | "2.0"
+  auth:
+    type: basic
+    username: ${env:ORDERS_USER}
+    password: ${env:ORDERS_PASS}
+  tls:
+    ca: { path: ./certs/acme-ca.pem }      # or { base64: ${env:ORDERS_CA_B64} }
+  timeoutSeconds: 30
+
+audit:
+  file:
+    path: ./audit/audit.jsonl
+    rotate: daily
+    retainDays: 30
+  arguments: redacted
+
+telemetry:
+  enabled: false
+
+logging:
+  level: info                    # stdio: logs go to stderr / file, never stdout

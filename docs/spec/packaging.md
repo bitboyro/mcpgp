@@ -1,0 +1,154 @@
+# Spec: builds, packages, support packs, client registration
+
+Status: **draft v1** · Owner: packager
+
+## 1. Package
+
+One signed archive per build: `<server>-<version>.zip`.
+
+```
+orders-mcp-1.4.1.zip
+├─ orders-mcp.jar                     if target jar (always for Java)
+├─ orders-mcp-1.4.1.mcpb              if target mcpb (desktop bundle)
+├─ docker/                          if target docker: docker-compose.yml, image.tar (if build.image.tar)
+├─ source/                          if generation.mode is codegen or both
+├─ orders-mcp.example.yaml            example runtime config for this build
+├─ server.config.schema.json        runtime config schema for this build
+├─ docs/                            README · INSTALL · CONFIGURATION · TOOLS · OPERATIONS · CHANGELOG
+├─ AGENTS.md · SKILL.md · llms.txt  if build.docs includes agents
+├─ manifest.json                    copy of the manifest embedded in the jar, for review and diff
+├─ SHA256SUMS · SHA256SUMS.sig
+└─ SIGNING-KEY.pub                  the builder's public key, also published by the builder elsewhere
+```
+
+**Self-contained rule:** the package runs on the customer's infrastructure and talks only to the
+customer's own systems and clients. Nothing in it contacts the platform, the vendor or the internet on its
+own. No licence checks, no update checks, no telemetry to the vendor. Any such feature is opt-in and
+off by default.
+
+## 2. Builds on the platform
+
+| Action | Rule |
+|---|---|
+| Download | Whole package or each part. Failed builds offer their log. |
+| Archive / restore | Archived builds leave the active list; still downloadable. |
+| Delete | Removes files. Record and audit entry stay. **Released builds must be archived first.** |
+| Retention | Auto-archive after N days, purge archived files after M days, always keep the last K per variant. Released builds are never purged automatically. |
+| Approve & publish | Required for builds started by agents (see platform guardrails). |
+
+## 3. Generated docs
+
+Generated from the manifest, so they always match the build:
+
+| File | Audience | Content |
+|---|---|---|
+| README.md | people | what it does, tool groups, quickstart |
+| INSTALL.md | people | each built format; client registration snippets |
+| CONFIGURATION.md | people | every runtime config key from the schema: default, env var, example |
+| TOOLS.md | people | tool catalog, availability per contract |
+| OPERATIONS.md | people | audit format, telemetry, health, error codes, Collector example |
+| CHANGELOG.md | people | from the manifest diff: added, renamed, removed tools |
+| AGENTS.md | agents | install, configure, verify, step by step |
+| SKILL.md | agents | how to use the tools well |
+| llms.txt | agents | index of the docs |
+
+## 4. Support packs
+
+A pack is a descriptor plus an implementation per runtime (or a sidecar).
+
+```yaml
+pack: recording
+version: 1
+group: observability
+tools:
+  - id: start
+    annotations: { readOnlyHint: false }
+  - id: stop
+  - id: list_calls
+    annotations: { readOnlyHint: true }
+  - id: list_sessions
+    annotations: { readOnlyHint: true }
+requires:
+  config: { schema: recording.config.schema.json }   # operator config; pack registers only when present
+  services: [audit-store]
+permissions: [support.recording]
+```
+
+- Pack tools go through naming, selection, annotations, audit and redaction like API tools.
+- A pack whose `requires.config` is missing at runtime does not register its tools and logs why.
+- A pack configured **incompletely** (e.g. issue tracker URL without a token) fails startup with an
+  error free of secrets, instead of registering broken tools.
+- Initial packs (P0), none of which needs anything outside the server: schema (`describe_schema`), audit,
+  diagnostics (`tls_certificate_fetch`, connectivity), health, recording, introspection.
+- Later (P1), because they need external systems or files: issue tracker (Jira),
+  skills, agent feedback.
+
+### 4.1 Pack behaviours
+
+| Pack | Tools | Behaviour |
+|---|---|---|
+| audit | `audit_list` | Reads the audit file, newest first, paged; filters by tool, instance, outcome, time. |
+| recording | `recording_start` (description) · `recording_stop` (findings) · `recording_list` · `recording_sessions` | Named, dated sessions capturing upstream request/response pairs, bodies included, redacted before storage. A recording doubles as a configuration capture (its GETs) and a behaviour probe (its writes). |
+| diagnostics | `tls_certificate_fetch`, connectivity and auth checks | Read-only; `tls_certificate_fetch` returns PEM chain, subject, issuer, validity, SHA-256 and a hostname warning; limited to configured instance hosts by default. |
+| issue tracker | `issue_<area>_create` / `_list` per configured area · `comment_create` / `comment_list` | Areas are configured by the operator with a title, a description and a destination (`local` file store or an issue tracker such as Jira). Area descriptions tell the agent to **list before creating** to avoid duplicates. |
+| skills | `skill_get` · `skill_update` · `skill_improve` · `skill_history` · `skill_test_generate` | Confined to configured paths. `skill_improve` **never applies a change**: it returns the current content and asks the agent to propose the change as an issue; `skill_update` only on an explicit user request. Every update is versioned in `skill_history`. |
+| introspection | `explain_tool`, `manifest_info` | Build and naming provenance; no network. |
+| schema | `describe_schema` | Full or summarized input schemas on demand, drill-down into one definition, `oneOf` variant narrowing (tools-contract §11). Bundled data only; no instance, no network. |
+
+All pack tools that return collections use the paged envelope (tools-contract §10) regardless of the
+API's `pagination` option, because their data is local.
+
+## 5. Client registration (`<server> client add`)
+
+Per client, an adapter described as data:
+
+| Client | Mechanism | Config location |
+|---|---|---|
+| Claude Code | `claude mcp add …` (preferred) or project `.mcp.json` | — |
+| Claude Desktop | edit `claude_desktop_config.json` (stdio); remote servers via the app's connector settings; or open the `.mcpb` | macOS `~/Library/Application Support/Claude/`, Windows `%APPDATA%\Claude\` |
+| Cursor | edit `mcp.json` (`mcpServers`) | `~/.cursor/` or project `.cursor/` |
+| VS Code | `code --add-mcp '<json>'` or `.vscode/mcp.json` (`servers`) | — |
+| other | `--print` | — |
+
+Rules: merge only this server's entry; back up before writing; `--dry-run` shows the diff; never write
+secrets into client configs.
+
+Snippets: [examples/client/mcp-clients](../../examples/client/mcp-clients).
+
+## 7. Signing and images
+
+### 7.1 Signing
+
+- **Package signature (default):** `SHA256SUMS` lists every file in the package with its SHA-256;
+  `SHA256SUMS.sig` is a detached signature made with the builder's **key pair** (Ed25519,
+  minisign-compatible format). Verification works fully offline:
+  `<server> verify` or `mcpgp verify <zip> --key SIGNING-KEY.pub`.
+- The private key comes from a secret reference (`build.sign.key`), never from the definition files.
+  Customers should check the public key against one the builder publishes separately (website,
+  contract, email), not only the copy in the package.
+- **Jar signing (optional):** when `build.jarSigning` is set, the jar is signed with `jarsigner`
+  using a company code-signing certificate, so customers that trust the company CA can verify the jar
+  on its own.
+
+### 7.2 Container image (`docker` target)
+
+- Default base: **Eclipse Temurin JRE** (the Java version the runtime needs); `build.image.base`
+  chooses another (e.g. a company-approved or Red Hat UBI image).
+- Runs as a non-root user; the storage root and the config are mounted volumes
+  (`/data` → `storage.root`, `/config`); ports: MCP and, if set, management.
+- Delivery: `push: true` pushes to `build.image.registry`; `tar: true` adds `docker/image.tar` to the
+  package for customers without registry access; both can be on.
+- The image digest is recorded in the build report and in `SHA256SUMS`.
+
+### 7.3 Kubernetes
+
+Not provided for now. Customers deploy the image with their own manifests. Plain manifests or a Helm
+chart can be added when a customer asks.
+
+## 6. Security considerations
+
+- Packages are self-contained and never contact the platform or vendor (ADR-0003).
+- Checksums are signed; `verify` checks them before install.
+- `manifest.json` lists every extension and its checksum.
+
+See [../security.md](../security.md).

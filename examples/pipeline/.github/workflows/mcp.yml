@@ -1,0 +1,46 @@
+name: mcp-servers
+
+on:
+  pull_request:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write          # release assets
+  pull-requests: write     # diff comment
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/example/mcpgp:0.4.2    # pin by digest in real use: @sha256:…
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }           # tags needed for `diff --against last-release`
+
+      - name: Validate
+        run: mcpgp validate --all
+
+      - name: Diff against last release
+        run: mcpgp diff --all --against last-release --format md > diff.md
+
+      - name: Comment diff on PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with: { path: diff.md }
+
+      - name: Build
+        run: mcpgp build --all --frozen-lock     # version follows the API (contract) version
+
+      - name: Test against mocks
+        run: mcpgp test --all
+
+      - name: Sign
+        if: github.ref_type == 'tag'
+        env: { MCPGP_SIGNING_KEY: "${{ secrets.MCPGP_SIGNING_KEY }}" }
+        run: mcpgp sign dist/
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with: { files: "dist/*" }

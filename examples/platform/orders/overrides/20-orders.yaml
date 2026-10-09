@@ -1,0 +1,7 @@
+rules:
+  - match: { tag: orders }
+    description: { prepend: "[Orders] " }
+
+  - match: { operationId: "~^refund" }
+    name: { template: "order_refund" }
+    description: { append: " Only paid orders can be refunded." }

@@ -1,0 +1,8 @@
+# Maps workspace references to local paths for CLI use.
+workspace: acme
+servers:
+  orders-mcp: ../orders/orders.mcpgp.yaml
+contracts:
+  orders@2.0: ../orders/contracts/orders-2.0.yaml
+naming:
+  acme-standard@2: naming/acme-standard.yaml

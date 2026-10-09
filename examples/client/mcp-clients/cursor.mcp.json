@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "orders": {
+      "url": "https://orders-mcp.acme.internal/mcp"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "orders": {
+      "type": "http",
+      "url": "https://orders-mcp.acme.internal/mcp"
+    }
+  }
+}
