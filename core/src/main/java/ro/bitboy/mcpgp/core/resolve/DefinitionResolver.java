@@ -264,7 +264,7 @@ public final class DefinitionResolver {
         }
 
         private List<Path> includedFiles(String pattern, Path file, Path root, Location location) {
-            if (isRemote(pattern) || Workspace.isReference(pattern)) {
+            if (ProjectPaths.isRemote(pattern) || Workspace.isReference(pattern)) {
                 return reference(pattern, file, root, location).map(List::of).orElse(List.of());
             }
             Path base = file.getParent();
@@ -355,11 +355,6 @@ public final class DefinitionResolver {
          * a workspace reference, or — never allowed here — a remote URL.
          */
         private Optional<Path> reference(String ref, Path from, Path root, Location location) {
-            if (isRemote(ref)) {
-                diagnostics.error(Codes.REMOTE_REFERENCE_NOT_ALLOWED,
-                        "Remote reference '" + ref + "' is not allowed; commit the file to the project", location);
-                return Optional.empty();
-            }
             if (Workspace.isReference(ref)) {
                 Optional<Path> target = workspace.resolve(ref);
                 if (target.isEmpty()) {
@@ -374,30 +369,9 @@ public final class DefinitionResolver {
                 files.add(target.get());
                 return target;
             }
-            Path candidate = Path.of(ref);
-            if (candidate.isAbsolute()) {
-                diagnostics.error(Codes.PATH_OUTSIDE_ROOT, "Absolute path '" + ref + "' is not allowed; use a path relative to the project", location);
-                return Optional.empty();
-            }
-            Path resolved = from.getParent().resolve(candidate).normalize();
-            if (!checkInside(resolved, root, ref, location)) {
-                return Optional.empty();
-            }
-            if (!Files.isRegularFile(resolved)) {
-                diagnostics.error(Codes.FILE_NOT_FOUND, "File not found: '" + ref + "'", location);
-                return Optional.empty();
-            }
-            try {
-                if (!resolved.toRealPath().startsWith(root.toRealPath())) {
-                    diagnostics.error(Codes.PATH_OUTSIDE_ROOT, "Path '" + ref + "' leaves the project root through a link", location);
-                    return Optional.empty();
-                }
-            } catch (IOException e) {
-                diagnostics.error(Codes.FILE_UNREADABLE, "Cannot read '" + ref + "': " + e.getMessage(), location);
-                return Optional.empty();
-            }
-            files.add(resolved);
-            return Optional.of(resolved);
+            Optional<Path> resolved = ProjectPaths.resolveLocal(ref, from, root, diagnostics, location);
+            resolved.ifPresent(files::add);
+            return resolved;
         }
 
         private boolean checkInside(Path resolved, Path root, String ref, Location location) {
@@ -443,10 +417,6 @@ public final class DefinitionResolver {
         private String display(Path file) {
             return slash(primaryRoot.relativize(file));
         }
-    }
-
-    private static boolean isRemote(String ref) {
-        return ref.startsWith("http://") || ref.startsWith("https://");
     }
 
     private static String slash(Path path) {

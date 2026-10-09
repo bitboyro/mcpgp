@@ -23,6 +23,15 @@ public final class Codes {
     public static final String DUPLICATE_KEY = "DUPLICATE_KEY";
     public static final String DEFAULT_CONTRACT_AMBIGUOUS = "DEFAULT_CONTRACT_AMBIGUOUS";
 
+    // contracts (OpenAPI)
+    public static final String SPEC_INVALID = "SPEC_INVALID";
+    public static final String SPEC_VERSION_UNSUPPORTED = "SPEC_VERSION_UNSUPPORTED";
+    public static final String REF_UNRESOLVED = "REF_UNRESOLVED";
+    public static final String OPERATION_ID_DUPLICATE = "OPERATION_ID_DUPLICATE";
+    public static final String UNSUPPORTED_FEATURE = "UNSUPPORTED_FEATURE";
+    public static final String OVERLAY_INVALID = "OVERLAY_INVALID";
+    public static final String OVERLAY_TARGET_MATCHES_NOTHING = "OVERLAY_TARGET_MATCHES_NOTHING";
+
     private Codes() {
     }
 }
