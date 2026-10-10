@@ -98,6 +98,10 @@ permissions: [support.recording]
 All pack tools that return collections use the paged envelope (tools-contract §10) regardless of the
 API's `pagination` option, because their data is local.
 
+A runtime offers only the tools it implements: a pack tool (or built-in) in the manifest that the
+runtime version doesn't implement yet is left out of `tools/list` and can't be called; startup logs
+which ones.
+
 ## 5. Client registration (`<server> client add`)
 
 Per client, an adapter described as data:

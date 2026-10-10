@@ -35,6 +35,11 @@ versions follow [SemVer](https://semver.org).
   `none` (loopback) and `static` (constant-time bearer keys, key name as audit actor),
   `/health/live` and `/health/ready`, optional management port. `oauth` inbound mode stops startup
   with a clear message until it is implemented.
+- Runtime: discovery tools (`search_tools` / `describe_tool` / `call_tool`, and the catalog style),
+  BM25 ranking, filtered by the instance's contract; packs audit (`audit_list`), introspection
+  (`explain_tool`, `manifest_info`), schema (`describe_schema`) and diagnostics
+  (`tls_certificate_fetch`, `connectivity_check`). Tools the runtime doesn't implement yet are not
+  offered.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.
