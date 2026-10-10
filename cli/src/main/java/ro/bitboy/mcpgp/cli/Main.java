@@ -216,7 +216,7 @@ public final class Main {
                 common.spec.commandLine().getErr().println("error: build.sign.key: " + e.getMessage());
                 return ERRORS;
             }
-            Packager.Result packaged = new Packager(() -> Main.class.getResourceAsStream(Packager.RUNTIME_RESOURCE))
+            Packager.Result packaged = new Packager(Packager::runtimeJar)
                     .build(manifest, document, build.createdAt(), out, signing);
             packaged.warnings().forEach(w -> common.spec.commandLine().getErr().println("warning: " + w));
             if (!common.json && !common.quiet) {

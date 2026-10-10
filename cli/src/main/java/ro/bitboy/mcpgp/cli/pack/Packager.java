@@ -28,8 +28,8 @@ import java.util.stream.Stream;
  */
 public final class Packager {
 
-    /** Where the CLI carries the runtime jar. */
-    public static final String RUNTIME_RESOURCE = "/mcpgp/runtime.jar";
+    /** Names the runtime jar the CLI carries (see {@link #runtimeJar()}). */
+    static final String RUNTIME_PROPERTIES = "/mcpgp/runtime.properties";
     /** Where the server jar carries its manifest (Manifest.CLASSPATH_LOCATION inside Spring Boot's layout). */
     public static final String MANIFEST_ENTRY = "BOOT-INF/classes/mcpgp/manifest.json";
     private static final List<String> TARGETS = List.of("jar");
@@ -45,7 +45,19 @@ public final class Packager {
         InputStream open() throws IOException;
     }
 
-    /** @param runtime the runtime jar (normally {@link #RUNTIME_RESOURCE} from the CLI's own jar) */
+    /** The runtime jar carried by this CLI, as a stream (null when the CLI was built without it). */
+    public static InputStream runtimeJar() throws IOException {
+        java.util.Properties properties = new java.util.Properties();
+        try (InputStream in = Packager.class.getResourceAsStream(RUNTIME_PROPERTIES)) {
+            if (in == null) {
+                return null;
+            }
+            properties.load(in);
+        }
+        return Packager.class.getResourceAsStream(properties.getProperty("jar", ""));
+    }
+
+    /** @param runtime the runtime jar (normally {@link #runtimeJar()}) */
     public Packager(InputStreamSource runtime) {
         this.runtime = runtime;
     }
@@ -83,7 +95,7 @@ public final class Packager {
             Path runtimeJar = staging.resolve(".runtime.jar");
             try (InputStream in = runtime.open()) {
                 if (in == null) {
-                    throw new IOException("this CLI was built without the server runtime (" + RUNTIME_RESOURCE + ")");
+                    throw new IOException("this CLI was built without the server runtime jar (see " + RUNTIME_PROPERTIES + ")");
                 }
                 Files.copy(in, runtimeJar);
             }

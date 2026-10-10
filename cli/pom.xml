@@ -43,29 +43,36 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
     <plugins>
-      <!-- the CLI carries the server runtime, so `mcpgp build` needs neither Maven nor the network -->
+      <!-- the CLI carries the server runtime, so `mcpgp build` needs neither Maven nor the network.
+           The runtime module is built first (module order); its exec jar is copied in as a resource. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
+        <artifactId>maven-resources-plugin</artifactId>
         <executions>
           <execution>
             <id>bundle-runtime</id>
             <phase>generate-resources</phase>
             <goals>
-              <goal>copy</goal>
+              <goal>copy-resources</goal>
             </goals>
             <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>ro.bitboy.mcpgp</groupId>
-                  <artifactId>mcpgp-runtime</artifactId>
-                  <version>${project.version}</version>
-                  <classifier>exec</classifier>
-                  <outputDirectory>${project.build.outputDirectory}/mcpgp</outputDirectory>
-                  <destFileName>runtime.jar</destFileName>
-                </artifactItem>
-              </artifactItems>
+              <outputDirectory>${project.build.outputDirectory}/mcpgp/runtime</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/../runtime/target</directory>
+                  <includes>
+                    <include>mcpgp-runtime-${project.version}-exec.jar</include>
+                  </includes>
+                  <filtering>false</filtering>
+                </resource>
+              </resources>
             </configuration>
           </execution>
         </executions>
