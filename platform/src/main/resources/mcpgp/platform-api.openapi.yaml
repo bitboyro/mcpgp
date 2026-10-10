@@ -100,6 +100,18 @@ paths:
       responses:
         "200": { description: Manifest, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/versions/{version}/example-config:
+    get:
+      operationId: getExampleConfig
+      tags: [servers]
+      summary: Example configuration
+      description: The example configuration the version's package ships, with secrets as references only.
+      parameters:
+        - $ref: "#/components/parameters/ServerId"
+        - $ref: "#/components/parameters/Version"
+      responses:
+        "200": { description: The example configuration, content: { application/yaml: { schema: { type: string } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/duplicate:
     parameters: [ { $ref: "#/components/parameters/ServerId" } ]
     post:
@@ -321,6 +333,33 @@ paths:
       responses:
         "201": { description: Signed in, content: { application/json: { schema: { $ref: "#/components/schemas/Token" } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /sessions/current:
+    delete:
+      operationId: signOut
+      tags: [identities]
+      summary: Sign out
+      description: Revokes the session token in use (and clears the web UI's session cookie). API tokens are revoked with revokeToken instead.
+      responses:
+        "200": { description: Signed out, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /platform:
+    get:
+      operationId: getSignInOptions
+      tags: [identities]
+      summary: Sign-in options
+      description: Which ways of signing in this installation offers. No bearer token needed.
+      security: []
+      responses:
+        "200": { description: Sign-in options, content: { application/json: { schema: { type: object, properties: { auth: { type: object, properties: { local: { type: boolean }, oidc: { type: boolean } } } } } } } }
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [identities]
+      summary: Platform settings
+      description: The workspace name, sign-in options, whether a signing key is configured, build retention and agent guardrails.
+      responses:
+        "200": { description: Settings, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /identities/{identityId}/password:
     put:
       operationId: setPassword
@@ -468,6 +507,7 @@ paths:
       summary: List activity
       parameters:
         - { name: target, in: query, schema: { type: string } }
+        - { name: server, in: query, schema: { type: string }, description: "A server id: its own entries and those of its builds." }
         - { name: actor, in: query, schema: { type: string } }
         - { name: action, in: query, schema: { type: string }, description: Action or its prefix, e.g. version. }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }

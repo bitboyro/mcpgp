@@ -84,6 +84,18 @@ versions follow [SemVer](https://semver.org).
 - Platform-side and client-side examples.
 - Development process, roadmap, contribution guidelines, issue and PR templates.
 
+- Web UI (M6, slice 1), served by the platform at `/`: React + Vite in `platform/web`, built into
+  the jar. Sign-in with local accounts; All servers with duplicate / variant / new server; per
+  server Overview (agent, customer setup, package and checks previews), Tools & rules with
+  provenance, Connections, Sources (versions, files, uploads, checks), Builds (live log, downloads,
+  release, archive, delete) and Activity; Shared library, All builds, API & agents (identities,
+  tokens shown once, approvals). Bundled Geist fonts; nothing loaded from other hosts.
+- Platform API: web UI sessions as an HttpOnly, SameSite=Strict cookie, with cookie-authenticated
+  changes accepted only with the web client's header from the platform's own origin;
+  `DELETE /sessions/current` (sign out), `GET /platform` (sign-in options, no token),
+  `GET /settings`, `GET /servers/{id}/versions/{version}/example-config`, and `GET /activity?server=`;
+  security headers (CSP, nosniff, no framing, no referrer) on every answer.
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 

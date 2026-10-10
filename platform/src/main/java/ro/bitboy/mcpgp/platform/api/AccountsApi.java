@@ -2,8 +2,11 @@ package ro.bitboy.mcpgp.platform.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,12 +24,14 @@ import ro.bitboy.mcpgp.platform.service.Transfer;
 import ro.bitboy.mcpgp.platform.store.Model;
 import ro.bitboy.mcpgp.platform.store.Store;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Sign-in with local accounts, passwords, approvals, export and import (spec/platform-api.md §3, §5, §7.1). */
+/** Sign-in with local accounts, sign-out, sign-in options and settings, passwords, approvals, export and import (spec/platform-api.md §3, §5, §7.1). */
 @RestController
 @RequestMapping("/api/v1")
 public class AccountsApi {
@@ -45,17 +50,64 @@ public class AccountsApi {
         this.config = config;
     }
 
-    /** {@code {name, password}} → a session token (12 hours). The only endpoint without a token. */
+    /**
+     * {@code {name, password}} → a session token (12 hours). The web UI (header {@code X-Mcpgp-Client: web})
+     * gets it as an HttpOnly cookie instead of in the body, so its scripts never hold the token.
+     */
     @PostMapping("/sessions")
-    public ResponseEntity<byte[]> signIn(@RequestBody(required = false) byte[] body) {
+    public ResponseEntity<byte[]> signIn(HttpServletRequest request, @RequestBody(required = false) byte[] body) {
         if (!config.localAccounts()) {
             throw new ApiException(404, "NOT_FOUND", "local accounts are turned off; sign in with your company account");
         }
         JsonNode json = Json.parse(body);
         Access.IssuedToken token = accounts.signIn(json.path("name").asText(null), json.path("password").asText(null));
         Map<String, Object> result = IdentitiesApi.token(token.record());
+        if (AuthFilter.isWeb(request)) {
+            return ResponseEntity.status(201).header(HttpHeaders.SET_COOKIE, sessionCookie(request, token.value(), Accounts.SESSION).toString())
+                    .contentType(MediaType.APPLICATION_JSON).body(Json.status(201, result).getBody());
+        }
         result.put("value", token.value());
         return Json.status(201, result);
+    }
+
+    /** Signs out: revokes the session token in use and clears the web UI's cookie. API tokens are revoked with DELETE /tokens/{id}. */
+    @DeleteMapping("/sessions/current")
+    public ResponseEntity<byte[]> signOut(HttpServletRequest request) {
+        Access.Principal who = ServersApi.who(request);
+        Model.Token token = store.tokens().stream().filter(t -> t.id().equals(who.token())).findFirst().orElseThrow();
+        if (!"session".equals(token.label())) {
+            throw new ApiException(409, "CONFLICT", "this is an API token, not a session; revoke it with DELETE /tokens/" + token.id());
+        }
+        store.saveToken(new Model.Token(token.id(), token.identity(), token.hash(), token.scopes(), token.label(), token.created(),
+                token.expires(), true));
+        store.append(new Model.Activity(Instant.now().toString(), who.identity().name(), who.identity().kind(), "signout",
+                who.identity().name(), "ok", Map.of("token", token.id())));
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, sessionCookie(request, "", Duration.ZERO).toString())
+                .contentType(MediaType.APPLICATION_JSON).body(Json.ok(Map.of("signedOut", true)).getBody());
+    }
+
+    /** How people can sign in; needed before signing in, so it has no token and tells nothing else. */
+    @GetMapping("/platform")
+    public ResponseEntity<byte[]> platform() {
+        return Json.ok(Map.of("auth", Map.of("local", config.localAccounts(), "oidc", false)));
+    }
+
+    /** The installation's settings, as far as builders need them (spec/platform-api.md §7). */
+    @GetMapping("/settings")
+    public ResponseEntity<byte[]> settings(HttpServletRequest request) {
+        ServersApi.who(request).require("servers:read");
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("workspace", config.workspace());
+        body.put("auth", Map.of("local", config.localAccounts(), "oidc", false));
+        body.put("signing", Map.of("configured", config.signingKey() != null && !config.signingKey().isBlank()));
+        body.put("retention", config.retention());
+        body.put("guardrails", config.guardrails());
+        return Json.ok(body);
+    }
+
+    static ResponseCookie sessionCookie(HttpServletRequest request, String value, Duration maxAge) {
+        boolean https = request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"));
+        return ResponseCookie.from(AuthFilter.COOKIE, value).httpOnly(true).secure(https).sameSite("Strict").path("/").maxAge(maxAge).build();
     }
 
     /** {@code {password, currentPassword?}}: admins set anyone's; people change their own with the current one. */

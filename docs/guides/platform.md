@@ -22,6 +22,33 @@ Environment variables `MCPGP_PLATFORM_STORAGE__ROOT`, `MCPGP_PLATFORM_HTTP__HOST
 `MCPGP_PLATFORM_HTTP__PORT` override the file. Back up by copying the storage root while the
 platform is stopped. TLS: put the platform behind your reverse proxy for now.
 
+## The web UI
+
+Open `http://<host>:<port>/` (for example `http://127.0.0.1:8443/`) and sign in with a local account.
+Give the administrator a password once, either with `MCPGP_PLATFORM_ADMIN_PASSWORD` set when you run
+`init`, or with the admin token:
+
+```bash
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"password":"<at least 12 characters>"}' localhost:8443/api/v1/identities/<id>/password
+```
+
+The pages: **All servers** (duplicate, variant, upload a new server), and per server **Overview**
+(what agents get, what the customer configures, the package, the checks), **Tools & rules** (each
+tool as the agent gets it, and why), **Connections**, **Sources** (versions, files, upload a new
+version), **Builds** (download, release, archive, delete) and **Activity**; plus the **Shared library**,
+**All builds**, **Activity** and **API & agents** (identities, tokens, approvals). The UI uses the same
+API as everyone else; nothing it does is UI-only. Settings that change the definition are made in its
+files for now (upload a new version); editing them on the page comes next.
+
+The session is an HttpOnly cookie valid 12 hours. Behind a reverse proxy that terminates TLS, pass
+`X-Forwarded-Proto: https` so the cookie is marked `Secure`, and keep the `Host` header (the platform
+compares a browser's `Origin` with it).
+
+Working on the UI itself: `cd platform/web && npm run dev` serves it on `127.0.0.1:5173` with `/api`
+proxied to a platform on port 8443 (`MCPGP_API_PORT` picks another). `mvn -pl platform package`
+builds it into the jar; `-Dskip.installnodenpm -Dskip.npm` leaves it out.
+
 ## First steps with the API
 
 ```bash

@@ -133,10 +133,12 @@ public class IdentitiesApi {
 
     @GetMapping("/activity")
     public ResponseEntity<byte[]> activity(HttpServletRequest request, @RequestParam(required = false) String target,
-                                           @RequestParam(required = false) String actor, @RequestParam(required = false) String action,
+                                           @RequestParam(required = false) String server, @RequestParam(required = false) String actor, @RequestParam(required = false) String action,
                                            @RequestParam(defaultValue = "50") int limit) {
         ServersApi.who(request).require("servers:read");
+        // server: the server's own entries and those of its builds (which name it in their details)
         List<Model.Activity> items = store.activity(a -> (target == null || target.equals(a.target()))
+                && (server == null || server.equals(a.target()) || a.details() != null && server.equals(a.details().get("server")))
                 && (actor == null || actor.equals(a.actor())) && (action == null || a.action().startsWith(action)),
                 Math.max(1, Math.min(200, limit)));
         return Json.ok(Map.of("items", items));

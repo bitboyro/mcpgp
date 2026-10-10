@@ -42,6 +42,8 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
 - `POST /servers/{id}/versions/{version}/validate` returns the compiler's diagnostics.
 - `GET /servers/{id}/versions/{version}/manifest` returns the manifest (compiled on demand, cached by
   digest): what agents will get, with provenance. This is what the UI's previews show.
+- `GET /servers/{id}/versions/{version}/example-config` returns the example configuration the
+  version's package will ship (what the customer fills in), with secrets as references only.
 - **Duplicate:** `POST /servers/{id}/duplicate { id, title }`: an independent copy of the current
   version's files. **Variant:** `POST /servers/{id}/variants { id, title, pin? }`: a new server whose
   definition `extends` this one (`@latest`, or `@<version>` with `pin`) and stores only its overrides.
@@ -95,7 +97,16 @@ compiles (the CLI does the same with `--workspace`).
   user) and prints a one-time admin token; with `MCPGP_PLATFORM_ADMIN_PASSWORD` set, the administrator
   also gets a local password.
 - **Sign-in:** `POST /api/v1/sessions { name, password }` → a session token (12 hours); an unknown name
-  and a wrong password get the same answer. `PUT /identities/{id}/password` sets a password (admins:
+  and a wrong password get the same answer. `GET /api/v1/platform` (no token) says which ways of
+  signing in the installation offers. `DELETE /api/v1/sessions/current` signs out (revokes the session
+  token; API tokens are revoked with `DELETE /tokens/{id}` instead).
+- **Web UI sessions:** the web UI sends `X-Mcpgp-Client: web` on every request. Its sign-in answer
+  carries the session token only as a cookie (`mcpgp_session`; `HttpOnly`, `SameSite=Strict`, `Path=/`,
+  `Secure` over HTTPS), never in the body, so the page's scripts can't read it. A request authenticated
+  by that cookie that changes something (anything but `GET`/`HEAD`/`OPTIONS`) must carry the header,
+  and its `Origin`, when present, must name the host it was sent to; otherwise `403`. Other sites can
+  send neither without a CORS preflight, which the platform never grants. Requests with an
+  `Authorization` header are unaffected. `PUT /identities/{id}/password` sets a password (admins:
   anyone's; people: their own, with the current one). `auth.local.enabled: false` turns local accounts
   off.
 
@@ -142,8 +153,9 @@ Roles bundle scopes: **viewer** (`servers:read`), **builder** (viewer + `servers
 
 Append-only: `ts`, `actor` (identity, kind, via token or session), `action` (`server.create`,
 `version.create`, `build.start`, `build.finish`, `build.release`, `artifact.download`, `approval.decide`,
-`identity.create`, `token.create`, `signin`, …), `target`, `outcome`, details. `GET /activity` with
-filters (server, actor, action, time). Never contains secrets or token values.
+`identity.create`, `token.create`, `signin`, `signout`, …), `target`, `outcome`, details. `GET /activity`
+with filters: `target`, `server` (the server's own entries and those of its builds), `actor`, `action`
+(or its prefix), `limit`. Never contains secrets or token values.
 
 ## 7. Platform configuration and storage
 
@@ -198,6 +210,13 @@ records). From 1.0.0 the format is migrated forward automatically on start, with
 - Builds run the compiler and packager only; nothing from a definition is executed (extensions are
   compiled code the builder adds to the platform, never uploaded with a definition).
 - Tokens and passwords are stored as hashes; the signing key and OIDC secret are references.
+- `GET /settings` gives builders the workspace name, sign-in options, whether a signing key is
+  configured (never the key), retention and guardrails.
+- The web UI (M6) is served by the platform itself, from its own origin: every answer carries a
+  Content-Security-Policy allowing only the platform's own scripts, styles, fonts and API
+  (`default-src 'self'`, no inline scripts or styles, no framing), `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: no-referrer` and `X-Frame-Options: DENY`. Fonts are bundled; the UI loads nothing
+  from other hosts. After sign-in it only returns to paths on the platform.
 - The activity log is append-only through the API; it records identities, never secrets.
 
 See [../security.md](../security.md).

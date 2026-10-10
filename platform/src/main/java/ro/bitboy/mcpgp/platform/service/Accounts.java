@@ -28,7 +28,7 @@ public final class Accounts {
     static final int MIN_LENGTH = 12;
     static final int MAX_FAILURES = 5;
     static final Duration LOCK = Duration.ofMinutes(15);
-    static final Duration SESSION = Duration.ofHours(12);
+    public static final Duration SESSION = Duration.ofHours(12);
     private static final SecureRandom RANDOM = new SecureRandom();
     /** Hashed when there is no such account, so the answer takes the same time. */
     private static final byte[] DUMMY_SALT = new byte[16];
