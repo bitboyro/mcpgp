@@ -102,6 +102,12 @@ versions follow [SemVer](https://semver.org).
   list items; comments and formatting kept; dry run; refused when stale, not compilable, or not
   editable as text).
 
+- Platform: company sign-in with OpenID Connect (authorization code with PKCE, through Spring
+  Security) and LDAP / Active Directory (search and bind; encrypted connections only); groups map to
+  roles, people in no mapped group get no identity, the first sign-in links the administrator `init`
+  created (by verified email for OIDC). Identities record the account they sign in with.
+- Web UI: the sign-in page offers the company account and says when directory accounts work.
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 

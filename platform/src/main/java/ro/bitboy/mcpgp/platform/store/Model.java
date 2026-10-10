@@ -60,7 +60,16 @@ public final class Model {
     }
 
     /** A person, agent or pipeline. */
-    public record Identity(String id, String kind, String name, Set<String> scopes, String owner, String created, boolean disabled) {
+    /**
+     * {@code external}: the directory account a person signs in with ({@code oidc:<issuer>|<sub>} or
+     * {@code ldap:<dn>}), or null. Identities the platform created from a directory have the owner
+     * {@code directory}; their scopes follow the person's groups at every sign-in.
+     */
+    public record Identity(String id, String kind, String name, Set<String> scopes, String owner, String created, boolean disabled,
+                           String external) {
+        public Identity(String id, String kind, String name, Set<String> scopes, String owner, String created, boolean disabled) {
+            this(id, kind, name, scopes, owner, created, disabled, null);
+        }
     }
 
     /** An API token: only the hash of its secret is stored. */

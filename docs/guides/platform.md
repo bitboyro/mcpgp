@@ -44,6 +44,14 @@ the preview shows the result before anything is saved, Review shows the lines of
 change, and Save makes the next version. Everything else is changed in the files (upload a new
 version on Sources).
 
+**Company sign-in.** Add `auth.oidc` (SSO) or `auth.ldap` (the directory) to `platform.yaml`; the
+sign-in page then offers them (the keys: [spec/platform-api.md §7](../spec/platform-api.md#7-platform-configuration-and-storage)).
+Register the platform at your identity provider with the redirect URI
+`<publicUrl>/login/oauth2/code/oidc`, and set `http.publicUrl` when the platform is behind a proxy.
+Map your groups to roles under `roles`: people in no mapped group can't sign in. Run `init --admin`
+with the administrator's email (OIDC) or directory user name (LDAP), so their first company sign-in
+becomes that administrator; `auth.local.enabled: false` then turns local accounts off.
+
 The session is an HttpOnly cookie valid 12 hours. Behind a reverse proxy that terminates TLS, pass
 `X-Forwarded-Proto: https` so the cookie is marked `Secure`, and keep the `Host` header (the platform
 compares a browser's `Origin` with it).

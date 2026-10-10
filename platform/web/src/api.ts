@@ -70,6 +70,8 @@ export interface Identity {
   created: string
   disabled: boolean
   tokenScopes?: string[]
+  signsInWith?: 'oidc' | 'ldap'
+  rolesFromGroups?: boolean
 }
 
 export interface Token {
@@ -168,9 +170,11 @@ export interface LibraryItem {
   updated: string
 }
 
+export interface SignInOptions { local: boolean; ldap: boolean; oidc: boolean; oidcLabel?: string }
+
 export interface Settings {
   workspace: string
-  auth: { local: boolean; oidc: boolean }
+  auth: SignInOptions
   signing: { configured: boolean }
   retention: { archiveAfterDays: number; deleteArchivedAfterDays: number; keepLast: number }
   guardrails: { agentBuildsPerHour: number; agentVersionsPerHour: number }
@@ -235,7 +239,7 @@ export interface EditPreview {
 }
 
 export const api = {
-  signInOptions: () => json<{ auth: { local: boolean; oidc: boolean } }>('GET', '/platform'),
+  signInOptions: () => json<{ auth: SignInOptions }>('GET', '/platform'),
   signIn: (name: string, password: string) => json<Token>('POST', '/sessions', { name, password }),
   signOut: () => json<{ signedOut: boolean }>('DELETE', '/sessions/current'),
   me: () => json<Identity>('GET', '/me'),

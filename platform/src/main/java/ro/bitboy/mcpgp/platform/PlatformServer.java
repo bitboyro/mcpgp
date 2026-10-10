@@ -31,7 +31,11 @@ import java.util.Set;
  * The platform: {@code java -jar mcpgp-platform.jar [--config platform.yaml]}, and
  * {@code init --admin <name>} once to create the first administrator.
  */
-@SpringBootApplication(proxyBeanMethods = false)
+// Spring Security only does OIDC sign-in (SignInSecurity), from platform.yaml: no generated password, no spring.security.* clients
+@SpringBootApplication(proxyBeanMethods = false, exclude = {
+        org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration.class,
+        org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration.class,
+        org.springframework.boot.security.oauth2.client.autoconfigure.servlet.OAuth2ClientWebSecurityAutoConfiguration.class})
 public class PlatformServer {
 
     public static void main(String[] args) {
@@ -121,8 +125,11 @@ public class PlatformServer {
     }
 
     @Bean
-    Accounts accounts(Store store, Access access) {
-        return new Accounts(store, access, java.time.Clock.systemUTC());
+    Accounts accounts(Store store, Access access, PlatformConfig config) {
+        ro.bitboy.mcpgp.platform.service.Directory directory = config.ldap() == null ? null
+                : new ro.bitboy.mcpgp.platform.service.Directory(config.ldap(), System.getenv());
+        return new Accounts(store, access, java.time.Clock.systemUTC(), config.localAccounts(), directory,
+                config.ldap() == null ? Map.of() : config.ldap().roles());
     }
 
     @Bean
