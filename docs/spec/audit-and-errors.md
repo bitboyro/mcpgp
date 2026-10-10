@@ -40,7 +40,7 @@ build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `auth
 |---|---|
 | `server.start` / `server.stop` | process lifecycle; includes config hash, never config values |
 | `session.start` / `session.end` | MCP session (HTTP stateful) or process (stdio) |
-| `auth.inbound` | inbound auth decision |
+| `auth.inbound` | inbound auth decision: refused requests (no or unknown key, foreign `Origin`); accepted ones show as the `actor` of their events |
 | `tool.call` | every tool call |
 | `tool.confirm` | confirmation asked / given / refused |
 | `instance.health` | instance status change (healthy, degraded, unreachable) |

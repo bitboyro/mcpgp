@@ -43,7 +43,8 @@ class ConfigLoaderTest {
                 REPO, Map.of("EU_CLIENT_ID", "eu", "EU_CLIENT_SECRET", "s1", "CX_USER", "cx", "CX_PASS", "s2",
                         "TEST_API_KEY", "s3", "TEST_CA_B64", ro.bitboy.mcpgp.runtime.TestCerts.base64(CERTS.serverPem),
                         "TEST_P12_PASS", ro.bitboy.mcpgp.runtime.TestCerts.PASSWORD, "JIRA_TOKEN", "s5"),
-                Map.of("instances.2.tls.clientCert.path", CERTS.clientP12.toString())));
+                // oauth inbound auth comes later; everything else of the example is checked in stdio mode
+                Map.of("instances.2.tls.clientCert.path", CERTS.clientP12.toString(), "server.transport", "stdio")));
         assertThat(config.instances().get("orders").get(2).tlsContext()).isNotNull();
         assertThat(config.instances().get("orders")).extracting(RuntimeConfig.Instance::id).containsExactly("prod-eu", "partner-x", "test");
         RuntimeConfig.Instance test = config.instances().get("orders").get(2);
@@ -52,8 +53,13 @@ class ConfigLoaderTest {
         assertThat(test.auth().path("value").asText()).isEqualTo("s3");
         assertThat(config.instances().get("orders").get(0).timeoutSeconds()).isEqualTo(30);   // build default
         assertThat(config.secrets()).contains("s1", "s2", "s3", ro.bitboy.mcpgp.runtime.TestCerts.PASSWORD).doesNotContain("eu");
-        assertThat(config.server().transport()).isEqualTo("http");
+        assertThat(config.server().transport()).isEqualTo("stdio");
         assertThat(config.audit().arguments()).isEqualTo("hashed");
+        assertThatThrownBy(() -> loader.load(ORDERS, new ConfigLoader.Options(Optional.of(REPO.resolve("examples/client/multi-instance/orders-mcp.yaml")),
+                REPO, Map.of("EU_CLIENT_ID", "eu", "EU_CLIENT_SECRET", "s1", "CX_USER", "cx", "CX_PASS", "s2", "TEST_API_KEY", "s3",
+                        "TEST_CA_B64", ro.bitboy.mcpgp.runtime.TestCerts.base64(CERTS.serverPem), "TEST_P12_PASS", ro.bitboy.mcpgp.runtime.TestCerts.PASSWORD,
+                        "JIRA_TOKEN", "s5"), Map.of("instances.2.tls.clientCert.path", CERTS.clientP12.toString()))))
+                .hasMessageContaining("oauth is not available in this runtime version yet");
     }
 
     @Test

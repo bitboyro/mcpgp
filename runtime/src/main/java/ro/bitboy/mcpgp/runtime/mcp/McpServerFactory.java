@@ -59,13 +59,26 @@ public final class McpServerFactory {
         return catalog;
     }
 
+    /** Transport-context key with the authenticated client's key name (HTTP, static mode). */
+    public static final String CLIENT_KEY = "mcpgp.client";
+
+    /** stdio. */
     public McpSyncServer create(McpServerTransportProvider transport) {
+        return configure(McpServer.sync(transport));
+    }
+
+    /** Streamable HTTP. */
+    public McpSyncServer create(io.modelcontextprotocol.spec.McpStreamableServerTransportProvider transport) {
+        return configure(McpServer.sync(transport));
+    }
+
+    private McpSyncServer configure(McpServer.SyncSpecification<?> builder) {
         List<McpServerFeatures.SyncToolSpecification> specs = new ArrayList<>();
         for (JsonNode tool : catalog.listed()) {
             specs.add(new McpServerFeatures.SyncToolSpecification(ToolCatalog.toMcp(tool),
                     (exchange, request) -> call(exchange, request)));
         }
-        var builder = McpServer.sync(transport)
+        builder
                 .serverInfo(new McpSchema.Implementation(manifest.serverName(), manifest.serverTitle(), manifest.serverVersion()))
                 .capabilities(McpSchema.ServerCapabilities.builder().tools(true).logging().build())
                 .requestTimeout(Duration.ofSeconds(maxTimeout() + 30L))
@@ -167,8 +180,14 @@ public final class McpServerFactory {
         audit.write(event);
     }
 
-    private static void actor(ObjectNode event, McpSyncServerExchange exchange) {
-        if (exchange != null && exchange.getClientInfo() != null) {
+    private void actor(ObjectNode event, McpSyncServerExchange exchange) {
+        if (exchange == null) {
+            return;
+        }
+        Object key = exchange.transportContext() == null ? null : exchange.transportContext().get(CLIENT_KEY);
+        if (key != null) {
+            event.putObject("actor").put("kind", "client").put("id", key.toString()).put("auth", config.server().authMode());
+        } else if (exchange.getClientInfo() != null) {
             event.putObject("actor").put("kind", "client").put("id", exchange.getClientInfo().name());
         }
     }
