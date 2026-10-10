@@ -21,6 +21,16 @@ orders-mcp-1.4.1.zip
 └─ SIGNING-KEY.pub                  the builder's public key, also published by the builder elsewhere
 ```
 
+How it is built: the CLI carries the runtime as an executable Spring Boot jar and adds the build's
+manifest to a copy of it (at `/mcpgp/manifest.json`), so `mcpgp build` needs neither Maven nor the
+network. The zip is reproducible: entries sorted, timestamps from `build.createdAt`. Targets and
+generation modes this version can't produce yet are reported as warnings.
+
+`server.config.schema.json` narrows the generic runtime-config schema to the build: its transports
+and inbound auth modes, `instance` or `instances` (per API in multi-API servers), its contract
+versions, its sign-in types, client certificates only with `mtls`, its file forms and packs. Its
+`$id` is `urn:mcpgp:config:<server>:<version>`.
+
 **Self-contained rule:** the package runs on the customer's infrastructure and talks only to the
 customer's own systems and clients. Nothing in it contacts the platform, the vendor or the internet on its
 own. No licence checks, no update checks, no telemetry to the vendor. Any such feature is opt-in and

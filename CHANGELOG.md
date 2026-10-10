@@ -50,6 +50,9 @@ versions follow [SemVer](https://semver.org).
   `<server> reload`; rejected configs keep the running one; the tool list follows instance changes
   (`list_changed`). Audit events `config.reload` and, for HTTP, `session.start` / `session.end`.
 - A startup warning when `telemetry.enabled` is set (telemetry comes in M7).
+- `mcpgp build` makes the package: the executable server jar with the manifest embedded, the
+  manifest copy, the build's own `server.config.schema.json`, an example config and `SHA256SUMS`, in a
+  reproducible zip. The CLI carries the runtime, so building needs neither Maven nor the network.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.

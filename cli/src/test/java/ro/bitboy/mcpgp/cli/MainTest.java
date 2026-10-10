@@ -66,12 +66,6 @@ class MainTest {
     }
 
     @Test
-    void buildWithoutManifestOnlyIsNotAvailableYet(@TempDir Path dist) {
-        assertThat(run("build", "--workspace", WORKSPACE, "--out", dist.toString(), ORDERS)).isEqualTo(1);
-        assertThat(err.toString()).contains("--manifest-only");
-    }
-
-    @Test
     void explainShowsProvenance() {
         assertThat(run("explain", "--workspace", WORKSPACE, ORDERS, "orders_customer_get")).isZero();
         assertThat(out.toString()).contains("orders_customer_get  (orders:GET:/customers/{id})")

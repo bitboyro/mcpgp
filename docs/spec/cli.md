@@ -41,7 +41,7 @@ sign:
 | `mcpgp explain <def> <tool>` | Provenance of a tool's name, title, description |
 | `mcpgp diff <def> [--against <tag\|manifest.json\|last-release>] [--format md\|json]` | Added, removed and changed tools, schemas and names (informational) |
 | `mcpgp names accept <def> <tool…\|--all>` | Accept renames into `mcp-names.lock` |
-| `mcpgp build <def…\|--all> [--version <v>] [--build-number <n>] [--source <uri>] [--frozen-lock] [--manifest-only] [--out <dir>]` | Compile + package; `--manifest-only` writes only `dist/<name>-<version>.manifest.json` |
+| `mcpgp build <def…\|--all> [--version <v>] [--build-number <n>] [--source <uri>] [--frozen-lock] [--manifest-only] [--out <dir>]` | Compile + package: `dist/<name>-<version>.zip` and `dist/<name>-<version>.manifest.json`; `--manifest-only` writes only the manifest |
 | `mcpgp test <def> [--suite tests/]` | Start the built server against a mock generated from the specs; run smoke + user test cases |
 | `mcpgp sign <dist>` / `verify <zip>` | Sign checksums / verify a package |
 | `mcpgp migrate <def>` | Upgrade a definition to the current `apiVersion` |

@@ -22,8 +22,8 @@
   <modules>
     <module>schemas</module>
     <module>core</module>
-    <module>cli</module>
     <module>runtime</module>
+    <module>cli</module>
   </modules>
 
   <properties>
@@ -108,6 +108,11 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-resources-plugin</artifactId>
           <version>3.3.1</version>
+        </plugin>
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <version>${spring-boot.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>
