@@ -15,7 +15,17 @@ import java.util.Map;
  * Environment variables {@code MCPGP_PLATFORM_STORAGE__ROOT}, {@code MCPGP_PLATFORM_HTTP__HOST} and
  * {@code MCPGP_PLATFORM_HTTP__PORT} override the file.
  */
-public record PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace) {
+public record PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
+                             boolean localAccounts, Guardrails guardrails) {
+
+    /** Agent quotas (spec/platform-api.md §5). */
+    public record Guardrails(int agentBuildsPerHour, int agentVersionsPerHour) {
+        public static final Guardrails DEFAULT = new Guardrails(20, 60);
+    }
+
+    public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace) {
+        this(storageRoot, host, port, signingKey, retention, workspace, true, Guardrails.DEFAULT);
+    }
 
     /** Build retention (spec/platform-api.md §2.2); released builds and the last {@code keepLast} are never touched. */
     public record Retention(int archiveAfterDays, int deleteArchivedAfterDays, int keepLast) {
@@ -68,7 +78,11 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
         if (!workspace.matches("[a-z0-9][a-z0-9-]*")) {
             throw new IllegalArgumentException("workspace: lowercase letters, digits and '-'");
         }
-        return new PlatformConfig(storage, host, port, signing, r, workspace);
+        boolean local = doc.at("/auth/local/enabled").asBoolean(true);
+        JsonNode guard = doc.path("guardrails");
+        Guardrails g = new Guardrails(guard.path("agentBuildsPerHour").asInt(Guardrails.DEFAULT.agentBuildsPerHour()),
+                guard.path("agentVersionsPerHour").asInt(Guardrails.DEFAULT.agentVersionsPerHour()));
+        return new PlatformConfig(storage, host, port, signing, r, workspace, local, g);
     }
 
     static Path configFile(String[] args) {

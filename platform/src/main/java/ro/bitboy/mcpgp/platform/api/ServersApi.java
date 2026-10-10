@@ -35,12 +35,15 @@ public class ServersApi {
     private final Servers servers;
     private final Compilation compilation;
     private final ro.bitboy.mcpgp.platform.PlatformConfig config;
+    private final ro.bitboy.mcpgp.platform.service.Guardrails guardrails;
 
-    public ServersApi(Store store, Servers servers, Compilation compilation, ro.bitboy.mcpgp.platform.PlatformConfig config) {
+    public ServersApi(Store store, Servers servers, Compilation compilation, ro.bitboy.mcpgp.platform.PlatformConfig config,
+                      ro.bitboy.mcpgp.platform.service.Guardrails guardrails) {
         this.store = store;
         this.servers = servers;
         this.compilation = compilation;
         this.config = config;
+        this.guardrails = guardrails;
     }
 
     static Access.Principal who(HttpServletRequest request) {
@@ -66,6 +69,7 @@ public class ServersApi {
                                          @RequestBody(required = false) byte[] body) {
         Access.Principal who = who(request);
         who.require("servers:write");
+        guardrails.quota(who, "versions");
         Model.Server server = servers.create(id, title, body == null ? new byte[0] : body, contentType, message, who);
         return withEtag(Json.status(201, detail(server)), server);
     }
@@ -83,6 +87,7 @@ public class ServersApi {
                                              @RequestBody(required = false) byte[] body) {
         Access.Principal who = who(request);
         who.require("servers:write");
+        guardrails.quota(who, "versions");
         Model.Server before = servers.get(id);
         Model.Server server = servers.addVersion(id, body == null ? new byte[0] : body, contentType, message, who);
         return withEtag(Json.status(server.revision() == before.revision() ? 200 : 201, detail(server)), server);

@@ -334,6 +334,37 @@ public final class FileStore implements Store {
         writeJson(root.resolve("identities/tokens.json"), all);
     }
 
+    // ---------------------------------------------------------------------- accounts and approvals
+
+    @Override
+    public synchronized List<Model.Credential> credentials() {
+        return readList(root.resolve("identities/credentials.json"), new TypeReference<>() {
+        });
+    }
+
+    @Override
+    public synchronized void saveCredential(Model.Credential credential) {
+        List<Model.Credential> all = new ArrayList<>(credentials());
+        all.removeIf(c -> c.identity().equals(credential.identity()));
+        all.add(credential);
+        writeJson(root.resolve("identities/credentials.json"), all);
+        ownerOnly(root.resolve("identities/credentials.json"), "rw-------");
+    }
+
+    @Override
+    public synchronized List<Model.Approval> approvals() {
+        return readList(root.resolve("approvals/approvals.json"), new TypeReference<>() {
+        });
+    }
+
+    @Override
+    public synchronized void saveApproval(Model.Approval approval) {
+        List<Model.Approval> all = new ArrayList<>(approvals());
+        all.removeIf(a -> a.id().equals(approval.id()));
+        all.add(approval);
+        writeJson(root.resolve("approvals/approvals.json"), all);
+    }
+
     // ---------------------------------------------------------------------- activity
 
     @Override

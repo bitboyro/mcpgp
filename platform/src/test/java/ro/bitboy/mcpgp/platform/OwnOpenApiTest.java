@@ -29,6 +29,7 @@ class OwnOpenApiTest {
         assertThat(result.manifest().orElseThrow().path("tools").findValuesAsText("name"))
                 .contains("platform_server_list", "platform_server_create", "platform_version_add", "platform_manifest_get",
                         "platform_token_revoke", "platform_build_start", "platform_build_release", "platform_artifact_download",
-                        "platform_server_duplicate", "platform_variant_create", "platform_library_item_create");
+                        "platform_server_duplicate", "platform_variant_create", "platform_library_item_create",
+                        "platform_sign_in", "platform_request_approve", "platform_store_export");
     }
 }

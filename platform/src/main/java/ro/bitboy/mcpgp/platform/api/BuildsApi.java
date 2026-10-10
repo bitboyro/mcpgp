@@ -38,11 +38,13 @@ public class BuildsApi {
     private final Store store;
     private final Servers servers;
     private final Builds builds;
+    private final ro.bitboy.mcpgp.platform.service.Guardrails guardrails;
 
-    public BuildsApi(Store store, Servers servers, Builds builds) {
+    public BuildsApi(Store store, Servers servers, Builds builds, ro.bitboy.mcpgp.platform.service.Guardrails guardrails) {
         this.store = store;
         this.servers = servers;
         this.builds = builds;
+        this.guardrails = guardrails;
     }
 
     /** {@code {version?: number|"latest", buildNumber?, versionOverride?}}. */
@@ -50,6 +52,7 @@ public class BuildsApi {
     public ResponseEntity<byte[]> start(HttpServletRequest request, @PathVariable String id, @RequestBody(required = false) byte[] body) {
         Access.Principal who = ServersApi.who(request);
         who.require("builds:run");
+        guardrails.quota(who, "builds");
         JsonNode json = Json.parse(body);
         Model.Server server = servers.get(id);
         Model.VersionRef version = servers.version(server, json.path("version").asText("latest"));
@@ -124,7 +127,10 @@ public class BuildsApi {
         Access.Principal who = ServersApi.who(request);
         who.require("builds:release");
         if (who.identity().kind().equals("agent")) {
-            throw new ApiException(403, "APPROVAL_REQUIRED", "agents can't release builds; a person releases it (spec/platform-api.md §5)");
+            // spec/platform-api.md §5: an agent's release waits for a person
+            Model.Approval approval = guardrails.requestRelease(find(build), who);
+            return Json.status(202, Map.of("approval", approval, "detail", "a person with approvals:decide releases it by approving "
+                    + approval.id()));
         }
         return Json.ok(build(builds.release(find(build), who.identity().name(), who.identity().kind())));
     }

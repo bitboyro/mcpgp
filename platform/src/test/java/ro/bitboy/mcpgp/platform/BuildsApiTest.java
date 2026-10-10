@@ -168,14 +168,15 @@ class BuildsApiTest {
     @Test
     void releaseArchiveAndDeleteFollowTheRules() throws Exception {
         String id = build("orders", Map.of()).path("id").asText();
-        // agents can't release
+        // agents can't release directly: their release becomes an approval (AccountsTest covers deciding it)
         JsonNode agent = json(call("POST", "/identities", admin, JSON.writeValueAsBytes(Map.of("kind", "agent", "name", "rel-bot",
                 "role", "releaser")), "application/json"));
         String agentToken = json(call("POST", "/tokens", admin, JSON.writeValueAsBytes(Map.of("identity", agent.path("id").asText())),
                 "application/json")).path("value").asText();
         HttpResponse<byte[]> byAgent = call("POST", "/builds/" + id + "/release", agentToken, null, null);
-        assertThat(byAgent.statusCode()).isEqualTo(403);
-        assertThat(json(byAgent).path("code").asText()).isEqualTo("APPROVAL_REQUIRED");
+        assertThat(byAgent.statusCode()).isEqualTo(202);
+        assertThat(json(byAgent).at("/approval/status").asText()).isEqualTo("pending");
+        assertThat(json(call("GET", "/builds/" + id, admin, null, null)).path("released").asBoolean()).isFalse();
         assertThat(call("DELETE", "/builds/" + id, agentToken, null, null).statusCode()).isEqualTo(403);
 
         JsonNode released = json(call("POST", "/builds/" + id + "/release", admin, null, null));
