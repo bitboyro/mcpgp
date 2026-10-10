@@ -117,6 +117,14 @@ Per client, an adapter described as data:
 Rules: merge only this server's entry; back up before writing; `--dry-run` shows the diff; never write
 secrets into client configs.
 
+- The entry is named after the server without `-mcp` (`orders`), or `--name`; `--file` writes to
+  another file. stdio entries run this jar with this config; HTTP entries use `server.publicUrl`
+  (or the local address) plus the base path.
+- Claude Code: the command writes the project's `.mcp.json`; `claude mcp add` stays the alternative
+  the user can run themselves. Claude Desktop takes only stdio entries in its file; for HTTP servers
+  the command explains the connector settings instead.
+- Client files must be plain JSON (comments are refused rather than lost).
+
 Snippets: [examples/client/mcp-clients](../../examples/client/mcp-clients).
 
 ## 7. Signing and images

@@ -22,11 +22,15 @@ public record Startup(Manifest manifest, RuntimeConfig config) {
     public static Startup load(String[] args, Map<String, String> env, Path workingDir) {
         Map<String, String> flags = flags(args);
         Optional<Path> configFile = Optional.ofNullable(flags.remove("config")).map(Path::of);
-        String manifestFile = flags.remove("manifest");
-        Manifest manifest = manifestFile == null ? Manifest.embedded() : Manifest.file(Path.of(manifestFile));
+        Manifest manifest = manifest(flags.remove("manifest"));
         RuntimeConfig config = new ConfigLoader(new Schemas())
                 .load(manifest, new ConfigLoader.Options(configFile, workingDir, env, flags));
         return new Startup(manifest, config);
+    }
+
+    /** The embedded manifest, or the {@code --manifest} file in development. */
+    static Manifest manifest(String file) {
+        return file == null ? Manifest.embedded() : Manifest.file(Path.of(file));
     }
 
     static Map<String, String> flags(String[] args) {

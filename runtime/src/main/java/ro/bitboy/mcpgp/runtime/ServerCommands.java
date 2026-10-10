@@ -38,18 +38,22 @@ import java.util.Set;
  */
 public final class ServerCommands {
 
-    static final Set<String> COMMANDS = Set.of("doctor", "instance");
+    static final Set<String> COMMANDS = Set.of("doctor", "instance", "init", "client");
 
     private final Map<String, String> env;
     private final Path workingDir;
     private final BufferedReader in;
     private final PrintStream out;
+    private final boolean console;
+    /** The jar client entries point to; null to use the running jar. */
+    Path jar;
 
     public ServerCommands(Map<String, String> env, Path workingDir, InputStream in, PrintStream out) {
         this.env = env;
         this.workingDir = workingDir;
         this.in = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
         this.out = out;
+        this.console = in == System.in;
     }
 
     public int run(String[] args) {
@@ -58,11 +62,21 @@ public final class ServerCommands {
         boolean quick = false;
         boolean base64 = false;
         boolean yes = false;
+        boolean print = false;
+        boolean dryRun = false;
+        String api = null;
+        String name = null;
+        Path clientFile = null;
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--quick" -> quick = true;
                 case "--base64" -> base64 = true;
                 case "--yes" -> yes = true;
+                case "--print" -> print = true;
+                case "--dry-run" -> dryRun = true;
+                case "--api" -> api = i + 1 < args.length ? args[++i] : null;
+                case "--name" -> name = i + 1 < args.length ? args[++i] : null;
+                case "--file" -> clientFile = i + 1 < args.length ? Path.of(args[++i]) : null;
                 default -> {
                     if (args[i].startsWith("--")) {
                         rest.add(args[i]);
@@ -74,6 +88,9 @@ public final class ServerCommands {
                     }
                 }
             }
+        }
+        if (!words.isEmpty() && words.get(0).equals("init")) {
+            return init(rest);
         }
         Startup startup;
         try {
@@ -93,16 +110,57 @@ public final class ServerCommands {
                 case "instance list" -> list(startup.config());
                 case "instance test" -> words.size() == 3 ? test(instance(startup.config(), words.get(2))) : usage();
                 case "instance trust" -> words.size() == 3 ? trust(startup.config(), instance(startup.config(), words.get(2)), base64, yes) : usage();
+                case "instance add" -> words.size() == 3 ? setup(startup.manifest(), rest).add(startup.config(), words.get(2), api) : usage();
+                case "instance remove" -> words.size() == 3 ? setup(startup.manifest(), rest).remove(startup.config(), words.get(2), api) : usage();
+                case "client add" -> words.size() == 3
+                        ? new ClientRegistration(startup.manifest(), startup.config(), workingDir, env, out, jar).add(words.get(2), clientFile, name, print, dryRun)
+                        : usage();
                 default -> usage();
             };
         } catch (IllegalArgumentException e) {
             out.println("✗ " + e.getMessage());
             return 1;
+        } catch (IOException e) {
+            out.println("✗ " + e.getMessage());
+            return 1;
         }
     }
 
+    private int init(List<String> rest) {
+        try {
+            Map<String, String> flags = Startup.flags(rest.toArray(String[]::new));
+            String config = flags.get("config");
+            return setup(Startup.manifest(flags.get("manifest")), rest).init(config == null ? null : Path.of(config));
+        } catch (ManifestException | IllegalArgumentException e) {
+            out.println("✗ " + e.getMessage());
+            return 1;
+        } catch (IOException e) {
+            out.println("✗ " + e.getMessage());
+            return 1;
+        }
+    }
+
+    /** Setup commands; they validate their result by loading it with the same options (manifest, flags). */
+    private SetupCommands setup(ro.bitboy.mcpgp.runtime.manifest.Manifest manifest, List<String> rest) {
+        return new SetupCommands(manifest, env, workingDir, in, out, file -> {
+            List<String> options = new ArrayList<>();
+            for (int i = 0; i < rest.size(); i++) {
+                if (rest.get(i).equals("--config")) {
+                    i++;
+                } else if (!rest.get(i).startsWith("--config=")) {
+                    options.add(rest.get(i));
+                }
+            }
+            options.add("--config");
+            options.add(file.toString());
+            return Startup.load(options.toArray(String[]::new), env, workingDir).config();
+        }, console);
+    }
+
     private int usage() {
-        out.println("Usage: doctor [--quick] | instance list | instance test <id> | instance trust <id> [--base64] [--yes]");
+        out.println("Usage: init | doctor [--quick] | instance list | instance test|add|remove|trust <id> | client add <client>");
+        out.println("       instance trust: [--base64] [--yes]   instance add/remove: [--api <id>]");
+        out.println("       client add claude-code|claude-desktop|cursor|vscode [--print] [--dry-run] [--file <path>] [--name <entry>]");
         out.println("       (plus --config <file> and --<key> <value> as when starting the server)");
         return 2;
     }

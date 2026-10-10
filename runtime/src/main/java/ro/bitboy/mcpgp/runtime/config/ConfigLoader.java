@@ -217,7 +217,10 @@ public final class ConfigLoader {
                     continue;
                 }
                 String value = line.substring(eq + 1).strip();
-                if (value.length() >= 2 && (value.startsWith("\"") && value.endsWith("\"") || value.startsWith("'") && value.endsWith("'"))) {
+                if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+                    // double quotes: \" and \\ are escapes
+                    value = value.substring(1, value.length() - 1).replaceAll("\\\\([\"\\\\])", "$1");
+                } else if (value.length() >= 2 && value.startsWith("'") && value.endsWith("'")) {
                     value = value.substring(1, value.length() - 1);
                 }
                 values.put(line.substring(0, eq).strip(), value);
