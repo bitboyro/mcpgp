@@ -56,6 +56,11 @@ public final class ToolCatalog {
         return Optional.ofNullable(tools.get(name));
     }
 
+    /** Removes tools this runtime can't run, so they are neither listed nor callable. */
+    void remove(java.util.Collection<String> names) {
+        names.forEach(tools::remove);
+    }
+
     public Map<String, JsonNode> all() {
         return tools;
     }

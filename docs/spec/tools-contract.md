@@ -375,6 +375,8 @@ load tool definitions only when needed.
 \* in multi-instance builds.
 
 Rules for both styles:
+- Discovery covers API tools; built-in and pack tools are listed directly.
+- With `instance`, `search_tools` returns only tools available on that instance's contract.
 - Ranking: BM25 over tool name, title, tags and description; exact name matches first.
 - `call_tool` / `invoke_operation` apply exactly the same validation, confirmation, sensitivity,
   audit and auth as a directly listed tool; hidden or excluded tools can't be called.

@@ -35,6 +35,8 @@ public final class McpServerFactory {
     private final RuntimeConfig config;
     private final ToolCatalog catalog;
     private final Map<String, ToolHandler> builtins = new HashMap<>();
+    /** The handler of every offered tool, by tool name. */
+    private final Map<String, ToolHandler> handlers = new HashMap<>();
     private final ToolHandler apiTools;
     private final AuditLog audit;
     private final Confirmations confirmations;
@@ -52,7 +54,31 @@ public final class McpServerFactory {
         this.confirmations = new Confirmations(clock);
         this.catalog = new ToolCatalog(manifest, config);
         builtins.put("instances_list", new InstancesList(manifest, config));
+        builtins.putAll(new Discovery(manifest, config, catalog, this::call).handlers());
         this.apiTools = new ApiToolHandler(manifest, config);
+        Packs packs = new Packs(manifest, config, catalog);
+        Map<String, ToolHandler> packHandlers = packs.handlers();
+        // tools without an implementation in this runtime are not offered (and said so at startup)
+        List<String> unsupported = new ArrayList<>();
+        for (JsonNode tool : catalog.all().values()) {
+            String name = tool.path("name").asText();
+            ToolHandler handler = switch (tool.path("kind").asText()) {
+                case "api" -> apiTools;
+                case "builtin" -> builtins.get(tool.path("handler").asText());
+                case "pack" -> packHandlers.entrySet().stream().filter(e -> name.equals(e.getKey()) || name.endsWith("_" + e.getKey()))
+                        .map(Map.Entry::getValue).findFirst().orElse(null);
+                default -> null;
+            };
+            if (handler == null) {
+                unsupported.add(name);
+            } else {
+                handlers.put(name, handler);
+            }
+        }
+        if (!unsupported.isEmpty()) {
+            LOG.warn("Not offered, because this runtime version doesn't implement them yet: {}", String.join(", ", unsupported));
+            catalog.remove(unsupported);
+        }
     }
 
     public ToolCatalog catalog() {
@@ -111,7 +137,7 @@ public final class McpServerFactory {
             if (tool == null) {
                 throw new ToolError("INPUT_VALIDATION", "Unknown tool " + name);
             }
-            ToolHandler handler = handler(tool);
+            ToolHandler handler = handlers.get(name);
             Object token = arguments.remove("confirm");
             if (tool.path("confirm").asBoolean(false)) {
                 confirmations.check(exchange, tool, arguments, token == null ? null : token.toString(),
@@ -119,7 +145,17 @@ public final class McpServerFactory {
             } else if (token != null) {
                 arguments.put("confirm", token);       // not a confirmation tool: let validation reject it
             }
-            result = Results.ok(handler.call(exchange, tool, arguments, record), null);
+            Object value = handler.call(exchange, tool, arguments, record);
+            if (value instanceof Discovery.Passthrough passthrough) {
+                // call_tool / invoke_operation: the inner call was audited itself; return its result as is
+                result = passthrough.result();
+                if (Boolean.TRUE.equals(result.isError())) {
+                    outcome = "error";
+                    code = result.structuredContent() instanceof Map<?, ?> m && m.get("code") != null ? m.get("code").toString() : "INTERNAL";
+                }
+            } else {
+                result = Results.ok(value, null);
+            }
         } catch (ToolError e) {
             outcome = e.code().equals("CONFIRMATION_REQUIRED") || e.code().equals("NOT_AVAILABLE_ON_INSTANCE") ? "denied" : "error";
             code = e.code();
@@ -203,21 +239,6 @@ public final class McpServerFactory {
         if (value != null) {
             node.put(key, value);
         }
-    }
-
-    private ToolHandler handler(JsonNode tool) {
-        String kind = tool.path("kind").asText();
-        return switch (kind) {
-            case "api" -> apiTools;
-            case "builtin" -> {
-                ToolHandler handler = builtins.get(tool.path("handler").asText());
-                if (handler == null) {
-                    throw new ToolError("INTERNAL", tool.path("name").asText() + " is not available in this runtime version");
-                }
-                yield handler;
-            }
-            default -> throw new ToolError("INTERNAL", tool.path("name").asText() + " is not available in this runtime version");
-        };
     }
 
     private int maxTimeout() {
