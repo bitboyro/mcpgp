@@ -1,4 +1,4 @@
-package ro.bitboy.mcpgp.cli.pack;
+package ro.bitboy.mcpgp.packager;
 
 import com.fasterxml.jackson.databind.JsonNode;
 

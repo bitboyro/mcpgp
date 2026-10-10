@@ -1,4 +1,4 @@
-package ro.bitboy.mcpgp.cli.pack;
+package ro.bitboy.mcpgp.packager;
 
 /**
  * BLAKE2b (RFC 7693), unkeyed, for minisign signatures (prehash) and key checksums. The JDK has no

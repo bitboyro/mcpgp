@@ -1,4 +1,4 @@
-package ro.bitboy.mcpgp.cli.pack;
+package ro.bitboy.mcpgp.packager;
 
 import org.junit.jupiter.api.Test;
 

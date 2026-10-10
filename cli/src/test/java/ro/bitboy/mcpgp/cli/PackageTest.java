@@ -9,8 +9,8 @@ import com.networknt.schema.SpecificationVersion;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import ro.bitboy.mcpgp.cli.pack.Minisign;
-import ro.bitboy.mcpgp.cli.pack.Packager;
+import ro.bitboy.mcpgp.packager.Minisign;
+import ro.bitboy.mcpgp.packager.Packager;
 
 import java.io.IOException;
 import java.io.OutputStream;
