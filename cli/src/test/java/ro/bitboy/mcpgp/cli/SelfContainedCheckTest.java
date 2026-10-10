@@ -122,7 +122,9 @@ class SelfContainedCheckTest {
                     if (m.find()) {
                         int connectPort = Integer.parseInt(m.group(1));
                         String address = m.group(2);
-                        boolean loopback = address.startsWith("127.") || address.equals("::1");
+                        // IPv4-mapped IPv6 (::ffff:127.0.0.1) is how dual-stack Java sockets reach IPv4 loopback
+                        String v4 = address.toLowerCase().startsWith("::ffff:") ? address.substring(7) : address;
+                        boolean loopback = v4.startsWith("127.") || address.equals("::1");
                         if (!loopback || connectPort == 53 || connectPort != port) {
                             outside.add(address + ":" + connectPort);
                         }
