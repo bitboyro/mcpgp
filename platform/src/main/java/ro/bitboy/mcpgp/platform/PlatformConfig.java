@@ -15,15 +15,22 @@ import java.util.Map;
  * Environment variables {@code MCPGP_PLATFORM_STORAGE__ROOT}, {@code MCPGP_PLATFORM_HTTP__HOST} and
  * {@code MCPGP_PLATFORM_HTTP__PORT} override the file.
  */
-public record PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention) {
+public record PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace) {
 
     /** Build retention (spec/platform-api.md §2.2); released builds and the last {@code keepLast} are never touched. */
     public record Retention(int archiveAfterDays, int deleteArchivedAfterDays, int keepLast) {
         public static final Retention DEFAULT = new Retention(90, 365, 10);
     }
 
+    /** The name in {@code mcpgp://<workspace>/<kind>/<name>} references this platform resolves. */
+    public static final String DEFAULT_WORKSPACE = "local";
+
     public PlatformConfig(Path storageRoot, String host, int port) {
-        this(storageRoot, host, port, null, Retention.DEFAULT);
+        this(storageRoot, host, port, null, Retention.DEFAULT, DEFAULT_WORKSPACE);
+    }
+
+    public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention) {
+        this(storageRoot, host, port, signingKey, retention, DEFAULT_WORKSPACE);
     }
 
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
@@ -57,7 +64,11 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
         Retention r = new Retention(retention.path("archiveAfterDays").asInt(Retention.DEFAULT.archiveAfterDays()),
                 retention.path("deleteArchivedAfterDays").asInt(Retention.DEFAULT.deleteArchivedAfterDays()),
                 retention.path("keepLast").asInt(Retention.DEFAULT.keepLast()));
-        return new PlatformConfig(storage, host, port, signing, r);
+        String workspace = env.getOrDefault("MCPGP_PLATFORM_WORKSPACE", doc.path("workspace").asText(DEFAULT_WORKSPACE));
+        if (!workspace.matches("[a-z0-9][a-z0-9-]*")) {
+            throw new IllegalArgumentException("workspace: lowercase letters, digits and '-'");
+        }
+        return new PlatformConfig(storage, host, port, signing, r, workspace);
     }
 
     static Path configFile(String[] args) {

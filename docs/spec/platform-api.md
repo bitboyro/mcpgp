@@ -69,7 +69,10 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
 
 ### 2.3 Library
 
-`/library/{kind}/{name}` with versions, like servers. Definitions reference items as
+`/library/{kind}/{name}` with versions, like servers. The workspace name in references is the
+platform setting `workspace` (default `local`); references to another workspace don't resolve. An item
+with several files names its `root` (the file references point to). Manifest previews are recomputed
+when a referenced item or server gets a new version. Definitions reference items as
 `mcpgp://<org>/<kind>/<name>@<version|latest>`; the platform resolves them from its library when it
 compiles (the CLI does the same with `--workspace`).
 
@@ -139,6 +142,7 @@ filters (server, actor, action, time). Never contains secrets or token values.
 `platform.yaml` (or environment variables `MCPGP_PLATFORM_…`, as for servers):
 
 ```yaml
+workspace: acme                    # the <workspace> of mcpgp:// references (default local)
 http: { host: 0.0.0.0, port: 8443, publicUrl: https://mcpgp.acme.internal }
 storage:
   type: files                      # files (now) | postgres (later)

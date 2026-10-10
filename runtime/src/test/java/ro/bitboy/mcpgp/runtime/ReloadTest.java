@@ -10,10 +10,9 @@ import ro.bitboy.mcpgp.runtime.call.MockTarget;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +38,7 @@ class ReloadTest {
     MockTarget second;
     OutputStream toServer;
     final BlockingQueue<JsonNode> messages = new LinkedBlockingQueue<>();
+    volatile IOException pumpError;
     int nextId = 1;
     Path config;
 
@@ -61,10 +61,14 @@ class ReloadTest {
         Files.writeString(config, instances);
         Startup startup = Startup.load(new String[] {"--manifest", REPO.resolve("examples/manifest/orders-mcp.manifest.json").toString(),
                 "--config", config.toString(), "--storage.root", dir.resolve("data").toString()}, Map.of(), dir);
-        PipedInputStream serverIn = new PipedInputStream(1 << 16);
-        toServer = new PipedOutputStream(serverIn);
-        PipedOutputStream serverOut = new PipedOutputStream();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(new PipedInputStream(serverOut, 1 << 20), StandardCharsets.UTF_8));
+        // nio pipes: unlike PipedInputStream, they don't fail when a writing thread ends
+        java.nio.channels.Pipe in = java.nio.channels.Pipe.open();
+        java.nio.channels.Pipe out = java.nio.channels.Pipe.open();
+        InputStream serverIn = java.nio.channels.Channels.newInputStream(in.source());
+        toServer = java.nio.channels.Channels.newOutputStream(in.sink());
+        OutputStream serverOut = java.nio.channels.Channels.newOutputStream(out.sink());
+        BufferedReader reader = new BufferedReader(new InputStreamReader(java.nio.channels.Channels.newInputStream(out.source()),
+                StandardCharsets.UTF_8));
         Thread pump = new Thread(() -> {
             try {
                 String line;
@@ -72,7 +76,7 @@ class ReloadTest {
                     messages.add(JSON.readTree(line));
                 }
             } catch (IOException e) {
-                // closed
+                pumpError = e;
             }
         });
         pump.setDaemon(true);
@@ -106,7 +110,8 @@ class ReloadTest {
                     skipped.add(message);
                 }
             }
-            throw new AssertionError("no matching message within " + seconds + " s");
+            throw new AssertionError("no matching message within " + seconds + " s"
+                    + (pumpError == null ? "" : " (reading the server's output failed: " + pumpError + ")"));
         } finally {
             messages.addAll(skipped);
         }

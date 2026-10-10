@@ -10,6 +10,7 @@ import ro.bitboy.mcpgp.platform.api.AuthFilter;
 import ro.bitboy.mcpgp.platform.service.Access;
 import ro.bitboy.mcpgp.platform.service.Builds;
 import ro.bitboy.mcpgp.platform.service.Compilation;
+import ro.bitboy.mcpgp.platform.service.Library;
 import ro.bitboy.mcpgp.platform.service.Servers;
 import ro.bitboy.mcpgp.platform.store.FileStore;
 import ro.bitboy.mcpgp.platform.store.Model;
@@ -95,8 +96,13 @@ public class PlatformServer {
     }
 
     @Bean
-    Compilation compilation(Store store) {
-        return new Compilation(store);
+    Compilation compilation(Store store, PlatformConfig config) {
+        return new Compilation(store, config.workspace());
+    }
+
+    @Bean
+    Library library(Store store) {
+        return new Library(store);
     }
 
     @Bean(initMethod = "start", destroyMethod = "close")
