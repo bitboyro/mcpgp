@@ -53,4 +53,19 @@ curl -OJ -H "Authorization: Bearer $TOKEN" localhost:8443/api/v1/builds/<id>/art
 Packages are signed when `signing.key` is set (a reference, e.g. `"${env:MCPGP_SIGNING_KEY}"`; create the
 key with `mcpgp keygen`). Retention: `retention: { archiveAfterDays: 90, deleteArchivedAfterDays: 365, keepLast: 10 }`.
 
+Library and variants (`workspace: acme` in `platform.yaml` resolves `mcpgp://acme/…`):
+
+```bash
+# a shared naming policy, referenced as mcpgp://acme/naming/acme-standard@1
+curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d "{\"files\":{\"acme-standard.yaml\":$(jq -Rs . < acme-standard.yaml)}}" \
+     "localhost:8443/api/v1/library/naming?name=acme-standard"
+
+# a variant that extends orders-mcp, and an independent copy
+curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"id":"orders-readonly"}' \
+     localhost:8443/api/v1/servers/orders-mcp/variants
+curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"id":"orders-copy"}' \
+     localhost:8443/api/v1/servers/orders-mcp/duplicate
+```
+
 The API describes itself at `/api/v1/openapi.json`.

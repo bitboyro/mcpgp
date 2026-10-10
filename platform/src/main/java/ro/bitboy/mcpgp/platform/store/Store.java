@@ -26,6 +26,14 @@ public interface Store {
      */
     Model.Server saveServer(Model.Server server, long expectedRevision);
 
+    // library
+    List<Model.LibraryItem> library();
+
+    Optional<Model.LibraryItem> libraryItem(String kind, String name);
+
+    /** Like {@link #saveServer}: {@code expectedRevision} -1 for a new item. */
+    Model.LibraryItem saveLibraryItem(Model.LibraryItem item, long expectedRevision);
+
     // content
     String putBlob(byte[] content);
 

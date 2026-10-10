@@ -60,6 +60,47 @@ public final class Servers {
         return saved;
     }
 
+    /** An independent copy of the latest version's files (spec/platform-api.md §2.1). */
+    public Model.Server duplicate(String sourceId, String id, String title, Access.Principal who) {
+        Model.Server source = get(sourceId);
+        Model.Version files = files(source.latest());
+        return createFrom(id, title, null, files, "duplicate of " + sourceId + " version " + source.latest().number(), who, "server.duplicate",
+                Map.of("source", sourceId));
+    }
+
+    /**
+     * A variant: a new server whose definition extends this one ({@code @latest}, or the current version
+     * with {@code pin}) and holds only its own overrides (ADR-0010).
+     */
+    public Model.Server variant(String parentId, String id, String title, boolean pin, String workspace, Access.Principal who) {
+        Model.Server parent = get(parentId);
+        String reference = "mcpgp://" + workspace + "/servers/" + parentId + "@" + (pin ? String.valueOf(parent.latest().number()) : "latest");
+        String definition = "# A variant of " + parentId + ": everything not set here comes from it.\n"
+                + "apiVersion: mcpgp/v1\nkind: McpServer\nmetadata:\n  name: " + id + "\n"
+                + (title == null ? "" : "  title: \"" + title.replace("\"", "'") + "\"\n")
+                + "extends: " + reference + "\n";
+        Model.Version files = projects.store(Map.of(id + ".mcpgp.yaml", definition.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        return createFrom(id, title, parentId, files, "variant of " + parentId, who, "server.variant", Map.of("parent", parentId,
+                "extends", reference));
+    }
+
+    private Model.Server createFrom(String id, String title, String parent, Model.Version files, String message, Access.Principal who,
+                                    String action, Map<String, Object> details) {
+        if (id == null || !id.matches("[a-z0-9][a-z0-9-]{1,62}")) {
+            throw ApiException.validation("id: lowercase letters, digits and '-', 2–63 characters");
+        }
+        String now = Instant.now().toString();
+        Model.Server server;
+        try {
+            server = store.saveServer(new Model.Server(id, title == null || title.isBlank() ? id : title, parent, false, now, now,
+                    List.of(new Model.VersionRef(1, files.digest(), message, who.identity().name(), now)), 0), -1);
+        } catch (Store.ConflictException e) {
+            throw new ApiException(409, "CONFLICT", "a server with id " + id + " exists");
+        }
+        record(who, action, id, details);
+        return server;
+    }
+
     public Model.Server setArchived(String id, boolean archived, long expectedRevision, Access.Principal who) {
         Model.Server server = get(id);
         Model.Server saved = save(new Model.Server(server.id(), server.title(), server.parent(), archived, server.created(),

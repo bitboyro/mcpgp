@@ -68,6 +68,10 @@ versions follow [SemVer](https://semver.org).
   (`signing.key`), build numbers for rebuilds, release (people only for now), archive / restore /
   delete (released builds archived first; records stay), daily retention.
 - `packager` module: packaging moved out of the CLI, shared by the CLI and the platform.
+- Platform library: shared, versioned items (contracts, naming, rules, packs, templates) that
+  definitions reference as `mcpgp://<workspace>/<kind>/<name>@<version>`; servers are referenced the
+  same way (variants). Duplicate and variant endpoints. Manifest previews follow new versions of
+  what they reference.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.

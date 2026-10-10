@@ -125,6 +125,52 @@ public final class FileStore implements Store {
         return root.resolve("servers").resolve(id).resolve("server.json");
     }
 
+    // ---------------------------------------------------------------------- library
+
+    @Override
+    public synchronized List<Model.LibraryItem> library() {
+        Path dir = root.resolve("library");
+        if (!Files.isDirectory(dir)) {
+            return List.of();
+        }
+        List<Model.LibraryItem> items = new ArrayList<>();
+        try (Stream<Path> files = Files.walk(dir, 3)) {
+            for (Path file : files.filter(p -> p.getFileName().toString().equals("item.json")).sorted().toList()) {
+                read(file, Model.LibraryItem.class).ifPresent(items::add);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return items;
+    }
+
+    @Override
+    public synchronized Optional<Model.LibraryItem> libraryItem(String kind, String name) {
+        return read(libraryFile(kind, name), Model.LibraryItem.class);
+    }
+
+    @Override
+    public synchronized Model.LibraryItem saveLibraryItem(Model.LibraryItem item, long expectedRevision) {
+        Optional<Model.LibraryItem> current = libraryItem(item.kind(), item.name());
+        if (expectedRevision < 0 && current.isPresent()) {
+            throw new ConflictException(item.kind() + "/" + item.name() + " exists");
+        }
+        if (expectedRevision >= 0 && (current.isEmpty() || current.get().revision() != expectedRevision)) {
+            throw new ConflictException(item.kind() + "/" + item.name() + " was changed meanwhile");
+        }
+        Model.LibraryItem saved = new Model.LibraryItem(item.kind(), item.name(), item.title(), item.created(), item.updated(),
+                List.copyOf(item.versions()), current.map(Model.LibraryItem::revision).orElse(0L) + 1);
+        writeJson(libraryFile(item.kind(), item.name()), saved);
+        return saved;
+    }
+
+    private Path libraryFile(String kind, String name) {
+        if (!kind.matches("[a-z]{2,20}") || !name.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,79}")) {
+            throw new IllegalArgumentException("invalid library item");
+        }
+        return root.resolve("library").resolve(kind).resolve(name).resolve("item.json");
+    }
+
     // ---------------------------------------------------------------------- content
 
     @Override

@@ -9,6 +9,7 @@ import ro.bitboy.mcpgp.schemas.Schemas;
 
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -21,16 +22,30 @@ public final class Workspace {
     static final Pattern REFERENCE =
             Pattern.compile("^mcpgp://([a-z0-9][a-z0-9-]*)/([a-z]+)/([A-Za-z0-9._-]+)(?:@([A-Za-z0-9._-]+))?$");
 
-    private static final Workspace NONE = new Workspace(null, null, null);
+    private static final Workspace NONE = new Workspace(null, null, null, null);
+
+    /** A parsed reference: kind ({@code servers}, {@code naming}, …), name and version ({@code null} = latest). */
+    public record Reference(String kind, String name, String version) {
+    }
 
     private final String name;
     private final Path directory;
     private final JsonNode mapping;
+    private final Function<Reference, Optional<Path>> lookup;
 
-    private Workspace(String name, Path directory, JsonNode mapping) {
+    private Workspace(String name, Path directory, JsonNode mapping, Function<Reference, Optional<Path>> lookup) {
         this.name = name;
         this.directory = directory;
         this.mapping = mapping;
+        this.lookup = lookup;
+    }
+
+    /**
+     * A workspace backed by a lookup (the platform's library): {@code lookup} returns the local file of
+     * a reference, or empty when there is no such item.
+     */
+    public static Workspace of(String name, Function<Reference, Optional<Path>> lookup) {
+        return new Workspace(name, null, null, lookup);
     }
 
     public static Workspace none() {
@@ -50,7 +65,7 @@ public final class Workspace {
             problems.forEach(p -> diagnostics.error(Codes.WORKSPACE_INVALID, p.message(), location.withPointer(p.pointer())));
             return NONE;
         }
-        return new Workspace(node.get().get("workspace").asText(), absolute.getParent(), node.get());
+        return new Workspace(node.get().get("workspace").asText(), absolute.getParent(), node.get(), null);
     }
 
     public static boolean isReference(String value) {
@@ -60,7 +75,14 @@ public final class Workspace {
     /** The local file a reference points to, if this workspace maps it. */
     public Optional<Path> resolve(String reference) {
         Matcher m = REFERENCE.matcher(reference);
-        if (mapping == null || !m.matches() || !m.group(1).equals(name)) {
+        if (!m.matches() || name == null || !m.group(1).equals(name)) {
+            return Optional.empty();
+        }
+        if (lookup != null) {
+            String version = m.group(4) == null || m.group(4).equals("latest") ? null : m.group(4);
+            return lookup.apply(new Reference(m.group(2), m.group(3), version));
+        }
+        if (mapping == null) {
             return Optional.empty();
         }
         JsonNode kind = mapping.get(m.group(2));

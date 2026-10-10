@@ -12,6 +12,7 @@ security:
 tags:
   - { name: servers, description: Server definition projects and their versions }
   - { name: builds, description: Builds, their logs and artifacts }
+  - { name: library, description: Shared items referenced as mcpgp://<workspace>/<kind>/<name>@<version> }
   - { name: identities, description: Identities, tokens and the activity log }
 paths:
   /servers:
@@ -96,6 +97,89 @@ paths:
       description: The manifest of a version (what agents will get, with provenance).
       responses:
         "200": { description: Manifest, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/duplicate:
+    parameters: [ { $ref: "#/components/parameters/ServerId" } ]
+    post:
+      operationId: duplicateServer
+      tags: [servers]
+      summary: Duplicate server
+      description: An independent copy of the latest version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { id: { type: string }, title: { type: string } }, required: [id] }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/variants:
+    parameters: [ { $ref: "#/components/parameters/ServerId" } ]
+    post:
+      operationId: createVariant
+      tags: [servers]
+      summary: Create variant
+      description: A server that extends this one (latest, or pinned to its current version) and holds only overrides.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { id: { type: string }, title: { type: string }, pin: { type: boolean, default: false } }, required: [id] }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /library:
+    get:
+      operationId: listLibrary
+      tags: [library]
+      summary: List library items
+      responses:
+        "200": { description: Items with their references, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /library/{kind}:
+    parameters: [ { $ref: "#/components/parameters/Kind" } ]
+    post:
+      operationId: createLibraryItem
+      tags: [library]
+      summary: Create library item
+      parameters:
+        - { name: name, in: query, required: true, schema: { type: string } }
+        - { name: title, in: query, schema: { type: string } }
+        - { name: root, in: query, description: The file references point to, when there are several, schema: { type: string } }
+        - { name: message, in: query, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/ProjectFiles" } }
+          application/zip: { schema: { type: string, format: binary } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /library/{kind}/{name}:
+    parameters: [ { $ref: "#/components/parameters/Kind" }, { name: name, in: path, required: true, schema: { type: string } } ]
+    get:
+      operationId: getLibraryItem
+      tags: [library]
+      summary: Get library item
+      responses:
+        "200": { description: The item, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /library/{kind}/{name}/versions:
+    parameters: [ { $ref: "#/components/parameters/Kind" }, { name: name, in: path, required: true, schema: { type: string } } ]
+    post:
+      operationId: addLibraryVersion
+      tags: [library]
+      summary: Add library version
+      parameters:
+        - { name: root, in: query, schema: { type: string } }
+        - { name: message, in: query, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/ProjectFiles" } }
+          application/zip: { schema: { type: string, format: binary } }
+      responses:
+        "201": { description: Version added, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/archive:
     parameters: [ { $ref: "#/components/parameters/ServerId" } ]
@@ -311,6 +395,7 @@ components:
     ServerId: { name: id, in: path, required: true, schema: { type: string } }
     Version: { name: version, in: path, required: true, description: A version number or latest, schema: { type: string } }
     BuildId: { name: build, in: path, required: true, schema: { type: string } }
+    Kind: { name: kind, in: path, required: true, schema: { enum: [contracts, naming, rules, packs, templates] } }
     IfMatch: { name: If-Match, in: header, description: The server's ETag, for optimistic concurrency, schema: { type: string } }
   responses:
     Problem:

@@ -23,6 +23,17 @@ public final class Model {
         }
     }
 
+    /**
+     * A shared item of the library (spec/platform-api.md §2.3), referenced as
+     * {@code mcpgp://<workspace>/<kind>/<name>@<version>}.
+     */
+    public record LibraryItem(String kind, String name, String title, String created, String updated, List<VersionRef> versions,
+                              long revision) {
+        public VersionRef latest() {
+            return versions.isEmpty() ? null : versions.get(versions.size() - 1);
+        }
+    }
+
     /** A version of a server: number, content digest, who made it and why. */
     public record VersionRef(int number, String digest, String message, String author, String created) {
     }

@@ -34,11 +34,13 @@ public class ServersApi {
     private final Store store;
     private final Servers servers;
     private final Compilation compilation;
+    private final ro.bitboy.mcpgp.platform.PlatformConfig config;
 
-    public ServersApi(Store store, Servers servers, Compilation compilation) {
+    public ServersApi(Store store, Servers servers, Compilation compilation, ro.bitboy.mcpgp.platform.PlatformConfig config) {
         this.store = store;
         this.servers = servers;
         this.compilation = compilation;
+        this.config = config;
     }
 
     static Access.Principal who(HttpServletRequest request) {
@@ -131,6 +133,27 @@ public class ServersApi {
                     Map.of("diagnostics", diagnostics(preview.result().diagnostics())));
         }
         return Json.ok(preview.manifest());
+    }
+
+    /** {@code {id, title?}}: an independent copy of the latest version. */
+    @PostMapping("/{id}/duplicate")
+    public ResponseEntity<byte[]> duplicate(HttpServletRequest request, @PathVariable String id, @RequestBody(required = false) byte[] body) {
+        Access.Principal who = who(request);
+        who.require("servers:write");
+        com.fasterxml.jackson.databind.JsonNode json = Json.parse(body);
+        Model.Server server = servers.duplicate(id, json.path("id").asText(null), json.path("title").asText(null), who);
+        return withEtag(Json.status(201, detail(server)), server);
+    }
+
+    /** {@code {id, title?, pin?}}: a server that extends this one and holds only overrides. */
+    @PostMapping("/{id}/variants")
+    public ResponseEntity<byte[]> variant(HttpServletRequest request, @PathVariable String id, @RequestBody(required = false) byte[] body) {
+        Access.Principal who = who(request);
+        who.require("servers:write");
+        com.fasterxml.jackson.databind.JsonNode json = Json.parse(body);
+        Model.Server server = servers.variant(id, json.path("id").asText(null), json.path("title").asText(null),
+                json.path("pin").asBoolean(false), config.workspace(), who);
+        return withEtag(Json.status(201, detail(server)), server);
     }
 
     @PostMapping("/{id}/archive")

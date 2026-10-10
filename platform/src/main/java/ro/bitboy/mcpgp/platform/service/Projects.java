@@ -35,19 +35,43 @@ public final class Projects {
         this.store = store;
     }
 
-    /** Reads an upload: {@code application/zip} or {@code application/json}. */
+    /** Reads an upload of a server project: {@code application/zip} or {@code application/json}. */
     public Model.Version store(byte[] body, String contentType) {
-        Map<String, byte[]> files = contentType != null && contentType.startsWith("application/zip") ? unzip(body) : fromJson(body);
-        return store(files);
+        return store(read(body, contentType), null, true);
+    }
+
+    /** Reads an upload of a library item: its root is {@code root}, or its only file. */
+    public Model.Version storeItem(byte[] body, String contentType, String root) {
+        return store(read(body, contentType), root, false);
+    }
+
+    private static Map<String, byte[]> read(byte[] body, String contentType) {
+        return contentType != null && contentType.startsWith("application/zip") ? unzip(body) : fromJson(body);
     }
 
     public Model.Version store(Map<String, byte[]> files) {
+        return store(files, null, true);
+    }
+
+    private Model.Version store(Map<String, byte[]> files, String root, boolean server) {
         if (files.isEmpty()) {
             throw ApiException.validation("the project has no files");
         }
-        List<String> roots = files.keySet().stream().filter(p -> !p.contains("/") && p.endsWith(".mcpgp.yaml")).toList();
-        if (roots.size() != 1) {
-            throw ApiException.validation("the project needs exactly one *.mcpgp.yaml at its top level (found " + roots.size() + ")");
+        List<String> roots;
+        if (server) {
+            roots = files.keySet().stream().filter(p -> !p.contains("/") && p.endsWith(".mcpgp.yaml")).toList();
+            if (roots.size() != 1) {
+                throw ApiException.validation("the project needs exactly one *.mcpgp.yaml at its top level (found " + roots.size() + ")");
+            }
+        } else if (root != null) {
+            if (!files.containsKey(root)) {
+                throw ApiException.validation("root " + root + " is not one of the files");
+            }
+            roots = List.of(root);
+        } else if (files.size() == 1) {
+            roots = List.copyOf(files.keySet());
+        } else {
+            throw ApiException.validation("an item with several files needs ?root=<path> (the file references point to)");
         }
         Map<String, String> blobs = new TreeMap<>();
         files.forEach((path, content) -> blobs.put(path, store.putBlob(content)));

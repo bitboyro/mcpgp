@@ -15,7 +15,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -25,10 +27,17 @@ import java.util.stream.Stream;
 public final class Compilation {
 
     private final Store store;
+    private final String workspace;
     private final Compiler compiler = new Compiler(new Schemas());
 
     public Compilation(Store store) {
+        this(store, ro.bitboy.mcpgp.platform.PlatformConfig.DEFAULT_WORKSPACE);
+    }
+
+    /** @param workspace the workspace name of {@code mcpgp://} references this platform resolves */
+    public Compilation(Store store, String workspace) {
         this.store = store;
+        this.workspace = workspace;
     }
 
     /**
@@ -43,16 +52,52 @@ public final class Compilation {
             throw new UncheckedIOException(e);
         }
         try {
-            materialize(version, dir);
-            return compiler.compile(dir.resolve(version.root()), new Compiler.Options(Workspace.none(), false, build));
+            Path project = dir.resolve("project");
+            materialize(version, project);
+            return compiler.compile(project.resolve(version.root()), new Compiler.Options(workspace(dir.resolve("workspace")), false, build));
         } finally {
             delete(dir);
         }
     }
 
-    /** The manifest preview of a version, cached by its digest. */
+    /**
+     * {@code mcpgp://<workspace>/<kind>/<name>@<version>} from the library, and
+     * {@code mcpgp://<workspace>/servers/<id>@<version>} from the servers; written below {@code dir}
+     * when a compilation asks for them.
+     */
+    private Workspace workspace(Path dir) {
+        return Workspace.of(workspace, reference -> {
+            List<Model.VersionRef> versions;
+            if (reference.kind().equals("servers")) {
+                versions = store.server(safe(reference.name())).map(Model.Server::versions).orElse(List.of());
+            } else {
+                versions = store.libraryItem(reference.kind(), safe(reference.name())).map(Model.LibraryItem::versions).orElse(List.of());
+            }
+            Optional<Model.VersionRef> ref = reference.version() == null
+                    ? (versions.isEmpty() ? Optional.empty() : Optional.of(versions.get(versions.size() - 1)))
+                    : versions.stream().filter(v -> String.valueOf(v.number()).equals(reference.version())).findFirst();
+            if (ref.isEmpty()) {
+                return Optional.empty();
+            }
+            Model.Version files = store.version(ref.get().digest()).orElseThrow();
+            Path target = dir.resolve(reference.kind()).resolve(reference.name() + "@" + ref.get().number());
+            if (!Files.exists(target)) {
+                materialize(files, target);
+            }
+            return Optional.of(target.resolve(files.root()));
+        });
+    }
+
+    private static String safe(String name) {
+        if (!name.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,79}")) {
+            throw new IllegalArgumentException("invalid reference name");
+        }
+        return name;
+    }
+
+    /** The manifest preview of a version, cached by its digest and the state of the library and servers it may use. */
     public Preview preview(Model.Version version, String createdAt) {
-        String key = version.digest();
+        String key = version.digest() + "-" + libraryState();
         var cached = store.cached("manifest", key);
         if (cached.isPresent()) {
             return new Preview(new String(cached.get(), StandardCharsets.UTF_8), null);
@@ -65,6 +110,15 @@ public final class Compilation {
         String text = CanonicalJson.pretty(manifest);
         store.cache("manifest", key, text.getBytes(StandardCharsets.UTF_8));
         return new Preview(text, result);
+    }
+
+    /** Changes whenever a library item or server gets a new version (a reference may then resolve differently). */
+    private String libraryState() {
+        StringBuilder state = new StringBuilder();
+        store.library().forEach(i -> state.append(i.kind()).append('/').append(i.name()).append('@').append(i.latest().digest()).append('\n'));
+        store.servers().forEach(s -> state.append("servers/").append(s.id()).append('@')
+                .append(s.latest() == null ? "" : s.latest().digest()).append('\n'));
+        return ro.bitboy.mcpgp.platform.store.FileStore.sha256(state.toString().getBytes(StandardCharsets.UTF_8)).substring(0, 16);
     }
 
     /** A manifest (when the version compiles) and the compiler result (null when served from the cache). */
