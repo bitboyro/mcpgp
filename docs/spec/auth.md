@@ -12,12 +12,14 @@ Tokens never cross from one side to the other (no token passthrough).
 
 ## 1. Inbound (client → MCP server)
 
-Applies to HTTP transports. stdio servers run as the local user and have no inbound auth.
+Applies to HTTP transports. stdio servers run as the local user and have no inbound auth. Before
+auth, requests with an `Origin` header not in `server.allowedOrigins` are refused with `403`
+(DNS-rebinding protection); requests without `Origin` (non-browser clients) pass this check.
 
 | Mode | Standard | Behaviour |
 |---|---|---|
 | `none` | — | Only on loopback, or with `allowInsecure: true` (runtime-config §4) |
-| `static` | RFC 6750 bearer usage | `Authorization: Bearer <key>`; keys from `server.auth.keys[]`, compared in constant time |
+| `static` | RFC 6750 bearer usage | `Authorization: Bearer <key>`; keys from `server.auth.keys[]`, compared in constant time; a missing or unknown key → `401` with `WWW-Authenticate: Bearer`; the key's `name` is the `actor` in audit events |
 | `oauth` | MCP Authorization spec; OAuth 2.1; RFC 9728; RFC 8707; RFC 6750 | The server is an OAuth **resource server** (below) |
 
 ### 1.1 `oauth` mode

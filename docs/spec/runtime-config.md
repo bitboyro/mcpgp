@@ -221,7 +221,8 @@ directory is created with owner-only permissions; config and `.env` usually live
 
 ### 4.3 Health and logs
 
-- **Health** (HTTP servers, on the management port or the main port when none is set):
+- **Health** (HTTP servers, on the management port or the main port when none is set; with a
+  management port, health answers only there and the MCP endpoint only on the main port):
   - `GET /health/live` → `200 {"status":"up"}` while the process runs.
   - `GET /health/ready` → `200` when configuration is loaded and at least one instance is reachable;
     `503` otherwise. Body: `{"status":"up|down|degraded","instances":{"prod-eu":"up","partner-x":"down"}}`.

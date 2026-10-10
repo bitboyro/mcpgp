@@ -260,8 +260,20 @@ public final class ConfigLoader {
         List<String> origins = new ArrayList<>();
         server.path("allowedOrigins").forEach(o -> origins.add(o.asText()));
         String basePath = server.path("basePath").asText("/mcp");
-        return new RuntimeConfig.Server(transport, host, server.path("port").asInt(8080), basePath,
-                server.path("publicUrl").asText(null), authMode, server.path("auth"), allowInsecure, List.copyOf(origins));
+        // inbound auth applies to HTTP only (auth.md §1)
+        if (transport.equals("http") && authMode.equals("oauth")) {
+            problems.add("/server/auth/mode: oauth is not available in this runtime version yet; use static keys or a gateway");
+        }
+        if (transport.equals("http") && authMode.equals("static") && server.path("auth").path("keys").isEmpty()) {
+            problems.add("/server/auth/keys: static mode needs at least one key ({ name, value })");
+        }
+        Integer management = server.path("management").path("port").isInt() ? server.path("management").path("port").asInt() : null;
+        int port = server.path("port").asInt(8080);
+        if (management != null && management == port) {
+            problems.add("/server/management/port: must differ from server.port");
+        }
+        return new RuntimeConfig.Server(transport, host, port, basePath,
+                server.path("publicUrl").asText(null), authMode, server.path("auth"), allowInsecure, List.copyOf(origins), management);
     }
 
     private static Map<String, List<RuntimeConfig.Instance>> instances(Manifest manifest, JsonNode doc, Path baseDir,

@@ -31,6 +31,10 @@ versions follow [SemVer](https://semver.org).
 - Runtime: audit file (JSON Lines): `server.start/stop`, `session.start/end`, `tool.call`,
   `tool.confirm`; arguments masked or hashed, files by hash, redacted upstream error bodies;
   rotation daily / hourly / by size, retention, owner-only permissions.
+- Runtime: Streamable HTTP transport (manifest's MCP revisions only), Origin check, inbound auth
+  `none` (loopback) and `static` (constant-time bearer keys, key name as audit actor),
+  `/health/live` and `/health/ready`, optional management port. `oauth` inbound mode stops startup
+  with a clear message until it is implemented.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.

@@ -40,7 +40,8 @@ public record RuntimeConfig(
      * @param authMode inbound auth: {@code none}, {@code static}, {@code oauth}
      */
     public record Server(String transport, String host, int port, String basePath, String publicUrl,
-                         String authMode, JsonNode auth, boolean allowInsecure, List<String> allowedOrigins) {
+                         String authMode, JsonNode auth, boolean allowInsecure, List<String> allowedOrigins,
+                         Integer managementPort) {
     }
 
     /**
