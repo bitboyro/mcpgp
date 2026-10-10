@@ -164,6 +164,56 @@ public final class Builds implements AutoCloseable {
                 serverVersion == null ? Map.of() : Map.of("serverVersion", serverVersion));
     }
 
+    /** The platform MCP server's project, bundled in the jar from platform/mcp. */
+    static final String PLATFORM_MCP = "/mcpgp/platform-mcp/";
+    static final List<String> PLATFORM_MCP_FILES = List.of("mcpgp-platform.mcpgp.yaml", "contracts/platform-api.openapi.yaml");
+
+    /**
+     * The platform's own MCP server as a package (spec/platform-api.md §3): built from its bundled
+     * project with the same compiler and packager as any build, signed when the platform has a key,
+     * and kept until the platform's version changes. Agents run it themselves with their own token.
+     */
+    public synchronized byte[] platformMcp() {
+        String key = (Compiler.VERSION + "-" + (config.signingKey() == null ? "unsigned" : "signed")).toLowerCase(java.util.Locale.ROOT);
+        var cached = store.cached("platform-mcp", key);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+        Path work = null;
+        try {
+            work = Files.createTempDirectory("mcpgp-platform-mcp-");
+            Path project = work.resolve("project");
+            for (String file : PLATFORM_MCP_FILES) {
+                try (var in = Builds.class.getResourceAsStream(PLATFORM_MCP + file)) {
+                    if (in == null) {
+                        throw new IllegalStateException("the platform MCP server's " + file + " is not in this build");
+                    }
+                    Files.createDirectories(project.resolve(file).getParent());
+                    Files.copy(in, project.resolve(file));
+                }
+            }
+            Instant createdAt = clock.instant().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+            Compiler.Result result = new Compiler(new ro.bitboy.mcpgp.schemas.Schemas()).compile(project.resolve(PLATFORM_MCP_FILES.getFirst()),
+                    new Compiler.Options(ro.bitboy.mcpgp.core.resolve.Workspace.none(), false,
+                            new ManifestWriter.Build(createdAt, Compiler.VERSION, null, null, "mcpgp-platform")));
+            if (!result.ok()) {
+                throw new IllegalStateException("the platform MCP server doesn't compile: " + result.diagnostics());
+            }
+            JsonNode document = result.definition().get().document();
+            Packager.Result packaged = new Packager(Packager::runtimeJar).build(result.manifest().get(), document, createdAt,
+                    work.resolve("out"), signingKey(document));
+            byte[] zip = Files.readAllBytes(packaged.zip());
+            store.cache("platform-mcp", key, zip);
+            return zip;
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        } finally {
+            if (work != null) {
+                Compilation.delete(work);
+            }
+        }
+    }
+
     /**
      * The platform's signing key (spec/platform-api.md §2.2): {@code signing.key} in the platform config,
      * a reference. A definition that asks for signing fails without one; others are built unsigned.

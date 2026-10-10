@@ -1,0 +1,52 @@
+# The platform's own MCP server: agents run it themselves, pointed at the platform with their own
+# token, and get the platform's API as tools. The platform enforces scopes, quotas and approvals on
+# every call, as for any other API client (spec/platform-api.md §3, §5).
+apiVersion: mcpgp/v1
+kind: McpServer
+metadata:
+  name: mcpgp-platform
+  title: mcpgp platform
+  description: >
+    Build MCP servers on an mcpgp platform: upload definitions and new versions, preview what agents
+    get, run builds and download packages. Releases by agents wait for a person's approval.
+
+apis:
+  - id: platform
+    title: mcpgp platform API
+    toolPrefix: platform
+    contracts:
+      - { version: "1.0", spec: contracts/platform-api.openapi.yaml, default: true }
+    select:
+      access: all                    # the platform decides what each token may do
+      exclude:
+        # people's sign-in and passwords, and moving the whole store, aren't for agents
+        - { operationId: "~^(signIn|signOut|getSignInOptions|setPassword|exportStore|importStore)$" }
+    downstreamAuth:
+      supported: [bearer]            # the agent's own platform token
+      identity: service-account
+
+instances:
+  mode: single
+
+exposure:
+  mode: plain                        # about 45 tools
+
+overrides:
+  rules:
+    # these take things away from people (a server, a build, a token) or decide for them: confirm first
+    - match: { operationId: "~^(archiveServer|archiveBuild|revokeToken|rejectRequest)$" }
+      annotations: { destructiveHint: true }
+
+safety:
+  confirmDestructive: true           # deletes and the operations above ask first
+
+packs:
+  audit: {}
+  introspection: {}
+
+runtimeDefaults:
+  transports: { allowed: [stdio, http], default: stdio }
+
+build:
+  targets: [jar]
+  docs: [people, agents]

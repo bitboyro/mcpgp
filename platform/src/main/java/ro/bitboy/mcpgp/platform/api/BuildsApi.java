@@ -48,6 +48,18 @@ public class BuildsApi {
     }
 
     /** {@code {version?: number|"latest", buildNumber?, versionOverride?}}. */
+    /** The platform's own MCP server, for agents to run with their own token (spec/platform-api.md §3). */
+    @GetMapping("/platform-mcp")
+    public ResponseEntity<byte[]> platformMcp(HttpServletRequest request) {
+        Access.Principal who = ServersApi.who(request);
+        who.require("servers:read");
+        byte[] zip = builds.platformMcp();
+        store.append(new Model.Activity(Instant.now().toString(), who.identity().name(), who.identity().kind(), "artifact.download",
+                "platform-mcp", "ok", Map.of("name", "mcpgp-platform.zip")));
+        return ResponseEntity.ok().header("Content-Disposition", "attachment; filename=\"mcpgp-platform.zip\"")
+                .contentType(MediaType.parseMediaType("application/zip")).body(zip);
+    }
+
     @PostMapping("/servers/{id}/builds")
     public ResponseEntity<byte[]> start(HttpServletRequest request, @PathVariable String id, @RequestBody(required = false) byte[] body) {
         Access.Principal who = ServersApi.who(request);
