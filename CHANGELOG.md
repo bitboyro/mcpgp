@@ -108,8 +108,14 @@ versions follow [SemVer](https://semver.org).
   created (by verified email for OIDC). Identities record the account they sign in with.
 - Web UI: the sign-in page offers the company account and says when directory accounts work.
 
+- Multi-API servers end to end: the `ops-assistant` example compiles (orders, and fictional tickets
+  and monitoring contracts), its manifest is pinned in `examples/manifest`, and a runtime test runs it
+  against three target servers with basic, bearer and OAuth client-credentials sign-in.
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 
 ### Fixed
+- Discovery: in multi-API servers, `search_tools` matched every API's tools against the first API's
+  instance of the given id (and its contract), so tools of other APIs sharing that id went missing.
 - audit-event schema: `args` as `{ "sha256": … }` was rejected (`oneOf` matched two branches).

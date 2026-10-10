@@ -9,7 +9,7 @@ validated in CI against the JSON Schemas once those exist (milestone M1).
 |---|---|
 | [platform/orders](platform/orders) | Full multi-file definition: two contract versions, rules in several files, packs, multi-instance, lock file |
 | [platform/orders-readonly](platform/orders-readonly) | A **variant**: extends `orders`, read only, single instance, desktop bundle |
-| [platform/ops-assistant](platform/ops-assistant) | A server combining **three APIs** with discovery exposure |
+| [platform/ops-assistant](platform/ops-assistant) | A server combining **three APIs** (orders, and fictional tickets and monitoring APIs) with discovery exposure |
 | [platform/workspace/naming](platform/workspace/naming) | A shared naming policy used by several servers |
 
 ## Client side (the operator)
@@ -34,3 +34,4 @@ validated in CI against the JSON Schemas once those exist (milestone M1).
 | Example | Shows |
 |---|---|
 | [manifest/orders-mcp.manifest.json](manifest/orders-mcp.manifest.json) | Compiler output for `orders-mcp` (abbreviated: 4 tools) |
+| [manifest/ops-assistant.manifest.json](manifest/ops-assistant.manifest.json) | Compiler output for `ops-assistant`: three APIs (orders, tickets, monitoring), tools prefixed per API |

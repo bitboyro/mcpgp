@@ -14,13 +14,13 @@ apis:
           type: basic
           username: ${env:ORDERS_USER}
           password: ${env:ORDERS_PASS}
-  jira:
+  tickets:
     instances:
       - id: acme
-        baseUrl: https://jira.acme.internal
+        baseUrl: https://tickets.acme.internal
         auth:
           type: bearer
-          token: ${env:JIRA_PAT}
+          token: ${env:TICKETS_TOKEN}
   monitoring:
     instances:
       - id: soc
