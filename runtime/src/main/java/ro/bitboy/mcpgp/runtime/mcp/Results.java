@@ -18,6 +18,11 @@ public final class Results {
 
     /** A success: the value as JSON text and as {@code structuredContent} (when it is an object). */
     public static McpSchema.CallToolResult ok(Object value, Map<String, Object> meta) {
+        if (value instanceof ToolOutput output) {
+            String text = output.text() != null ? output.text() : json(output.structured());
+            return new McpSchema.CallToolResult(List.of(new McpSchema.TextContent(text)), false, output.structured(),
+                    output.meta() == null || output.meta().isEmpty() ? null : output.meta());
+        }
         String text = json(value);
         Object structured = value instanceof Map<?, ?> ? value : null;
         return new McpSchema.CallToolResult(List.of(new McpSchema.TextContent(text)), false, structured,

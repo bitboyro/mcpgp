@@ -67,7 +67,9 @@ Rules:
 - `readOnly` schema properties are removed from inputs.
 - `$ref`s are inlined up to depth 5, then placed in `$defs`.
 - JSON Schema 2020-12; `additionalProperties: false` on the top level and on every group.
-- The runtime maps each group straight back to the request: no guessing, no renaming.
+- The runtime maps each group straight back to the request: no guessing, no renaming. Path values
+  are percent-encoded (a `/` in a value stays inside its segment); empty, `.` and `..` path values
+  are rejected.
 
 Rationale and rejected options: [ADR-0006](../decisions/0006-tool-input-schema-shape.md).
 
@@ -117,7 +119,9 @@ Success:
 Failure from the upstream or input validation: `isError: true` with a readable message, an error code
 from [audit-and-errors.md](audit-and-errors.md) and a hint. How much of an upstream error body is
 included is the operator's choice (`errors.detail`, runtime-config §4.5). No upstream call is retried
-automatically; the agent decides whether to try again. Protocol errors (unknown tool, malformed
+automatically; the agent decides whether to try again. Redirects (3xx) are not followed, so
+credentials never travel to another address; they are returned as `UPSTREAM_4XX` with a note. Secret
+values from the config are replaced with `***` in everything returned from upstream. Protocol errors (unknown tool, malformed
 request) are JSON-RPC errors.
 
 ## 7. Built-in tools

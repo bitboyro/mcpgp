@@ -9,6 +9,7 @@ import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.spec.McpServerTransportProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ro.bitboy.mcpgp.runtime.call.ApiToolHandler;
 import ro.bitboy.mcpgp.runtime.config.RuntimeConfig;
 import ro.bitboy.mcpgp.runtime.manifest.Manifest;
 
@@ -27,12 +28,14 @@ public final class McpServerFactory {
     private final RuntimeConfig config;
     private final ToolCatalog catalog;
     private final Map<String, ToolHandler> builtins = new HashMap<>();
+    private final ToolHandler apiTools;
 
     public McpServerFactory(Manifest manifest, RuntimeConfig config) {
         this.manifest = manifest;
         this.config = config;
         this.catalog = new ToolCatalog(manifest, config);
         builtins.put("instances_list", new InstancesList(manifest, config));
+        this.apiTools = new ApiToolHandler(manifest, config);
     }
 
     public ToolCatalog catalog() {
@@ -56,7 +59,7 @@ public final class McpServerFactory {
     }
 
     /** Dispatches a call by tool kind; every failure becomes an {@code isError} result. */
-    McpSchema.CallToolResult call(McpSyncServerExchange exchange, McpSchema.CallToolRequest request) {
+    public McpSchema.CallToolResult call(McpSyncServerExchange exchange, McpSchema.CallToolRequest request) {
         String name = request.name();
         Map<String, Object> arguments = request.arguments() == null ? Map.of() : request.arguments();
         JsonNode tool = catalog.tool(name).orElse(null);
@@ -67,7 +70,7 @@ public final class McpServerFactory {
             ToolHandler handler = handler(tool);
             return Results.ok(handler.call(exchange, tool, arguments), null);
         } catch (ToolError e) {
-            return Results.error(e, null);
+            return Results.error(e, e.meta());
         } catch (RuntimeException e) {
             LOG.error("Tool {} failed", name, e);
             return Results.error(new ToolError("INTERNAL", "The tool failed unexpectedly; see the server log"), null);
@@ -77,6 +80,7 @@ public final class McpServerFactory {
     private ToolHandler handler(JsonNode tool) {
         String kind = tool.path("kind").asText();
         return switch (kind) {
+            case "api" -> apiTools;
             case "builtin" -> {
                 ToolHandler handler = builtins.get(tool.path("handler").asText());
                 if (handler == null) {
