@@ -38,7 +38,7 @@ Built into the platform jar and served by it (`WebUi`), on the API's own origin.
 |---|---|---|
 | Sign in | `/sign-in` | local accounts; OIDC comes with Spring Security |
 | All servers | `/` | cards, duplicate / variant panel, new server (folder or zip), shared library |
-| Overview (canvas: Shape) | `/servers/:id` | the definition's choices, read-only; previews: agent, customer setup, package, checks |
+| Overview (canvas: Shape) | `/servers/:id` | the definition's choices and packs, editable: changes preview live (agent, customer setup, package, checks), Review shows the file's diff, Save makes the next version |
 | Tools & rules | `/servers/:id/tools` | filters, search, the tool as the agent gets it, its provenance |
 | Connections | `/servers/:id/connections` | contracts, sign-in types, target servers; the shipped example config |
 | Sources | `/servers/:id/sources` | versions, files, upload a new version, checks |
@@ -47,9 +47,9 @@ Built into the platform jar and served by it (`WebUi`), on the API's own origin.
 | Shared library | `/library` | items by kind (adding them is API / CLI) |
 | API & agents | `/agents` | identities, tokens (shown once), guardrails, approvals, agent activity |
 
-Not yet: changing the definition's choices on the page (Shape's six choices, "Describe a change",
-Package & deliver's formats and packs) — each change becomes a new version; until then, settings are
-changed in the files and uploaded on Sources. The platform MCP server comes with M7.
+Not yet: "Describe a change" (proposals from a description), Package & deliver's formats and docs
+(`build.targets` isn't in the manifest, so it needs the resolved definition), and editing tools and
+rules on the page. The platform MCP server comes with M7.
 
 ## Known follow-ups
 

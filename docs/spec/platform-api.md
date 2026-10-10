@@ -44,6 +44,15 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   digest): what agents will get, with provenance. This is what the UI's previews show.
 - `GET /servers/{id}/versions/{version}/example-config` returns the example configuration the
   version's package will ship (what the customer fills in), with secrets as references only.
+- **Edits:** `POST /servers/{id}/edits { base, changes: [{ op, path, value }], message?, dryRun? }`
+  changes the root definition of the latest version (`base`; another number gets `409`) and saves the
+  result as the next version, like an upload. `op` is `set` (`null` is a value: in a variant it removes
+  what is inherited) or `remove`; `path` is a JSON Pointer, plus `[key=value]` to pick a list item
+  (`/apis/[id=orders]/select/access`; created when missing). The file is edited as text, so comments
+  and formatting elsewhere stay; when that isn't possible, the edit is refused (`422`) rather than
+  rewriting the file. An edit that doesn't compile is not saved (`422` with diagnostics). With
+  `dryRun` nothing is saved: the answer is the edited definition, its manifest (or diagnostics) and
+  example configuration, which is how the UI previews unsaved changes.
 - **Duplicate:** `POST /servers/{id}/duplicate { id, title }`: an independent copy of the current
   version's files. **Variant:** `POST /servers/{id}/variants { id, title, pin? }`: a new server whose
   definition `extends` this one (`@latest`, or `@<version>` with `pin`) and stores only its overrides.

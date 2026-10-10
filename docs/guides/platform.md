@@ -38,8 +38,11 @@ The pages: **All servers** (duplicate, variant, upload a new server), and per se
 tool as the agent gets it, and why), **Connections**, **Sources** (versions, files, upload a new
 version), **Builds** (download, release, archive, delete) and **Activity**; plus the **Shared library**,
 **All builds**, **Activity** and **API & agents** (identities, tokens, approvals). The UI uses the same
-API as everyone else; nothing it does is UI-only. Settings that change the definition are made in its
-files for now (upload a new version); editing them on the page comes next.
+API as everyone else; nothing it does is UI-only. On Overview, the server's settings (what agents
+see, what they may do, target servers, transports, confirmation, packs) can be changed on the page:
+the preview shows the result before anything is saved, Review shows the lines of the definition that
+change, and Save makes the next version. Everything else is changed in the files (upload a new
+version on Sources).
 
 The session is an HttpOnly cookie valid 12 hours. Behind a reverse proxy that terminates TLS, pass
 `X-Forwarded-Proto: https` so the cookie is marked `Secure`, and keep the `Host` header (the platform

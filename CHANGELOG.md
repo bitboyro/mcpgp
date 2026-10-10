@@ -96,6 +96,12 @@ versions follow [SemVer](https://semver.org).
   `GET /settings`, `GET /servers/{id}/versions/{version}/example-config`, and `GET /activity?server=`;
   security headers (CSP, nosniff, no framing, no referrer) on every answer.
 
+- Web UI: the server's settings and packs are edited on its Overview page, with a live preview of
+  unsaved changes, a diff of the definition, and Save as the next version.
+- Platform API: `POST /servers/{id}/edits` (set / remove at JSON Pointer paths with `[key=value]`
+  list items; comments and formatting kept; dry run; refused when stale, not compilable, or not
+  editable as text).
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 

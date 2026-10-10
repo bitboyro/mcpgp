@@ -223,6 +223,17 @@ export interface Manifest {
 
 export interface PackageFile { path: string; size: number }
 
+export interface Change { op: 'set' | 'remove'; path: string; value?: unknown }
+
+export interface EditPreview {
+  base: number
+  digest: string
+  definition: string
+  manifest?: Manifest
+  exampleConfig?: string
+  diagnostics?: Diagnostic[]
+}
+
 export const api = {
   signInOptions: () => json<{ auth: { local: boolean; oidc: boolean } }>('GET', '/platform'),
   signIn: (name: string, password: string) => json<Token>('POST', '/sessions', { name, password }),
@@ -243,6 +254,10 @@ export const api = {
     json<{ ok?: boolean; diagnostics: Diagnostic[] }>('POST', `/servers/${enc(id)}/versions/${version}/validate`),
   exampleConfig: (id: string, version: string | number = 'latest') => text(`/servers/${enc(id)}/versions/${version}/example-config`),
   manifest: (id: string, version: string | number = 'latest') => json<Manifest>('GET', `/servers/${enc(id)}/versions/${version}/manifest`),
+  previewEdit: (id: string, base: number, changes: Change[]) =>
+    json<EditPreview>('POST', `/servers/${enc(id)}/edits`, { base, changes, dryRun: true }),
+  saveEdit: (id: string, base: number, changes: Change[], message?: string) =>
+    json<Server>('POST', `/servers/${enc(id)}/edits`, { base, changes, message }),
   duplicate: (id: string, body: { id: string; title?: string }) => json<Server>('POST', `/servers/${enc(id)}/duplicate`, body),
   variant: (id: string, body: { id: string; title?: string; pin?: boolean }) => json<Server>('POST', `/servers/${enc(id)}/variants`, body),
   archiveServer: (id: string) => json<Server>('POST', `/servers/${enc(id)}/archive`),

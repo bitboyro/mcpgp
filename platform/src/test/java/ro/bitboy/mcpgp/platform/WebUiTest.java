@@ -28,72 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The web UI's side of the platform (M6): pages and their headers, the session cookie, the guard on
  * changes made with it, sign-out, and the read endpoints the pages use.
  */
-class WebUiTest {
-
-    static final Path EXAMPLES = Path.of("..", "examples", "platform").toAbsolutePath().normalize();
-    static final ObjectMapper JSON = new ObjectMapper();
-    static final HttpClient HTTP = HttpClient.newHttpClient();
-    static final String PASSWORD = "a long test password";
-
-    @TempDir
-    static Path dir;
-    static ConfigurableApplicationContext context;
-    static String root;
-    static String admin;
-
-    @BeforeAll
-    static void start() throws Exception {
-        int port;
-        try (ServerSocket socket = new ServerSocket(0)) {
-            port = socket.getLocalPort();
-        }
-        PlatformConfig config = new PlatformConfig(dir.resolve("store"), "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT, "acme");
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        PlatformServer.init(config, new String[] {"init", "--admin", "ana"}, new PrintStream(out, true, StandardCharsets.UTF_8));
-        admin = out.toString(StandardCharsets.UTF_8).lines().filter(l -> l.strip().startsWith("mcpgp_")).findFirst().orElseThrow().strip();
-        context = PlatformServer.start(config);
-        root = "http://127.0.0.1:" + port;
-        String me = json(send(bearer("GET", "/api/v1/me", null))).path("id").asText();
-        assertThat(send(bearer("PUT", "/api/v1/identities/" + me + "/password", JSON.writeValueAsBytes(Map.of("password", PASSWORD)))).statusCode())
-                .isEqualTo(200);
-        assertThat(send(bearer("POST", "/api/v1/library/naming?name=acme-standard",
-                JSON.writeValueAsBytes(Map.of("files", Map.of("acme-standard.yaml", "source: operationId\n"))))).statusCode()).isEqualTo(201);
-        assertThat(send(bearer("POST", "/api/v1/library/naming/acme-standard/versions", JSON.writeValueAsBytes(Map.of("files",
-                Map.of("acme-standard.yaml", Files.readString(EXAMPLES.resolve("workspace/naming/acme-standard.yaml"))))))).statusCode()).isEqualTo(201);
-        assertThat(send(bearer("POST", "/api/v1/servers?id=orders-mcp", project(EXAMPLES.resolve("orders")))).statusCode()).isEqualTo(201);
-    }
-
-    @AfterAll
-    static void stop() {
-        context.close();
-    }
-
-    static HttpRequest.Builder request(String method, String path, byte[] body) {
-        return HttpRequest.newBuilder(URI.create(root + path)).header("Content-Type", "application/json")
-                .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofByteArray(body));
-    }
-
-    static HttpRequest.Builder bearer(String method, String path, byte[] body) {
-        return request(method, path, body).header("Authorization", "Bearer " + admin);
-    }
-
-    static HttpResponse<byte[]> send(HttpRequest.Builder request) throws Exception {
-        return HTTP.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
-    }
-
-    static JsonNode json(HttpResponse<byte[]> response) throws Exception {
-        return JSON.readTree(response.body());
-    }
-
-    static byte[] project(Path folder) throws Exception {
-        Map<String, String> files = new LinkedHashMap<>();
-        try (Stream<Path> walk = Files.walk(folder)) {
-            for (Path p : walk.filter(Files::isRegularFile).sorted().toList()) {
-                files.put(folder.relativize(p).toString().replace('\\', '/'), Files.readString(p));
-            }
-        }
-        return JSON.writeValueAsBytes(Map.of("files", files));
-    }
+class WebUiTest extends PlatformTestBase {
 
     /** Signs in as the web UI does; returns the Set-Cookie header. */
     static String webSignIn() throws Exception {
