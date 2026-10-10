@@ -76,7 +76,7 @@ class SelfContainedCheckTest {
         Process sums = run(pkg, "sha256sum", "-c", "SHA256SUMS");
         String sumsOut = output(sums);
         assertThat(sums.exitValue()).as(sumsOut).isZero();
-        Process minisign = run(pkg, "minisign", "-V", "-p", "SIGNING-KEY.pub", "-m", "SHA256SUMS");
+        Process minisign = run(pkg, "minisign", "-V", "-p", "SIGNING-KEY.pub", "-m", "SHA256SUMS", "-x", "SHA256SUMS.sig");
         String minisignOut = output(minisign);
         assertThat(minisign.exitValue()).as(minisignOut).isZero();
         assertThat(minisignOut).contains("Signature and comment signature verified");
