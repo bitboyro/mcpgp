@@ -36,6 +36,10 @@ public class McpgpServer {
     }
 
     public static void main(String[] args) {
+        if (args.length > 0 && ServerCommands.COMMANDS.contains(args[0])) {
+            System.exit(new ServerCommands(System.getenv(), Path.of("").toAbsolutePath(), System.in, System.out).run(args));
+            return;
+        }
         Startup startup;
         try {
             startup = Startup.load(args, System.getenv(), Path.of("").toAbsolutePath());
