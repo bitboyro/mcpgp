@@ -18,7 +18,12 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
-      - name: Build and test (schemas validate every example and conformance file)
+      - name: Tools for the package check (sha256sum is there already)
+        run: sudo apt-get update -q && sudo apt-get install -y -q strace minisign
+      - name: Build and test (schemas validate every example and conformance file; the package check)
+        env:
+          # SelfContainedCheckTest: checksums, minisign -V, and the packaged server's connections under strace
+          MCPGP_PACKAGE_CHECK: "1"
         run: mvn -B verify
 
   links:
