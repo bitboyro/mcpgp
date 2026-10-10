@@ -53,6 +53,10 @@ versions follow [SemVer](https://semver.org).
 - `mcpgp build` makes the package: the executable server jar with the manifest embedded, the
   manifest copy, the build's own `server.config.schema.json`, an example config and `SHA256SUMS`, in a
   reproducible zip. The CLI carries the runtime, so building needs neither Maven nor the network.
+- Generated docs in the package: README, INSTALL, CONFIGURATION (every key with its environment
+  variable), TOOLS, OPERATIONS; AGENTS.md and llms.txt with `build.docs: [agents]`.
+- Package signing: Ed25519 over `SHA256SUMS` in minisign format (prehashed), `SIGNING-KEY.pub` in the
+  package; `mcpgp keygen` and `mcpgp verify`.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.

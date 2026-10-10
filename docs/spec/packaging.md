@@ -145,7 +145,12 @@ Snippets: [examples/client/mcp-clients](../../examples/client/mcp-clients).
   `SHA256SUMS.sig` is a detached signature made with the builder's **key pair** (Ed25519,
   minisign-compatible format). Verification works fully offline:
   `<server> verify` or `mcpgp verify <zip> --key SIGNING-KEY.pub`.
-- The private key comes from a secret reference (`build.sign.key`), never from the definition files.
+- The private key comes from a secret reference (`build.sign.key`: `${env:NAME}` or `${file:path}`),
+  never from the definition files. It must be unencrypted (`mcpgp keygen`, or `minisign -G -W`); keep
+  it in the CI secret store. A build that sets `build.sign` but can't read the key fails; a build
+  without `build.sign` produces an unsigned package and says so.
+- Signatures are prehashed (algorithm `ED`: Ed25519 over BLAKE2b-512 of `SHA256SUMS`); the trusted
+  comment records the build time, the file and the package name.
   Customers should check the public key against one the builder publishes separately (website,
   contract, email), not only the copy in the package.
 - **Jar signing (optional):** when `build.jarSigning` is set, the jar is signed with `jarsigner`
