@@ -23,8 +23,8 @@ import java.util.function.Consumer;
 
 /**
  * The stdio transport, offering only the MCP revisions the manifest supports. When the client closes
- * stdin, the server first answers every request it has already read (up to {@code drainTimeout}), then
- * calls {@code onClose} once to shut down.
+ * stdin, the server first answers every request it has already read (up to {@code drainTimeout}); the
+ * SDK sees the end of input only then, and {@code onClose} runs once to shut down.
  */
 final class StdioTransport extends StdioServerTransportProvider {
 
@@ -40,7 +40,7 @@ final class StdioTransport extends StdioServerTransportProvider {
 
     private StdioTransport(McpJsonMapper mapper, Pending pending, InputStream in, OutputStream out, List<String> revisions,
                            Duration drainTimeout, Runnable onClose) {
-        super(mapper, new TappedInput(in, pending::inbound, () -> pending.drainThen(drainTimeout, onClose)),
+        super(mapper, new TappedInput(in, pending::inbound, () -> pending.drain(drainTimeout), onClose),
                 new TappedOutput(out, pending::outbound));
         this.revisions = List.copyOf(revisions);
     }
@@ -73,7 +73,8 @@ final class StdioTransport extends StdioServerTransportProvider {
             }
         }
 
-        void drainThen(Duration timeout, Runnable onClose) {
+        /** Waits until every request read so far is answered, or the timeout passes. */
+        void drain(Duration timeout) {
             long deadline = System.nanoTime() + timeout.toNanos();
             synchronized (this) {
                 while (!ids.isEmpty()) {
@@ -90,7 +91,6 @@ final class StdioTransport extends StdioServerTransportProvider {
                     }
                 }
             }
-            onClose.run();
         }
 
         private static JsonNode parse(String line) {
@@ -123,15 +123,21 @@ final class StdioTransport extends StdioServerTransportProvider {
         }
     }
 
+    /**
+     * Reads stdin for the SDK. At end of input it first waits for {@code drain} (so the SDK keeps its
+     * session open and answers what it has read), then reports EOF and starts {@code onClose}.
+     */
     private static final class TappedInput extends FilterInputStream {
         private final Lines lines;
-        private final Runnable onEof;
+        private final Runnable drain;
+        private final Runnable onClose;
         private final AtomicBoolean closed = new AtomicBoolean();
 
-        TappedInput(InputStream in, Consumer<String> sink, Runnable onEof) {
+        TappedInput(InputStream in, Consumer<String> sink, Runnable drain, Runnable onClose) {
             super(in);
             this.lines = new Lines(sink);
-            this.onEof = onEof;
+            this.drain = drain;
+            this.onClose = onClose;
         }
 
         @Override
@@ -154,8 +160,9 @@ final class StdioTransport extends StdioServerTransportProvider {
 
         private int eof(int n) {
             if (n < 0 && closed.compareAndSet(false, true)) {
-                // not a daemon: it keeps the process alive until pending requests are answered
-                new Thread(onEof, "stdin-closed").start();
+                drain.run();
+                // not a daemon: it keeps the process alive until shutdown is done
+                new Thread(onClose, "stdin-closed").start();
             }
             return n;
         }
