@@ -92,7 +92,7 @@ final class Docs {
         if (signed) {
             md.append(" The builder signs that list (`SHA256SUMS.sig`, Ed25519, minisign format); check `SIGNING-KEY.pub` against the key ")
                     .append("the builder publishes separately (website, contract, email), not only the copy in the package.\n\n");
-            md.append("```bash\nsha256sum -c SHA256SUMS\nminisign -V -p SIGNING-KEY.pub -m SHA256SUMS      # or: mcpgp verify <zip> --key SIGNING-KEY.pub\n```\n\n");
+            md.append("```bash\nsha256sum -c SHA256SUMS\nminisign -V -p SIGNING-KEY.pub -m SHA256SUMS -x SHA256SUMS.sig      # or: mcpgp verify <zip> --key SIGNING-KEY.pub\n```\n\n");
         } else {
             md.append(" This package is not signed.\n\n```bash\nsha256sum -c SHA256SUMS\n```\n\n");
         }
@@ -301,7 +301,7 @@ final class Docs {
         StringBuilder md = new StringBuilder("# " + title + " for agents\n\n");
         md.append("Steps to install, configure and verify `").append(server).append("` ").append(version).append(".\n\n");
         md.append("1. Check the package: `sha256sum -c SHA256SUMS` must report every file OK")
-                .append(signed ? ", and `minisign -V -p SIGNING-KEY.pub -m SHA256SUMS` must succeed with the key the builder published.\n" : ".\n");
+                .append(signed ? ", and `minisign -V -p SIGNING-KEY.pub -m SHA256SUMS -x SHA256SUMS.sig` must succeed with the key the builder published.\n" : ".\n");
         md.append("2. Ask the user for each target server: its address").append(multi ? ", an id (e.g. `prod-eu`)" : "")
                 .append(" and how it signs in (").append(String.join(", ", authTypes())).append("). Never invent credentials.\n");
         md.append("3. Write `").append(server).append(".yaml` from `").append(server)

@@ -196,7 +196,7 @@ class PackageTest {
                 .contains("| `instances[].auth.type` | `basic` · `apiKey` · `oauth2ClientCredentials` · `none` |")
                 .doesNotContain("keychain");
         String install = new String(entry(zip, "docs/INSTALL.md"), StandardCharsets.UTF_8);
-        assertThat(install).contains("minisign -V -p SIGNING-KEY.pub -m SHA256SUMS");
+        assertThat(install).contains("minisign -V -p SIGNING-KEY.pub -m SHA256SUMS -x SHA256SUMS.sig");
         assertThat(new String(entry(zip, "AGENTS.md"), StandardCharsets.UTF_8)).contains("Call `instances_list` first");
     }
 
