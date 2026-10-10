@@ -68,7 +68,48 @@ public final class MockTarget implements AutoCloseable {
     private final ConcurrentLinkedDeque<Response> queue = new ConcurrentLinkedDeque<>();
 
     public MockTarget() throws IOException {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        this(HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0));
+    }
+
+    /**
+     * An HTTPS target with the given PKCS#12 keystore ({@link ro.bitboy.mcpgp.runtime.TestCerts#PASSWORD});
+     * with {@code clientCa} set, clients must present a certificate it signed (mTLS).
+     */
+    public static MockTarget https(java.nio.file.Path keystore, java.nio.file.Path clientCa) throws Exception {
+        java.security.KeyStore keys = java.security.KeyStore.getInstance("PKCS12");
+        try (var in = java.nio.file.Files.newInputStream(keystore)) {
+            keys.load(in, ro.bitboy.mcpgp.runtime.TestCerts.PASSWORD.toCharArray());
+        }
+        javax.net.ssl.KeyManagerFactory kmf = javax.net.ssl.KeyManagerFactory.getInstance(javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(keys, ro.bitboy.mcpgp.runtime.TestCerts.PASSWORD.toCharArray());
+        javax.net.ssl.TrustManager[] trust = null;
+        if (clientCa != null) {
+            java.security.KeyStore cas = java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType());
+            cas.load(null, null);
+            try (var in = java.nio.file.Files.newInputStream(clientCa)) {
+                cas.setCertificateEntry("client", java.security.cert.CertificateFactory.getInstance("X.509").generateCertificate(in));
+            }
+            javax.net.ssl.TrustManagerFactory tmf = javax.net.ssl.TrustManagerFactory.getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());
+            tmf.init(cas);
+            trust = tmf.getTrustManagers();
+        }
+        javax.net.ssl.SSLContext context = javax.net.ssl.SSLContext.getInstance("TLS");
+        context.init(kmf.getKeyManagers(), trust, null);
+        com.sun.net.httpserver.HttpsServer server = com.sun.net.httpserver.HttpsServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        boolean needClientAuth = clientCa != null;
+        server.setHttpsConfigurator(new com.sun.net.httpserver.HttpsConfigurator(context) {
+            @Override
+            public void configure(com.sun.net.httpserver.HttpsParameters params) {
+                javax.net.ssl.SSLParameters ssl = context.getDefaultSSLParameters();
+                ssl.setNeedClientAuth(needClientAuth);
+                params.setSSLParameters(ssl);
+            }
+        });
+        return new MockTarget(server);
+    }
+
+    private MockTarget(HttpServer server) {
+        this.server = server;
         server.createContext("/", exchange -> {
             byte[] body = exchange.getRequestBody().readAllBytes();
             received.add(new Received(exchange.getRequestMethod(), exchange.getRequestURI().getRawPath(),
@@ -93,7 +134,7 @@ public final class MockTarget implements AutoCloseable {
     }
 
     public String address() {
-        return "http://127.0.0.1:" + server.getAddress().getPort();
+        return (server instanceof com.sun.net.httpserver.HttpsServer ? "https" : "http") + "://127.0.0.1:" + server.getAddress().getPort();
     }
 
     public MockTarget respond(Response response) {

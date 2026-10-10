@@ -47,8 +47,17 @@ final class EnvOverrides {
         return serverName.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", "_") + "_";
     }
 
+    /** Environment rule: a list set here replaces the base list as a whole. */
     Result apply(ObjectNode base, Map<String, String> env, String prefix) {
-        ObjectNode overlay = NODES.objectNode();
+        return apply(base, env, prefix, true);
+    }
+
+    /**
+     * @param replaceLists true for environment variables (lists replace the file's list); false for CLI
+     *                     flags, which change only the fields they name, inside existing list items
+     */
+    Result apply(ObjectNode base, Map<String, String> env, String prefix, boolean replaceLists) {
+        ObjectNode overlay = replaceLists ? NODES.objectNode() : base.deepCopy();
         Set<String> fromEnv = new TreeSet<>();
         Set<String> envLists = new TreeSet<>();
         List<String> problems = new ArrayList<>();
@@ -104,6 +113,9 @@ final class EnvOverrides {
                     problems.add("Environment list " + list + " has no item " + i + "; indexes must be contiguous from 0");
                 }
             }
+        }
+        if (!replaceLists) {
+            return new Result(overlay, fromEnv, problems, warnings);
         }
         ObjectNode merged = base.deepCopy();
         merge(merged, overlay);

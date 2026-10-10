@@ -41,7 +41,9 @@ Applies to HTTP transports. stdio servers run as the local user and have no inbo
 
 ## 2. Downstream (MCP server → target server)
 
-Each instance uses one of the types the build supports, plus optional mTLS.
+Each instance uses one of the types the build supports, plus optional mTLS. `mtls` is not an
+`auth.type` in the runtime config: it is `tls.clientCert` (runtime-config §5.2), allowed only when
+the build lists `mtls` among its supported types.
 
 | Type | Standard | Request |
 |---|---|---|
@@ -70,6 +72,10 @@ auth:
 - Concurrent calls share one token request (no stampede).
 - Token endpoint errors (RFC 6749 §5.2 `error` codes) surface as `AUTH_DOWNSTREAM` with the `error`
   value, never the secret.
+- The token endpoint is reached with the instance's own TLS settings (runtime-config §5); if it uses
+  a public CA while the instance trusts only its own, set `trust: ca-and-system`.
+- With `clientAuth: basic`, client id and secret are form-encoded before Basic encoding
+  (RFC 6749 §2.3.1). Access tokens are redacted like configured secrets.
 
 ### 2.2 Per-operation security
 

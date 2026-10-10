@@ -240,17 +240,4 @@ class ApiCallTest {
         assertThat(structured(call("orders_customer_get", Map.of("instance", "prod-eu", "path", Map.of("id", "1")))).path("code").asText())
                 .isEqualTo("UPSTREAM_UNREACHABLE");
     }
-
-    @Test
-    void tlsSettingsAreNeverSilentlyIgnored() throws IOException {
-        configure("");
-        Path file = dir.resolve("orders-mcp.yaml");
-        Files.writeString(file, Files.readString(file).replace("{ id: slow, baseUrl: \"" + target.address() + "\", timeoutSeconds: 1 }",
-                "{ id: slow, baseUrl: \"" + target.address() + "\", tls: { trust: ca-only, ca: { base64: Y2E= } } }"));
-        server = new McpServerFactory(ORDERS, new ConfigLoader(new Schemas()).load(ORDERS, new ConfigLoader.Options(Optional.of(file), dir,
-                Map.of("PASS", "p", "KEY", "k"), Map.of("storage.root", dir.resolve("data").toString()))));
-        McpSchema.CallToolResult result = call("orders_customer_get", Map.of("instance", "slow", "path", Map.of("id", "1")));
-        assertThat(text(result)).contains("tls settings");
-        assertThat(target.received).isEmpty();
-    }
 }

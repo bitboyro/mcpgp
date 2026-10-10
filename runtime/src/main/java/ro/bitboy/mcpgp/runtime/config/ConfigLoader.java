@@ -86,11 +86,12 @@ public final class ConfigLoader {
         Map<String, String> flagEnv = new LinkedHashMap<>();
         Map<String, String> flagNames = new HashMap<>();
         options.flags().forEach((key, value) -> {
-            String asEnv = "F_" + key.replace(".", "__").toUpperCase(Locale.ROOT);
+            // list indexes attach to their list: instances.0.id → INSTANCES_0__ID
+            String asEnv = "F_" + key.replaceAll("\\.(\\d+)(?=\\.|$)", "_$1").replace(".", "__").toUpperCase(Locale.ROOT);
             flagEnv.put(asEnv, value);
             flagNames.put(asEnv, key);
         });
-        EnvOverrides.Result withFlags = overrides.apply(withEnv.config(), flagEnv, "F_");
+        EnvOverrides.Result withFlags = overrides.apply(withEnv.config(), flagEnv, "F_", false);
         withFlags.problems().forEach(p -> problems.add(p.replaceFirst("^F_\\S*", "flag")));
         for (String warning : withFlags.warnings()) {
             problems.add("Unknown flag --" + flagNames.getOrDefault(warning.substring(0, warning.indexOf(' ')), warning));
@@ -123,7 +124,7 @@ public final class ConfigLoader {
         // 6. what the build allows
         RuntimeConfig.Server server = server(manifest, resolved.path("server"), problems);
         Path storage = storageRoot(name, resolved);
-        Map<String, List<RuntimeConfig.Instance>> instances = instances(manifest, resolved, problems, warnings);
+        Map<String, List<RuntimeConfig.Instance>> instances = instances(manifest, resolved, baseDir, problems, warnings);
         RuntimeConfig.Files files = files(manifest, resolved.path("files"), storage, baseDir, problems);
         if (!problems.isEmpty()) {
             throw new ConfigException(problems);
@@ -262,7 +263,7 @@ public final class ConfigLoader {
                 server.path("publicUrl").asText(null), authMode, server.path("auth"), allowInsecure, List.copyOf(origins));
     }
 
-    private static Map<String, List<RuntimeConfig.Instance>> instances(Manifest manifest, JsonNode doc,
+    private static Map<String, List<RuntimeConfig.Instance>> instances(Manifest manifest, JsonNode doc, Path baseDir,
                                                                          List<String> problems, List<String> warnings) {
         boolean multiApi = manifest.apis().size() > 1;
         boolean multi = manifest.multiInstance();
@@ -341,12 +342,24 @@ public final class ConfigLoader {
                 if (timeout > maxTimeout) {
                     problems.add(where + "/timeoutSeconds: " + timeout + " is above the build's limit of " + maxTimeout);
                 }
-                JsonNode tls = node.path("tls");
+                JsonNode tls = node.has("tls") ? node.get("tls") : JsonNodeFactory.instance.objectNode();
                 if (tls.path("insecureSkipHostnameVerify").asBoolean(false)) {
                     warnings.add("Instance " + id + " skips the TLS hostname check (insecureSkipHostnameVerify)");
                 }
+                if (tls.has("clientCert") && !api.supportedAuth().contains("mtls")) {
+                    problems.add(where + "/tls/clientCert: client certificates (mtls) are not supported by this server (supported: "
+                            + String.join(", ", api.supportedAuth()) + ")");
+                }
+                TlsBuilder.InstanceTls context = null;
+                if (!tls.isEmpty()) {
+                    try {
+                        context = TlsBuilder.build(tls, baseDir, where + "/tls");
+                    } catch (IllegalArgumentException e) {
+                        problems.add(e.getMessage());
+                    }
+                }
                 list.add(new RuntimeConfig.Instance(api.id(), id, baseUrl, contract, node.path("readOnly").asBoolean(false),
-                        timeout, auth, tls.isMissingNode() ? JsonNodeFactory.instance.objectNode() : tls));
+                        timeout, auth, tls, context, baseDir));
             }
             result.put(api.id(), List.copyOf(list));
         }

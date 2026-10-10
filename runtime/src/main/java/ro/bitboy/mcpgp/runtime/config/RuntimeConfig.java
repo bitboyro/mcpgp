@@ -47,9 +47,12 @@ public record RuntimeConfig(
      * @param id       what agents pass as {@code instance}; {@code default} in single-instance builds
      * @param contract a shipped contract version, or {@code auto}
      * @param auth     the resolved {@code auth} object (secrets resolved); {@code {type: none}} when absent
+     * @param tls      the resolved {@code tls} object; empty when the system trust store is used
+     * @param tlsContext the instance's own TLS context; null when {@code tls} is empty
+     * @param baseDir  where relative material paths start (to rebuild the context after rotation)
      */
     public record Instance(String api, String id, String baseUrl, String contract, boolean readOnly,
-                           int timeoutSeconds, JsonNode auth, JsonNode tls) {
+                           int timeoutSeconds, JsonNode auth, JsonNode tls, TlsBuilder.InstanceTls tlsContext, Path baseDir) {
         public String authType() {
             return auth.path("type").asText("none");
         }
