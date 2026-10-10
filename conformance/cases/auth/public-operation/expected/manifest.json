@@ -1,0 +1,283 @@
+{
+  "apis": [
+    {
+      "contracts": [
+        {
+          "basePath": "/api",
+          "default": true,
+          "digest": "sha256:361ff706f58c8d9ba1feae5f0c36d2a1583728b8e356fcfb28681bce61ca8a94",
+          "format": "openapi-3.0",
+          "version": "1.0"
+        }
+      ],
+      "downstreamAuth": {
+        "supported": [
+          "basic"
+        ]
+      },
+      "id": "status",
+      "pagination": null,
+      "requestBody": {
+        "multiple": "split",
+        "suffixes": {
+          "application/octet-stream": "binary",
+          "application/x-www-form-urlencoded": "form",
+          "multipart/form-data": "multipart"
+        }
+      },
+      "toolPrefix": "status"
+    }
+  ],
+  "build": {
+    "cli": "0.0.0",
+    "createdAt": "1970-01-01T00:00:00Z",
+    "definition": {
+      "digest": "sha256:ce40c139b778c5fc635576a7d11fb5d7b5ea06d9f9000aacf99cc3ab85c86e04",
+      "name": "status-mcp"
+    },
+    "extends": null,
+    "lock": null
+  },
+  "diagnostics": [ ],
+  "exposure": {
+    "mode": "plain",
+    "plainSearch": false
+  },
+  "instances": {
+    "max": null,
+    "mixedContracts": "union",
+    "mode": "single"
+  },
+  "manifestVersion": "1.0",
+  "packs": [ ],
+  "policies": {
+    "baseUrlAllowlist": [ ],
+    "confirmDestructive": true,
+    "files": {
+      "forms": [
+        "base64",
+        "path"
+      ]
+    },
+    "redaction": {
+      "fields": [ ]
+    },
+    "responseLimitKb": 256,
+    "runtimeDefaults": { }
+  },
+  "runtime": {
+    "inboundAuth": {
+      "allowed": [
+        "none",
+        "static",
+        "oauth"
+      ],
+      "default": "none"
+    },
+    "mcpRevisions": [
+      "2025-03-26",
+      "2025-06-18",
+      "2025-11-25"
+    ],
+    "minRuntime": "0.0.0",
+    "transports": {
+      "allowed": [
+        "stdio",
+        "http"
+      ],
+      "default": "stdio"
+    }
+  },
+  "schemas": {
+    "status@1.0": { }
+  },
+  "server": {
+    "name": "status-mcp",
+    "version": "1.0.0"
+  },
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "status",
+      "confirm": false,
+      "description": "Health",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": { },
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "status_health_get",
+      "operation": {
+        "key": "status:GET:/health",
+        "operationId": "getHealth",
+        "tags": [ ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/status-1.0.yaml",
+            "pointer": "/paths/~1health/get/summary",
+            "step": "spec",
+            "value": "Health"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "getHealth"
+          },
+          {
+            "step": "normalize",
+            "value": "get health"
+          },
+          {
+            "step": "shape",
+            "value": "health_get"
+          },
+          {
+            "step": "namespace",
+            "value": "status_health_get"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/status-1.0.yaml",
+            "pointer": "/paths/~1health/get/summary",
+            "step": "spec",
+            "value": "Health"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Health",
+      "variants": {
+        "1.0": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [ ],
+          "path": "/health",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "status": "200"
+            }
+          ],
+          "security": [ ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "status",
+      "confirm": false,
+      "description": "Incidents",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": { },
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "status_incident_list",
+      "operation": {
+        "key": "status:GET:/incidents",
+        "operationId": "listIncidents",
+        "tags": [ ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/status-1.0.yaml",
+            "pointer": "/paths/~1incidents/get/summary",
+            "step": "spec",
+            "value": "Incidents"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "listIncidents"
+          },
+          {
+            "step": "normalize",
+            "value": "list incidents"
+          },
+          {
+            "step": "shape",
+            "value": "incident_list"
+          },
+          {
+            "step": "namespace",
+            "value": "status_incident_list"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/status-1.0.yaml",
+            "pointer": "/paths/~1incidents/get/summary",
+            "step": "spec",
+            "value": "Incidents"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Incidents",
+      "variants": {
+        "1.0": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [ ],
+          "path": "/incidents",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "properties": {
+                  "items": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "status": "200"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ]
+          ]
+        }
+      }
+    }
+  ]
+}

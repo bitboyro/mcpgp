@@ -20,7 +20,6 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * The server process: {@code java -jar <server>.jar [--config <file>] [--<key> <value>…]}.
@@ -72,14 +71,7 @@ public class McpgpServer {
         });
         org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(McpgpServer.class);
         config.warnings().forEach(log::warn);
-        for (RuntimeConfig.Instance instance : config.allInstances()) {
-            if (!instance.tls().isEmpty()) {
-                log.warn("Instance {} has tls settings; this runtime version doesn't apply them yet, so its calls fail", instance.id());
-            }
-            if (Set.of("oauth2ClientCredentials", "mtls").contains(instance.authType())) {
-                log.warn("Instance {} uses {}, which this runtime version doesn't support yet; its calls fail", instance.id(), instance.authType());
-            }
-        }
+
         return app.run();
     }
 

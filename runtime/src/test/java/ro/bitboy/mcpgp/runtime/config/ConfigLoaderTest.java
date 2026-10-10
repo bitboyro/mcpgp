@@ -30,29 +30,37 @@ class ConfigLoaderTest {
         return loader.load(manifest, new ConfigLoader.Options(Optional.ofNullable(file), REPO, env, Map.of()));
     }
 
+    static final ro.bitboy.mcpgp.runtime.TestCerts CERTS = ro.bitboy.mcpgp.runtime.TestCerts.get();
+
     static Map<String, String> envFile(Path file) throws IOException {
         return ConfigLoader.dotEnv(file, new java.util.ArrayList<>());
     }
 
     @Test
     void loadsTheMultiInstanceExample() {
-        RuntimeConfig config = load(ORDERS, REPO.resolve("examples/client/multi-instance/orders-mcp.yaml"), Map.of(
-                "EU_CLIENT_ID", "eu", "EU_CLIENT_SECRET", "s1", "CX_USER", "cx", "CX_PASS", "s2",
-                "TEST_API_KEY", "s3", "TEST_CA_B64", "Y2E=", "TEST_P12_PASS", "s4", "JIRA_TOKEN", "s5"));
+        // the example's certificate files don't exist in the repo: real test material instead
+        RuntimeConfig config = loader.load(ORDERS, new ConfigLoader.Options(Optional.of(REPO.resolve("examples/client/multi-instance/orders-mcp.yaml")),
+                REPO, Map.of("EU_CLIENT_ID", "eu", "EU_CLIENT_SECRET", "s1", "CX_USER", "cx", "CX_PASS", "s2",
+                        "TEST_API_KEY", "s3", "TEST_CA_B64", ro.bitboy.mcpgp.runtime.TestCerts.base64(CERTS.serverPem),
+                        "TEST_P12_PASS", ro.bitboy.mcpgp.runtime.TestCerts.PASSWORD, "JIRA_TOKEN", "s5"),
+                Map.of("instances.2.tls.clientCert.path", CERTS.clientP12.toString())));
+        assertThat(config.instances().get("orders").get(2).tlsContext()).isNotNull();
         assertThat(config.instances().get("orders")).extracting(RuntimeConfig.Instance::id).containsExactly("prod-eu", "partner-x", "test");
         RuntimeConfig.Instance test = config.instances().get("orders").get(2);
         assertThat(test.readOnly()).isTrue();
         assertThat(test.timeoutSeconds()).isEqualTo(60);
         assertThat(test.auth().path("value").asText()).isEqualTo("s3");
         assertThat(config.instances().get("orders").get(0).timeoutSeconds()).isEqualTo(30);   // build default
-        assertThat(config.secrets()).contains("s1", "s2", "s3", "s4").doesNotContain("eu", "Y2E=");
+        assertThat(config.secrets()).contains("s1", "s2", "s3", ro.bitboy.mcpgp.runtime.TestCerts.PASSWORD).doesNotContain("eu");
         assertThat(config.server().transport()).isEqualTo("http");
         assertThat(config.audit().arguments()).isEqualTo("hashed");
     }
 
     @Test
     void loadsAConfigMadeOnlyOfEnvironmentVariables() throws IOException {
-        RuntimeConfig config = load(ORDERS, null, envFile(REPO.resolve("examples/client/env-only/orders-mcp.env.example")));
+        Map<String, String> env = new HashMap<>(envFile(REPO.resolve("examples/client/env-only/orders-mcp.env.example")));
+        env.put("ORDERS_MCP_INSTANCES_0__TLS__CA__BASE64", ro.bitboy.mcpgp.runtime.TestCerts.base64(CERTS.serverPem));   // the example's is a placeholder
+        RuntimeConfig config = load(ORDERS, null, env);
         assertThat(config.source()).isEmpty();
         assertThat(config.server().port()).isEqualTo(8080);
         assertThat(config.server().authMode()).isEqualTo("static");
@@ -165,8 +173,9 @@ class ConfigLoaderTest {
         Path file = dir.resolve("orders-mcp.yaml");
         Files.writeString(file, "server: { transport: http }\ninstances: [ { id: a, baseUrl: a.example } ]\n");
         RuntimeConfig config = loader.load(ORDERS, new ConfigLoader.Options(Optional.of(file), dir,
-                Map.of("ORDERS_MCP_SERVER__PORT", "9100"), Map.of("server.port", "9200")));
+                Map.of("ORDERS_MCP_SERVER__PORT", "9100"), Map.of("server.port", "9200", "instances.0.timeoutSeconds", "45")));
         assertThat(config.server().port()).isEqualTo(9200);
+        assertThat(config.instances().get("orders").get(0).timeoutSeconds()).isEqualTo(45);
         assertThatThrownBy(() -> loader.load(ORDERS, new ConfigLoader.Options(Optional.of(file), dir, Map.of(), Map.of("server.prot", "1"))))
                 .hasMessageContaining("Unknown flag --server.prot");
     }

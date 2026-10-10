@@ -54,6 +54,8 @@ Rules:
 - A variable with the server's prefix that matches no setting is logged as a warning and ignored
   (it may be a value used by a `${env:…}` reference); it never stops startup.
 - CLI flags use the same keys with dots: `--server.port 8080`, `--instances.0.timeoutSeconds 60`.
+  Unlike environment variables, a flag changes only the field it names, inside the existing list
+  item; it never replaces the list.
 
 ## 2. Secrets
 

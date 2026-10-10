@@ -1,0 +1,28 @@
+mcpRevision: "2025-11-25"
+steps:
+  - name: public operation is called without credentials
+    mcp:
+      method: tools/call
+      params: { name: status_health_get, arguments: {} }
+    upstream:
+      method: GET
+      path: /api/health
+      headers:
+        Authorization: { absent: true }
+    respond: { status: 200, json: { status: up } }
+    expect:
+      isError: false
+      structuredContent: { status: up }
+
+  - name: other operations get the instance's credentials
+    mcp:
+      method: tools/call
+      params: { name: status_incident_list, arguments: {} }
+    upstream:
+      method: GET
+      path: /api/incidents
+      headers:
+        Authorization: { startsWith: "Basic " }
+    respond: { status: 200, json: { items: [] } }
+    expect:
+      isError: false

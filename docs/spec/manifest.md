@@ -170,7 +170,8 @@ Rules:
   calls against an instance using another contract return `NOT_AVAILABLE_ON_INSTANCE`.
 - `parameters[]`: `{ name, in, required, style, explode, schema }`, in the grouped shape's order.
 - `security` mirrors the OpenAPI requirement (alternatives of AND-sets) and is used to hide or explain
-  tools the instance's sign-in can't use.
+  tools the instance's sign-in can't use. `"security": []` marks a public operation (the spec's
+  `security: []`): the runtime sends no credentials for it. Absent means none was declared.
 - `kind: builtin` (e.g. `instances_list`, `search_tools`) and `kind: pack` tools have no `variants`;
   they carry `handler: "<builtin id>"` or `pack: "<pack id>"`.
 - Hidden tools are not in the manifest. Excluded operations are listed only in `diagnostics` (info).

@@ -1,0 +1,5 @@
+# a dummy credential, written inline only because conformance cases run without an environment
+allowInlineSecrets: true
+instance:
+  baseUrl: mock
+  auth: { type: basic, username: conformance, password: not-a-real-password }

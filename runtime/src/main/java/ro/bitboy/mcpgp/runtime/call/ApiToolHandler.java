@@ -48,9 +48,10 @@ public final class ApiToolHandler implements ToolHandler {
                 apiKeys.put(id, placement);
             }
         });
-        this.upstream = new Upstream(apiKeys);
+        Redactor redactor = new Redactor(config.secrets());
+        this.upstream = new Upstream(apiKeys, redactor);
         this.responses = new ResponseMapper(manifest.policies().path("responseLimitKb").asInt(256),
-                config.errorDetail(), config.secrets());
+                config.errorDetail(), redactor);
     }
 
     @Override
@@ -81,7 +82,9 @@ public final class ApiToolHandler implements ToolHandler {
             URI base = BaseUrl.resolve(instance.baseUrl(), api.contracts().get(contract).basePath());
             RequestBuilder.UpstreamRequest request = requests.build(variant, args, base);
             LOG.debug("{} {} → {}", request.method(), variant.path("path").asText(), instance.id());
-            HttpResponse<byte[]> response = upstream.send(instance, request);
+            // security: [] marks a public operation: no credentials (auth.md §2.2)
+            boolean publicOperation = variant.path("security").isArray() && variant.path("security").isEmpty();
+            HttpResponse<byte[]> response = upstream.send(instance, request, publicOperation);
             return responses.map(response, instance.id(), meta);
         } catch (ToolError e) {
             throw e.meta().isEmpty() ? e.withMeta(meta) : e;

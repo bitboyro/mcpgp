@@ -20,6 +20,11 @@ versions follow [SemVer](https://semver.org).
   root, size caps), basic / bearer / apiKey credentials, response and error mapping with redaction
   and `errors.detail`.
 - Conformance traffic runner (Java): runs `traffic.yaml` steps against a mock target.
+- Runtime: per-instance TLS (own truststore, `ca-only` / `ca-and-system` / `system`, hostname-only
+  relaxation, rotation of `path` material), client certificates (PKCS#12 or PEM + PKCS#8 key),
+  OAuth 2 client credentials (token cache, one token request at a time, single retry on 401).
+- Compiler: `security: []` (public operations) is kept in the manifest; the runtime sends no
+  credentials for them. Conformance case `auth/public-operation`.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.

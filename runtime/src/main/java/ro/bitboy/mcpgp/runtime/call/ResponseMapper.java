@@ -9,11 +9,9 @@ import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,13 +28,12 @@ final class ResponseMapper {
 
     private final int limitBytes;
     private final boolean fullErrors;
-    private final List<String> secrets;
+    private final Redactor redactor;
 
-    ResponseMapper(int responseLimitKb, String errorDetail, Set<String> secrets) {
+    ResponseMapper(int responseLimitKb, String errorDetail, Redactor redactor) {
         this.limitBytes = responseLimitKb * 1024;
         this.fullErrors = !"summary".equals(errorDetail);
-        // longest first, so a secret containing another is replaced whole
-        this.secrets = secrets.stream().filter(s -> s.length() >= 4).sorted(Comparator.comparingInt(String::length).reversed()).toList();
+        this.redactor = redactor;
     }
 
     ToolOutput map(HttpResponse<byte[]> response, String instance, Map<String, Object> meta) {
@@ -118,11 +115,7 @@ final class ResponseMapper {
     }
 
     String redact(String text) {
-        String result = text;
-        for (String secret : secrets) {
-            result = result.replace(secret, "***");
-        }
-        return result;
+        return redactor.redact(text);
     }
 
     private String text(byte[] body) {

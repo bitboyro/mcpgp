@@ -1,0 +1,8 @@
+name: public-operation
+description: >
+  An operation with `security: []` is public: the runtime sends no credentials for it, while other
+  operations of the same instance get the instance's credentials.
+area: auth
+specs: [auth.md#22-per-operation-security, manifest.md#5-tools]
+mcpRevisions: ["2025-11-25"]
+expect: manifest

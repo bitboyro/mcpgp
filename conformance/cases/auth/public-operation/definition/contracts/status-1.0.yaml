@@ -1,0 +1,29 @@
+openapi: 3.0.3
+info: { title: Status, version: "1.0" }
+servers: [{ url: https://status.example/api }]
+security: [{ basicAuth: [] }]
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { status: { type: string } } }
+  /incidents:
+    get:
+      operationId: listIncidents
+      summary: Incidents
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { items: { type: array, items: { type: string } } } }
+components:
+  securitySchemes:
+    basicAuth: { type: http, scheme: basic }

@@ -1,7 +1,10 @@
 package ro.bitboy.mcpgp.runtime.call;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ro.bitboy.mcpgp.runtime.config.RuntimeConfig;
+import ro.bitboy.mcpgp.runtime.config.TlsBuilder;
 import ro.bitboy.mcpgp.runtime.mcp.ToolError;
 
 import javax.net.ssl.SSLException;
@@ -15,6 +18,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Map;
@@ -22,30 +26,67 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Sends requests to instances: one HTTP client per instance, downstream credentials added here
- * (never from tool input), redirects not followed (credentials must not travel to another host),
- * and no automatic retries (the agent decides).
+ * Sends requests to instances: one HTTP client per instance with its own TLS context, downstream
+ * credentials added here (never from tool input), redirects not followed (credentials must not travel
+ * to another host). The only repeats are the ones the specs allow: once after a {@code 401} with a
+ * fresh OAuth token (auth.md §2.1), once after a TLS failure when certificate files changed (§5.4).
  */
 final class Upstream {
 
+    private static final Logger LOG = LoggerFactory.getLogger(Upstream.class);
     /** Headers the agent may never set; the runtime owns them. */
     private static final Set<String> RESERVED = Set.of("authorization", "content-type", "content-length", "host",
             "cookie", "connection", "transfer-encoding", "expect", "upgrade");
 
-    private final Map<String, HttpClient> clients = new ConcurrentHashMap<>();
-    /** apiKey placement per API, from the manifest ({@code in}, {@code name}). */
-    private final Map<String, JsonNode> apiKeys;
-
-    Upstream(Map<String, JsonNode> apiKeys) {
-        this.apiKeys = apiKeys;
+    private record Client(HttpClient http, TlsBuilder.InstanceTls tls) {
     }
 
-    HttpResponse<byte[]> send(RuntimeConfig.Instance instance, RequestBuilder.UpstreamRequest request) {
-        if (!instance.tls().isEmpty()) {
-            // never fall back to a looser trust than configured
-            throw new ToolError("UPSTREAM_UNREACHABLE", "instance " + instance.id() + " has tls settings, which this runtime version doesn't apply yet",
-                    "Remove the tls block to use the system trust store, or use a newer runtime");
+    private final Map<String, Client> clients = new ConcurrentHashMap<>();
+    /** apiKey placement per API, from the manifest ({@code in}, {@code name}). */
+    private final Map<String, JsonNode> apiKeys;
+    private final OAuthTokens tokens;
+
+    Upstream(Map<String, JsonNode> apiKeys, Redactor redactor) {
+        this.apiKeys = apiKeys;
+        this.tokens = new OAuthTokens(redactor, Clock.systemUTC());
+    }
+
+    /**
+     * @param publicOperation the operation declares {@code security: []}: no credentials are sent
+     */
+    HttpResponse<byte[]> send(RuntimeConfig.Instance instance, RequestBuilder.UpstreamRequest request, boolean publicOperation) {
+        String key = instance.api() + "/" + instance.id();
+        Client client = clients.computeIfAbsent(key, k -> client(instance, instance.tlsContext()));
+        HttpResponse<byte[]> response;
+        try {
+            response = attempt(instance, request, client, publicOperation);
+        } catch (SSLException e) {
+            if (client.tls() == null || !client.tls().filesChanged()) {
+                throw tlsError(instance, e);
+            }
+            LOG.info("Certificate files of instance {} changed; reloading them and trying once more", instance.id());
+            TlsBuilder.InstanceTls reloaded = TlsBuilder.build(instance.tls(), instance.baseDir(), "instance " + instance.id() + " tls");
+            client = client(instance, reloaded);
+            clients.put(key, client);
+            try {
+                response = attempt(instance, request, client, publicOperation);
+            } catch (SSLException again) {
+                throw tlsError(instance, again);
+            }
         }
+        if (response.statusCode() == 401 && !publicOperation && instance.authType().equals("oauth2ClientCredentials")) {
+            tokens.discard(instance);
+            try {
+                response = attempt(instance, request, client, false);
+            } catch (SSLException e) {
+                throw tlsError(instance, e);
+            }
+        }
+        return response;
+    }
+
+    private HttpResponse<byte[]> attempt(RuntimeConfig.Instance instance, RequestBuilder.UpstreamRequest request, Client client,
+                                         boolean publicOperation) throws SSLException {
         URI uri = request.uri();
         HttpRequest.Builder http = HttpRequest.newBuilder().timeout(Duration.ofSeconds(instance.timeoutSeconds()));
         String cookie = null;
@@ -58,12 +99,12 @@ final class Upstream {
             }
         }
 
-        // downstream credentials
         JsonNode auth = instance.auth();
-        switch (instance.authType()) {
+        switch (publicOperation ? "none" : instance.authType()) {
             case "basic" -> http.header("Authorization", "Basic " + Base64.getEncoder().encodeToString(
                     (auth.path("username").asText() + ":" + auth.path("password").asText()).getBytes(StandardCharsets.UTF_8)));
             case "bearer" -> http.header("Authorization", "Bearer " + auth.path("token").asText());
+            case "oauth2ClientCredentials" -> http.header("Authorization", "Bearer " + tokens.token(instance, client.http()));
             case "apiKey" -> {
                 JsonNode placement = apiKeys.get(instance.api());
                 if (placement == null) {
@@ -80,8 +121,7 @@ final class Upstream {
             }
             case "none" -> {
             }
-            default -> throw new ToolError("AUTH_DOWNSTREAM", "sign-in type " + instance.authType()
-                    + " is not available in this runtime version yet", "Configure basic, bearer or apiKey for instance " + instance.id());
+            default -> throw new ToolError("AUTH_DOWNSTREAM", "sign-in type " + instance.authType() + " is not supported by this runtime");
         }
         if (cookie != null) {
             http.header("Cookie", cookie);
@@ -95,7 +135,7 @@ final class Upstream {
         http.uri(uri);
 
         try {
-            return client(instance).send(http.build(), HttpResponse.BodyHandlers.ofByteArray());
+            return client.http().send(http.build(), HttpResponse.BodyHandlers.ofByteArray());
         } catch (HttpConnectTimeoutException e) {
             throw new ToolError("UPSTREAM_UNREACHABLE", instance.id() + " did not accept a connection within " + instance.timeoutSeconds() + " s",
                     "Check that the instance's baseUrl is reachable from the server");
@@ -103,12 +143,14 @@ final class Upstream {
             throw new ToolError("UPSTREAM_TIMEOUT", instance.id() + " did not answer within " + instance.timeoutSeconds() + " s",
                     "Try again, or narrow the request");
         } catch (SSLException e) {
-            throw new ToolError("UPSTREAM_UNREACHABLE", "TLS connection to " + instance.id() + " failed: " + e.getMessage(),
-                    "Check the instance's tls settings (ca, trust)");
+            throw e;
         } catch (ConnectException e) {
             throw new ToolError("UPSTREAM_UNREACHABLE", instance.id() + " refused the connection",
                     "Check that the instance's baseUrl is reachable from the server");
         } catch (IOException e) {
+            if (e.getCause() instanceof SSLException ssl) {
+                throw ssl;
+            }
             throw new ToolError("UPSTREAM_UNREACHABLE", "Request to " + instance.id() + " failed: " + e.getClass().getSimpleName(),
                     "Check the instance's address and network");
         } catch (InterruptedException e) {
@@ -117,10 +159,19 @@ final class Upstream {
         }
     }
 
-    private HttpClient client(RuntimeConfig.Instance instance) {
-        return clients.computeIfAbsent(instance.api() + "/" + instance.id(), key -> HttpClient.newBuilder()
+    private static ToolError tlsError(RuntimeConfig.Instance instance, SSLException e) {
+        String reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+        return new ToolError("UPSTREAM_UNREACHABLE", "TLS connection to " + instance.id() + " failed: " + reason,
+                "Check the instance's tls settings (ca, trust, client certificate); the diagnostics pack can fetch the server's certificate");
+    }
+
+    private static Client client(RuntimeConfig.Instance instance, TlsBuilder.InstanceTls tls) {
+        HttpClient.Builder builder = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(Math.min(instance.timeoutSeconds(), 30)))
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build());
+                .followRedirects(HttpClient.Redirect.NEVER);
+        if (tls != null) {
+            builder.sslContext(tls.context());
+        }
+        return new Client(builder.build(), tls);
     }
 }

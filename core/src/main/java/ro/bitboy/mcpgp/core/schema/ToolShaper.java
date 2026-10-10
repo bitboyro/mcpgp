@@ -336,8 +336,9 @@ public final class ToolShaper {
         (plan.accept() != null ? plan.accept() : acceptOf(op)).forEach(accept::add);
         variant.set("accept", accept);
 
+        // an empty list is kept: it marks a public operation (no credentials, auth.md §2.2)
         List<List<SecurityRequirement>> security = op.security() != null ? op.security() : contract.security();
-        if (security != null && !security.isEmpty()) {
+        if (security != null && (!security.isEmpty() || op.security() != null)) {
             ArrayNode alternatives = NODES.arrayNode();
             for (List<SecurityRequirement> all : security) {
                 ArrayNode set = NODES.arrayNode();
