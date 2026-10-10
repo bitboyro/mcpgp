@@ -31,6 +31,23 @@ public final class Model {
     public record Version(String digest, String root, Map<String, String> files) {
     }
 
+    /**
+     * Compiling and packaging one version (spec/platform-api.md §2.2).
+     *
+     * @param status        queued, running, succeeded, failed
+     * @param serverVersion the version the package carries (e.g. 2.0.0+3), once known
+     * @param artifacts     stored files: the package zip and the manifest, with sizes and SHA-256
+     * @param deleted       files removed; the record stays
+     */
+    public record Build(String id, String server, int version, String versionDigest, String status, String startedBy,
+                        String startedByKind, String created, String started, String finished, Integer buildNumber,
+                        String serverVersion, boolean released, String releasedBy, boolean archived, String archivedAt,
+                        boolean deleted, List<Artifact> artifacts, String error) {
+    }
+
+    public record Artifact(String name, long size, String sha256) {
+    }
+
     /** A person, agent or pipeline. */
     public record Identity(String id, String kind, String name, Set<String> scopes, String owner, String created, boolean disabled) {
     }

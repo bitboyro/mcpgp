@@ -8,6 +8,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import ro.bitboy.mcpgp.platform.api.AuthFilter;
 import ro.bitboy.mcpgp.platform.service.Access;
+import ro.bitboy.mcpgp.platform.service.Builds;
 import ro.bitboy.mcpgp.platform.service.Compilation;
 import ro.bitboy.mcpgp.platform.service.Servers;
 import ro.bitboy.mcpgp.platform.store.FileStore;
@@ -96,6 +97,11 @@ public class PlatformServer {
     @Bean
     Compilation compilation(Store store) {
         return new Compilation(store);
+    }
+
+    @Bean(initMethod = "start", destroyMethod = "close")
+    Builds builds(Store store, Compilation compilation, PlatformConfig config) {
+        return new Builds(store, compilation, config, System.getenv(), java.time.Clock.systemUTC());
     }
 
     @Bean

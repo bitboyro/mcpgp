@@ -11,6 +11,7 @@ security:
   - bearerAuth: []
 tags:
   - { name: servers, description: Server definition projects and their versions }
+  - { name: builds, description: Builds, their logs and artifacts }
   - { name: identities, description: Identities, tokens and the activity log }
 paths:
   /servers:
@@ -116,6 +117,109 @@ paths:
       responses:
         "200": { description: Restored, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/builds:
+    parameters: [ { $ref: "#/components/parameters/ServerId" } ]
+    get:
+      operationId: listBuilds
+      tags: [builds]
+      summary: List builds
+      parameters:
+        - { name: archived, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200": { description: Newest first, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Build" } } } } } } }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: startBuild
+      tags: [builds]
+      summary: Start build
+      description: Queues a build of a version (default latest); poll getBuild until it is done.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: { type: string, description: A version number or latest, default: latest }
+                buildNumber: { type: integer, minimum: 1 }
+                versionOverride: { type: string }
+      responses:
+        "202": { description: Queued, content: { application/json: { schema: { $ref: "#/components/schemas/Build" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /builds/{build}:
+    parameters: [ { $ref: "#/components/parameters/BuildId" } ]
+    get:
+      operationId: getBuild
+      tags: [builds]
+      summary: Get build
+      responses:
+        "200": { description: Build, content: { application/json: { schema: { $ref: "#/components/schemas/Build" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: deleteBuild
+      tags: [builds]
+      summary: Delete build files
+      description: Removes the files; the record stays. Released builds must be archived first.
+      responses:
+        "200": { description: Deleted, content: { application/json: { schema: { $ref: "#/components/schemas/Build" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /builds/{build}/log:
+    parameters: [ { $ref: "#/components/parameters/BuildId" } ]
+    get:
+      operationId: getBuildLog
+      tags: [builds]
+      summary: Get build log
+      responses:
+        "200": { description: The log so far, content: { text/plain: { schema: { type: string } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /builds/{build}/artifacts:
+    parameters: [ { $ref: "#/components/parameters/BuildId" } ]
+    get:
+      operationId: listArtifacts
+      tags: [builds]
+      summary: List artifacts
+      responses:
+        "200": { description: Artifacts and the files inside the package, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /builds/{build}/artifacts/{name}:
+    parameters:
+      - { $ref: "#/components/parameters/BuildId" }
+      - { name: name, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: downloadArtifact
+      tags: [builds]
+      summary: Download artifact
+      parameters:
+        - { name: file, in: query, description: One file of the package, e.g. docs/INSTALL.md, schema: { type: string } }
+      responses:
+        "200": { description: The file, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /builds/{build}/release:
+    parameters: [ { $ref: "#/components/parameters/BuildId" } ]
+    post:
+      operationId: releaseBuild
+      tags: [builds]
+      summary: Release build
+      responses:
+        "200": { description: Released, content: { application/json: { schema: { $ref: "#/components/schemas/Build" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /builds/{build}/archive:
+    parameters: [ { $ref: "#/components/parameters/BuildId" } ]
+    post:
+      operationId: archiveBuild
+      tags: [builds]
+      summary: Archive build
+      responses:
+        "200": { description: Archived, content: { application/json: { schema: { $ref: "#/components/schemas/Build" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /builds/{build}/restore:
+    parameters: [ { $ref: "#/components/parameters/BuildId" } ]
+    post:
+      operationId: restoreBuild
+      tags: [builds]
+      summary: Restore build
+      responses:
+        "200": { description: Restored, content: { application/json: { schema: { $ref: "#/components/schemas/Build" } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /me:
     get:
       operationId: getMe
@@ -206,6 +310,7 @@ components:
   parameters:
     ServerId: { name: id, in: path, required: true, schema: { type: string } }
     Version: { name: version, in: path, required: true, description: A version number or latest, schema: { type: string } }
+    BuildId: { name: build, in: path, required: true, schema: { type: string } }
     IfMatch: { name: If-Match, in: header, description: The server's ETag, for optimistic concurrency, schema: { type: string } }
   responses:
     Problem:
@@ -253,6 +358,24 @@ components:
       properties:
         ok: { type: boolean }
         diagnostics: { type: array, items: { type: object, properties: { level: { type: string }, code: { type: string }, message: { type: string }, location: { type: string } } } }
+    Build:
+      type: object
+      properties:
+        id: { type: string }
+        server: { type: string }
+        version: { type: integer }
+        status: { enum: [queued, running, succeeded, failed] }
+        startedBy: { type: string }
+        created: { type: string, format: date-time }
+        started: { type: string, format: date-time }
+        finished: { type: string, format: date-time }
+        serverVersion: { type: string }
+        released: { type: boolean }
+        releasedBy: { type: string }
+        archived: { type: boolean }
+        deleted: { type: boolean }
+        artifacts: { type: array, items: { type: object, properties: { name: { type: string }, size: { type: integer }, sha256: { type: string } } } }
+        error: { type: string }
     Identity:
       type: object
       properties:

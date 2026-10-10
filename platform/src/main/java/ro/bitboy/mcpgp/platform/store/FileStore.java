@@ -173,6 +173,91 @@ public final class FileStore implements Store {
         return root.resolve("versions").resolve(digest + ".json");
     }
 
+    // ---------------------------------------------------------------------- builds
+
+    @Override
+    public synchronized List<Model.Build> builds() {
+        Path dir = root.resolve("builds");
+        if (!Files.isDirectory(dir)) {
+            return List.of();
+        }
+        List<Model.Build> builds = new ArrayList<>();
+        try (Stream<Path> entries = Files.list(dir)) {
+            for (Path entry : entries.sorted().toList()) {
+                read(entry.resolve("build.json"), Model.Build.class).ifPresent(builds::add);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return builds;
+    }
+
+    @Override
+    public synchronized Optional<Model.Build> build(String id) {
+        return read(buildDir(id).resolve("build.json"), Model.Build.class);
+    }
+
+    @Override
+    public synchronized void saveBuild(Model.Build build) {
+        writeJson(buildDir(build.id()).resolve("build.json"), build);
+    }
+
+    @Override
+    public void writeBuildFile(String build, String name, byte[] content) {
+        write(buildFilePath(build, name), content);
+    }
+
+    @Override
+    public synchronized void appendBuildLog(String build, String text) {
+        Path file = buildDir(build).resolve("log.txt");
+        try {
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, text, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public Optional<byte[]> buildFile(String build, String name) {
+        Path file = name.equals("log.txt") ? buildDir(build).resolve("log.txt") : buildFilePath(build, name);
+        try {
+            return Files.isRegularFile(file) ? Optional.of(Files.readAllBytes(file)) : Optional.empty();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public synchronized void deleteBuildFiles(String build) {
+        for (Path file : List.of(buildDir(build).resolve("artifacts"), buildDir(build).resolve("log.txt"))) {
+            if (!Files.exists(file)) {
+                continue;
+            }
+            try (Stream<Path> paths = Files.walk(file)) {
+                for (Path p : paths.sorted(Collections.reverseOrder()).toList()) {
+                    Files.delete(p);
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    private Path buildDir(String id) {
+        if (!id.matches("b-[0-9a-zA-Z]{6,40}")) {
+            throw new IllegalArgumentException("invalid build id");
+        }
+        return root.resolve("builds").resolve(id);
+    }
+
+    private Path buildFilePath(String build, String name) {
+        if (!name.matches("[A-Za-z0-9][A-Za-z0-9._+-]{0,200}")) {
+            throw new IllegalArgumentException("invalid artifact name");
+        }
+        return buildDir(build).resolve("artifacts").resolve(name);
+    }
+
     // ---------------------------------------------------------------------- identities
 
     @Override

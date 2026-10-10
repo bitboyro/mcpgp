@@ -35,6 +35,22 @@ public interface Store {
 
     Optional<Model.Version> version(String digest);
 
+    // builds
+    List<Model.Build> builds();
+
+    Optional<Model.Build> build(String id);
+
+    void saveBuild(Model.Build build);
+
+    void writeBuildFile(String build, String name, byte[] content);
+
+    void appendBuildLog(String build, String text);
+
+    Optional<byte[]> buildFile(String build, String name);
+
+    /** Removes a build's files (artifacts and log); the record stays. */
+    void deleteBuildFiles(String build);
+
     // identities and tokens
     List<Model.Identity> identities();
 
