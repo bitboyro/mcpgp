@@ -1,0 +1,349 @@
+{
+  "apis": [
+    {
+      "contracts": [
+        {
+          "basePath": "/v1",
+          "default": true,
+          "digest": "sha256:baada7ca18c650dbc0527f25de1022b495c6b31c9872af6905b072f2aad66962",
+          "format": "openapi-3.1",
+          "version": "1.0"
+        }
+      ],
+      "downstreamAuth": {
+        "supported": [ ]
+      },
+      "id": "notes",
+      "pagination": null,
+      "requestBody": {
+        "multiple": "split",
+        "suffixes": {
+          "application/octet-stream": "binary",
+          "application/x-www-form-urlencoded": "form",
+          "multipart/form-data": "multipart"
+        }
+      },
+      "toolPrefix": "notes"
+    }
+  ],
+  "build": {
+    "cli": "0.0.0",
+    "createdAt": "1970-01-01T00:00:00Z",
+    "definition": {
+      "digest": "sha256:c1d68d193293b22dda27a1299b262328654f42c7bef1a9bf69501bd9b8ef438b",
+      "name": "notes-mcp"
+    },
+    "extends": null,
+    "lock": null
+  },
+  "diagnostics": [ ],
+  "exposure": {
+    "mode": "plain",
+    "plainSearch": false
+  },
+  "instances": {
+    "max": null,
+    "mixedContracts": "union",
+    "mode": "multi"
+  },
+  "manifestVersion": "1.0",
+  "packs": [ ],
+  "policies": {
+    "baseUrlAllowlist": [ ],
+    "confirmDestructive": true,
+    "files": {
+      "forms": [
+        "base64",
+        "path"
+      ]
+    },
+    "redaction": {
+      "fields": [ ]
+    },
+    "responseLimitKb": 256,
+    "runtimeDefaults": { }
+  },
+  "runtime": {
+    "inboundAuth": {
+      "allowed": [
+        "none",
+        "static",
+        "oauth"
+      ],
+      "default": "none"
+    },
+    "mcpRevisions": [
+      "2025-03-26",
+      "2025-06-18",
+      "2025-11-25"
+    ],
+    "minRuntime": "0.0.0",
+    "transports": {
+      "allowed": [
+        "stdio",
+        "http"
+      ],
+      "default": "stdio"
+    }
+  },
+  "schemas": {
+    "notes@1.0": { }
+  },
+  "server": {
+    "instructions": "Every tool requires `instance`; call instances_list to see the configured servers.",
+    "name": "notes-mcp",
+    "version": "1.0.0"
+  },
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "confirm": false,
+      "description": "Lists the configured notes servers (instances) with their contract version, access and status. Use an instance's name as the `instance` argument of the other tools.",
+      "handler": "instances_list",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": { },
+        "type": "object"
+      },
+      "kind": "builtin",
+      "name": "instances_list",
+      "sensitive": false,
+      "title": "List instances"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "api": "notes",
+      "confirm": true,
+      "description": "Delete note",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm": {
+            "description": "Confirmation token from a CONFIRMATION_REQUIRED result. Only send it after the user agreed.",
+            "type": "string"
+          },
+          "instance": {
+            "description": "Target notes server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "notes_note_delete",
+      "operation": {
+        "key": "notes:DELETE:/notes/{id}",
+        "operationId": "deleteNote",
+        "tags": [ ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/notes-1.0.yaml",
+            "pointer": "/paths/~1notes~1{id}/delete/summary",
+            "step": "spec",
+            "value": "Delete note"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "deleteNote"
+          },
+          {
+            "step": "normalize",
+            "value": "delete note"
+          },
+          {
+            "step": "shape",
+            "value": "note_delete"
+          },
+          {
+            "step": "namespace",
+            "value": "notes_note_delete"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/notes-1.0.yaml",
+            "pointer": "/paths/~1notes~1{id}/delete/summary",
+            "step": "spec",
+            "value": "Delete note"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Delete note",
+      "variants": {
+        "1.0": {
+          "accept": [ ],
+          "method": "DELETE",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            }
+          ],
+          "path": "/notes/{id}",
+          "responses": [
+            {
+              "status": "204"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "notes",
+      "confirm": false,
+      "description": "Get note",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target notes server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "notes_note_get",
+      "operation": {
+        "key": "notes:GET:/notes/{id}",
+        "operationId": "getNote",
+        "tags": [ ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/notes-1.0.yaml",
+            "pointer": "/paths/~1notes~1{id}/get/summary",
+            "step": "spec",
+            "value": "Get note"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "getNote"
+          },
+          {
+            "step": "normalize",
+            "value": "get note"
+          },
+          {
+            "step": "shape",
+            "value": "note_get"
+          },
+          {
+            "step": "namespace",
+            "value": "notes_note_get"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/notes-1.0.yaml",
+            "pointer": "/paths/~1notes~1{id}/get/summary",
+            "step": "spec",
+            "value": "Get note"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Get note",
+      "variants": {
+        "1.0": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            }
+          ],
+          "path": "/notes/{id}",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "type": "object"
+              },
+              "status": "200"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -2,6 +2,7 @@ package ro.bitboy.mcpgp.runtime.call;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ro.bitboy.mcpgp.runtime.mcp.CallRecord;
 import ro.bitboy.mcpgp.runtime.mcp.ToolError;
 import ro.bitboy.mcpgp.runtime.mcp.ToolOutput;
 
@@ -36,7 +37,10 @@ final class ResponseMapper {
         this.redactor = redactor;
     }
 
-    ToolOutput map(HttpResponse<byte[]> response, String instance, Map<String, Object> meta) {
+    /** Upstream error bodies kept in the audit event are capped at this size. */
+    private static final int AUDIT_BODY_LIMIT = 64 * 1024;
+
+    ToolOutput map(HttpResponse<byte[]> response, String instance, Map<String, Object> meta, CallRecord record) {
         int status = response.statusCode();
         byte[] body = response.body() == null ? new byte[0] : response.body();
         String contentType = response.headers().firstValue("Content-Type").orElse("");
@@ -51,6 +55,11 @@ final class ResponseMapper {
             case "UPSTREAM_5XX" -> "The target server failed; trying again later may help";
             default -> status >= 300 && status < 400 ? "The target answered with a redirect, which is not followed" : null;
         };
+        if (body.length > 0) {
+            // the full (redacted) body always goes to the audit file, whatever errors.detail says
+            String full = text(body);
+            record.errorBody = full.length() > AUDIT_BODY_LIMIT ? full.substring(0, AUDIT_BODY_LIMIT) + "…" : full;
+        }
         String detail = body.length == 0 ? "" : ": " + (fullErrors ? truncate(text(body)) : summary(body, contentType));
         throw new ToolError(code, "HTTP " + status + " from " + instance + detail, hint).withMeta(meta);
     }

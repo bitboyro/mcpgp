@@ -53,6 +53,7 @@ Status: **draft v1** · Owner: core + runtime · Decision on input shape: [ADR-0
 | `header` | non-auth header parameters | the operation has such headers |
 | `cookie` | non-auth cookie parameters | the operation has such cookies |
 | `body` | the request body, with its schema as is | the operation has a request body |
+| `confirm` | optional confirmation token (§8) | the tool needs confirmation |
 
 Rules:
 - Keys are always these names; a key is omitted when the operation has no inputs of that kind.
@@ -151,7 +152,10 @@ Built-in tools go through the same casing and limit steps as API tools. Prefixes
    prod-eu? This can't be undone.") and proceeds only on an explicit accept.
 2. **Other clients:** the first call returns `CONFIRMATION_REQUIRED` with a `confirm` token and a
    summary of what will happen. The agent asks the user and calls again with the same arguments plus
-   `confirm: "<token>"`.
+   `confirm: "<token>"`. The structured error carries `confirm` (the token) and `expiresInSeconds`.
+
+A declined or cancelled elicitation also returns `CONFIRMATION_REQUIRED` ("the user did not
+confirm"); nothing is sent. A token for another call is used up, and the result carries a new one.
 
 Token rules:
 - single use; expires after 5 minutes;

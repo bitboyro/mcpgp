@@ -37,6 +37,7 @@ public final class Results {
         if (error.hint() != null) {
             structured.put("hint", error.hint());
         }
+        structured.putAll(error.details());
         String text = error.code() + ": " + error.getMessage() + (error.hint() == null ? "" : "\nHint: " + error.hint());
         return new McpSchema.CallToolResult(List.of(new McpSchema.TextContent(text)), true, structured,
                 meta == null || meta.isEmpty() ? null : meta);

@@ -1,0 +1,10 @@
+apiVersion: mcpgp/v1
+kind: McpServer
+metadata: { name: notes-mcp }
+apis:
+  - id: notes
+    contracts:
+      - { version: "1.0", spec: contracts/notes-1.0.yaml, default: true }
+    select: { access: all }
+instances:
+  mode: multi

@@ -13,6 +13,9 @@ import ro.bitboy.mcpgp.runtime.config.ConfigException;
 import ro.bitboy.mcpgp.runtime.config.RuntimeConfig;
 import ro.bitboy.mcpgp.runtime.manifest.Manifest;
 import ro.bitboy.mcpgp.runtime.manifest.ManifestException;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import ro.bitboy.mcpgp.runtime.audit.AuditLog;
+import ro.bitboy.mcpgp.runtime.mcp.Ids;
 import ro.bitboy.mcpgp.runtime.mcp.McpServerFactory;
 
 import java.io.InputStream;
@@ -88,6 +91,47 @@ public class McpgpServer {
     @Bean
     McpServerFactory mcpServerFactory(Manifest manifest, RuntimeConfig config) {
         return new McpServerFactory(manifest, config);
+    }
+
+    /** server.start / server.stop and, for stdio, session.start / session.end (audit-and-errors §2). */
+    @Bean(initMethod = "start", destroyMethod = "stop")
+    Lifecycle auditLifecycle(McpServerFactory factory, RuntimeConfig config) {
+        return new Lifecycle(factory.audit(), config);
+    }
+
+    static final class Lifecycle {
+        private final AuditLog audit;
+        private final RuntimeConfig config;
+        private final boolean stdio;
+
+        Lifecycle(AuditLog audit, RuntimeConfig config) {
+            this.audit = audit;
+            this.config = config;
+            this.stdio = config.server().transport().equals("stdio");
+        }
+
+        void start() {
+            ObjectNode event = audit.event("server.start", "ok", Ids.correlation());
+            event.putObject("actor").put("kind", "system");
+            event.put("inlineSecrets", config.inlineSecrets());
+            event.put("configHash", config.configHash());
+            audit.write(event);
+            if (stdio) {
+                audit.write(system(audit.event("session.start", "ok", Ids.correlation())));
+            }
+        }
+
+        void stop() {
+            if (stdio) {
+                audit.write(system(audit.event("session.end", "ok", Ids.correlation())));
+            }
+            audit.write(system(audit.event("server.stop", "ok", Ids.correlation())));
+        }
+
+        private static ObjectNode system(ObjectNode event) {
+            event.putObject("actor").put("kind", "system");
+            return event;
+        }
     }
 
     @Bean(destroyMethod = "closeGracefully")

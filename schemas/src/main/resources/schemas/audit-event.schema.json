@@ -41,7 +41,8 @@
     },
     "latencyMs": { "type": "integer", "minimum": 0 },
     "args": {
-      "oneOf": [
+      "description": "none, redacted (the keys with every value masked: an object, or the word for older events), or the SHA-256 of the arguments.",
+      "anyOf": [
         { "enum": ["none", "redacted"] },
         { "type": "object", "properties": { "sha256": { "type": "string" } }, "required": ["sha256"], "additionalProperties": false },
         { "type": "object" }

@@ -25,6 +25,12 @@ versions follow [SemVer](https://semver.org).
   OAuth 2 client credentials (token cache, one token request at a time, single retry on 401).
 - Compiler: `security: []` (public operations) is kept in the manifest; the runtime sends no
   credentials for them. Conformance case `auth/public-operation`.
+- Runtime: confirmation of destructive tools (elicitation, or a single-use 5-minute token bound to
+  tool, instance, arguments and session); the compiler adds the optional `confirm` input. Conformance
+  case `safety/confirm-destructive`.
+- Runtime: audit file (JSON Lines): `server.start/stop`, `session.start/end`, `tool.call`,
+  `tool.confirm`; arguments masked or hashed, files by hash, redacted upstream error bodies;
+  rotation daily / hourly / by size, retention, owner-only permissions.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.
@@ -34,3 +40,6 @@ versions follow [SemVer](https://semver.org).
   runtime config, tools contract, audit & errors, packaging), ADRs 0001–0013, protocol compatibility policy.
 - Platform-side and client-side examples.
 - Development process, roadmap, contribution guidelines, issue and PR templates.
+
+### Fixed
+- audit-event schema: `args` as `{ "sha256": … }` was rejected (`oneOf` matched two branches).

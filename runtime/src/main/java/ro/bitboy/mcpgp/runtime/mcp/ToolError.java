@@ -9,6 +9,7 @@ public final class ToolError extends RuntimeException {
     private final String code;
     private final String hint;
     private java.util.Map<String, Object> meta = java.util.Map.of();
+    private java.util.Map<String, Object> details = java.util.Map.of();
 
     public ToolError(String code, String message, String hint) {
         super(message, null, false, false);
@@ -36,5 +37,15 @@ public final class ToolError extends RuntimeException {
 
     public java.util.Map<String, Object> meta() {
         return meta;
+    }
+
+    /** Extra fields of the structured error, e.g. the confirmation token. */
+    public ToolError withDetails(java.util.Map<String, Object> details) {
+        this.details = java.util.Map.copyOf(details);
+        return this;
+    }
+
+    public java.util.Map<String, Object> details() {
+        return details;
     }
 }
