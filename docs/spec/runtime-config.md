@@ -271,7 +271,10 @@ The server watches its config file (and `.env`, and `path` certificate material)
 | instances (add, remove, change), credentials, TLS material, contract selection, `errors`, `files`, `audit` retention, log level | transport, host, port, inbound auth mode, storage root |
 
 A reload that fails validation is rejected as a whole; the running config stays in effect and the
-error is logged and audited. Added or removed instances update the `instance` enum and send
+error is logged and audited. `<server> reload` leaves a request file (`reload.request`) in the
+storage root, which the running server picks up; this works on every platform (`SIGHUP` only on
+Unix-like systems). Calls already running finish with the old config. Changes that need a restart
+are logged as such and take effect at the next start. Added or removed instances update the `instance` enum and send
 `notifications/tools/list_changed` to connected clients.
 
 ## 5. TLS and certificate material

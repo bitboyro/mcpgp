@@ -129,6 +129,9 @@ public final class ConfigLoader {
         if (!problems.isEmpty()) {
             throw new ConfigException(problems);
         }
+        if (resolved.path("telemetry").path("enabled").asBoolean(false)) {
+            warnings.add("telemetry.enabled is set, but this runtime version has no telemetry yet; nothing is exported");
+        }
         JsonNode audit = resolved.path("audit");
         RuntimeConfig.Audit auditConfig = new RuntimeConfig.Audit(
                 audit.path("file").path("enabled").asBoolean(true),

@@ -39,7 +39,7 @@ build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `auth
 | Type | When |
 |---|---|
 | `server.start` / `server.stop` | process lifecycle; includes config hash, never config values |
-| `session.start` / `session.end` | MCP session (HTTP stateful) or process (stdio) |
+| `session.start` / `session.end` | MCP session (HTTP stateful: when the server issues a session id, and when the client ends it with `DELETE`; sessions that just expire have no `end`) or process (stdio) |
 | `auth.inbound` | inbound auth decision: refused requests (no or unknown key, foreign `Origin`); accepted ones show as the `actor` of their events |
 | `tool.call` | every tool call |
 | `tool.confirm` | confirmation asked / given / refused |

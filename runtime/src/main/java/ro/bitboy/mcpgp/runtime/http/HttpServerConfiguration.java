@@ -79,9 +79,9 @@ public class HttpServerConfiguration {
     }
 
     @Bean
-    ServletRegistrationBean<HealthServlet> health(RuntimeConfig config) {
-        ServletRegistrationBean<HealthServlet> registration =
-                new ServletRegistrationBean<>(new HealthServlet(config.allInstances(), Clock.systemUTC()), "/health/*");
+    ServletRegistrationBean<HealthServlet> health(ro.bitboy.mcpgp.runtime.Reloader reloader) {
+        ServletRegistrationBean<HealthServlet> registration = new ServletRegistrationBean<>(
+                new HealthServlet(() -> reloader.current().config().allInstances(), Clock.systemUTC()), "/health/*");
         registration.setName("health");
         return registration;
     }

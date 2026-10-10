@@ -46,6 +46,10 @@ versions follow [SemVer](https://semver.org).
 - Customer commands that write config: `init` (guided), `instance add <id>` / `instance remove <id>`
   (in-place YAML edits that keep comments, `.bak`, rollback when the result doesn't load), and
   `client add claude-code|claude-desktop|cursor|vscode` (`--print`, `--dry-run`, backup, no secrets).
+- Config reload while running: file watch (config, `.env`, certificate files), `SIGHUP`, and
+  `<server> reload`; rejected configs keep the running one; the tool list follows instance changes
+  (`list_changed`). Audit events `config.reload` and, for HTTP, `session.start` / `session.end`.
+- A startup warning when `telemetry.enabled` is set (telemetry comes in M7).
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.

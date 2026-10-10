@@ -38,7 +38,7 @@ import java.util.Set;
  */
 public final class ServerCommands {
 
-    static final Set<String> COMMANDS = Set.of("doctor", "instance", "init", "client");
+    static final Set<String> COMMANDS = Set.of("doctor", "instance", "init", "client", "reload");
 
     private final Map<String, String> env;
     private final Path workingDir;
@@ -107,6 +107,7 @@ public final class ServerCommands {
         try {
             return switch (command) {
                 case "doctor" -> doctor(startup, quick);
+                case "reload" -> reload(startup.config());
                 case "instance list" -> list(startup.config());
                 case "instance test" -> words.size() == 3 ? test(instance(startup.config(), words.get(2))) : usage();
                 case "instance trust" -> words.size() == 3 ? trust(startup.config(), instance(startup.config(), words.get(2)), base64, yes) : usage();
@@ -158,7 +159,7 @@ public final class ServerCommands {
     }
 
     private int usage() {
-        out.println("Usage: init | doctor [--quick] | instance list | instance test|add|remove|trust <id> | client add <client>");
+        out.println("Usage: init | doctor [--quick] | reload | instance list | instance test|add|remove|trust <id> | client add <client>");
         out.println("       instance trust: [--base64] [--yes]   instance add/remove: [--api <id>]");
         out.println("       client add claude-code|claude-desktop|cursor|vscode [--print] [--dry-run] [--file <path>] [--name <entry>]");
         out.println("       (plus --config <file> and --<key> <value> as when starting the server)");
@@ -205,6 +206,14 @@ public final class ServerCommands {
         }
         out.println(ok ? "All checks passed." : "Some checks failed.");
         return ok ? 0 : 1;
+    }
+
+    /** Leaves a reload request for the running server (runtime-config §4.6); works on every platform. */
+    private int reload(RuntimeConfig config) throws IOException {
+        Files.createDirectories(config.storageRoot());
+        Files.writeString(config.storageRoot().resolve(Reloader.REQUEST), java.time.Instant.now().toString());
+        out.println("✓ reload requested; a running server picks it up within a second (its log says whether the new config was applied)");
+        return 0;
     }
 
     private boolean live(RuntimeConfig config) {

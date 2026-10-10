@@ -12,12 +12,12 @@ import java.util.Optional;
 
 /**
  * What the server starts with: the manifest (embedded, or {@code --manifest} for development), the
- * loaded runtime config and the remaining command-line flags.
+ * loaded runtime config, and what it was loaded from (to load it again on reload).
  *
  * <p>Arguments: {@code --config <file>}, {@code --manifest <file>}, and config overrides as
  * {@code --<dotted.key> <value>} or {@code --<dotted.key>=<value>} (runtime-config §1).
  */
-public record Startup(Manifest manifest, RuntimeConfig config) {
+public record Startup(Manifest manifest, RuntimeConfig config, String[] args, Map<String, String> env, Path workingDir) {
 
     public static Startup load(String[] args, Map<String, String> env, Path workingDir) {
         Map<String, String> flags = flags(args);
@@ -25,7 +25,7 @@ public record Startup(Manifest manifest, RuntimeConfig config) {
         Manifest manifest = manifest(flags.remove("manifest"));
         RuntimeConfig config = new ConfigLoader(new Schemas())
                 .load(manifest, new ConfigLoader.Options(configFile, workingDir, env, flags));
-        return new Startup(manifest, config);
+        return new Startup(manifest, config, args.clone(), Map.copyOf(env), workingDir);
     }
 
     /** The embedded manifest, or the {@code --manifest} file in development. */

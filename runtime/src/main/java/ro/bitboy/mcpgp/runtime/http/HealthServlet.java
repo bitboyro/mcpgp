@@ -28,12 +28,13 @@ final class HealthServlet extends HttpServlet {
     private static final Duration CACHE = Duration.ofSeconds(10);
     private static final int CONNECT_TIMEOUT_MS = 2000;
 
-    private final List<RuntimeConfig.Instance> instances;
+    /** The current instances (they change on config reload). */
+    private final java.util.function.Supplier<List<RuntimeConfig.Instance>> instances;
     private final Clock clock;
     private Map<String, String> last;
     private Instant checkedAt = Instant.EPOCH;
 
-    HealthServlet(List<RuntimeConfig.Instance> instances, Clock clock) {
+    HealthServlet(java.util.function.Supplier<List<RuntimeConfig.Instance>> instances, Clock clock) {
         this.instances = instances;
         this.clock = clock;
     }
@@ -64,7 +65,7 @@ final class HealthServlet extends HttpServlet {
             return last;
         }
         Map<String, String> states = new LinkedHashMap<>();
-        for (RuntimeConfig.Instance instance : instances) {
+        for (RuntimeConfig.Instance instance : instances.get()) {
             URI uri = BaseUrl.resolve(instance.baseUrl(), "");
             try (Socket socket = new Socket()) {
                 socket.connect(new InetSocketAddress(uri.getHost(), uri.getPort()), CONNECT_TIMEOUT_MS);

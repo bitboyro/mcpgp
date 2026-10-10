@@ -147,6 +147,7 @@ class HttpServerTest {
         assertThat(call.at("/actor/id").asText()).isEqualTo("team-a");
         assertThat(call.at("/actor/auth").asText()).isEqualTo("static");
         assertThat(String.join("\n", lines)).contains("\"type\":\"auth.inbound\"").doesNotContain("k-team-a-0123456789");
+        assertThat(lines).anyMatch(l -> l.contains("\"type\":\"session.start\"") && l.contains("\"id\":\"team-a\""));
     }
 
     @Test
