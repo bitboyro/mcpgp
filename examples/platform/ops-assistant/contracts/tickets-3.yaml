@@ -1,0 +1,117 @@
+openapi: 3.1.0
+info:
+  title: Example Tickets API
+  version: "3"
+  description: A fictional issue tracker, for the multi-API example.
+servers:
+  - url: https://tickets.example.com/api/3
+security:
+  - basicAuth: []
+  - bearerAuth: []
+paths:
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      summary: List tickets
+      parameters:
+        - { name: status, in: query, schema: { enum: [open, in-progress, done] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200": { description: Tickets, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Ticket" } } } } }
+    post:
+      operationId: createTicket
+      tags: [tickets]
+      summary: Create ticket
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/TicketInput" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Ticket" } } } }
+  /tickets/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getTicket
+      tags: [tickets]
+      summary: Get ticket
+      responses:
+        "200": { description: The ticket, content: { application/json: { schema: { $ref: "#/components/schemas/Ticket" } } } }
+        "404": { description: No such ticket }
+    patch:
+      operationId: updateTicket
+      tags: [tickets]
+      summary: Update ticket
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/TicketInput" } } }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/Ticket" } } } }
+    delete:
+      operationId: deleteTicket
+      tags: [tickets]
+      summary: Delete ticket
+      responses:
+        "204": { description: Deleted }
+  /tickets/{id}/comments:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: listTicketComments
+      tags: [ticket-comments]
+      summary: List comments of a ticket
+      responses:
+        "200": { description: Comments, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Comment" } } } } }
+    post:
+      operationId: addTicketComment
+      tags: [ticket-comments]
+      summary: Add comment to a ticket
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [body], properties: { body: { type: string } } } } }
+      responses:
+        "201": { description: Added, content: { application/json: { schema: { $ref: "#/components/schemas/Comment" } } } }
+  /search:
+    get:
+      operationId: searchTickets
+      tags: [ticket-search]
+      summary: Search tickets
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string }, description: Words to look for in titles and descriptions }
+      responses:
+        "200": { description: Matching tickets, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Ticket" } } } } }
+  /admin/users:
+    get:
+      operationId: listUsers
+      tags: [admin]
+      summary: List users
+      responses:
+        "200": { description: Users }
+components:
+  securitySchemes:
+    basicAuth: { type: http, scheme: basic }
+    bearerAuth: { type: http, scheme: bearer }
+  schemas:
+    Ticket:
+      type: object
+      properties:
+        id: { type: string, readOnly: true }
+        title: { type: string }
+        description: { type: string }
+        status: { enum: [open, in-progress, done] }
+        priority: { enum: [low, normal, high] }
+        orderId: { type: string, description: The order this ticket is about, if any }
+    TicketInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        description: { type: string }
+        priority: { enum: [low, normal, high], default: normal }
+        orderId: { type: string }
+    Comment:
+      type: object
+      properties:
+        id: { type: string, readOnly: true }
+        body: { type: string }
+        author: { type: string, readOnly: true }

@@ -1,0 +1,3733 @@
+{
+  "apis": [
+    {
+      "contracts": [
+        {
+          "basePath": "/api/v2",
+          "default": true,
+          "digest": "sha256:535d848c8812c9c937320af75cce9931e51f0817225e65cb5e6b17fe6d4f8859",
+          "format": "openapi-3.1",
+          "version": "2.0"
+        }
+      ],
+      "downstreamAuth": {
+        "supported": [
+          "basic",
+          "oauth2ClientCredentials"
+        ]
+      },
+      "id": "orders",
+      "pagination": null,
+      "requestBody": {
+        "multiple": "split",
+        "suffixes": {
+          "application/octet-stream": "binary",
+          "application/x-www-form-urlencoded": "form",
+          "multipart/form-data": "multipart"
+        }
+      },
+      "toolPrefix": "orders"
+    },
+    {
+      "contracts": [
+        {
+          "basePath": "/api/3",
+          "default": true,
+          "digest": "sha256:1620f17ee6612db5fc54c1dea477a6448eb722d98f88072f6d80697a2c7b23cf",
+          "format": "openapi-3.1",
+          "version": "3"
+        }
+      ],
+      "downstreamAuth": {
+        "supported": [
+          "basic",
+          "bearer"
+        ]
+      },
+      "id": "tickets",
+      "pagination": null,
+      "requestBody": {
+        "multiple": "split",
+        "suffixes": {
+          "application/octet-stream": "binary",
+          "application/x-www-form-urlencoded": "form",
+          "multipart/form-data": "multipart"
+        }
+      },
+      "title": "Example Tickets API",
+      "toolPrefix": "tickets"
+    },
+    {
+      "contracts": [
+        {
+          "basePath": "/v1",
+          "default": true,
+          "digest": "sha256:280e09c0052e2ab2e9123fa2f1bab179350ac5a59bf710d5db8424c5949fc807",
+          "format": "openapi-3.0",
+          "version": "2024-09-01"
+        }
+      ],
+      "downstreamAuth": {
+        "supported": [
+          "oauth2ClientCredentials"
+        ]
+      },
+      "id": "monitoring",
+      "pagination": null,
+      "requestBody": {
+        "multiple": "split",
+        "suffixes": {
+          "application/octet-stream": "binary",
+          "application/x-www-form-urlencoded": "form",
+          "multipart/form-data": "multipart"
+        }
+      },
+      "title": "Example Monitoring API",
+      "toolPrefix": "monitoring"
+    }
+  ],
+  "build": {
+    "cli": "0.1.0",
+    "createdAt": "2026-10-10T12:00:00Z",
+    "definition": {
+      "digest": "sha256:adf60b86f7f37fa970ca30767b2a1ea43b4c2a14e59b85b6968ad49d8f78bdb8",
+      "name": "ops-assistant"
+    },
+    "extends": null,
+    "lock": null
+  },
+  "diagnostics": [
+    {
+      "code": "OPERATION_EXCLUDED",
+      "level": "info",
+      "location": {
+        "file": "ops-assistant.mcpgp.yaml"
+      },
+      "message": "monitoring:POST:/alerts/{id}/acknowledge excluded: access: read-only",
+      "operation": "monitoring:POST:/alerts/{id}/acknowledge",
+      "reason": "access: read-only"
+    },
+    {
+      "code": "OPERATION_EXCLUDED",
+      "level": "info",
+      "location": {
+        "file": "ops-assistant.mcpgp.yaml"
+      },
+      "message": "orders:DELETE:/customers/{id} excluded: access: read-write",
+      "operation": "orders:DELETE:/customers/{id}",
+      "reason": "access: read-write"
+    },
+    {
+      "code": "OPERATION_EXCLUDED",
+      "level": "info",
+      "location": {
+        "file": "ops-assistant.mcpgp.yaml"
+      },
+      "message": "orders:GET:/accounts excluded: not included",
+      "operation": "orders:GET:/accounts",
+      "reason": "not included"
+    },
+    {
+      "code": "OPERATION_EXCLUDED",
+      "level": "info",
+      "location": {
+        "file": "ops-assistant.mcpgp.yaml"
+      },
+      "message": "orders:GET:/customers/{id}/contacts excluded: not included",
+      "operation": "orders:GET:/customers/{id}/contacts",
+      "reason": "not included"
+    },
+    {
+      "code": "OPERATION_EXCLUDED",
+      "level": "info",
+      "location": {
+        "file": "ops-assistant.mcpgp.yaml"
+      },
+      "message": "orders:GET:/internal/metrics excluded: not included",
+      "operation": "orders:GET:/internal/metrics",
+      "reason": "not included"
+    },
+    {
+      "code": "OPERATION_EXCLUDED",
+      "level": "info",
+      "location": {
+        "file": "ops-assistant.mcpgp.yaml"
+      },
+      "message": "orders:GET:/users excluded: not included",
+      "operation": "orders:GET:/users",
+      "reason": "not included"
+    },
+    {
+      "code": "OPERATION_EXCLUDED",
+      "level": "info",
+      "location": {
+        "file": "ops-assistant.mcpgp.yaml"
+      },
+      "message": "orders:GET:/version excluded: not included",
+      "operation": "orders:GET:/version",
+      "reason": "not included"
+    },
+    {
+      "code": "OPERATION_EXCLUDED",
+      "level": "info",
+      "location": {
+        "file": "ops-assistant.mcpgp.yaml"
+      },
+      "message": "tickets:DELETE:/tickets/{id} excluded: access: read-write",
+      "operation": "tickets:DELETE:/tickets/{id}",
+      "reason": "access: read-write"
+    },
+    {
+      "code": "OPERATION_EXCLUDED",
+      "level": "info",
+      "location": {
+        "file": "ops-assistant.mcpgp.yaml"
+      },
+      "message": "tickets:GET:/admin/users excluded: not included",
+      "operation": "tickets:GET:/admin/users",
+      "reason": "not included"
+    }
+  ],
+  "exposure": {
+    "discoveryStyle": "search",
+    "mode": "discovery",
+    "plainSearch": false
+  },
+  "instances": {
+    "max": null,
+    "mixedContracts": "union",
+    "mode": "multi"
+  },
+  "manifestVersion": "1.0",
+  "packs": [
+    {
+      "id": "audit",
+      "requires": {
+        "config": false
+      },
+      "tools": [
+        "audit_list"
+      ],
+      "version": "1"
+    },
+    {
+      "id": "health",
+      "requires": {
+        "config": false
+      },
+      "tools": [ ],
+      "version": "1"
+    }
+  ],
+  "policies": {
+    "baseUrlAllowlist": [ ],
+    "confirmDestructive": true,
+    "files": {
+      "forms": [
+        "base64",
+        "path"
+      ]
+    },
+    "redaction": {
+      "fields": [ ]
+    },
+    "responseLimitKb": 256,
+    "runtimeDefaults": { }
+  },
+  "runtime": {
+    "inboundAuth": {
+      "allowed": [
+        "none",
+        "static",
+        "oauth"
+      ],
+      "default": "none"
+    },
+    "mcpRevisions": [
+      "2025-03-26",
+      "2025-06-18",
+      "2025-11-25"
+    ],
+    "minRuntime": "0.1.0",
+    "transports": {
+      "allowed": [
+        "stdio",
+        "http"
+      ],
+      "default": "stdio"
+    }
+  },
+  "schemas": {
+    "monitoring@2024-09-01": {
+      "Alert": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "firing",
+              "acknowledged",
+              "resolved"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "orders@2.0": {
+      "Customer": {
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "id": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CustomerInput": {
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "accountId"
+        ],
+        "type": "object"
+      },
+      "Order": {
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "paid",
+              "refunded",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "Problem": {
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "tickets@3": {
+      "Comment": {
+        "properties": {
+          "author": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "id": {
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Ticket": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "orderId": {
+            "description": "The order this ticket is about",
+            "if any": null,
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "low",
+              "normal",
+              "high"
+            ]
+          },
+          "status": {
+            "enum": [
+              "open",
+              "in-progress",
+              "done"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TicketInput": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "priority": {
+            "default": "normal",
+            "enum": [
+              "low",
+              "normal",
+              "high"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "server": {
+    "instructions": "Every tool requires `instance`; call the <api>_instances_list tools to see the configured servers.",
+    "name": "ops-assistant",
+    "title": "Integration operations assistant",
+    "version": "2.0.0"
+  },
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "confirm": false,
+      "description": "Lists audit events of this server, newest first, optionally filtered by tool, instance, outcome and time. Paged.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "Cursor from the previous page.",
+            "type": "string"
+          },
+          "instance": {
+            "description": "Only events against this instance.",
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "outcome": {
+            "enum": [
+              "ok",
+              "error",
+              "denied"
+            ],
+            "type": "string"
+          },
+          "since": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "tool": {
+            "description": "Only events of this tool.",
+            "type": "string"
+          },
+          "until": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "kind": "pack",
+      "name": "audit_list",
+      "pack": "audit",
+      "sensitive": false,
+      "title": "List audit events"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "confirm": false,
+      "description": "Calls a tool found with search_tools. The same validation, confirmation and auth apply as for a directly listed tool.",
+      "handler": "call_tool",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "arguments": {
+            "description": "The tool's arguments, as described by describe_tool.",
+            "type": "object"
+          },
+          "instance": {
+            "description": "Target server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "name": {
+            "description": "Tool name from search_tools.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance",
+          "name",
+          "arguments"
+        ],
+        "type": "object"
+      },
+      "kind": "builtin",
+      "name": "call_tool",
+      "sensitive": false,
+      "title": "Call tool"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "confirm": false,
+      "description": "Returns a tool's full definition: description, input schema and annotations.",
+      "handler": "describe_tool",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "name": {
+            "description": "Tool name from search_tools.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance",
+          "name"
+        ],
+        "type": "object"
+      },
+      "kind": "builtin",
+      "name": "describe_tool",
+      "sensitive": false,
+      "title": "Describe tool"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "monitoring",
+      "confirm": false,
+      "description": "Get alert",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target Example Monitoring API server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "monitoring_alert_get",
+      "operation": {
+        "key": "monitoring:GET:/alerts/{id}",
+        "operationId": "getAlert",
+        "tags": [
+          "alerts"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/monitoring.yaml",
+            "pointer": "/paths/~1alerts~1{id}/get/summary",
+            "step": "spec",
+            "value": "Get alert"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "getAlert"
+          },
+          {
+            "step": "normalize",
+            "value": "get alert"
+          },
+          {
+            "step": "shape",
+            "value": "alert_get"
+          },
+          {
+            "step": "namespace",
+            "value": "monitoring_alert_get"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/monitoring.yaml",
+            "pointer": "/paths/~1alerts~1{id}/get/summary",
+            "step": "spec",
+            "value": "Get alert"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Get alert",
+      "variants": {
+        "2024-09-01": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            }
+          ],
+          "path": "/alerts/{id}",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/monitoring@2024-09-01/Alert"
+              },
+              "status": "200"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "monitoring.read"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "monitoring",
+      "confirm": false,
+      "description": "List alerts",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target Example Monitoring API server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "query": {
+            "additionalProperties": false,
+            "description": "Values sent in the URL query string.",
+            "properties": {
+              "state": {
+                "enum": [
+                  "firing",
+                  "acknowledged",
+                  "resolved"
+                ],
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "monitoring_alert_list",
+      "operation": {
+        "key": "monitoring:GET:/alerts",
+        "operationId": "listAlerts",
+        "tags": [
+          "alerts"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/monitoring.yaml",
+            "pointer": "/paths/~1alerts/get/summary",
+            "step": "spec",
+            "value": "List alerts"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "listAlerts"
+          },
+          {
+            "step": "normalize",
+            "value": "list alerts"
+          },
+          {
+            "step": "shape",
+            "value": "alert_list"
+          },
+          {
+            "step": "namespace",
+            "value": "monitoring_alert_list"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/monitoring.yaml",
+            "pointer": "/paths/~1alerts/get/summary",
+            "step": "spec",
+            "value": "List alerts"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "List alerts",
+      "variants": {
+        "2024-09-01": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": true,
+              "in": "query",
+              "name": "state",
+              "required": false,
+              "schema": {
+                "enum": [
+                  "firing",
+                  "acknowledged",
+                  "resolved"
+                ],
+                "type": "string"
+              },
+              "style": "form"
+            }
+          ],
+          "path": "/alerts",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "items": {
+                  "$ref": "#/schemas/monitoring@2024-09-01/Alert"
+                },
+                "type": "array"
+              },
+              "status": "200"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "monitoring.read"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "confirm": false,
+      "description": "Lists the configured Example Monitoring API servers (instances) with their contract version, access and status. Use an instance's name as the `instance` argument of the other tools.",
+      "handler": "instances_list",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": { },
+        "type": "object"
+      },
+      "kind": "builtin",
+      "name": "monitoring_instances_list",
+      "sensitive": false,
+      "title": "List instances"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "monitoring",
+      "confirm": false,
+      "description": "Query metrics",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target Example Monitoring API server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "query": {
+            "additionalProperties": false,
+            "description": "Values sent in the URL query string.",
+            "properties": {
+              "from": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "query": {
+                "description": "A metric selector, e.g. orders_failed_total",
+                "type": "string"
+              },
+              "to": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "query"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "monitoring_metric_search",
+      "operation": {
+        "key": "monitoring:GET:/metrics/query",
+        "operationId": "queryMetrics",
+        "tags": [
+          "metrics"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/monitoring.yaml",
+            "pointer": "/paths/~1metrics~1query/get/summary",
+            "step": "spec",
+            "value": "Query metrics"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "queryMetrics"
+          },
+          {
+            "step": "normalize",
+            "value": "query metrics"
+          },
+          {
+            "step": "shape",
+            "value": "metric_query"
+          },
+          {
+            "step": "vocabulary",
+            "value": "metric_search"
+          },
+          {
+            "step": "namespace",
+            "value": "monitoring_metric_search"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/monitoring.yaml",
+            "pointer": "/paths/~1metrics~1query/get/summary",
+            "step": "spec",
+            "value": "Query metrics"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Query metrics",
+      "variants": {
+        "2024-09-01": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": true,
+              "in": "query",
+              "name": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "form"
+            },
+            {
+              "explode": true,
+              "in": "query",
+              "name": "from",
+              "required": false,
+              "schema": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "style": "form"
+            },
+            {
+              "explode": true,
+              "in": "query",
+              "name": "to",
+              "required": false,
+              "schema": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "style": "form"
+            }
+          ],
+          "path": "/metrics/query",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "type": "object"
+              },
+              "status": "200"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "monitoring.read"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "orders",
+      "confirm": false,
+      "description": "Gets one customer by id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target orders server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "description": "Customer id.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "query": {
+            "additionalProperties": false,
+            "description": "Values sent in the URL query string.",
+            "properties": {
+              "expand": {
+                "description": "Include related data.",
+                "enum": [
+                  "accounts",
+                  "orders"
+                ],
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "orders_customer_account_get",
+      "operation": {
+        "key": "orders:GET:/customers/{id}",
+        "operationId": "getCustomerAccountByIdV2",
+        "tags": [
+          "customers"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers~1{id}/get/description",
+            "step": "spec",
+            "value": "Gets one customer by id."
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "getCustomerAccountByIdV2"
+          },
+          {
+            "step": "normalize",
+            "value": "get customer account"
+          },
+          {
+            "step": "shape",
+            "value": "customer_account_get"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_customer_account_get"
+          }
+        ],
+        "title": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers~1{id}/get/summary",
+            "step": "spec",
+            "value": "Get customer"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Get customer",
+      "variants": {
+        "2.0": {
+          "accept": [
+            "application/json",
+            "application/problem+json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            },
+            {
+              "explode": true,
+              "in": "query",
+              "name": "expand",
+              "required": false,
+              "schema": {
+                "enum": [
+                  "accounts",
+                  "orders"
+                ],
+                "type": "string"
+              },
+              "style": "form"
+            }
+          ],
+          "path": "/customers/{id}",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Customer"
+              },
+              "status": "200"
+            },
+            {
+              "contentType": "application/problem+json",
+              "error": true,
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Problem"
+              },
+              "status": "default"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "apiKey"
+              }
+            ],
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "orders.read"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "api": "orders",
+      "confirm": false,
+      "description": "Creates a customer in the given account and returns it with its new id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "Request body, sent as application/json.",
+            "properties": {
+              "accountId": {
+                "type": "string"
+              },
+              "email": {
+                "format": "email",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "accountId"
+            ],
+            "type": "object"
+          },
+          "instance": {
+            "description": "Target orders server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          }
+        },
+        "required": [
+          "instance",
+          "body"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "orders_customer_create",
+      "operation": {
+        "key": "orders:POST:/customers",
+        "operationId": "createCustomer",
+        "tags": [
+          "customers"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers/post/description",
+            "step": "spec",
+            "value": "Creates a customer in the given account and returns it with its new id."
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "createCustomer"
+          },
+          {
+            "step": "normalize",
+            "value": "create customer"
+          },
+          {
+            "step": "shape",
+            "value": "customer_create"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_customer_create"
+          }
+        ],
+        "title": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers/post/summary",
+            "step": "spec",
+            "value": "Create customer"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Create customer",
+      "variants": {
+        "2.0": {
+          "accept": [
+            "application/json",
+            "application/problem+json"
+          ],
+          "body": {
+            "contentType": "application/json",
+            "required": true,
+            "schema": {
+              "$ref": "#/schemas/orders@2.0/CustomerInput"
+            }
+          },
+          "method": "POST",
+          "parameters": [ ],
+          "path": "/customers",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Customer"
+              },
+              "status": "201"
+            },
+            {
+              "contentType": "application/problem+json",
+              "error": true,
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Problem"
+              },
+              "status": "default"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "apiKey"
+              }
+            ],
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "orders.write"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "api": "orders",
+      "confirm": false,
+      "description": "Creates a customer in the given account and returns it with its new id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "additionalProperties": false,
+            "description": "Request body, sent as multipart/form-data.",
+            "properties": {
+              "document": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "base64": {
+                        "contentEncoding": "base64",
+                        "type": "string"
+                      },
+                      "contentType": {
+                        "enum": [
+                          "application/pdf"
+                        ],
+                        "type": "string"
+                      },
+                      "filename": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "base64"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "path": {
+                        "description": "Path of the file, relative to the server's file root.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "payload": {
+                "description": "(sent as an application/json part)",
+                "properties": {
+                  "accountId": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "accountId"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "payload"
+            ],
+            "type": "object"
+          },
+          "instance": {
+            "description": "Target orders server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          }
+        },
+        "required": [
+          "instance",
+          "body"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "orders_customer_create_multipart",
+      "operation": {
+        "key": "orders:POST:/customers",
+        "operationId": "createCustomer",
+        "tags": [
+          "customers"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers/post/description",
+            "step": "spec",
+            "value": "Creates a customer in the given account and returns it with its new id."
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "createCustomer"
+          },
+          {
+            "step": "normalize",
+            "value": "create customer"
+          },
+          {
+            "step": "shape",
+            "value": "customer_create"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_customer_create"
+          },
+          {
+            "step": "contentTypeSuffix",
+            "value": "orders_customer_create_multipart"
+          }
+        ],
+        "title": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers/post/summary",
+            "step": "spec",
+            "value": "Create customer"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Create customer",
+      "variants": {
+        "2.0": {
+          "accept": [
+            "application/json",
+            "application/problem+json"
+          ],
+          "body": {
+            "contentType": "multipart/form-data",
+            "parts": [
+              {
+                "contentTypes": [
+                  "application/json"
+                ],
+                "file": false,
+                "name": "payload",
+                "required": true,
+                "secret": false
+              },
+              {
+                "contentTypes": [
+                  "application/pdf"
+                ],
+                "file": true,
+                "name": "document",
+                "required": false,
+                "secret": false
+              }
+            ],
+            "required": true,
+            "schema": {
+              "properties": {
+                "document": {
+                  "format": "binary",
+                  "type": "string"
+                },
+                "payload": {
+                  "$ref": "#/schemas/orders@2.0/CustomerInput"
+                }
+              },
+              "required": [
+                "payload"
+              ],
+              "type": "object"
+            }
+          },
+          "method": "POST",
+          "parameters": [ ],
+          "path": "/customers",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Customer"
+              },
+              "status": "201"
+            },
+            {
+              "contentType": "application/problem+json",
+              "error": true,
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Problem"
+              },
+              "status": "default"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "apiKey"
+              }
+            ],
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "orders.write"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "orders",
+      "confirm": false,
+      "description": "Lists customers in an account, newest first.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target orders server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "query": {
+            "additionalProperties": false,
+            "description": "Values sent in the URL query string.",
+            "properties": {
+              "accountId": {
+                "description": "Account id.",
+                "type": "string"
+              },
+              "cursor": {
+                "type": "string"
+              },
+              "limit": {
+                "default": 50,
+                "maximum": 500,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "accountId"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "query"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "orders_customer_list",
+      "operation": {
+        "key": "orders:GET:/customers",
+        "operationId": "listCustomers",
+        "tags": [
+          "customers"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers/get/description",
+            "step": "spec",
+            "value": "Lists customers in an account, newest first."
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "listCustomers"
+          },
+          {
+            "step": "normalize",
+            "value": "list customers"
+          },
+          {
+            "step": "shape",
+            "value": "customer_list"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_customer_list"
+          }
+        ],
+        "title": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers/get/summary",
+            "step": "spec",
+            "value": "List customers"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "List customers",
+      "variants": {
+        "2.0": {
+          "accept": [
+            "application/json",
+            "application/problem+json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": true,
+              "in": "query",
+              "name": "accountId",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "form"
+            },
+            {
+              "explode": true,
+              "in": "query",
+              "name": "limit",
+              "required": false,
+              "schema": {
+                "default": 50,
+                "maximum": 500,
+                "type": "integer"
+              },
+              "style": "form"
+            },
+            {
+              "explode": true,
+              "in": "query",
+              "name": "cursor",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "style": "form"
+            }
+          ],
+          "path": "/customers",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "properties": {
+                  "data": {
+                    "items": {
+                      "$ref": "#/schemas/orders@2.0/Customer"
+                    },
+                    "type": "array"
+                  },
+                  "next": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "type": "object"
+              },
+              "status": "200"
+            },
+            {
+              "contentType": "application/problem+json",
+              "error": true,
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Problem"
+              },
+              "status": "default"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "apiKey"
+              }
+            ],
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "orders.read"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "api": "orders",
+      "confirm": false,
+      "description": "Update customer",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "Request body, sent as application/json.",
+            "properties": {
+              "accountId": {
+                "type": "string"
+              },
+              "email": {
+                "format": "email",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "accountId"
+            ],
+            "type": "object"
+          },
+          "instance": {
+            "description": "Target orders server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "description": "Customer id.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path",
+          "body"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "orders_customer_update",
+      "operation": {
+        "key": "orders:PUT:/customers/{id}",
+        "operationId": "updateCustomer",
+        "tags": [
+          "customers"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers~1{id}/put/summary",
+            "step": "spec",
+            "value": "Update customer"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "updateCustomer"
+          },
+          {
+            "step": "normalize",
+            "value": "update customer"
+          },
+          {
+            "step": "shape",
+            "value": "customer_update"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_customer_update"
+          }
+        ],
+        "title": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1customers~1{id}/put/summary",
+            "step": "spec",
+            "value": "Update customer"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Update customer",
+      "variants": {
+        "2.0": {
+          "accept": [
+            "application/json",
+            "application/problem+json"
+          ],
+          "body": {
+            "contentType": "application/json",
+            "required": true,
+            "schema": {
+              "$ref": "#/schemas/orders@2.0/CustomerInput"
+            }
+          },
+          "method": "PUT",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            }
+          ],
+          "path": "/customers/{id}",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Customer"
+              },
+              "status": "200"
+            },
+            {
+              "contentType": "application/problem+json",
+              "error": true,
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Problem"
+              },
+              "status": "default"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "apiKey"
+              }
+            ],
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "orders.write"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "confirm": false,
+      "description": "Lists the configured orders servers (instances) with their contract version, access and status. Use an instance's name as the `instance` argument of the other tools.",
+      "handler": "instances_list",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": { },
+        "type": "object"
+      },
+      "kind": "builtin",
+      "name": "orders_instances_list",
+      "sensitive": false,
+      "title": "List instances"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "orders",
+      "confirm": false,
+      "description": "Download invoice PDF",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target orders server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "orders_invoice_document_get",
+      "operation": {
+        "key": "orders:GET:/invoices/{id}/document",
+        "operationId": "getInvoiceDocument",
+        "tags": [
+          "invoices"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1invoices~1{id}~1document/get/summary",
+            "step": "spec",
+            "value": "Download invoice PDF"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "getInvoiceDocument"
+          },
+          {
+            "step": "normalize",
+            "value": "get invoice document"
+          },
+          {
+            "step": "shape",
+            "value": "invoice_document_get"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_invoice_document_get"
+          }
+        ],
+        "title": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1invoices~1{id}~1document/get/summary",
+            "step": "spec",
+            "value": "Download invoice PDF"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Download invoice PDF",
+      "variants": {
+        "2.0": {
+          "accept": [
+            "application/pdf",
+            "application/problem+json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            }
+          ],
+          "path": "/invoices/{id}/document",
+          "responses": [
+            {
+              "contentType": "application/pdf",
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              },
+              "status": "200"
+            },
+            {
+              "contentType": "application/problem+json",
+              "error": true,
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Problem"
+              },
+              "status": "default"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "apiKey"
+              }
+            ],
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "orders.read"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "api": "orders",
+      "confirm": false,
+      "description": "Refunds a paid order.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "Request body, sent as application/json.",
+            "properties": {
+              "amount": {
+                "minimum": 0,
+                "type": "number"
+              },
+              "paymentToken": {
+                "type": "string",
+                "writeOnly": true
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "amount"
+            ],
+            "type": "object"
+          },
+          "instance": {
+            "description": "Target orders server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "query": {
+            "additionalProperties": false,
+            "description": "Values sent in the URL query string.",
+            "properties": {
+              "notify": {
+                "default": true,
+                "description": "Email the customer.",
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path",
+          "body"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "orders_order_refund",
+      "operation": {
+        "key": "orders:POST:/orders/{id}/refund",
+        "operationId": "refundOrder",
+        "tags": [
+          "orders"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1orders~1{id}~1refund/post/description",
+            "step": "spec",
+            "value": "Refunds a paid order."
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "refundOrder"
+          },
+          {
+            "step": "normalize",
+            "value": "refund order"
+          },
+          {
+            "step": "shape",
+            "value": "order_refund"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_order_refund"
+          }
+        ],
+        "title": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1orders~1{id}~1refund/post/summary",
+            "step": "spec",
+            "value": "Refund order"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Refund order",
+      "variants": {
+        "2.0": {
+          "accept": [
+            "application/json",
+            "application/problem+json"
+          ],
+          "body": {
+            "contentType": "application/json",
+            "required": true,
+            "schema": {
+              "properties": {
+                "amount": {
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "paymentToken": {
+                  "type": "string",
+                  "writeOnly": true
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "amount"
+              ],
+              "type": "object"
+            }
+          },
+          "method": "POST",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            },
+            {
+              "explode": true,
+              "in": "query",
+              "name": "notify",
+              "required": false,
+              "schema": {
+                "default": true,
+                "type": "boolean"
+              },
+              "style": "form"
+            }
+          ],
+          "path": "/orders/{id}/refund",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Order"
+              },
+              "status": "200"
+            },
+            {
+              "contentType": "application/problem+json",
+              "error": true,
+              "schema": {
+                "$ref": "#/schemas/orders@2.0/Problem"
+              },
+              "status": "default"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "orders.write"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "orders",
+      "confirm": false,
+      "description": "Search orders by customer, status and time range. Newest first.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target orders server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "query": {
+            "additionalProperties": false,
+            "description": "Values sent in the URL query string.",
+            "properties": {
+              "customerId": {
+                "type": "string"
+              },
+              "since": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "open",
+                  "paid",
+                  "refunded",
+                  "cancelled"
+                ],
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "orders_order_search",
+      "operation": {
+        "key": "orders:GET:/orders",
+        "operationId": "searchOrders",
+        "tags": [
+          "orders"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1orders/get/description",
+            "step": "spec",
+            "value": "Search orders by customer, status and time range. Newest first."
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "searchOrders"
+          },
+          {
+            "step": "normalize",
+            "value": "search orders"
+          },
+          {
+            "step": "shape",
+            "value": "order_search"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_order_search"
+          }
+        ],
+        "title": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1orders/get/summary",
+            "step": "spec",
+            "value": "Search orders"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Search orders",
+      "variants": {
+        "2.0": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": true,
+              "in": "query",
+              "name": "customerId",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "style": "form"
+            },
+            {
+              "explode": true,
+              "in": "query",
+              "name": "status",
+              "required": false,
+              "schema": {
+                "enum": [
+                  "open",
+                  "paid",
+                  "refunded",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              "style": "form"
+            },
+            {
+              "explode": true,
+              "in": "query",
+              "name": "since",
+              "required": false,
+              "schema": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "style": "form"
+            }
+          ],
+          "path": "/orders",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "items": {
+                  "$ref": "#/schemas/orders@2.0/Order"
+                },
+                "type": "array"
+              },
+              "status": "200"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "apiKey"
+              }
+            ],
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "orders.read"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "orders",
+      "confirm": false,
+      "description": "Overdue invoices",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target orders server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          }
+        },
+        "required": [
+          "instance"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "orders_overdue_invoice_list",
+      "operation": {
+        "key": "orders:GET:/invoices/overdue",
+        "operationId": "listOverdueInvoices",
+        "tags": [
+          "invoices"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1invoices~1overdue/get/summary",
+            "step": "spec",
+            "value": "Overdue invoices"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "listOverdueInvoices"
+          },
+          {
+            "step": "normalize",
+            "value": "list overdue invoices"
+          },
+          {
+            "step": "shape",
+            "value": "overdue_invoice_list"
+          },
+          {
+            "step": "namespace",
+            "value": "orders_overdue_invoice_list"
+          }
+        ],
+        "title": [
+          {
+            "file": "../orders/contracts/orders-2.0.yaml",
+            "pointer": "/paths/~1invoices~1overdue/get/summary",
+            "step": "spec",
+            "value": "Overdue invoices"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Overdue invoices",
+      "variants": {
+        "2.0": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [ ],
+          "path": "/invoices/overdue",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "items": {
+                  "properties": {
+                    "dueDate": {
+                      "format": "date",
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "status": "200"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "apiKey"
+              }
+            ],
+            [
+              {
+                "scheme": "oauth",
+                "scopes": [
+                  "orders.read"
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "confirm": false,
+      "description": "Finds tools by what they do. Returns one line per tool (name, title, summary, read-only), best matches first.",
+      "handler": "search_tools",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "limit": {
+            "default": 10,
+            "description": "Maximum number of results.",
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "query": {
+            "description": "What you want to do, in a few words.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance",
+          "query"
+        ],
+        "type": "object"
+      },
+      "kind": "builtin",
+      "name": "search_tools",
+      "sensitive": false,
+      "title": "Search tools"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "confirm": false,
+      "description": "Lists the configured Example Tickets API servers (instances) with their contract version, access and status. Use an instance's name as the `instance` argument of the other tools.",
+      "handler": "instances_list",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": { },
+        "type": "object"
+      },
+      "kind": "builtin",
+      "name": "tickets_instances_list",
+      "sensitive": false,
+      "title": "List instances"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "api": "tickets",
+      "confirm": false,
+      "description": "Add comment to a ticket",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "Request body, sent as application/json.",
+            "properties": {
+              "body": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "body"
+            ],
+            "type": "object"
+          },
+          "instance": {
+            "description": "Target Example Tickets API server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path",
+          "body"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "tickets_ticket_comment_create",
+      "operation": {
+        "key": "tickets:POST:/tickets/{id}/comments",
+        "operationId": "addTicketComment",
+        "tags": [
+          "ticket-comments"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets~1{id}~1comments/post/summary",
+            "step": "spec",
+            "value": "Add comment to a ticket"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "addTicketComment"
+          },
+          {
+            "step": "normalize",
+            "value": "add ticket comment"
+          },
+          {
+            "step": "shape",
+            "value": "ticket_comment_add"
+          },
+          {
+            "step": "vocabulary",
+            "value": "ticket_comment_create"
+          },
+          {
+            "step": "namespace",
+            "value": "tickets_ticket_comment_create"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets~1{id}~1comments/post/summary",
+            "step": "spec",
+            "value": "Add comment to a ticket"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Add comment to a ticket",
+      "variants": {
+        "3": {
+          "accept": [
+            "application/json"
+          ],
+          "body": {
+            "contentType": "application/json",
+            "required": true,
+            "schema": {
+              "properties": {
+                "body": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "body"
+              ],
+              "type": "object"
+            }
+          },
+          "method": "POST",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            }
+          ],
+          "path": "/tickets/{id}/comments",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/tickets@3/Comment"
+              },
+              "status": "201"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "bearerAuth"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "tickets",
+      "confirm": false,
+      "description": "List comments of a ticket",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target Example Tickets API server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "tickets_ticket_comment_list",
+      "operation": {
+        "key": "tickets:GET:/tickets/{id}/comments",
+        "operationId": "listTicketComments",
+        "tags": [
+          "ticket-comments"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets~1{id}~1comments/get/summary",
+            "step": "spec",
+            "value": "List comments of a ticket"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "listTicketComments"
+          },
+          {
+            "step": "normalize",
+            "value": "list ticket comments"
+          },
+          {
+            "step": "shape",
+            "value": "ticket_comment_list"
+          },
+          {
+            "step": "namespace",
+            "value": "tickets_ticket_comment_list"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets~1{id}~1comments/get/summary",
+            "step": "spec",
+            "value": "List comments of a ticket"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "List comments of a ticket",
+      "variants": {
+        "3": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            }
+          ],
+          "path": "/tickets/{id}/comments",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "items": {
+                  "$ref": "#/schemas/tickets@3/Comment"
+                },
+                "type": "array"
+              },
+              "status": "200"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "bearerAuth"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "api": "tickets",
+      "confirm": false,
+      "description": "Create ticket",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "Request body, sent as application/json.",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "orderId": {
+                "type": "string"
+              },
+              "priority": {
+                "default": "normal",
+                "enum": [
+                  "low",
+                  "normal",
+                  "high"
+                ]
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "title"
+            ],
+            "type": "object"
+          },
+          "instance": {
+            "description": "Target Example Tickets API server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          }
+        },
+        "required": [
+          "instance",
+          "body"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "tickets_ticket_create",
+      "operation": {
+        "key": "tickets:POST:/tickets",
+        "operationId": "createTicket",
+        "tags": [
+          "tickets"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets/post/summary",
+            "step": "spec",
+            "value": "Create ticket"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "createTicket"
+          },
+          {
+            "step": "normalize",
+            "value": "create ticket"
+          },
+          {
+            "step": "shape",
+            "value": "ticket_create"
+          },
+          {
+            "step": "namespace",
+            "value": "tickets_ticket_create"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets/post/summary",
+            "step": "spec",
+            "value": "Create ticket"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Create ticket",
+      "variants": {
+        "3": {
+          "accept": [
+            "application/json"
+          ],
+          "body": {
+            "contentType": "application/json",
+            "required": true,
+            "schema": {
+              "$ref": "#/schemas/tickets@3/TicketInput"
+            }
+          },
+          "method": "POST",
+          "parameters": [ ],
+          "path": "/tickets",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/tickets@3/Ticket"
+              },
+              "status": "201"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "bearerAuth"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "tickets",
+      "confirm": false,
+      "description": "Get ticket",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target Example Tickets API server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "tickets_ticket_get",
+      "operation": {
+        "key": "tickets:GET:/tickets/{id}",
+        "operationId": "getTicket",
+        "tags": [
+          "tickets"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets~1{id}/get/summary",
+            "step": "spec",
+            "value": "Get ticket"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "getTicket"
+          },
+          {
+            "step": "normalize",
+            "value": "get ticket"
+          },
+          {
+            "step": "shape",
+            "value": "ticket_get"
+          },
+          {
+            "step": "namespace",
+            "value": "tickets_ticket_get"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets~1{id}/get/summary",
+            "step": "spec",
+            "value": "Get ticket"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Get ticket",
+      "variants": {
+        "3": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            }
+          ],
+          "path": "/tickets/{id}",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/tickets@3/Ticket"
+              },
+              "status": "200"
+            },
+            {
+              "error": true,
+              "status": "404"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "bearerAuth"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "tickets",
+      "confirm": false,
+      "description": "List tickets",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target Example Tickets API server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "query": {
+            "additionalProperties": false,
+            "description": "Values sent in the URL query string.",
+            "properties": {
+              "limit": {
+                "default": 20,
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "status": {
+                "enum": [
+                  "open",
+                  "in-progress",
+                  "done"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "tickets_ticket_list",
+      "operation": {
+        "key": "tickets:GET:/tickets",
+        "operationId": "listTickets",
+        "tags": [
+          "tickets"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets/get/summary",
+            "step": "spec",
+            "value": "List tickets"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "listTickets"
+          },
+          {
+            "step": "normalize",
+            "value": "list tickets"
+          },
+          {
+            "step": "shape",
+            "value": "ticket_list"
+          },
+          {
+            "step": "namespace",
+            "value": "tickets_ticket_list"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets/get/summary",
+            "step": "spec",
+            "value": "List tickets"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "List tickets",
+      "variants": {
+        "3": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": true,
+              "in": "query",
+              "name": "status",
+              "required": false,
+              "schema": {
+                "enum": [
+                  "open",
+                  "in-progress",
+                  "done"
+                ]
+              },
+              "style": "form"
+            },
+            {
+              "explode": true,
+              "in": "query",
+              "name": "limit",
+              "required": false,
+              "schema": {
+                "default": 20,
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "style": "form"
+            }
+          ],
+          "path": "/tickets",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "items": {
+                  "$ref": "#/schemas/tickets@3/Ticket"
+                },
+                "type": "array"
+              },
+              "status": "200"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "bearerAuth"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "api": "tickets",
+      "confirm": false,
+      "description": "Search tickets",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target Example Tickets API server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "query": {
+            "additionalProperties": false,
+            "description": "Values sent in the URL query string.",
+            "properties": {
+              "q": {
+                "description": "Words to look for in titles and descriptions",
+                "type": "string"
+              }
+            },
+            "required": [
+              "q"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "query"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "tickets_ticket_search",
+      "operation": {
+        "key": "tickets:GET:/search",
+        "operationId": "searchTickets",
+        "tags": [
+          "ticket-search"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1search/get/summary",
+            "step": "spec",
+            "value": "Search tickets"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "searchTickets"
+          },
+          {
+            "step": "normalize",
+            "value": "search tickets"
+          },
+          {
+            "step": "shape",
+            "value": "ticket_search"
+          },
+          {
+            "step": "namespace",
+            "value": "tickets_ticket_search"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1search/get/summary",
+            "step": "spec",
+            "value": "Search tickets"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Search tickets",
+      "variants": {
+        "3": {
+          "accept": [
+            "application/json"
+          ],
+          "method": "GET",
+          "parameters": [
+            {
+              "explode": true,
+              "in": "query",
+              "name": "q",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "form"
+            }
+          ],
+          "path": "/search",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "items": {
+                  "$ref": "#/schemas/tickets@3/Ticket"
+                },
+                "type": "array"
+              },
+              "status": "200"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "bearerAuth"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "api": "tickets",
+      "confirm": false,
+      "description": "Update ticket",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "Request body, sent as application/json.",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "orderId": {
+                "type": "string"
+              },
+              "priority": {
+                "default": "normal",
+                "enum": [
+                  "low",
+                  "normal",
+                  "high"
+                ]
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "title"
+            ],
+            "type": "object"
+          },
+          "instance": {
+            "description": "Target Example Tickets API server. Filled in at startup from the runtime config.",
+            "enum": [ ],
+            "type": "string",
+            "x-mcpgp-instanceEnum": true
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path",
+          "body"
+        ],
+        "type": "object"
+      },
+      "kind": "api",
+      "name": "tickets_ticket_update",
+      "operation": {
+        "key": "tickets:PATCH:/tickets/{id}",
+        "operationId": "updateTicket",
+        "tags": [
+          "tickets"
+        ]
+      },
+      "outputSchema": null,
+      "provenance": {
+        "description": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets~1{id}/patch/summary",
+            "step": "spec",
+            "value": "Update ticket"
+          }
+        ],
+        "name": [
+          {
+            "step": "source",
+            "value": "updateTicket"
+          },
+          {
+            "step": "normalize",
+            "value": "update ticket"
+          },
+          {
+            "step": "shape",
+            "value": "ticket_update"
+          },
+          {
+            "step": "namespace",
+            "value": "tickets_ticket_update"
+          }
+        ],
+        "title": [
+          {
+            "file": "contracts/tickets-3.yaml",
+            "pointer": "/paths/~1tickets~1{id}/patch/summary",
+            "step": "spec",
+            "value": "Update ticket"
+          }
+        ]
+      },
+      "sensitive": false,
+      "title": "Update ticket",
+      "variants": {
+        "3": {
+          "accept": [
+            "application/json"
+          ],
+          "body": {
+            "contentType": "application/json",
+            "required": true,
+            "schema": {
+              "$ref": "#/schemas/tickets@3/TicketInput"
+            }
+          },
+          "method": "PATCH",
+          "parameters": [
+            {
+              "explode": false,
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "style": "simple"
+            }
+          ],
+          "path": "/tickets/{id}",
+          "responses": [
+            {
+              "contentType": "application/json",
+              "schema": {
+                "$ref": "#/schemas/tickets@3/Ticket"
+              },
+              "status": "200"
+            }
+          ],
+          "security": [
+            [
+              {
+                "scheme": "basicAuth"
+              }
+            ],
+            [
+              {
+                "scheme": "bearerAuth"
+              }
+            ]
+          ]
+        }
+      }
+    }
+  ]
+}

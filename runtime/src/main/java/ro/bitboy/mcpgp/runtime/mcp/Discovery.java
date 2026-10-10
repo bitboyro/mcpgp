@@ -78,15 +78,19 @@ final class Discovery {
     private Object search(Map<String, Object> args) {
         String query = String.valueOf(args.getOrDefault("query", ""));
         int limit = args.get("limit") instanceof Number n ? Math.max(1, Math.min(50, n.intValue())) : 10;
-        String contract = contractOf(args.get("instance"));
+        // in multi-API servers an id may name an instance of several APIs: each tool is matched against its own API's
+        Map<String, String> contracts = args.get("instance") == null ? null : contractsOf(args.get("instance").toString());
         List<String> terms = words(query);
         String exact = query.strip().toLowerCase(Locale.ROOT);
         record Hit(JsonNode tool, double score) {
         }
         List<Hit> hits = new ArrayList<>();
         for (Doc doc : docs) {
-            if (contract != null && !doc.tool().path("variants").has(contract)) {
-                continue;
+            if (contracts != null) {
+                String contract = contracts.get(doc.tool().path("api").asText());
+                if (contract == null || !doc.tool().path("variants").has(contract)) {
+                    continue;
+                }
             }
             double score = doc.tool().path("name").asText().equals(exact) ? 1_000 : 0;
             for (String term : terms) {
@@ -193,16 +197,15 @@ final class Discovery {
         return tool;
     }
 
-    private String contractOf(Object instance) {
-        if (instance == null) {
-            return null;
-        }
+    /** The contract each API's instance of this id uses (APIs without one are absent). */
+    private Map<String, String> contractsOf(String instance) {
+        Map<String, String> contracts = new LinkedHashMap<>();
         for (RuntimeConfig.Instance i : config.allInstances()) {
-            if (i.id().equals(instance.toString())) {
-                return i.contract().equals("auto") ? manifest.apis().get(i.api()).defaultContract() : i.contract();
+            if (i.id().equals(instance)) {
+                contracts.put(i.api(), i.contract().equals("auto") ? manifest.apis().get(i.api()).defaultContract() : i.contract());
             }
         }
-        return null;
+        return contracts;
     }
 
     static String summary(String description) {

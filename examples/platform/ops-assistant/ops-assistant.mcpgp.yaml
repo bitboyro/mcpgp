@@ -14,14 +14,16 @@ apis:
       include: [{ tag: [orders, customers, invoices] }]
     downstreamAuth: { supported: [basic, oauth2ClientCredentials] }
 
-  - id: jira
+  - id: tickets
+    title: Example Tickets API
     contracts:
-      - { version: "3", spec: contracts/jira-cloud-v3.json, default: true }
+      - { version: "3", spec: contracts/tickets-3.yaml, default: true }
     select:
-      include: [{ tag: [issues, issue-comments, issue-search] }]
-    downstreamAuth: { supported: [basic, bearer] }      # API token as basic, or PAT
+      include: [{ tag: [tickets, ticket-comments, ticket-search] }]
+    downstreamAuth: { supported: [basic, bearer] }
 
   - id: monitoring
+    title: Example Monitoring API
     contracts:
       - { version: "2024-09-01", spec: contracts/monitoring.yaml, default: true }
     select: { access: read-only }
@@ -32,7 +34,7 @@ instances:
 
 naming:
   extends: mcpgp://acme/naming/acme-standard@2   # CLI: --workspace ../workspace
-  namespace: { perApi: true }               # orders_*, jira_*, monitoring_*
+  namespace: { perApi: true }               # orders_*, tickets_*, monitoring_*
 
 exposure:
   mode: discovery                            # many tools across three APIs

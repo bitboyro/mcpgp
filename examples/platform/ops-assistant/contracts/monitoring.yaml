@@ -1,0 +1,65 @@
+openapi: 3.0.3
+info:
+  title: Example Monitoring API
+  version: "2024-09-01"
+  description: A fictional monitoring service, for the multi-API example.
+servers:
+  - url: https://monitoring.example.com/v1
+security:
+  - oauth: [monitoring.read]
+paths:
+  /alerts:
+    get:
+      operationId: listAlerts
+      tags: [alerts]
+      summary: List alerts
+      parameters:
+        - { name: state, in: query, schema: { type: string, enum: [firing, acknowledged, resolved] } }
+      responses:
+        "200": { description: Alerts, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Alert" } } } } }
+  /alerts/{id}:
+    get:
+      operationId: getAlert
+      tags: [alerts]
+      summary: Get alert
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: The alert, content: { application/json: { schema: { $ref: "#/components/schemas/Alert" } } } }
+  /alerts/{id}/acknowledge:
+    post:
+      operationId: acknowledgeAlert
+      tags: [alerts]
+      summary: Acknowledge alert
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Acknowledged }
+  /metrics/query:
+    get:
+      operationId: queryMetrics
+      tags: [metrics]
+      summary: Query metrics
+      parameters:
+        - { name: query, in: query, required: true, schema: { type: string }, description: "A metric selector, e.g. orders_failed_total" }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+      responses:
+        "200": { description: Series, content: { application/json: { schema: { type: object } } } }
+components:
+  securitySchemes:
+    oauth:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://login.example.com/oauth2/token
+          scopes: { monitoring.read: Read alerts and metrics }
+  schemas:
+    Alert:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        state: { type: string, enum: [firing, acknowledged, resolved] }
+        severity: { type: string, enum: [info, warning, critical] }
+        startedAt: { type: string, format: date-time }
