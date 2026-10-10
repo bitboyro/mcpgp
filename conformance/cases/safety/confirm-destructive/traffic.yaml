@@ -1,0 +1,20 @@
+mcpRevision: "2025-11-25"
+steps:
+  - name: delete asks for confirmation and sends nothing
+    mcp:
+      method: tools/call
+      params: { name: notes_note_delete, arguments: { instance: mock, path: { id: n-1 } } }
+    upstream: none
+    expect:
+      isError: true
+      code: CONFIRMATION_REQUIRED
+      structuredContent: { confirm: { matches: "^[0-9a-f]{32}$" } }
+
+  - name: reads need no confirmation
+    mcp:
+      method: tools/call
+      params: { name: notes_note_get, arguments: { instance: mock, path: { id: n-1 } } }
+    upstream: { method: GET, path: /v1/notes/n-1 }
+    respond: { status: 200, json: { id: n-1 } }
+    expect:
+      isError: false

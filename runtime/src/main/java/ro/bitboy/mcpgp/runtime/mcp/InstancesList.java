@@ -25,7 +25,7 @@ final class InstancesList implements ToolHandler {
     }
 
     @Override
-    public Object call(McpSyncServerExchange exchange, JsonNode tool, Map<String, Object> arguments) {
+    public Object call(McpSyncServerExchange exchange, JsonNode tool, Map<String, Object> arguments, CallRecord record) {
         String name = tool.path("name").asText();
         List<Map<String, Object>> instances = new ArrayList<>();
         for (Manifest.Api api : manifest.apis().values()) {

@@ -10,8 +10,9 @@ import java.util.Map;
 public interface ToolHandler {
     /**
      * @param tool      the served tool definition
-     * @param arguments the call's arguments (never null)
+     * @param arguments the call's arguments (never null; without a confirmation token)
+     * @param record    what the call did, for the audit event
      * @return the result value (a map becomes {@code structuredContent})
      */
-    Object call(McpSyncServerExchange exchange, JsonNode tool, Map<String, Object> arguments);
+    Object call(McpSyncServerExchange exchange, JsonNode tool, Map<String, Object> arguments, CallRecord record);
 }

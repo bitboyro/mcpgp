@@ -17,6 +17,7 @@ import java.util.Set;
  * @param secrets       every secret value, for redaction
  * @param inlineSecrets started with {@code allowInlineSecrets} and plain secret values
  * @param warnings      things to log at startup
+ * @param configHash    SHA-256 of the config as written (references, not secret values), for audit events
  */
 public record RuntimeConfig(
         Optional<Path> source,
@@ -32,7 +33,8 @@ public record RuntimeConfig(
         JsonNode packs,
         Set<String> secrets,
         boolean inlineSecrets,
-        List<String> warnings) {
+        List<String> warnings,
+        String configHash) {
 
     /**
      * @param authMode inbound auth: {@code none}, {@code static}, {@code oauth}

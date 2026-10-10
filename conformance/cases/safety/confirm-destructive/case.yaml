@@ -1,0 +1,8 @@
+name: confirm-destructive
+description: >
+  With confirmDestructive (the default), a DELETE tool is not executed on its first call: the client
+  gets CONFIRMATION_REQUIRED with a token, and nothing reaches the target.
+area: security
+specs: [tools-contract.md#8-confirmation]
+mcpRevisions: ["2025-11-25"]
+expect: manifest

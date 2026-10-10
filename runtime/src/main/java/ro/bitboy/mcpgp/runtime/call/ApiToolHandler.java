@@ -5,17 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpSyncServerExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import ro.bitboy.mcpgp.runtime.config.BaseUrl;
 import ro.bitboy.mcpgp.runtime.config.RuntimeConfig;
 import ro.bitboy.mcpgp.runtime.manifest.Manifest;
+import ro.bitboy.mcpgp.runtime.mcp.CallRecord;
 import ro.bitboy.mcpgp.runtime.mcp.ToolError;
 import ro.bitboy.mcpgp.runtime.mcp.ToolHandler;
 
 import java.net.URI;
 import java.net.http.HttpResponse;
-import java.security.SecureRandom;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +26,6 @@ public final class ApiToolHandler implements ToolHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(ApiToolHandler.class);
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final Manifest manifest;
     private final RuntimeConfig config;
@@ -55,17 +52,16 @@ public final class ApiToolHandler implements ToolHandler {
     }
 
     @Override
-    public Object call(McpSyncServerExchange exchange, JsonNode tool, Map<String, Object> arguments) {
+    public Object call(McpSyncServerExchange exchange, JsonNode tool, Map<String, Object> arguments, CallRecord record) {
         Manifest.Api api = manifest.apis().get(tool.path("api").asText());
+        record.api = api.id();
         RuntimeConfig.Instance instance = instance(api, arguments);
         String contract = instance.contract().equals("auto") ? api.defaultContract() : instance.contract();
+        record.instance = instance.id();
+        record.contract = contract;
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("mcpgp/instance", instance.id());
         meta.put("mcpgp/contract", contract);
-        byte[] id = new byte[3];
-        RANDOM.nextBytes(id);
-        meta.put("mcpgp/correlationId", "c-" + HexFormat.of().formatHex(id));
-        MDC.put("cid", (String) meta.get("mcpgp/correlationId"));
         try {
             JsonNode variant = tool.path("variants").get(contract);
             if (variant == null) {
@@ -80,16 +76,17 @@ public final class ApiToolHandler implements ToolHandler {
             JsonNode args = JSON.valueToTree(arguments);
             validator.validate(tool, args, contract, instance.id());
             URI base = BaseUrl.resolve(instance.baseUrl(), api.contracts().get(contract).basePath());
-            RequestBuilder.UpstreamRequest request = requests.build(variant, args, base);
+            record.method = variant.path("method").asText();
+            record.path = variant.path("path").asText();
+            RequestBuilder.UpstreamRequest request = requests.build(variant, args, base, record);
             LOG.debug("{} {} → {}", request.method(), variant.path("path").asText(), instance.id());
             // security: [] marks a public operation: no credentials (auth.md §2.2)
             boolean publicOperation = variant.path("security").isArray() && variant.path("security").isEmpty();
             HttpResponse<byte[]> response = upstream.send(instance, request, publicOperation);
-            return responses.map(response, instance.id(), meta);
+            record.status = response.statusCode();
+            return responses.map(response, instance.id(), meta, record);
         } catch (ToolError e) {
             throw e.meta().isEmpty() ? e.withMeta(meta) : e;
-        } finally {
-            MDC.remove("cid");
         }
     }
 

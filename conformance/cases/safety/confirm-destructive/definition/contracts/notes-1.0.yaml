@@ -1,0 +1,17 @@
+openapi: 3.1.0
+info: { title: Notes, version: "1.0" }
+servers: [{ url: https://notes.example/v1 }]
+paths:
+  /notes/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getNote
+      summary: Get note
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object } } } }
+    delete:
+      operationId: deleteNote
+      summary: Delete note
+      responses:
+        "204": { description: Deleted }

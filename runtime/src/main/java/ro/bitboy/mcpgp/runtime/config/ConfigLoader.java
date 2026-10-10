@@ -140,7 +140,8 @@ public final class ConfigLoader {
                 resolved.path("errors").path("detail").asText("full"),
                 resolved.path("logging").path("level").asText("info"),
                 resolved.path("telemetry"), resolved.path("packs"),
-                Set.copyOf(secrets.secrets()), allowInline && !secrets.inline().isEmpty(), List.copyOf(warnings));
+                Set.copyOf(secrets.secrets()), allowInline && !secrets.inline().isEmpty(), List.copyOf(warnings),
+                configHash(document, secrets.inline()));
     }
 
     // ---------------------------------------------------------------------- sources
@@ -412,6 +413,36 @@ public final class ConfigLoader {
                 base.set(f.getKey(), f.getValue().deepCopy());
             }
         }
+    }
+
+    /**
+     * The hash of the config before references are resolved. Plain secret values (allowed only with
+     * allowInlineSecrets) are masked first, so the hash never depends on a secret.
+     */
+    private static String configHash(ObjectNode document, List<String> inline) {
+        ObjectNode copy = document.deepCopy();
+        for (String pointer : inline) {
+            int slash = pointer.lastIndexOf('/');
+            JsonNode parent = copy.at(pointer.substring(0, slash));
+            if (parent instanceof ObjectNode object) {
+                object.put(pointer.substring(slash + 1), "***");
+            } else if (parent instanceof com.fasterxml.jackson.databind.node.ArrayNode array) {
+                array.set(Integer.parseInt(pointer.substring(slash + 1)), JsonNodeFactory.instance.textNode("***"));
+            }
+        }
+        return "sha256:" + TlsBuilder.sha256(sorted(copy).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private static JsonNode sorted(JsonNode node) {
+        if (node instanceof ObjectNode object) {
+            List<String> keys = new ArrayList<>();
+            object.fieldNames().forEachRemaining(keys::add);
+            keys.sort(String::compareTo);
+            ObjectNode result = JsonNodeFactory.instance.objectNode();
+            keys.forEach(k -> result.set(k, sorted(object.get(k))));
+            return result;
+        }
+        return node;
     }
 
     private static String firstLine(String message) {

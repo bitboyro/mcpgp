@@ -154,6 +154,11 @@ public final class ToolShaper {
                 required.add("body");
             }
         }
+        if (plan.confirm()) {
+            // tools-contract §8: clients without elicitation call again with the token
+            properties.set("confirm", NODES.objectNode().put("type", "string").put("description",
+                    "Confirmation token from a CONFIRMATION_REQUIRED result. Only send it after the user agreed."));
+        }
 
         ObjectNode input = NODES.objectNode().put("type", "object");
         input.set("properties", properties);

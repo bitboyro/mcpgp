@@ -3,6 +3,8 @@ package ro.bitboy.mcpgp.runtime.call;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ro.bitboy.mcpgp.runtime.audit.Arguments;
+import ro.bitboy.mcpgp.runtime.mcp.CallRecord;
 import ro.bitboy.mcpgp.runtime.mcp.ToolError;
 
 import java.io.ByteArrayOutputStream;
@@ -34,7 +36,8 @@ final class RequestBuilder {
         this.files = files;
     }
 
-    UpstreamRequest build(JsonNode variant, JsonNode arguments, URI base) {
+    /** @param record receives the files the request sends (name, size, SHA-256), for the audit event */
+    UpstreamRequest build(JsonNode variant, JsonNode arguments, URI base, CallRecord record) {
         String path = variant.path("path").asText();
         StringBuilder query = new StringBuilder();
         List<Map.Entry<String, String>> headers = new ArrayList<>();
@@ -79,7 +82,7 @@ final class RequestBuilder {
         JsonNode bodyValue = arguments.get("body");
         if (bodySpec != null && bodySpec.isObject() && bodyValue != null && !bodyValue.isNull()) {
             String bound = bodySpec.path("contentType").asText();
-            Encoded encoded = encode(bound, bodySpec, bodyValue);
+            Encoded encoded = encode(bound, bodySpec, bodyValue, record);
             check(bound, bodySpec, bodyValue, encoded);
             body = encoded.bytes();
             contentType = encoded.contentType();
@@ -157,10 +160,10 @@ final class RequestBuilder {
     private record Encoded(byte[] bytes, String contentType, List<String> partNames) {
     }
 
-    private Encoded encode(String bound, JsonNode bodySpec, JsonNode value) {
+    private Encoded encode(String bound, JsonNode bodySpec, JsonNode value, CallRecord record) {
         String type = bound.toLowerCase();
         if (type.startsWith("multipart/")) {
-            return multipart(bound, bodySpec, value);
+            return multipart(bound, bodySpec, value, record);
         }
         if (type.equals("application/x-www-form-urlencoded")) {
             StringBuilder form = new StringBuilder();
@@ -177,7 +180,7 @@ final class RequestBuilder {
             return new Encoded(json(value), bound, List.of());
         }
         if (value.isObject() && (value.has("base64") || value.has("path"))) {
-            FileInputs.FileData file = files.read(value, List.of(bound), "body");
+            FileInputs.FileData file = noted(record, files.read(value, List.of(bound), "body"));
             return new Encoded(file.bytes(), file.contentType(), List.of());
         }
         if (value.isTextual()) {
@@ -186,7 +189,7 @@ final class RequestBuilder {
         return new Encoded(json(value), bound, List.of());
     }
 
-    private Encoded multipart(String bound, JsonNode bodySpec, JsonNode value) {
+    private Encoded multipart(String bound, JsonNode bodySpec, JsonNode value, CallRecord record) {
         String boundary = "mcpgp-" + UUID.randomUUID().toString().replace("-", "");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         List<String> names = new ArrayList<>();
@@ -207,7 +210,7 @@ final class RequestBuilder {
                 }
                 for (int i = 0; i < fileValues.size(); i++) {
                     String field = "body." + name + (partValue.isArray() ? "[" + i + "]" : "");
-                    FileInputs.FileData file = files.read(fileValues.get(i), types, field);
+                    FileInputs.FileData file = noted(record, files.read(fileValues.get(i), types, field));
                     String filename = file.filename() == null ? name : file.filename();
                     writePart(out, boundary, "form-data; name=\"" + quote(name) + "\"; filename=\"" + quote(filename) + "\"",
                             file.contentType(), file.bytes());
@@ -223,6 +226,12 @@ final class RequestBuilder {
         }
         write(out, "--" + boundary + "--\r\n");
         return new Encoded(out.toByteArray(), bound + "; boundary=" + boundary, names);
+    }
+
+    private static FileInputs.FileData noted(CallRecord record, FileInputs.FileData file) {
+        record.files.add(new CallRecord.File(file.filename() == null ? "" : file.filename(), file.bytes().length,
+                Arguments.sha256(file.bytes())));
+        return file;
     }
 
     private static void writePart(ByteArrayOutputStream out, String boundary, String disposition, String type, byte[] bytes) {
