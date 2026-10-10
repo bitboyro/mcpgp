@@ -68,6 +68,20 @@ public final class Model {
                         boolean revoked) {
     }
 
+    /**
+     * A local account's password (spec/platform-api.md §3): PBKDF2-HMAC-SHA256, salted.
+     *
+     * @param failures    sign-in failures in a row
+     * @param lockedUntil no sign-in before this time, or null
+     */
+    public record Credential(String identity, String salt, int iterations, String hash, int failures, String lockedUntil) {
+    }
+
+    /** A request waiting for a person's decision (spec/platform-api.md §5), e.g. an agent's release. */
+    public record Approval(String id, String action, String target, String requestedBy, String requestedAt, String status,
+                           String decidedBy, String decidedAt, String comment) {
+    }
+
     /** One entry of the activity log. Never contains secrets or token values. */
     public record Activity(String ts, String actor, String actorKind, String action, String target, String outcome,
                            Map<String, Object> details) {

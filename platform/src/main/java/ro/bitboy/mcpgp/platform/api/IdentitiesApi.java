@@ -31,10 +31,12 @@ public class IdentitiesApi {
 
     private final Store store;
     private final Access access;
+    private final ro.bitboy.mcpgp.platform.service.Accounts accounts;
 
-    public IdentitiesApi(Store store, Access access) {
+    public IdentitiesApi(Store store, Access access, ro.bitboy.mcpgp.platform.service.Accounts accounts) {
         this.store = store;
         this.access = access;
+        this.accounts = accounts;
     }
 
     @GetMapping("/me")
@@ -60,8 +62,17 @@ public class IdentitiesApi {
         who.require("admin");
         JsonNode json = Json.parse(body);
         Set<String> scopes = scopes(json);
+        if (json.hasNonNull("password") && !json.path("kind").asText("").equals("person")) {
+            throw ApiException.validation("only people have passwords; agents and pipelines use tokens");
+        }
+        if (json.hasNonNull("password") && json.get("password").asText().length() < 12) {
+            throw ApiException.validation("the password needs at least 12 characters");
+        }
         Model.Identity identity = access.createIdentity(json.path("kind").asText(""), json.path("name").asText(null), scopes,
                 who.identity().id());
+        if (json.hasNonNull("password")) {
+            accounts.setPassword(identity, json.get("password").asText());
+        }
         record(who, "identity.create", identity.name(), Map.of("kind", identity.kind(), "scopes", scopes));
         return Json.status(201, identity(identity));
     }

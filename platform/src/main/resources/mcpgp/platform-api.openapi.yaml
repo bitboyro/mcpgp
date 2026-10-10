@@ -14,6 +14,8 @@ tags:
   - { name: builds, description: Builds, their logs and artifacts }
   - { name: library, description: Shared items referenced as mcpgp://<workspace>/<kind>/<name>@<version> }
   - { name: identities, description: Identities, tokens and the activity log }
+  - { name: approvals, description: Requests waiting for a person }
+  - { name: admin, description: Export and import }
 paths:
   /servers:
     get:
@@ -304,6 +306,89 @@ paths:
       responses:
         "200": { description: Restored, content: { application/json: { schema: { $ref: "#/components/schemas/Build" } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /sessions:
+    post:
+      operationId: signIn
+      tags: [identities]
+      summary: Sign in
+      description: Signs in a person with a local account; the answer is a session token (12 hours). No bearer token needed.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { name: { type: string }, password: { type: string, format: password } }, required: [name, password] }
+      responses:
+        "201": { description: Signed in, content: { application/json: { schema: { $ref: "#/components/schemas/Token" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /identities/{identityId}/password:
+    put:
+      operationId: setPassword
+      tags: [identities]
+      summary: Set password
+      parameters:
+        - { name: identityId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { password: { type: string, format: password }, currentPassword: { type: string, format: password } }, required: [password] }
+      responses:
+        "200": { description: Set, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /approvals:
+    get:
+      operationId: listApprovals
+      tags: [approvals]
+      summary: List approvals
+      parameters:
+        - { name: status, in: query, schema: { enum: [pending, approved, rejected, all], default: pending } }
+      responses:
+        "200": { description: Approvals, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Approval" } } } } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /approvals/{approvalId}/approve:
+    post:
+      operationId: approveRequest
+      tags: [approvals]
+      summary: Approve request
+      parameters: [ { name: approvalId, in: path, required: true, schema: { type: string } } ]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { comment: { type: string } } } } } }
+      responses:
+        "200": { description: Approved, content: { application/json: { schema: { $ref: "#/components/schemas/Approval" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /approvals/{approvalId}/reject:
+    post:
+      operationId: rejectRequest
+      tags: [approvals]
+      summary: Reject request
+      parameters: [ { name: approvalId, in: path, required: true, schema: { type: string } } ]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { comment: { type: string } } } } } }
+      responses:
+        "200": { description: Rejected, content: { application/json: { schema: { $ref: "#/components/schemas/Approval" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /export:
+    get:
+      operationId: exportStore
+      tags: [admin]
+      summary: Export store
+      description: Everything as a zip, to move to another platform release (before 1.0.0 stores are not migrated).
+      parameters:
+        - { name: artifacts, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200": { description: The export, content: { application/zip: { schema: { type: string, format: binary } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /import:
+    post:
+      operationId: importStore
+      tags: [admin]
+      summary: Import store
+      description: Fills a fresh store from an export.
+      requestBody:
+        required: true
+        content: { application/zip: { schema: { type: string, format: binary } } }
+      responses:
+        "200": { description: Counts of what was imported, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /me:
     get:
       operationId: getMe
@@ -333,6 +418,7 @@ paths:
               properties:
                 kind: { enum: [person, agent, pipeline] }
                 name: { type: string }
+                password: { type: string, format: password, description: People only; at least 12 characters }
                 role: { enum: [viewer, builder, releaser, admin] }
                 scopes: { type: array, items: { $ref: "#/components/schemas/Scope" } }
               required: [kind, name]
@@ -461,6 +547,18 @@ components:
         deleted: { type: boolean }
         artifacts: { type: array, items: { type: object, properties: { name: { type: string }, size: { type: integer }, sha256: { type: string } } } }
         error: { type: string }
+    Approval:
+      type: object
+      properties:
+        id: { type: string }
+        action: { type: string }
+        target: { type: string }
+        requestedBy: { type: string }
+        requestedAt: { type: string, format: date-time }
+        status: { enum: [pending, approved, rejected] }
+        decidedBy: { type: string }
+        decidedAt: { type: string, format: date-time }
+        comment: { type: string }
     Identity:
       type: object
       properties:

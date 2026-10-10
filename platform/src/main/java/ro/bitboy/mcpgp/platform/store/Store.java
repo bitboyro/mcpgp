@@ -68,6 +68,15 @@ public interface Store {
 
     void saveToken(Model.Token token);
 
+    // local accounts and approvals
+    List<Model.Credential> credentials();
+
+    void saveCredential(Model.Credential credential);
+
+    List<Model.Approval> approvals();
+
+    void saveApproval(Model.Approval approval);
+
     // activity
     void append(Model.Activity activity);
 

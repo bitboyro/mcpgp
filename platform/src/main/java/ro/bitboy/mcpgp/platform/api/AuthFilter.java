@@ -27,7 +27,8 @@ public final class AuthFilter extends HttpFilter {
 
     @Override
     protected void doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
-        if (request.getRequestURI().equals("/api/v1/openapi.json")) {
+        if (request.getRequestURI().equals("/api/v1/openapi.json")
+                || request.getRequestURI().equals("/api/v1/sessions") && request.getMethod().equals("POST")) {
             chain.doFilter(request, response);
             return;
         }

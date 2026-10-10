@@ -92,7 +92,12 @@ compiles (the CLI does the same with `--workspace`).
 - **OIDC:** authorization code flow with PKCE against the configured issuer; people are matched by
   `sub` (and `email` for the first sign-in); group claims can map to roles. Comes with the web UI (M6).
 - **Bootstrap:** `platform init` creates the first administrator (local account or the first OIDC
-  user) and prints a one-time admin token.
+  user) and prints a one-time admin token; with `MCPGP_PLATFORM_ADMIN_PASSWORD` set, the administrator
+  also gets a local password.
+- **Sign-in:** `POST /api/v1/sessions { name, password }` → a session token (12 hours); an unknown name
+  and a wrong password get the same answer. `PUT /identities/{id}/password` sets a password (admins:
+  anyone's; people: their own, with the current one). `auth.local.enabled: false` turns local accounts
+  off.
 
 Scopes:
 
@@ -123,10 +128,13 @@ Roles bundle scopes: **viewer** (`servers:read`), **builder** (viewer + `servers
 
 ## 5. Agent guardrails and approvals
 
-- An agent's **release** creates an approval instead of releasing; a person with `approvals:decide`
-  approves (the build is released) or rejects it, with a comment.
+- An agent's **release** creates an approval instead of releasing (`202` with the approval); a person
+  with `approvals:decide` approves (the build is released) or rejects it, with a comment. Agents never
+  decide approvals, whatever their scopes.
 - Agents may not delete builds, change identities or settings, or allow spec hosts.
-- Quotas per agent: builds per hour (default 20), versions per hour (default 60).
+- Quotas per agent: builds per hour (default 20), versions per hour (default 60; new servers count
+  as versions); over the limit → `429 QUOTA_EXCEEDED`. Settings: `guardrails: { agentBuildsPerHour,
+  agentVersionsPerHour }`.
 - Destructive API calls (delete, archive) by agents require the agent's token to have the scope and
   are recorded with the agent and its owner.
 

@@ -8,6 +8,9 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import ro.bitboy.mcpgp.platform.api.AuthFilter;
 import ro.bitboy.mcpgp.platform.service.Access;
+import ro.bitboy.mcpgp.platform.service.Accounts;
+import ro.bitboy.mcpgp.platform.service.Guardrails;
+import ro.bitboy.mcpgp.platform.service.Transfer;
 import ro.bitboy.mcpgp.platform.service.Builds;
 import ro.bitboy.mcpgp.platform.service.Compilation;
 import ro.bitboy.mcpgp.platform.service.Library;
@@ -71,6 +74,11 @@ public class PlatformServer {
         }
         Access access = new Access(store);
         Model.Identity identity = access.createIdentity("person", admin, Set.copyOf(Access.SCOPES), null);
+        String password = System.getenv("MCPGP_PLATFORM_ADMIN_PASSWORD");
+        if (password != null && !password.isBlank()) {
+            new Accounts(store, access, java.time.Clock.systemUTC()).setPassword(identity, password);
+            out.println("✓ local account " + admin + " can sign in with the password from MCPGP_PLATFORM_ADMIN_PASSWORD");
+        }
         Access.IssuedToken token = access.issue(identity, Set.of("admin"), "bootstrap", Instant.now().plus(30, ChronoUnit.DAYS));
         store.append(new Model.Activity(Instant.now().toString(), admin, "person", "platform.init", config.storageRoot().toString(), "ok",
                 Map.of("token", token.record().id())));
@@ -103,6 +111,21 @@ public class PlatformServer {
     @Bean
     Library library(Store store) {
         return new Library(store);
+    }
+
+    @Bean
+    Accounts accounts(Store store, Access access) {
+        return new Accounts(store, access, java.time.Clock.systemUTC());
+    }
+
+    @Bean
+    Guardrails guardrails(Store store, Builds builds, PlatformConfig config) {
+        return new Guardrails(store, builds, config.guardrails(), java.time.Clock.systemUTC());
+    }
+
+    @Bean
+    Transfer transfer(Store store) {
+        return new Transfer(store);
     }
 
     @Bean(initMethod = "start", destroyMethod = "close")
