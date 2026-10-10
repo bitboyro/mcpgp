@@ -24,6 +24,7 @@
     <module>core</module>
     <module>runtime</module>
     <module>cli</module>
+    <module>platform</module>
   </modules>
 
   <properties>

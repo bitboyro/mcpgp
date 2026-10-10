@@ -1,0 +1,333 @@
+package ro.bitboy.mcpgp.platform.store;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+
+/**
+ * The file store (spec/platform-api.md §7.1): a directory, backed up by copying it. Writes go to a
+ * temporary file and are moved into place, so a crash never leaves half a file. One platform process
+ * per directory.
+ *
+ * <pre>
+ * root/store.json                 { "format": "0.1" }
+ * root/servers/(id)/server.json
+ * root/blobs/sha256/(ab)/(digest)
+ * root/versions/(digest).json
+ * root/identities/identities.json, tokens.json
+ * root/activity/activity-YYYY-MM.jsonl
+ * root/cache/(kind)/(key)
+ * </pre>
+ */
+public final class FileStore implements Store {
+
+    private static final ObjectMapper JSON = new ObjectMapper()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .enable(SerializationFeature.INDENT_OUTPUT);
+    private static final ObjectMapper LINES = new ObjectMapper()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+    private final Path root;
+
+    /** Opens (or creates) a store; refuses a store of another format (no migrations before 1.0.0). */
+    public FileStore(Path root) {
+        this.root = root.toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(this.root);
+            ownerOnly(this.root, "rwx------");
+            Path marker = this.root.resolve("store.json");
+            if (Files.exists(marker)) {
+                String format = JSON.readTree(marker.toFile()).path("format").asText("");
+                if (!format.equals(FORMAT)) {
+                    throw new IllegalStateException("The store at " + this.root + " has format " + format + "; this platform release uses "
+                            + FORMAT + ". Before 1.0.0 stores are not migrated: export the data with the release that wrote it "
+                            + "(GET /api/v1/export) and import it here (POST /api/v1/import).");
+                }
+            } else {
+                try (Stream<Path> existing = Files.list(this.root)) {
+                    if (existing.findAny().isPresent()) {
+                        throw new IllegalStateException(this.root + " is not empty and has no store.json; choose an empty directory");
+                    }
+                }
+                write(marker, JSON.writeValueAsBytes(Map.of("format", FORMAT)));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("The store at " + this.root + " can't be opened", e);
+        }
+    }
+
+    // ---------------------------------------------------------------------- servers
+
+    @Override
+    public synchronized List<Model.Server> servers() {
+        Path dir = root.resolve("servers");
+        if (!Files.isDirectory(dir)) {
+            return List.of();
+        }
+        List<Model.Server> servers = new ArrayList<>();
+        try (Stream<Path> entries = Files.list(dir)) {
+            for (Path entry : entries.sorted().toList()) {
+                read(entry.resolve("server.json"), Model.Server.class).ifPresent(servers::add);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return servers;
+    }
+
+    @Override
+    public synchronized Optional<Model.Server> server(String id) {
+        return read(serverFile(id), Model.Server.class);
+    }
+
+    @Override
+    public synchronized Model.Server saveServer(Model.Server server, long expectedRevision) {
+        Optional<Model.Server> current = server(server.id());
+        if (expectedRevision < 0 && current.isPresent()) {
+            throw new ConflictException("server " + server.id() + " exists");
+        }
+        if (expectedRevision >= 0 && (current.isEmpty() || current.get().revision() != expectedRevision)) {
+            throw new ConflictException("server " + server.id() + " was changed meanwhile");
+        }
+        Model.Server saved = new Model.Server(server.id(), server.title(), server.parent(), server.archived(), server.created(),
+                server.updated(), List.copyOf(server.versions()), current.map(Model.Server::revision).orElse(0L) + 1);
+        writeJson(serverFile(server.id()), saved);
+        return saved;
+    }
+
+    private Path serverFile(String id) {
+        if (!id.matches("[a-z0-9][a-z0-9-]{1,62}")) {
+            throw new IllegalArgumentException("invalid server id " + id);
+        }
+        return root.resolve("servers").resolve(id).resolve("server.json");
+    }
+
+    // ---------------------------------------------------------------------- content
+
+    @Override
+    public String putBlob(byte[] content) {
+        String digest = sha256(content);
+        Path file = blobFile(digest);
+        if (!Files.exists(file)) {
+            write(file, content);
+        }
+        return digest;
+    }
+
+    @Override
+    public byte[] blob(String digest) {
+        try {
+            return Files.readAllBytes(blobFile(digest));
+        } catch (IOException e) {
+            throw new UncheckedIOException("blob " + digest + " is missing", e);
+        }
+    }
+
+    private Path blobFile(String digest) {
+        if (!digest.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("invalid digest");
+        }
+        return root.resolve("blobs/sha256").resolve(digest.substring(0, 2)).resolve(digest);
+    }
+
+    @Override
+    public void saveVersion(Model.Version version) {
+        Path file = versionFile(version.digest());
+        if (!Files.exists(file)) {
+            writeJson(file, version);
+        }
+    }
+
+    @Override
+    public Optional<Model.Version> version(String digest) {
+        return read(versionFile(digest), Model.Version.class);
+    }
+
+    private Path versionFile(String digest) {
+        if (!digest.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("invalid digest");
+        }
+        return root.resolve("versions").resolve(digest + ".json");
+    }
+
+    // ---------------------------------------------------------------------- identities
+
+    @Override
+    public synchronized List<Model.Identity> identities() {
+        return readList(root.resolve("identities/identities.json"), new TypeReference<>() {
+        });
+    }
+
+    @Override
+    public synchronized void saveIdentity(Model.Identity identity) {
+        List<Model.Identity> all = new ArrayList<>(identities());
+        all.removeIf(i -> i.id().equals(identity.id()));
+        all.add(identity);
+        writeJson(root.resolve("identities/identities.json"), all);
+    }
+
+    @Override
+    public synchronized List<Model.Token> tokens() {
+        return readList(root.resolve("identities/tokens.json"), new TypeReference<>() {
+        });
+    }
+
+    @Override
+    public synchronized void saveToken(Model.Token token) {
+        List<Model.Token> all = new ArrayList<>(tokens());
+        all.removeIf(t -> t.id().equals(token.id()));
+        all.add(token);
+        writeJson(root.resolve("identities/tokens.json"), all);
+    }
+
+    // ---------------------------------------------------------------------- activity
+
+    @Override
+    public synchronized void append(Model.Activity activity) {
+        Path file = root.resolve("activity").resolve("activity-" + YearMonth.from(java.time.Instant.parse(activity.ts()).atZone(ZoneOffset.UTC)) + ".jsonl");
+        try {
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, LINES.writeValueAsString(activity) + "\n", StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            throw new UncheckedIOException("the activity log can't be written", e);
+        }
+    }
+
+    @Override
+    public synchronized List<Model.Activity> activity(Predicate<Model.Activity> filter, int limit) {
+        Path dir = root.resolve("activity");
+        if (!Files.isDirectory(dir)) {
+            return List.of();
+        }
+        List<Model.Activity> result = new ArrayList<>();
+        try (Stream<Path> files = Files.list(dir)) {
+            for (Path file : files.sorted(Collections.reverseOrder()).toList()) {
+                List<String> lines = Files.readAllLines(file);
+                for (int i = lines.size() - 1; i >= 0 && result.size() < limit; i--) {
+                    Model.Activity entry = LINES.readValue(lines.get(i), Model.Activity.class);
+                    if (filter.test(entry)) {
+                        result.add(entry);
+                    }
+                }
+                if (result.size() >= limit) {
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return result;
+    }
+
+    // ---------------------------------------------------------------------- cache
+
+    @Override
+    public Optional<byte[]> cached(String kind, String key) {
+        Path file = cacheFile(kind, key);
+        try {
+            return Files.exists(file) ? Optional.of(Files.readAllBytes(file)) : Optional.empty();
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public void cache(String kind, String key, byte[] content) {
+        write(cacheFile(kind, key), content);
+    }
+
+    private Path cacheFile(String kind, String key) {
+        if (!kind.matches("[a-z-]+") || !key.matches("[0-9a-z.-]+")) {
+            throw new IllegalArgumentException("invalid cache key");
+        }
+        return root.resolve("cache").resolve(kind).resolve(key);
+    }
+
+    // ---------------------------------------------------------------------- files
+
+    private <T> Optional<T> read(Path file, Class<T> type) {
+        if (!Files.exists(file)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(JSON.readValue(file.toFile(), type));
+        } catch (IOException e) {
+            throw new UncheckedIOException("can't read " + root.relativize(file), e);
+        }
+    }
+
+    private <T> List<T> readList(Path file, TypeReference<List<T>> type) {
+        if (!Files.exists(file)) {
+            return List.of();
+        }
+        try {
+            return JSON.readValue(file.toFile(), type);
+        } catch (IOException e) {
+            throw new UncheckedIOException("can't read " + root.relativize(file), e);
+        }
+    }
+
+    private void writeJson(Path file, Object value) {
+        try {
+            write(file, JSON.writeValueAsBytes(value));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** Write to a temporary file next to the target, then move it into place. */
+    private static void write(Path file, byte[] content) {
+        try {
+            Files.createDirectories(file.getParent());
+            Path temp = Files.createTempFile(file.getParent(), ".tmp-", "");
+            Files.write(temp, content);
+            try {
+                Files.move(temp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("can't write " + file, e);
+        }
+    }
+
+    public static String sha256(byte[] content) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static void ownerOnly(Path path, String permissions) {
+        try {
+            Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(permissions));
+        } catch (IOException | UnsupportedOperationException e) {
+            // not a POSIX file system
+        }
+    }
+}

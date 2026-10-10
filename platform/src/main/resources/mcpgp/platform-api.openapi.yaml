@@ -1,0 +1,293 @@
+openapi: 3.1.0
+info:
+  title: mcpgp platform API
+  version: "1.0"
+  description: >
+    Definitions, versions, builds and identities of a self-hosted mcpgp platform (spec/platform-api.md).
+    Every endpoint needs a bearer token, except this document.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - { name: servers, description: Server definition projects and their versions }
+  - { name: identities, description: Identities, tokens and the activity log }
+paths:
+  /servers:
+    get:
+      operationId: listServers
+      tags: [servers]
+      summary: List servers
+      parameters:
+        - { name: archived, in: query, schema: { type: boolean, default: false }, description: List archived servers instead }
+      responses:
+        "200": { description: Servers, content: { application/json: { schema: { $ref: "#/components/schemas/ServerList" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: createServer
+      tags: [servers]
+      summary: Create server
+      description: Creates a server from a first version of its project (a zip, or JSON files).
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{1,62}$" } }
+        - { name: title, in: query, schema: { type: string } }
+        - { name: message, in: query, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/ProjectFiles" } }
+          application/zip: { schema: { type: string, format: binary } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}:
+    parameters: [ { $ref: "#/components/parameters/ServerId" } ]
+    get:
+      operationId: getServer
+      tags: [servers]
+      summary: Get server
+      responses:
+        "200": { description: Server, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/versions:
+    parameters: [ { $ref: "#/components/parameters/ServerId" } ]
+    post:
+      operationId: addVersion
+      tags: [servers]
+      summary: Add version
+      description: Adds a version; the same content as the latest version adds nothing.
+      parameters:
+        - { name: message, in: query, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/ProjectFiles" } }
+          application/zip: { schema: { type: string, format: binary } }
+      responses:
+        "201": { description: Version added, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
+        "200": { description: Same content as the latest version, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/versions/{version}:
+    parameters: [ { $ref: "#/components/parameters/ServerId" }, { $ref: "#/components/parameters/Version" } ]
+    get:
+      operationId: getVersion
+      tags: [servers]
+      summary: Get version
+      responses:
+        "200": { description: The version and its files, content: { application/json: { schema: { $ref: "#/components/schemas/VersionDetail" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/versions/{version}/validate:
+    parameters: [ { $ref: "#/components/parameters/ServerId" }, { $ref: "#/components/parameters/Version" } ]
+    post:
+      operationId: validateVersion
+      tags: [servers]
+      summary: Validate version
+      description: Runs the compiler and returns its diagnostics.
+      responses:
+        "200": { description: Diagnostics, content: { application/json: { schema: { $ref: "#/components/schemas/Validation" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/versions/{version}/manifest:
+    parameters: [ { $ref: "#/components/parameters/ServerId" }, { $ref: "#/components/parameters/Version" } ]
+    get:
+      operationId: getManifest
+      tags: [servers]
+      summary: Get manifest
+      description: The manifest of a version (what agents will get, with provenance).
+      responses:
+        "200": { description: Manifest, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/archive:
+    parameters: [ { $ref: "#/components/parameters/ServerId" } ]
+    post:
+      operationId: archiveServer
+      tags: [servers]
+      summary: Archive server
+      parameters: [ { $ref: "#/components/parameters/IfMatch" } ]
+      responses:
+        "200": { description: Archived, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/restore:
+    parameters: [ { $ref: "#/components/parameters/ServerId" } ]
+    post:
+      operationId: restoreServer
+      tags: [servers]
+      summary: Restore server
+      parameters: [ { $ref: "#/components/parameters/IfMatch" } ]
+      responses:
+        "200": { description: Restored, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /me:
+    get:
+      operationId: getMe
+      tags: [identities]
+      summary: Who am I
+      responses:
+        "200": { description: The calling identity, content: { application/json: { schema: { $ref: "#/components/schemas/Identity" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /identities:
+    get:
+      operationId: listIdentities
+      tags: [identities]
+      summary: List identities
+      responses:
+        "200": { description: Identities, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Identity" } } } } } } }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: createIdentity
+      tags: [identities]
+      summary: Create identity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind: { enum: [person, agent, pipeline] }
+                name: { type: string }
+                role: { enum: [viewer, builder, releaser, admin] }
+                scopes: { type: array, items: { $ref: "#/components/schemas/Scope" } }
+              required: [kind, name]
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Identity" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /tokens:
+    get:
+      operationId: listTokens
+      tags: [identities]
+      summary: List tokens
+      responses:
+        "200": { description: Tokens (never their values), content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Token" } } } } } } }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: createToken
+      tags: [identities]
+      summary: Create token
+      description: The value is in the answer once and never again.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                identity: { type: string }
+                scopes: { type: array, items: { $ref: "#/components/schemas/Scope" } }
+                label: { type: string }
+                expiresInDays: { type: integer, minimum: 1, maximum: 730, default: 90 }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Token" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /tokens/{tokenId}:
+    delete:
+      operationId: revokeToken
+      tags: [identities]
+      summary: Revoke token
+      parameters:
+        - { name: tokenId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Revoked, content: { application/json: { schema: { $ref: "#/components/schemas/Token" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /activity:
+    get:
+      operationId: listActivity
+      tags: [identities]
+      summary: List activity
+      parameters:
+        - { name: target, in: query, schema: { type: string } }
+        - { name: actor, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string }, description: Action or its prefix, e.g. version. }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200": { description: Newest first, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Activity" } } } } } } }
+        default: { $ref: "#/components/responses/Problem" }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    ServerId: { name: id, in: path, required: true, schema: { type: string } }
+    Version: { name: version, in: path, required: true, description: A version number or latest, schema: { type: string } }
+    IfMatch: { name: If-Match, in: header, description: The server's ETag, for optimistic concurrency, schema: { type: string } }
+  responses:
+    Problem:
+      description: An error (RFC 9457)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+  schemas:
+    Scope: { enum: [servers:read, servers:write, builds:run, builds:release, builds:delete, library:write, approvals:decide, admin] }
+    ProjectFiles:
+      type: object
+      properties:
+        files: { type: object, additionalProperties: { type: string }, description: "path → file content" }
+      required: [files]
+    VersionRef:
+      type: object
+      properties:
+        number: { type: integer }
+        digest: { type: string }
+        message: { type: string }
+        author: { type: string }
+        created: { type: string, format: date-time }
+    Server:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        parent: { type: string }
+        archived: { type: boolean }
+        latestVersion: { type: integer }
+        created: { type: string, format: date-time }
+        updated: { type: string, format: date-time }
+        versions: { type: array, items: { $ref: "#/components/schemas/VersionRef" } }
+    ServerList:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Server" } }
+    VersionDetail:
+      type: object
+      properties:
+        number: { type: integer }
+        digest: { type: string }
+        root: { type: string }
+        files: { type: array, items: { type: object, properties: { path: { type: string }, sha256: { type: string } } } }
+    Validation:
+      type: object
+      properties:
+        ok: { type: boolean }
+        diagnostics: { type: array, items: { type: object, properties: { level: { type: string }, code: { type: string }, message: { type: string }, location: { type: string } } } }
+    Identity:
+      type: object
+      properties:
+        id: { type: string }
+        kind: { enum: [person, agent, pipeline] }
+        name: { type: string }
+        scopes: { type: array, items: { $ref: "#/components/schemas/Scope" } }
+        created: { type: string, format: date-time }
+        disabled: { type: boolean }
+    Token:
+      type: object
+      properties:
+        id: { type: string }
+        identity: { type: string }
+        scopes: { type: array, items: { $ref: "#/components/schemas/Scope" } }
+        label: { type: string }
+        created: { type: string, format: date-time }
+        expires: { type: string, format: date-time }
+        revoked: { type: boolean }
+        value: { type: string, description: Only in the answer that creates the token }
+    Activity:
+      type: object
+      properties:
+        ts: { type: string, format: date-time }
+        actor: { type: string }
+        actorKind: { type: string }
+        action: { type: string }
+        target: { type: string }
+        outcome: { type: string }
+        details: { type: object }
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        code: { type: string }
+        detail: { type: string }

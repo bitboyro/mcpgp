@@ -1,0 +1,13 @@
+# The platform's own MCP server (M7), generated from its OpenAPI: a check that the document compiles.
+apiVersion: mcpgp/v1
+kind: McpServer
+metadata:
+  name: mcpgp-platform-mcp
+  title: mcpgp platform
+apis:
+  - id: platform
+    contracts:
+      - { version: "1.0", spec: platform-api.openapi.yaml, default: true }
+    select: { access: all }
+instances:
+  mode: single

@@ -72,6 +72,9 @@ no `dropWords`, `order: object_verb`, `case: snake`, `number: singular`, no voca
 
 - Splitting: `getCustomerAccountByIdV2` → `get Customer Account By Id V2`; `customer-account.get` → `customer account get`.
 - Lowercase all words; drop `dropWords`; collapse repeats.
+- Verbs are recognized from a built-in list (get, list, create, update, delete, search, archive,
+  restore, revoke, release, publish, assign, grant, …); `object_verb` moves a leading verb to the end
+  (`revokeToken` → `token_revoke`). Words outside the list are kept in place.
 - HTTP verb inference when the source has no verb (`methodPath`): GET on a collection → `list`,
   GET on an item → `get`, POST → `create`, PUT/PATCH → `update`, DELETE → `delete`.
 
