@@ -97,6 +97,12 @@ public class McpgpServer {
         return new McpServerFactory(manifest, config);
     }
 
+    /** Config reload (runtime-config §4.6), for either transport. */
+    @Bean(initMethod = "start", destroyMethod = "close")
+    Reloader reloader(Startup startup, McpServerFactory factory, McpSyncServer server) {
+        return new Reloader(startup, factory, server);
+    }
+
     /** server.start / server.stop and, for stdio, session.start / session.end (audit-and-errors §2). */
     @Bean(initMethod = "start", destroyMethod = "stop")
     Lifecycle auditLifecycle(McpServerFactory factory, RuntimeConfig config) {

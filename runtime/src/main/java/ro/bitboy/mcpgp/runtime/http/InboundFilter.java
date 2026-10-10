@@ -65,7 +65,25 @@ final class InboundFilter extends HttpFilter {
             }
             request.setAttribute(CLIENT, name);
         }
+        String session = request.getHeader("Mcp-Session-Id");
         chain.doFilter(request, response);
+        // session.start when the server hands out a session id; session.end when the client ends it
+        String issued = response.getHeader("Mcp-Session-Id");
+        if (session == null && issued != null && response.getStatus() < 300) {
+            sessionEvent("session.start", request);
+        } else if (session != null && request.getMethod().equals("DELETE") && response.getStatus() < 300) {
+            sessionEvent("session.end", request);
+        }
+    }
+
+    private void sessionEvent(String type, HttpServletRequest request) {
+        ObjectNode event = audit.event(type, "ok", Ids.correlation());
+        ObjectNode actor = event.putObject("actor").put("kind", "client");
+        Object client = request.getAttribute(CLIENT);
+        if (client != null) {
+            actor.put("id", client.toString()).put("auth", server.authMode());
+        }
+        audit.write(event);
     }
 
     /** Compares against every key, so the time doesn't depend on which one (or none) matches. */

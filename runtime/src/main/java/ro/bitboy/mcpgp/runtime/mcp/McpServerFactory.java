@@ -41,6 +41,8 @@ public final class McpServerFactory {
     private final AuditLog audit;
     private final Confirmations confirmations;
     private final Clock clock;
+    /** Who handles calls of the registered tools: this factory, or its replacement after a config reload. */
+    private volatile java.util.function.Supplier<McpServerFactory> current = () -> this;
 
     public McpServerFactory(Manifest manifest, RuntimeConfig config) {
         this(manifest, config, new AuditLog(config.audit(), manifest.serverName(), manifest.serverVersion(), Clock.systemUTC()), Clock.systemUTC());
@@ -101,8 +103,7 @@ public final class McpServerFactory {
     private McpSyncServer configure(McpServer.SyncSpecification<?> builder) {
         List<McpServerFeatures.SyncToolSpecification> specs = new ArrayList<>();
         for (JsonNode tool : catalog.listed()) {
-            specs.add(new McpServerFeatures.SyncToolSpecification(ToolCatalog.toMcp(tool),
-                    (exchange, request) -> call(exchange, request)));
+            specs.add(spec(tool));
         }
         builder
                 .serverInfo(new McpSchema.Implementation(manifest.serverName(), manifest.serverTitle(), manifest.serverVersion()))
@@ -116,6 +117,43 @@ public final class McpServerFactory {
 
     public AuditLog audit() {
         return audit;
+    }
+
+    public RuntimeConfig config() {
+        return config;
+    }
+
+    /** A registered tool: its definition, and calls handled by whichever factory is current. */
+    private McpServerFeatures.SyncToolSpecification spec(JsonNode tool) {
+        return new McpServerFeatures.SyncToolSpecification(ToolCatalog.toMcp(tool),
+                (exchange, request) -> current.get().call(exchange, request));
+    }
+
+    /**
+     * After a config reload: {@code next} handles all calls from now on (calls in flight finish on this
+     * one), and tools whose definition changed (the {@code instance} enum) are registered again.
+     *
+     * @return true when the tool list changed (clients were notified by the SDK, once per changed tool)
+     */
+    public boolean handOver(McpServerFactory next, McpSyncServer server) {
+        java.util.function.Supplier<McpServerFactory> target = () -> next;
+        this.current = target;
+        next.current = target;
+        boolean changed = false;
+        Map<String, JsonNode> before = new HashMap<>();
+        catalog.listed().forEach(t -> before.put(t.path("name").asText(), t));
+        for (JsonNode tool : next.catalog.listed()) {
+            JsonNode old = before.remove(tool.path("name").asText());
+            if (!tool.equals(old)) {
+                server.addTool(next.spec(tool));      // replaces the tool of the same name; notifies clients
+                changed = true;
+            }
+        }
+        for (String gone : before.keySet()) {
+            server.removeTool(gone);
+            changed = true;
+        }
+        return changed;
     }
 
     /**
