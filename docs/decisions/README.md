@@ -19,3 +19,4 @@ Accepted ADRs are not edited except to change status; write a new ADR to change 
 | [0011](0011-platform-never-calls-targets.md) | The platform never calls customer target servers | Accepted |
 | [0012](0012-naming-pipeline-and-lock.md) | Fixed naming pipeline with a lock file | Accepted |
 | [0013](0013-protocol-support-window.md) | Protocol support window and adapter layers | Accepted |
+| [0014](0014-platform-self-hosted.md) | The platform is self-hosted, single-tenant (for now) | Accepted |
