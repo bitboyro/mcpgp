@@ -25,8 +25,15 @@ final class Docs {
     private final boolean multi;
     private final boolean http;
     private final boolean signed;
+    /** The package's other files (the desktop bundle, docker/), so the docs describe only what is there. */
+    private final java.util.Set<String> packaged;
 
     Docs(JsonNode manifest, JsonNode schema, boolean signed) {
+        this(manifest, schema, signed, java.util.Set.of());
+    }
+
+    Docs(JsonNode manifest, JsonNode schema, boolean signed, java.util.Set<String> packaged) {
+        this.packaged = java.util.Set.copyOf(packaged);
         this.signed = signed;
         this.manifest = manifest;
         this.schema = schema;
@@ -115,6 +122,26 @@ final class Docs {
         md.append("java -jar ").append(server).append(".jar client add claude-desktop  # stdio servers\n");
         md.append("java -jar ").append(server).append(".jar client add <client> --print   # just show the entry\n```\n\n");
         md.append("Entries never contain secrets: the server reads its own config and `.env`.\n");
+        String bundle = server + "-" + version + ".mcpb";
+        if (packaged.contains(bundle)) {
+            md.append("\n## Desktop bundle\n\n");
+            md.append("`").append(bundle).append("` installs the server in desktop clients that take MCP Bundles (for example ")
+                    .append("Claude Desktop: open the file, or drag it onto Settings → Extensions). The install dialog asks for ");
+            md.append(multi || manifest.path("apis").size() > 1 ? "your `" + server + ".yaml`" : "the target server and its sign-in")
+                    .append("; the client keeps secrets in the system's key store. The bundle runs the same jar with the Java on that computer ")
+                    .append("(21 or newer), over stdio.\n");
+        }
+        if (packaged.contains("docker/Dockerfile")) {
+            md.append("\n## Container\n\n");
+            md.append("`docker/` has a Dockerfile and a compose file. Build the image from this directory with your own Docker ")
+                    .append("(and registry, if the Dockerfile's base image comes from one):\n\n```bash\n")
+                    .append("docker build -f docker/Dockerfile -t ").append(server).append(":").append(version.replace('+', '-')).append(" .\n")
+                    .append("mkdir -p config && cp ").append(server).append(".example.yaml config/").append(server).append(".yaml   # then edit it\n")
+                    .append("docker compose -f docker/docker-compose.yml up --build\n```\n\n");
+            md.append("The server runs over HTTP on port 8080 as a non-root user; `/config` holds `").append(server)
+                    .append(".yaml`, `/data` its audit log and state. Set `server.auth` (static keys or OAuth): on an address other than ")
+                    .append("loopback the server refuses to start without client sign-in.\n");
+        }
         return md.toString();
     }
 

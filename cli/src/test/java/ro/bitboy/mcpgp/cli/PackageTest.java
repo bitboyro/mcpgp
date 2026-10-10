@@ -74,16 +74,16 @@ class PackageTest {
         try (ZipFile file = new ZipFile(zip.toFile())) {
             Collections.list(file.entries()).forEach(e -> names.add(e.getName()));
         }
-        assertThat(names).containsExactly("AGENTS.md", "SHA256SUMS", "SHA256SUMS.sig", "SIGNING-KEY.pub", "docs/CONFIGURATION.md",
-                "docs/INSTALL.md", "docs/OPERATIONS.md", "docs/README.md", "docs/TOOLS.md", "llms.txt", "manifest.json",
-                "orders-mcp.example.yaml", "orders-mcp.jar", "server.config.schema.json");
+        assertThat(names).containsExactly("AGENTS.md", "SHA256SUMS", "SHA256SUMS.sig", "SIGNING-KEY.pub", "docker/Dockerfile",
+                "docker/docker-compose.yml", "docs/CONFIGURATION.md", "docs/INSTALL.md", "docs/OPERATIONS.md", "docs/README.md", "docs/TOOLS.md",
+                "llms.txt", "manifest.json", "orders-mcp-2.0.0+3.mcpb", "orders-mcp.example.yaml", "orders-mcp.jar", "server.config.schema.json");
         String sums = new String(entry(zip, "SHA256SUMS"), StandardCharsets.UTF_8);
         for (String name : names) {
             if (!name.startsWith("SHA256SUMS")) {
                 assertThat(sums).contains(Packager.sha256(entry(zip, name)) + "  " + name + "\n");
             }
         }
-        assertThat(ordersWarnings).contains("build target mcpb is not available").contains("build target docker is not available");
+        assertThat(ordersWarnings).doesNotContain("build target mcpb").doesNotContain("build target docker");
         assertThat(dist.resolve("orders-mcp-2.0.0+3.manifest.json")).exists();
     }
 
@@ -166,7 +166,7 @@ class PackageTest {
         assertThat(Main.run(new PrintWriter(out, true), new PrintWriter(new StringWriter(), true), "verify", zip.toString(), "--key", pub.toString()))
                 .as(out.toString()).isZero();
         assertThat(out.toString()).contains("✓ signature (timestamp:1791542400 file:SHA256SUMS hashed server:orders-mcp-2.0.0+3)")
-                .contains("✓ all 12 files match SHA256SUMS");
+                .contains("✓ all 15 files match SHA256SUMS");
         assertThat(new String(entry(zip, "SIGNING-KEY.pub"), StandardCharsets.UTF_8)).isEqualTo(Minisign.publicKeyFile(keys));
 
         // a changed file is caught

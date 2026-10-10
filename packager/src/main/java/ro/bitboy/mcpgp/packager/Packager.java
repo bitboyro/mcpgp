@@ -32,7 +32,7 @@ public final class Packager {
     static final String RUNTIME_PROPERTIES = "/mcpgp/runtime.properties";
     /** Where the server jar carries its manifest (Manifest.CLASSPATH_LOCATION inside Spring Boot's layout). */
     public static final String MANIFEST_ENTRY = "BOOT-INF/classes/mcpgp/manifest.json";
-    private static final List<String> TARGETS = List.of("jar");
+    private static final List<String> TARGETS = List.of("jar", "mcpb", "docker");
 
     /** What was built, and what was asked for but isn't available yet. */
     public record Result(Path zip, Path manifest, List<String> warnings) {
@@ -81,6 +81,8 @@ public final class Packager {
                 warnings.add("build target " + target.asText() + " is not available in this version; the package has the jar only");
             }
         }
+        java.util.Set<String> targets = new java.util.LinkedHashSet<>();
+        definition.at("/build/targets").forEach(t -> targets.add(t.asText()));
         String mode = definition.at("/generation/mode").asText("runtime");
         if (!mode.equals("runtime")) {
             warnings.add("generation.mode " + mode + " is not available in this version; the server works from its manifest");
@@ -104,6 +106,18 @@ public final class Packager {
             Files.delete(runtimeJar);
             files.put(server + ".jar", jar);
 
+            if (targets.contains("mcpb")) {
+                Path bundleManifest = write(staging, ".mcpb/manifest.json", CanonicalJson.pretty(Bundle.manifest(manifest)));
+                Path bundle = staging.resolve(base + ".mcpb");
+                Zips.zip(Map.of("manifest.json", bundleManifest, "server/" + server + ".jar", jar), time, bundle);
+                files.put(base + ".mcpb", bundle);
+            }
+            if (targets.contains("docker")) {
+                for (Map.Entry<String, String> file : Container.files(manifest, definition, warnings).entrySet()) {
+                    files.put(file.getKey(), write(staging, file.getKey(), file.getValue()));
+                }
+            }
+
             files.put("manifest.json", write(staging, "manifest.json", manifestText));
             ObjectNode configSchema = ConfigSchema.generate(manifest);
             files.put("server.config.schema.json", write(staging, "server.config.schema.json", CanonicalJson.pretty(configSchema)));
@@ -112,7 +126,7 @@ public final class Packager {
             for (JsonNode audience : definition.at("/build/docs")) {
                 agents |= audience.asText().equals("agents");
             }
-            for (Map.Entry<String, String> doc : new Docs(manifest, configSchema, signing != null).generate(agents).entrySet()) {
+            for (Map.Entry<String, String> doc : new Docs(manifest, configSchema, signing != null, files.keySet()).generate(agents).entrySet()) {
                 files.put(doc.getKey(), write(staging, doc.getKey(), doc.getValue()));
             }
             if (signing != null) {

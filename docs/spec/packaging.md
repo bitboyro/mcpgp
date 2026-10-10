@@ -9,8 +9,8 @@ One signed archive per build: `<server>-<version>.zip`.
 ```
 orders-mcp-1.4.1.zip
 ├─ orders-mcp.jar                     if target jar (always for Java)
-├─ orders-mcp-1.4.1.mcpb              if target mcpb (desktop bundle)
-├─ docker/                          if target docker: docker-compose.yml, image.tar (if build.image.tar)
+├─ orders-mcp-1.4.1.mcpb              if target mcpb (desktop bundle, §7.3)
+├─ docker/                          if target docker: Dockerfile, docker-compose.yml (§7.2)
 ├─ source/                          if generation.mode is codegen or both
 ├─ orders-mcp.example.yaml            example runtime config for this build
 ├─ server.config.schema.json        runtime config schema for this build
@@ -159,15 +159,36 @@ Snippets: [examples/client/mcp-clients](../../examples/client/mcp-clients).
 
 ### 7.2 Container image (`docker` target)
 
-- Default base: **Eclipse Temurin JRE** (the Java version the runtime needs); `build.image.base`
-  chooses another (e.g. a company-approved or Red Hat UBI image).
-- Runs as a non-root user; the storage root and the config are mounted volumes
-  (`/data` → `storage.root`, `/config`); ports: MCP and, if set, management.
-- Delivery: `push: true` pushes to `build.image.registry`; `tar: true` adds `docker/image.tar` to the
-  package for customers without registry access; both can be on.
-- The image digest is recorded in the build report and in `SHA256SUMS`.
+- The package carries what builds and runs the image: `docker/Dockerfile` and
+  `docker/docker-compose.yml`. The customer builds it from the package with their own Docker
+  (`docker build -f docker/Dockerfile -t <server>:<version> .`), so packaging needs neither a Docker
+  daemon nor the network, and the base image comes from wherever the customer's Docker pulls it.
+- Default base: **Eclipse Temurin JRE** (`eclipse-temurin:21-jre`); `build.image.base` chooses another
+  (e.g. a company-approved or Red Hat UBI image) that has `groupadd` and `useradd`.
+- The server runs over HTTP (the build must allow the `http` transport, otherwise the target is left
+  out with a warning) on port 8080, as user 10001; `/config` holds `<server>.yaml`, `/data` is
+  `storage.root`. The config needs `server.auth` (static keys or OAuth): beyond loopback the server
+  refuses to start without client sign-in.
+- Not yet: `build.image.push` (to `build.image.registry`) and `build.image.tar` (`docker/image.tar`);
+  a build that sets them says so in its warnings. When they come, the image digest is recorded in the
+  build report and in `SHA256SUMS`.
 
-### 7.3 Kubernetes
+### 7.3 Desktop bundle (`mcpb` target)
+
+`<server>-<version>.mcpb` is an [MCP Bundle](https://github.com/modelcontextprotocol/mcpb)
+(`manifest_version` `0.3`) that desktop clients install with a click: `manifest.json` and
+`server/<server>.jar`. It runs the jar over stdio (`server.type: binary`, `command: java`), so the
+computer needs **Java 21 or newer**; a bundled Java runtime may come later. The runtime's
+`storage.root` is `~/.<server>`.
+
+- One API and one instance: the install dialog asks for the target server and the sign-in for the
+  first type the API supports (basic, bearer, API key or OAuth client credentials; secrets are marked
+  `sensitive`, so the client keeps them in the system's key store). Its answers reach the server as
+  environment variables (`<PREFIX>INSTANCE__BASEURL`, `…__AUTH__…`, runtime-config §3).
+- Several instances or APIs, or mTLS: the dialog asks for the `<server>.yaml` file.
+- `tools` lists what `tools/list` shows in the build's exposure mode.
+
+### 7.4 Kubernetes
 
 Not provided for now. Customers deploy the image with their own manifests. Plain manifests or a Helm
 chart can be added when a customer asks.
