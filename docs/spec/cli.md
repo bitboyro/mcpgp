@@ -43,7 +43,8 @@ sign:
 | `mcpgp names accept <def> <tool…\|--all>` | Accept renames into `mcp-names.lock` |
 | `mcpgp build <def…\|--all> [--version <v>] [--build-number <n>] [--source <uri>] [--frozen-lock] [--manifest-only] [--out <dir>]` | Compile + package: `dist/<name>-<version>.zip` and `dist/<name>-<version>.manifest.json`; `--manifest-only` writes only the manifest |
 | `mcpgp test <def> [--suite tests/]` | Start the built server against a mock generated from the specs; run smoke + user test cases |
-| `mcpgp sign <dist>` / `verify <zip>` | Sign checksums / verify a package |
+| `mcpgp keygen [--out <dir>]` | Create a signing key pair (`mcpgp.key`, secret; `mcpgp.pub`, to publish) |
+| `mcpgp verify <zip> --key <pub>` | Check the signature of `SHA256SUMS` and every file against it; extra or changed files fail |
 | `mcpgp migrate <def>` | Upgrade a definition to the current `apiVersion` |
 | `mcpgp try <def> --target <url>` | Run the server locally against a real target the developer's machine can reach (never in CI by default) |
 | `mcpgp push <dist> [--platform <url>]` | Optional: register the build on a platform workspace |

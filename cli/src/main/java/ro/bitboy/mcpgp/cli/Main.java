@@ -8,6 +8,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
+import ro.bitboy.mcpgp.cli.pack.Minisign;
 import ro.bitboy.mcpgp.cli.pack.Packager;
 import ro.bitboy.mcpgp.core.Compiler;
 import ro.bitboy.mcpgp.core.diag.Codes;
@@ -33,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 /** {@code mcpgp}: the command line (spec/cli.md). Exit codes follow cli.md §4. */
 @Command(name = "mcpgp", mixinStandardHelpOptions = true, version = Compiler.VERSION,
         description = "Generate MCP servers from OpenAPI contracts.",
-        subcommands = {Main.Validate.class, Main.Build.class, Main.Explain.class})
+        subcommands = {Main.Validate.class, Main.Build.class, Main.Explain.class, Main.Keygen.class, Main.Verify.class})
 public final class Main {
 
     static final int OK = 0;
@@ -207,8 +208,16 @@ public final class Main {
                 }
                 return OK;
             }
+            com.fasterxml.jackson.databind.JsonNode document = result.definition().orElseThrow().document();
+            Minisign.Keys signing;
+            try {
+                signing = signingKey(document.at("/build/sign/key"), result.definition().get().root());
+            } catch (IllegalArgumentException e) {
+                common.spec.commandLine().getErr().println("error: build.sign.key: " + e.getMessage());
+                return ERRORS;
+            }
             Packager.Result packaged = new Packager(Packager::runtimeJar)
-                    .build(manifest, result.definition().orElseThrow().document(), build.createdAt(), out);
+                    .build(manifest, document, build.createdAt(), out, signing);
             packaged.warnings().forEach(w -> common.spec.commandLine().getErr().println("warning: " + w));
             if (!common.json && !common.quiet) {
                 common.out().println("wrote " + packaged.zip() + " (" + manifest.path("tools").size() + " tools) and " + packaged.manifest());
@@ -289,6 +298,128 @@ public final class Main {
                 }
             }
             return OK;
+        }
+    }
+
+    /**
+     * The builder's signing key from {@code build.sign.key}: a secret reference ({@code ${env:NAME}} or
+     * {@code ${file:path}}, relative to the definition), never a key written in the definition.
+     */
+    static Minisign.Keys signingKey(com.fasterxml.jackson.databind.JsonNode reference, Path root) {
+        if (reference.isMissingNode() || reference.isNull()) {
+            return null;
+        }
+        java.util.regex.Matcher ref = java.util.regex.Pattern.compile("^\\$\\{(env|file):([^}]+)}$").matcher(reference.asText());
+        if (!ref.matches()) {
+            throw new IllegalArgumentException("must be a reference like ${env:MCPGP_SIGNING_KEY} or ${file:path}, never the key itself");
+        }
+        String text;
+        if (ref.group(1).equals("env")) {
+            text = env.get(ref.group(2));
+            if (text == null || text.isBlank()) {
+                throw new IllegalArgumentException("environment variable " + ref.group(2) + " is not set");
+            }
+        } else {
+            try {
+                text = Files.readString(root.resolve(ref.group(2)));
+            } catch (IOException e) {
+                throw new IllegalArgumentException("cannot read " + ref.group(2));
+            }
+        }
+        return Minisign.readSecretKey(text);
+    }
+
+    @Command(name = "keygen", description = "Create a signing key pair (Ed25519, minisign format).")
+    static final class Keygen implements Callable<Integer> {
+        @CommandLine.Spec
+        CommandLine.Model.CommandSpec spec;
+
+        @Option(names = "--out", paramLabel = "<dir>", defaultValue = ".", description = "Where to write mcpgp.key and mcpgp.pub.")
+        Path out;
+
+        @Override
+        public Integer call() throws Exception {
+            Path secret = out.resolve("mcpgp.key");
+            Path pub = out.resolve("mcpgp.pub");
+            if (Files.exists(secret)) {
+                spec.commandLine().getErr().println(secret + " exists; not overwriting it");
+                return ERRORS;
+            }
+            Minisign.Keys keys = Minisign.generate();
+            Files.createDirectories(out);
+            Files.writeString(secret, Minisign.secretKeyFile(keys));
+            try {
+                Files.setPosixFilePermissions(secret, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+            } catch (UnsupportedOperationException e) {
+                // not a POSIX file system
+            }
+            Files.writeString(pub, Minisign.publicKeyFile(keys));
+            PrintWriter writer = spec.commandLine().getOut();
+            writer.println("wrote " + secret + " (secret: keep it out of the repository) and " + pub + " (publish it)");
+            writer.println("key id " + Minisign.keyIdText(keys.keyId()) + "; give builds the key with build.sign.key: \"${env:MCPGP_SIGNING_KEY}\"");
+            return OK;
+        }
+    }
+
+    @Command(name = "verify", description = "Verify a package: the signature of SHA256SUMS and every file's checksum.")
+    static final class Verify implements Callable<Integer> {
+        @CommandLine.Spec
+        CommandLine.Model.CommandSpec spec;
+
+        @Parameters(paramLabel = "<zip>", description = "The package.")
+        Path zip;
+
+        @Option(names = "--key", paramLabel = "<pub>", required = true,
+                description = "The builder's public key, as published by the builder (not only the copy in the package).")
+        Path key;
+
+        @Override
+        public Integer call() throws Exception {
+            PrintWriter writer = spec.commandLine().getOut();
+            java.util.Map<String, byte[]> entries = new java.util.TreeMap<>();
+            try (java.util.zip.ZipFile file = new java.util.zip.ZipFile(zip.toFile())) {
+                for (java.util.zip.ZipEntry entry : java.util.Collections.list(file.entries())) {
+                    entries.put(entry.getName(), file.getInputStream(entry).readAllBytes());
+                }
+            }
+            byte[] sums = entries.get("SHA256SUMS");
+            byte[] sig = entries.get("SHA256SUMS.sig");
+            if (sums == null || sig == null) {
+                writer.println("✗ the package has no " + (sums == null ? "SHA256SUMS" : "SHA256SUMS.sig"));
+                return ERRORS;
+            }
+            try {
+                String trusted = Minisign.verify(Minisign.readPublicKey(Files.readString(key)), sums,
+                        new String(sig, java.nio.charset.StandardCharsets.UTF_8));
+                writer.println("✓ signature (" + trusted.replace('\t', ' ') + ")");
+            } catch (IllegalArgumentException e) {
+                writer.println("✗ signature: " + e.getMessage());
+                return ERRORS;
+            }
+            boolean ok = true;
+            java.util.Set<String> listed = new java.util.HashSet<>();
+            for (String line : new String(sums, java.nio.charset.StandardCharsets.UTF_8).split("\n")) {
+                if (line.isBlank()) {
+                    continue;
+                }
+                String hex = line.substring(0, 64);
+                String name = line.substring(66);
+                listed.add(name);
+                byte[] data = entries.get(name);
+                boolean match = data != null && Packager.sha256(data).equals(hex);
+                ok &= match;
+                if (!match) {
+                    writer.println("✗ " + name + (data == null ? ": missing" : ": checksum differs"));
+                }
+            }
+            for (String name : entries.keySet()) {
+                if (!listed.contains(name) && !name.equals("SHA256SUMS") && !name.equals("SHA256SUMS.sig")) {
+                    writer.println("✗ " + name + ": not listed in SHA256SUMS");
+                    ok = false;
+                }
+            }
+            writer.println(ok ? "✓ all " + listed.size() + " files match SHA256SUMS" : "✗ the package was changed");
+            return ok ? OK : ERRORS;
         }
     }
 

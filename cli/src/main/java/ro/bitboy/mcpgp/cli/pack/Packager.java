@@ -67,6 +67,11 @@ public final class Packager {
      * @param out        the output directory ({@code dist/})
      */
     public Result build(ObjectNode manifest, JsonNode definition, Instant time, Path out) throws IOException {
+        return build(manifest, definition, time, out, null);
+    }
+
+    /** @param signing the builder's key to sign {@code SHA256SUMS} with; null for an unsigned package */
+    public Result build(ObjectNode manifest, JsonNode definition, Instant time, Path out, Minisign.Keys signing) throws IOException {
         String server = manifest.at("/server/name").asText();
         String version = manifest.at("/server/version").asText();
         String base = server + "-" + version;
@@ -100,11 +105,33 @@ public final class Packager {
             files.put(server + ".jar", jar);
 
             files.put("manifest.json", write(staging, "manifest.json", manifestText));
-            files.put("server.config.schema.json", write(staging, "server.config.schema.json",
-                    CanonicalJson.pretty(ConfigSchema.generate(manifest))));
+            ObjectNode configSchema = ConfigSchema.generate(manifest);
+            files.put("server.config.schema.json", write(staging, "server.config.schema.json", CanonicalJson.pretty(configSchema)));
             files.put(server + ".example.yaml", write(staging, server + ".example.yaml", ExampleConfig.yaml(manifest)));
+            boolean agents = false;
+            for (JsonNode audience : definition.at("/build/docs")) {
+                agents |= audience.asText().equals("agents");
+            }
+            for (Map.Entry<String, String> doc : new Docs(manifest, configSchema, signing != null).generate(agents).entrySet()) {
+                files.put(doc.getKey(), write(staging, doc.getKey(), doc.getValue()));
+            }
+            if (signing != null) {
+                files.put("SIGNING-KEY.pub", write(staging, "SIGNING-KEY.pub", Minisign.publicKeyFile(signing)));
+            } else {
+                warnings.add("the package is not signed (set build.sign.key to sign SHA256SUMS)");
+            }
 
-            files.put("SHA256SUMS", write(staging, "SHA256SUMS", sums(files)));
+            String sums = sums(files);
+            files.put("SHA256SUMS", write(staging, "SHA256SUMS", sums));
+            if (signing != null) {
+                try {
+                    String comment = "timestamp:" + time.getEpochSecond() + "\tfile:SHA256SUMS\thashed\tserver:" + base;
+                    files.put("SHA256SUMS.sig", write(staging, "SHA256SUMS.sig",
+                            Minisign.sign(signing, sums.getBytes(StandardCharsets.UTF_8), comment)));
+                } catch (java.security.GeneralSecurityException e) {
+                    throw new IOException("signing failed: " + e.getMessage());
+                }
+            }
 
             Path zip = out.resolve(base + ".zip");
             Zips.zip(files, time, zip);
