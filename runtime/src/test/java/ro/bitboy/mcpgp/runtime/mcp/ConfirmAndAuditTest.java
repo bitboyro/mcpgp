@@ -200,7 +200,7 @@ class ConfirmAndAuditTest {
         assertThat(first.path("contract").asText()).isEqualTo("2.0");
         assertThat(first.at("/upstream/path").asText()).isEqualTo("/customers/{id}");     // templated: no ids
         assertThat(first.at("/upstream/status").asInt()).isEqualTo(200);
-        assertThat(first.path("args").toString()).isEqualTo("{\"instance\":\"prod-eu\",\"path\":{\"id\":\"***\"}}");
+        assertThat(first.path("args")).isEqualTo(JSON.readTree("{\"instance\":\"prod-eu\",\"path\":{\"id\":\"***\"}}"));
         assertThat(first.path("cid").asText()).isEqualTo(ok.meta().get("mcpgp/correlationId"));
 
         JsonNode failed = calls.get(1);
