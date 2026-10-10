@@ -252,6 +252,17 @@ paths:
       responses:
         "200": { description: Restored, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /platform-mcp:
+    get:
+      operationId: getMcpPackage
+      tags: [builds]
+      summary: Download platform MCP server
+      description: >-
+        The platform's own MCP server as a package: agents run it themselves, configured with the
+        platform's address and their own token, and get this API as tools.
+      responses:
+        "200": { description: The package, content: { application/zip: { schema: { type: string, format: binary } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/builds:
     parameters: [ { $ref: "#/components/parameters/ServerId" } ]
     get:

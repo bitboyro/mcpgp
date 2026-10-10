@@ -68,6 +68,13 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- the platform MCP server, run against the platform in PlatformMcpTest -->
+    <dependency>
+      <groupId>ro.bitboy.mcpgp</groupId>
+      <artifactId>mcpgp-runtime</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
     <!-- an in-memory directory for the LDAP sign-in tests -->
     <dependency>
       <groupId>com.unboundid</groupId>
@@ -77,6 +84,17 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!-- the platform MCP server's project (definition and the API's OpenAPI document): served at
+           /api/v1/openapi.json, and packaged on request for agents -->
+      <resource>
+        <directory>mcp</directory>
+        <targetPath>mcpgp/platform-mcp</targetPath>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>com.github.eirslett</groupId>

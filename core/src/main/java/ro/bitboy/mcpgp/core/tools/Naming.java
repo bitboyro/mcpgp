@@ -35,7 +35,7 @@ final class Naming {
             "archive", "restore", "revoke", "release", "publish", "unpublish", "assign", "unassign", "grant", "activate",
             "deactivate", "lock", "unlock", "move", "copy", "clone", "duplicate", "merge", "rename", "submit", "close", "open",
             "reset", "verify", "refresh", "accept", "decline", "execute", "run", "trigger", "schedule", "register",
-            "unregister", "subscribe", "unsubscribe", "attach", "detach", "link", "unlink", "generate", "deploy");
+            "unregister", "subscribe", "unsubscribe", "attach", "detach", "link", "unlink", "generate", "deploy", "edit");
 
     private final String source;
     private final String fallback;

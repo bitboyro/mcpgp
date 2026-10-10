@@ -112,6 +112,11 @@ versions follow [SemVer](https://semver.org).
   and monitoring contracts), its manifest is pinned in `examples/manifest`, and a runtime test runs it
   against three target servers with basic, bearer and OAuth client-credentials sign-in.
 
+- Platform MCP server: `platform/mcp` (definition plus the platform's OpenAPI document, moved there
+  as the single source); `GET /api/v1/platform-mcp` builds and serves it as a package; the API & agents
+  page offers it with its setup. Agents run it with their own token. Guide: docs/guides/agents.md.
+- Naming: `edit` is a recognized verb (`editServer` → `server_edit`).
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 

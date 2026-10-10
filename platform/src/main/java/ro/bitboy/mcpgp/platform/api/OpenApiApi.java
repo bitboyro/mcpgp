@@ -14,7 +14,7 @@ import java.io.UncheckedIOException;
 @RestController
 public class OpenApiApi {
 
-    public static final String RESOURCE = "/mcpgp/platform-api.openapi.yaml";
+    public static final String RESOURCE = "/mcpgp/platform-mcp/contracts/platform-api.openapi.yaml";
 
     private final byte[] json;
 

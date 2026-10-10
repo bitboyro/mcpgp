@@ -19,17 +19,20 @@ class OwnOpenApiTest {
 
     @Test
     void compilesWithoutWarnings(@TempDir Path dir) throws IOException {
-        try (InputStream spec = OpenApiApi.class.getResourceAsStream(OpenApiApi.RESOURCE);
-             InputStream definition = OwnOpenApiTest.class.getResourceAsStream("/platform-mcp/platform.mcpgp.yaml")) {
-            Files.copy(spec, dir.resolve("platform-api.openapi.yaml"));
-            Files.copy(definition, dir.resolve("platform.mcpgp.yaml"));
+        // the platform MCP server's project as the jar bundles it (platform/mcp)
+        for (String file : java.util.List.of("mcpgp-platform.mcpgp.yaml", "contracts/platform-api.openapi.yaml")) {
+            try (InputStream in = OwnOpenApiTest.class.getResourceAsStream("/mcpgp/platform-mcp/" + file)) {
+                Files.createDirectories(dir.resolve(file).getParent());
+                Files.copy(in, dir.resolve(file));
+            }
         }
-        Compiler.Result result = new Compiler(new Schemas()).compile(dir.resolve("platform.mcpgp.yaml"), Compiler.Options.defaults());
+        Compiler.Result result = new Compiler(new Schemas()).compile(dir.resolve("mcpgp-platform.mcpgp.yaml"), Compiler.Options.defaults());
         assertThat(result.diagnostics()).filteredOn(d -> d.level() != Diagnostic.Level.INFO).isEmpty();
         assertThat(result.manifest().orElseThrow().path("tools").findValuesAsText("name"))
                 .contains("platform_server_list", "platform_server_create", "platform_version_add", "platform_manifest_get",
                         "platform_token_revoke", "platform_build_start", "platform_build_release", "platform_artifact_download",
                         "platform_server_duplicate", "platform_variant_create", "platform_library_item_create",
-                        "platform_sign_in", "platform_request_approve", "platform_store_export");
+                        "platform_request_approve", "platform_server_edit", "platform_mcp_package_get")
+                .doesNotContain("platform_sign_in", "platform_store_export");
     }
 }

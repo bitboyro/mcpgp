@@ -151,6 +151,12 @@ Scopes:
 | `approvals:decide` | approve or reject requests |
 | `admin` | identities, tokens, settings, retention |
 
+**Platform MCP server:** `GET /platform-mcp` returns the platform's own MCP server as a package, built
+from the project in `platform/mcp` (this API's OpenAPI document and a definition) with the same
+compiler and packager as any build, and signed with the platform's key when there is one. Agents run it
+themselves, configured with the platform's address and **their own token** as a bearer credential; the
+platform never forwards tokens. Sign-in, passwords and export / import are left out of its tools.
+
 Roles bundle scopes: **viewer** (`servers:read`), **builder** (viewer + `servers:write`, `builds:run`,
 `library:write`), **releaser** (builder + `builds:release`, `builds:delete`, `approvals:decide`),
 **admin** (all).
