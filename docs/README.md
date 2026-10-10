@@ -16,6 +16,7 @@
 | [spec/audit-and-errors.md](spec/audit-and-errors.md) | You emit audit events, errors or telemetry. |
 | [spec/packaging.md](spec/packaging.md) | You build or deliver packages, or register clients. |
 | [spec/cli.md](spec/cli.md) | You script the CLI or run it in CI. |
+| [spec/platform-api.md](spec/platform-api.md) | You work on the platform: store, builds, identities, the REST API. |
 | [guides/ci-pipeline.md](guides/ci-pipeline.md) | You want reliable builds from a git repo in CI. |
 | [spec/compatibility.md](spec/compatibility.md) | MCP or OpenAPI publish a new version, or you change one of our formats. |
 | [security.md](security.md) | You need the threat model or answer a security questionnaire. |
