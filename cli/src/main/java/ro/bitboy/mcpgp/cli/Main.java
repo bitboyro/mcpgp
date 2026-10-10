@@ -207,7 +207,7 @@ public final class Main {
                 }
                 return OK;
             }
-            Packager.Result packaged = new Packager(() -> Main.class.getResourceAsStream(Packager.RUNTIME_RESOURCE))
+            Packager.Result packaged = new Packager(Packager::runtimeJar)
                     .build(manifest, result.definition().orElseThrow().document(), build.createdAt(), out);
             packaged.warnings().forEach(w -> common.spec.commandLine().getErr().println("warning: " + w));
             if (!common.json && !common.quiet) {
