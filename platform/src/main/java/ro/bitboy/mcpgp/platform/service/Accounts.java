@@ -37,10 +37,26 @@ public final class Accounts {
     private final Access access;
     private final Clock clock;
 
+    private final boolean local;
+    private final Directory directory;
+    private final Map<String, String> directoryRoles;
+    private final SignIns signIns;
+    /** Failed directory sign-ins per name: [failures, locked until (epoch ms)]. */
+    private final Map<String, long[]> directoryFailures = new java.util.concurrent.ConcurrentHashMap<>();
+
     public Accounts(Store store, Access access, Clock clock) {
+        this(store, access, clock, true, null, Map.of());
+    }
+
+    /** With a company directory: names without a local account are checked there (spec/platform-api.md §3). */
+    public Accounts(Store store, Access access, Clock clock, boolean local, Directory directory, Map<String, String> directoryRoles) {
         this.store = store;
         this.access = access;
         this.clock = clock;
+        this.local = local;
+        this.directory = directory;
+        this.directoryRoles = directoryRoles;
+        this.signIns = new SignIns(store, access, clock);
     }
 
     public void setPassword(Model.Identity identity, String password) {
@@ -68,15 +84,34 @@ public final class Accounts {
                 .orElse(false);
     }
 
-    /** Signs in with name and password: a session token, or 401 (always the same message). */
-    public synchronized Access.IssuedToken signIn(String name, String password) {
+    /**
+     * Signs in with name and password: a session token, or 401 (always the same message). A local
+     * account is checked first; without one, the company directory, when there is one.
+     */
+    public Access.IssuedToken signIn(String name, String password) {
+        Optional<Access.IssuedToken> token = signInLocally(name, password);
+        if (token.isPresent()) {
+            return token.get();
+        }
+        if (directory != null) {
+            return signInWithDirectory(name, password);
+        }
+        throw refused(name, "unknown or no local account");
+    }
+
+    /** Empty when there is no local account of that name (or local accounts are off). */
+    private synchronized Optional<Access.IssuedToken> signInLocally(String name, String password) {
         Instant now = clock.instant();
         Optional<Model.Identity> identity = store.identities().stream()
                 .filter(i -> i.name().equalsIgnoreCase(name == null ? "" : name) && i.kind().equals("person") && !i.disabled()).findFirst();
-        Optional<Model.Credential> credential = identity.flatMap(i -> store.credentials().stream().filter(c -> c.identity().equals(i.id())).findFirst());
+        Optional<Model.Credential> credential = local
+                ? identity.flatMap(i -> store.credentials().stream().filter(c -> c.identity().equals(i.id())).findFirst())
+                : Optional.empty();
         if (credential.isEmpty()) {
-            pbkdf2(password == null ? "" : password, DUMMY_SALT, ITERATIONS);
-            throw refused(name, "unknown or no local account");
+            if (directory == null) {
+                pbkdf2(password == null ? "" : password, DUMMY_SALT, ITERATIONS);
+            }
+            return Optional.empty();
         }
         Model.Credential c = credential.get();
         if (c.lockedUntil() != null && Instant.parse(c.lockedUntil()).isAfter(now)) {
@@ -95,7 +130,41 @@ public final class Accounts {
         Access.IssuedToken token = access.issue(identity.get(), identity.get().scopes(), "session", now.plus(SESSION));
         store.append(new Model.Activity(now.toString(), identity.get().name(), "person", "signin", identity.get().name(), "ok",
                 Map.of("token", token.record().id())));
-        return token;
+        return Optional.of(token);
+    }
+
+    private Access.IssuedToken signInWithDirectory(String name, String password) {
+        String key = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
+        long now = clock.millis();
+        long[] failures = directoryFailures.getOrDefault(key, new long[] {0, 0});
+        if (failures[1] > now) {
+            throw refused(name, "locked");
+        }
+        Optional<SignIns.Person> person;
+        try {
+            person = directory.authenticate(name, password);
+        } catch (IllegalStateException e) {
+            store.append(new Model.Activity(clock.instant().toString(), name == null ? "" : name, "person", "signin", name == null ? "" : name,
+                    "error", Map.of("reason", "directory unavailable")));
+            throw new ApiException(503, "UNAVAILABLE", "the company directory can't be reached; try again in a moment");
+        }
+        if (person.isEmpty()) {
+            long count = failures[0] + 1;
+            boolean lock = count >= MAX_FAILURES;
+            directoryFailures.put(key, lock ? new long[] {0, now + LOCK.toMillis()} : new long[] {count, 0});
+            throw refused(name, lock ? "wrong password; locked for 15 minutes" : "wrong password (directory)");
+        }
+        directoryFailures.remove(key);
+        try {
+            return signIns.signIn(person.get(), directoryRoles);
+        } catch (SignIns.Refused e) {
+            // the same answer as a wrong password; the reason is in the activity log
+            throw new ApiException(401, "UNAUTHORIZED", "the name or password is wrong, or the account is locked for a while");
+        }
+    }
+
+    public SignIns signIns() {
+        return signIns;
     }
 
     private ApiException refused(String name, String reason) {

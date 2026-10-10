@@ -34,7 +34,9 @@ export function SignInPage() {
     }
   }
 
-  const local = options.data?.auth.local ?? true
+  const auth = options.data?.auth
+  const withPassword = auth ? auth.local || auth.ldap : true
+  const returned = params.get('error')
   return (
     <main className="signin">
       <form onSubmit={submit} aria-labelledby="signin-title">
@@ -43,7 +45,13 @@ export function SignInPage() {
           <h1 id="signin-title">Sign in to mcpgp</h1>
           <p className="hint">The platform for building MCP servers from API definitions.</p>
         </div>
-        {local ? (
+        {returned && <div className="error" role="alert">{RETURNED[returned] ?? RETURNED.sso}</div>}
+        {auth?.oidc && (
+          // a navigation, not a fetch: the provider's page takes over, then comes back to the platform
+          <a className="btn btn-primary" href="/oauth2/authorization/oidc">Sign in with {auth.oidcLabel ?? 'your company account'}</a>
+        )}
+        {auth?.oidc && withPassword && <p className="hint" style={{ textAlign: 'center' }}>or</p>}
+        {withPassword ? (
           <>
             <label className="field">Name
               <input className="input" name="name" autoComplete="username" required value={name} onChange={(e) => setName(e.target.value)} />
@@ -52,13 +60,19 @@ export function SignInPage() {
               <input className="input" name="password" type="password" autoComplete="current-password" required value={password}
                 onChange={(e) => setPassword(e.target.value)} />
             </label>
+            {auth?.ldap && <p className="hint">Your directory account works here{auth.local ? ', as do local accounts' : ''}.</p>}
             <ErrorBox error={error} />
-            <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+            <button className={'btn ' + (auth?.oidc ? '' : 'btn-primary')} type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
           </>
-        ) : (
-          <p className="notice">Local accounts are turned off on this installation. Sign in with your company account.</p>
+        ) : !auth?.oidc && options.isSuccess && (
+          <p className="notice">No way of signing in is turned on for this installation. Ask its administrator.</p>
         )}
       </form>
     </main>
   )
+}
+
+const RETURNED: Record<string, string> = {
+  'no-access': 'Your company account has no access to this platform: none of your groups is given a role here. Ask an administrator.',
+  sso: 'Signing in with your company account didn’t work. Try again; if it keeps failing, ask an administrator.',
 }

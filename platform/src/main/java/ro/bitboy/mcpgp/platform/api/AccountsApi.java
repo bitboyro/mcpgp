@@ -56,8 +56,8 @@ public class AccountsApi {
      */
     @PostMapping("/sessions")
     public ResponseEntity<byte[]> signIn(HttpServletRequest request, @RequestBody(required = false) byte[] body) {
-        if (!config.localAccounts()) {
-            throw new ApiException(404, "NOT_FOUND", "local accounts are turned off; sign in with your company account");
+        if (!config.localAccounts() && config.ldap() == null) {
+            throw new ApiException(404, "NOT_FOUND", "sign-in with a name and password is turned off; sign in with your company account");
         }
         JsonNode json = Json.parse(body);
         Access.IssuedToken token = accounts.signIn(json.path("name").asText(null), json.path("password").asText(null));
@@ -89,7 +89,7 @@ public class AccountsApi {
     /** How people can sign in; needed before signing in, so it has no token and tells nothing else. */
     @GetMapping("/platform")
     public ResponseEntity<byte[]> platform() {
-        return Json.ok(Map.of("auth", Map.of("local", config.localAccounts(), "oidc", false)));
+        return Json.ok(Map.of("auth", authOptions(config)));
     }
 
     /** The installation's settings, as far as builders need them (spec/platform-api.md §7). */
@@ -98,14 +98,26 @@ public class AccountsApi {
         ServersApi.who(request).require("servers:read");
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("workspace", config.workspace());
-        body.put("auth", Map.of("local", config.localAccounts(), "oidc", false));
+        body.put("auth", authOptions(config));
         body.put("signing", Map.of("configured", config.signingKey() != null && !config.signingKey().isBlank()));
         body.put("retention", config.retention());
         body.put("guardrails", config.guardrails());
         return Json.ok(body);
     }
 
-    static ResponseCookie sessionCookie(HttpServletRequest request, String value, Duration maxAge) {
+    /** How people sign in: a name and password (local accounts, the directory, or both), and company SSO. */
+    static Map<String, Object> authOptions(PlatformConfig config) {
+        Map<String, Object> auth = new LinkedHashMap<>();
+        auth.put("local", config.localAccounts());
+        auth.put("ldap", config.ldap() != null);
+        auth.put("oidc", config.oidc() != null);
+        if (config.oidc() != null) {
+            auth.put("oidcLabel", config.oidc().label());
+        }
+        return auth;
+    }
+
+    public static ResponseCookie sessionCookie(HttpServletRequest request, String value, Duration maxAge) {
         boolean https = request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"));
         return ResponseCookie.from(AuthFilter.COOKIE, value).httpOnly(true).secure(https).sameSite("Strict").path("/").maxAge(maxAge).build();
     }

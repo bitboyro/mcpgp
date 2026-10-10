@@ -91,7 +91,7 @@ compiles (the CLI does the same with `--workspace`).
 
 | Kind | Signs in with | Typical scopes |
 |---|---|---|
-| **person** | company SSO (OIDC), or a local account; then a session (UI) or personal tokens (API) | everything their role allows |
+| **person** | company SSO (OIDC), the company directory (LDAP / Active Directory), or a local account; then a session (UI) or personal tokens (API) | everything their role allows |
 | **agent** | API token | `servers:read`, `servers:write`, `builds:run` |
 | **pipeline** | API token | `servers:write`, `builds:run`, `builds:release` |
 
@@ -100,11 +100,30 @@ compiles (the CLI does the same with `--workspace`).
 - **Local accounts:** passwords stored as PBKDF2-HMAC-SHA256 hashes (salted, 600 000 iterations),
   minimum length 12; repeated failures slow down and lock the account temporarily. Can be turned off
   when SSO is configured.
-- **OIDC:** authorization code flow with PKCE against the configured issuer; people are matched by
-  `sub` (and `email` for the first sign-in); group claims can map to roles. Comes with the web UI (M6).
-- **Bootstrap:** `platform init` creates the first administrator (local account or the first OIDC
-  user) and prints a one-time admin token; with `MCPGP_PLATFORM_ADMIN_PASSWORD` set, the administrator
-  also gets a local password.
+- **OIDC:** authorization code flow with PKCE against the configured issuer (`/oauth2/authorization/oidc`,
+  callback `/login/oauth2/code/oidc`); the provider's settings come from its discovery document, read
+  at the first sign-in. The ID token's `groupsClaim` (default `groups`) maps to roles. A successful
+  sign-in becomes the same session cookie as a local one.
+- **LDAP / Active Directory:** names without a local account are checked against the directory through
+  `POST /sessions`: the service account (`bindDn`, its password a reference) finds the person with
+  `userSearch`, then the platform binds as them, so the directory checks the password and the
+  platform stores none; groups come from `groupSearch` (their `cn`). With `activeDirectory.domain`,
+  the bind is `name@domain` and groups come from `memberOf`. Connections are `ldaps://` or `ldap://`
+  with `startTls: true` (plain `ldap://` only to the platform's own host). Repeated failures lock the
+  name for 15 minutes, as for local accounts; an empty password is refused (it would be an anonymous bind).
+- **Groups and roles:** `roles` maps group names (ignoring case) to roles; at least one is required.
+  People in no mapped group get no identity and the same answer as a wrong password (the reason is in
+  the activity log). Identities created this way (`owner: directory`) follow their groups at every
+  sign-in and are refused once no group maps; identities made on the platform keep the scopes an
+  administrator gave them.
+- **Linking:** people are matched by their account (OIDC `issuer` + `sub`, the LDAP DN). At the first
+  sign-in, a person on the platform without a company account is linked when their name is the
+  account's **verified** email (OIDC: user names may be editable at the provider) or its user name
+  (LDAP). Identities show `signsInWith: oidc | ldap`.
+- **Bootstrap:** `platform init` creates the first administrator and prints a one-time admin token;
+  name them as they sign in (their email for OIDC, their user name for LDAP) so the first company
+  sign-in links to them. With `MCPGP_PLATFORM_ADMIN_PASSWORD` set, the administrator also gets a local
+  password.
 - **Sign-in:** `POST /api/v1/sessions { name, password }` → a session token (12 hours); an unknown name
   and a wrong password get the same answer. `GET /api/v1/platform` (no token) says which ways of
   signing in the installation offers. `DELETE /api/v1/sessions/current` signs out (revokes the session
@@ -172,13 +191,28 @@ with filters: `target`, `server` (the server's own entries and those of its buil
 
 ```yaml
 workspace: acme                    # the <workspace> of mcpgp:// references (default local)
-http: { host: 0.0.0.0, port: 8443, publicUrl: https://mcpgp.acme.internal }
+http: { host: 0.0.0.0, port: 8443, publicUrl: https://mcpgp.acme.internal }   # publicUrl: for the OIDC callback behind a proxy
 storage:
   type: files                      # files (now) | postgres (later)
   root: /var/lib/mcpgp
 auth:
   local: { enabled: true }
-  oidc: { issuer: https://login.acme.com, clientId: mcpgp, clientSecret: "${env:MCPGP_OIDC_SECRET}", roles: { mcpgp-admins: admin } }
+  oidc:                            # company SSO
+    issuer: https://login.acme.com
+    clientId: mcpgp
+    clientSecret: "${env:MCPGP_OIDC_SECRET}"   # none: a public client (PKCE only)
+    scopes: [openid, profile, email] # the default
+    groupsClaim: groups              # the default
+    label: Acme SSO                  # on the sign-in button
+    roles: { mcpgp-admins: admin, mcpgp-builders: builder }
+  ldap:                            # the company directory
+    url: ldaps://ldap.acme.internal/dc=acme,dc=com
+    bindDn: cn=mcpgp,ou=services,dc=acme,dc=com
+    bindPassword: "${env:MCPGP_LDAP_PASSWORD}"
+    userSearch: { base: "ou=people", filter: "(uid={0})" }        # {0}: the name typed in
+    groupSearch: { base: "ou=groups", filter: "(member={0})" }    # {0}: the person's DN, {1}: the name
+    # activeDirectory: { domain: acme.com }                      # instead of the searches
+    roles: { mcpgp-admins: admin, mcpgp-releasers: releaser }
 signing: { key: "${env:MCPGP_SIGNING_KEY}" }
 specHosts: []                      # hosts definitions may fetch specs from (none by default)
 retention: { archiveAfterDays: 90, deleteArchivedAfterDays: 365, keepLast: 10 }
@@ -218,7 +252,8 @@ records). From 1.0.0 the format is migrated forward automatically on start, with
   the host is in `specHosts`), size limits per file and per project.
 - Builds run the compiler and packager only; nothing from a definition is executed (extensions are
   compiled code the builder adds to the platform, never uploaded with a definition).
-- Tokens and passwords are stored as hashes; the signing key and OIDC secret are references.
+- Tokens and passwords are stored as hashes; the signing key, the OIDC client secret and the LDAP
+  service account's password are references. Directory passwords are never stored.
 - `GET /settings` gives builders the workspace name, sign-in options, whether a signing key is
   configured (never the key), retention and guardrails.
 - The web UI (M6) is served by the platform itself, from its own origin: every answer carries a

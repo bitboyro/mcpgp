@@ -84,11 +84,20 @@ describe('signing in', () => {
     expect(screen.getByTestId('where').textContent).toBe('/activity')
   })
 
-  it('says so when local accounts are off', async () => {
-    fakeApi({ 'GET /platform': { auth: { local: false, oidc: false } } })
-    renderAt('/sign-in')
-    await screen.findByText(/Local accounts are turned off/)
+  it('offers the company account, and only that when passwords are off', async () => {
+    fakeApi({ 'GET /platform': { auth: { local: false, ldap: false, oidc: true, oidcLabel: 'Acme SSO' } } })
+    renderAt('/sign-in?error=no-access')
+    const button = await screen.findByRole('link', { name: 'Sign in with Acme SSO' })
+    expect(button.getAttribute('href')).toBe('/oauth2/authorization/oidc')
     expect(screen.queryByLabelText('Password')).toBeNull()
+    expect(screen.getByRole('alert').textContent).toContain('none of your groups')
+  })
+
+  it('says the directory account works when LDAP is on', async () => {
+    fakeApi({ 'GET /platform': { auth: { local: false, ldap: true, oidc: false } } })
+    renderAt('/sign-in')
+    await screen.findByText('Your directory account works here.')
+    expect(screen.getByLabelText('Password')).toBeTruthy()
   })
 
   it('tells the app when the session ends', async () => {

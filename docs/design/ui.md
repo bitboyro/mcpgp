@@ -36,7 +36,7 @@ Built into the platform jar and served by it (`WebUi`), on the API's own origin.
 
 | Page | Route | State |
 |---|---|---|
-| Sign in | `/sign-in` | local accounts; OIDC comes with Spring Security |
+| Sign in | `/sign-in` | local and directory accounts; company SSO (OIDC) |
 | All servers | `/` | cards, duplicate / variant panel, new server (folder or zip), shared library |
 | Overview (canvas: Shape) | `/servers/:id` | the definition's choices and packs, editable: changes preview live (agent, customer setup, package, checks), Review shows the file's diff, Save makes the next version |
 | Tools & rules | `/servers/:id/tools` | filters, search, the tool as the agent gets it, its provenance |

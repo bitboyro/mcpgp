@@ -31,8 +31,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Builds (spec/platform-api.md §2.2): queued, then compiled and packaged one at a time with the same
@@ -43,7 +41,6 @@ public final class Builds implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Builds.class);
     private static final SecureRandom RANDOM = new SecureRandom();
-    private static final Pattern REFERENCE = Pattern.compile("^\\$\\{(env|file):([^}]+)}$");
 
     private final Store store;
     private final Compilation compilation;
@@ -178,23 +175,11 @@ public final class Builds implements AutoCloseable {
             }
             return null;
         }
-        Matcher ref = REFERENCE.matcher(config.signingKey());
-        if (!ref.matches()) {
+        if (!ro.bitboy.mcpgp.platform.Secrets.isReference(config.signingKey())) {
             throw new ApiException(500, "INTERNAL", "signing.key must be a reference (${env:…} or ${file:…})");
         }
-        String text;
-        if (ref.group(1).equals("env")) {
-            text = env.get(ref.group(2));
-        } else {
-            try {
-                text = Files.readString(Path.of(ref.group(2)));
-            } catch (IOException e) {
-                text = null;
-            }
-        }
-        if (text == null || text.isBlank()) {
-            throw new ApiException(500, "INTERNAL", "the platform's signing key (" + config.signingKey() + ") can't be read");
-        }
+        String text = ro.bitboy.mcpgp.platform.Secrets.resolve(config.signingKey(), env)
+                .orElseThrow(() -> new ApiException(500, "INTERNAL", "the platform's signing key (" + config.signingKey() + ") can't be read"));
         return Minisign.readSecretKey(text);
     }
 

@@ -92,8 +92,9 @@ function IdentityRow({ identity, tokens, onIssued, canIssue }: { identity: Ident
     <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="card-head">
         <span>
-          <b>{identity.name}</b> <span className="tag">{identity.kind}</span>{identity.disabled && <span className="tag">disabled</span>}<br />
-          <span className="meta">{identity.scopes.includes('admin') ? 'admin' : identity.scopes.join(' · ')}</span>
+          <b>{identity.name}</b> <span className="tag">{identity.kind}</span>{identity.disabled && <span className="tag">disabled</span>}
+          {identity.signsInWith && <span className="tag">{identity.signsInWith === 'oidc' ? 'company SSO' : 'directory'}</span>}<br />
+          <span className="meta">{identity.scopes.includes('admin') ? 'admin' : identity.scopes.join(' · ')}{identity.rolesFromGroups ? ' · from their groups' : ''}</span>
         </span>
         <span className="actions">
           <button type="button" className="btn btn-sm" aria-expanded={open} onClick={() => setOpen(!open)}>{active.length} token{active.length === 1 ? '' : 's'}</button>

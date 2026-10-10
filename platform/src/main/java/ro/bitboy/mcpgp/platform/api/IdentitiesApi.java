@@ -169,6 +169,13 @@ public class IdentitiesApi {
         m.put("scopes", i.scopes());
         m.put("created", i.created());
         m.put("disabled", i.disabled());
+        if (i.external() != null) {
+            // oidc or ldap; the account itself (a DN, a subject) stays out of lists
+            m.put("signsInWith", i.external().substring(0, i.external().indexOf(':')));
+        }
+        if (ro.bitboy.mcpgp.platform.service.SignIns.DIRECTORY.equals(i.owner())) {
+            m.put("rolesFromGroups", true);
+        }
         return m;
     }
 

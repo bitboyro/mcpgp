@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -16,7 +17,32 @@ import java.util.Map;
  * {@code MCPGP_PLATFORM_HTTP__PORT} override the file.
  */
 public record PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
-                             boolean localAccounts, Guardrails guardrails) {
+                             boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl) {
+
+    public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
+                          boolean localAccounts, Guardrails guardrails) {
+        this(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, null, null, null);
+    }
+
+    /**
+     * Company sign-in with OpenID Connect (spec/platform-api.md §3): authorization code with PKCE.
+     * {@code roles} maps values of the {@code groupsClaim} claim to platform roles.
+     */
+    public record Oidc(String issuer, String clientId, String clientSecret, List<String> scopes, String groupsClaim, Map<String, String> roles,
+                       String label) {
+    }
+
+    /**
+     * Company sign-in against a directory (spec/platform-api.md §3): a search for the person with the
+     * service account ({@code bindDn}), then a bind as them; or Active Directory by domain. Group names
+     * (their {@code cn}) map to platform roles in {@code roles}.
+     */
+    public record Ldap(String url, boolean startTls, String bindDn, String bindPassword, String userSearchBase, String userSearchFilter,
+                       String groupSearchBase, String groupSearchFilter, String activeDirectoryDomain, Map<String, String> roles) {
+        public boolean activeDirectory() {
+            return activeDirectoryDomain != null;
+        }
+    }
 
     /** Agent quotas (spec/platform-api.md §5). */
     public record Guardrails(int agentBuildsPerHour, int agentVersionsPerHour) {
@@ -82,7 +108,84 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
         JsonNode guard = doc.path("guardrails");
         Guardrails g = new Guardrails(guard.path("agentBuildsPerHour").asInt(Guardrails.DEFAULT.agentBuildsPerHour()),
                 guard.path("agentVersionsPerHour").asInt(Guardrails.DEFAULT.agentVersionsPerHour()));
-        return new PlatformConfig(storage, host, port, signing, r, workspace, local, g);
+        String publicUrl = env.getOrDefault("MCPGP_PLATFORM_HTTP__PUBLIC_URL", doc.at("/http/publicUrl").asText(null));
+        return new PlatformConfig(storage, host, port, signing, r, workspace, local, g, oidc(doc.at("/auth/oidc")), ldap(doc.at("/auth/ldap")),
+                publicUrl == null ? null : publicUrl.replaceAll("/+$", ""));
+    }
+
+    private static Oidc oidc(JsonNode node) {
+        if (!node.isObject()) {
+            return null;
+        }
+        String issuer = required(node, "issuer", "auth.oidc");
+        if (!issuer.startsWith("https://") && !loopback(java.net.URI.create(issuer).getHost())) {
+            throw new IllegalArgumentException("auth.oidc.issuer must be https://");
+        }
+        String secret = node.path("clientSecret").asText(null);
+        if (secret != null && !Secrets.isReference(secret)) {
+            throw new IllegalArgumentException("auth.oidc.clientSecret must be a reference (${env:…} or ${file:…})");
+        }
+        List<String> scopes = new java.util.ArrayList<>();
+        node.path("scopes").forEach(v -> scopes.add(v.asText()));
+        if (scopes.isEmpty()) {
+            scopes.addAll(List.of("openid", "profile", "email"));
+        }
+        if (!scopes.contains("openid")) {
+            throw new IllegalArgumentException("auth.oidc.scopes must include openid");
+        }
+        return new Oidc(issuer, required(node, "clientId", "auth.oidc"), secret, List.copyOf(scopes), node.path("groupsClaim").asText("groups"),
+                roles(node, "auth.oidc"), node.path("label").asText("company account"));
+    }
+
+    private static Ldap ldap(JsonNode node) {
+        if (!node.isObject()) {
+            return null;
+        }
+        String url = required(node, "url", "auth.ldap");
+        java.net.URI uri = java.net.URI.create(url);
+        boolean startTls = node.path("startTls").asBoolean(false);
+        if (!"ldaps".equals(uri.getScheme()) && !("ldap".equals(uri.getScheme()) && (startTls || loopback(uri.getHost())))) {
+            // passwords travel to the directory: only encrypted, except to a directory on this host
+            throw new IllegalArgumentException("auth.ldap.url must be ldaps://, or ldap:// with startTls: true");
+        }
+        String bindPassword = node.path("bindPassword").asText(null);
+        if (bindPassword != null && !Secrets.isReference(bindPassword)) {
+            throw new IllegalArgumentException("auth.ldap.bindPassword must be a reference (${env:…} or ${file:…})");
+        }
+        String domain = node.at("/activeDirectory/domain").asText(null);
+        if (domain == null && node.at("/userSearch/base").isMissingNode()) {
+            throw new IllegalArgumentException("auth.ldap needs userSearch (or activeDirectory.domain)");
+        }
+        return new Ldap(url, startTls, node.path("bindDn").asText(null), bindPassword, node.at("/userSearch/base").asText(null),
+                node.at("/userSearch/filter").asText("(uid={0})"), node.at("/groupSearch/base").asText(null),
+                node.at("/groupSearch/filter").asText("(member={0})"), domain, roles(node, "auth.ldap"));
+    }
+
+    private static Map<String, String> roles(JsonNode node, String where) {
+        Map<String, String> roles = new java.util.LinkedHashMap<>();
+        node.path("roles").properties().forEach(e -> {
+            if (!ro.bitboy.mcpgp.platform.service.Access.ROLES.containsKey(e.getValue().asText())) {
+                throw new IllegalArgumentException(where + ".roles." + e.getKey() + ": one of "
+                        + String.join(", ", new java.util.TreeSet<>(ro.bitboy.mcpgp.platform.service.Access.ROLES.keySet())));
+            }
+            roles.put(e.getKey(), e.getValue().asText());
+        });
+        if (roles.isEmpty()) {
+            throw new IllegalArgumentException(where + ".roles: map at least one group to a role; people in no mapped group can't sign in");
+        }
+        return Map.copyOf(roles);
+    }
+
+    private static String required(JsonNode node, String key, String where) {
+        String value = node.path(key).asText(null);
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(where + "." + key + " is required");
+        }
+        return value;
+    }
+
+    static boolean loopback(String host) {
+        return host != null && (host.equals("localhost") || host.equals("127.0.0.1") || host.equals("[::1]") || host.equals("::1"));
     }
 
     static Path configFile(String[] args) {
