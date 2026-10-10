@@ -112,6 +112,43 @@ paths:
       responses:
         "200": { description: The example configuration, content: { application/yaml: { schema: { type: string } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/edits:
+    post:
+      operationId: editServer
+      tags: [servers]
+      summary: Edit definition
+      description: >-
+        Changes the root definition of the latest version (base) and saves the result as the next
+        version, if it compiles. Paths are JSON Pointers, plus [key=value] to pick a list item, e.g.
+        /apis/[id=orders]/select/access. Comments and formatting elsewhere in the file are kept.
+        With dryRun, returns the edited definition and its manifest (or diagnostics) and saves nothing.
+      parameters:
+        - $ref: "#/components/parameters/ServerId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base, changes]
+              properties:
+                base: { type: integer, description: The latest version number the changes were made on }
+                message: { type: string }
+                dryRun: { type: boolean, default: false }
+                changes:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [path]
+                    properties:
+                      op: { enum: [set, remove], default: set }
+                      path: { type: string }
+                      value: { description: Any JSON value; null is a value (in a variant it removes what is inherited) }
+      responses:
+        "200": { description: The dry run's result, content: { application/json: { schema: { type: object } } } }
+        "201": { description: The new version, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/duplicate:
     parameters: [ { $ref: "#/components/parameters/ServerId" } ]
     post:

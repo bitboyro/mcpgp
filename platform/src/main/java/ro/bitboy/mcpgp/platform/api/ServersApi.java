@@ -1,6 +1,7 @@
 package ro.bitboy.mcpgp.platform.api;
 
 import jakarta.servlet.http.HttpServletRequest;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,8 @@ import ro.bitboy.mcpgp.core.Compiler;
 import ro.bitboy.mcpgp.core.diag.Diagnostic;
 import ro.bitboy.mcpgp.core.manifest.ManifestWriter;
 import ro.bitboy.mcpgp.packager.ExampleConfig;
+import ro.bitboy.mcpgp.platform.service.Edits;
+import ro.bitboy.mcpgp.platform.service.YamlEdit;
 import ro.bitboy.mcpgp.platform.service.Access;
 import ro.bitboy.mcpgp.platform.service.Compilation;
 import ro.bitboy.mcpgp.platform.service.Servers;
@@ -37,9 +40,11 @@ public class ServersApi {
     private final Compilation compilation;
     private final ro.bitboy.mcpgp.platform.PlatformConfig config;
     private final ro.bitboy.mcpgp.platform.service.Guardrails guardrails;
+    private final Edits edits;
 
     public ServersApi(Store store, Servers servers, Compilation compilation, ro.bitboy.mcpgp.platform.PlatformConfig config,
-                      ro.bitboy.mcpgp.platform.service.Guardrails guardrails) {
+                      ro.bitboy.mcpgp.platform.service.Guardrails guardrails, Edits edits) {
+        this.edits = edits;
         this.store = store;
         this.servers = servers;
         this.compilation = compilation;
@@ -142,6 +147,41 @@ public class ServersApi {
     }
 
     /** {@code {id, title?}}: an independent copy of the latest version. */
+    /**
+     * Changes made on the server's pages: {@code {base, changes: [{op, path, value}], message?, dryRun?}}.
+     * With {@code dryRun} the answer is the edited definition and its manifest (or diagnostics) and
+     * nothing is saved; otherwise the edit becomes the next version, if it compiles.
+     */
+    @PostMapping("/{id}/edits")
+    public ResponseEntity<byte[]> edit(HttpServletRequest request, @PathVariable String id, @RequestBody(required = false) byte[] body) {
+        Access.Principal who = who(request);
+        who.require("servers:write");
+        JsonNode json = Json.parse(body);
+        if (!json.path("base").canConvertToInt()) {
+            throw ApiException.validation("base: the version number the changes were made on");
+        }
+        int base = json.path("base").asInt();
+        List<YamlEdit.Change> changes = Edits.changes(json);
+        if (json.path("dryRun").asBoolean(false)) {
+            Edits.Result result = edits.preview(id, base, changes);
+            Map<String, Object> answer = new LinkedHashMap<>();
+            answer.put("base", base);
+            answer.put("digest", "sha256:" + result.version().digest());
+            answer.put("definition", result.definition());
+            if (result.compiles()) {
+                JsonNode manifest = Json.parse(result.preview().manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                answer.put("manifest", manifest);
+                answer.put("exampleConfig", ExampleConfig.yaml(manifest));
+            } else {
+                answer.put("diagnostics", diagnostics(result.preview().result().diagnostics()));
+            }
+            return Json.ok(answer);
+        }
+        guardrails.quota(who, "versions");
+        Model.Server server = edits.save(id, base, changes, json.path("message").asText(null), who);
+        return withEtag(Json.status(201, detail(server)), server);
+    }
+
     /** The example configuration the package will ship (packaging.md): what the customer fills in. */
     @GetMapping("/{id}/versions/{version}/example-config")
     public ResponseEntity<byte[]> exampleConfig(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
@@ -239,7 +279,7 @@ public class ServersApi {
         return m;
     }
 
-    static List<Map<String, Object>> diagnostics(List<Diagnostic> diagnostics) {
+    public static List<Map<String, Object>> diagnostics(List<Diagnostic> diagnostics) {
         List<Map<String, Object>> list = new ArrayList<>();
         for (Diagnostic d : diagnostics) {
             Map<String, Object> m = new LinkedHashMap<>();

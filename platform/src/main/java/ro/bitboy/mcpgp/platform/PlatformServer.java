@@ -14,6 +14,7 @@ import ro.bitboy.mcpgp.platform.service.Guardrails;
 import ro.bitboy.mcpgp.platform.service.Transfer;
 import ro.bitboy.mcpgp.platform.service.Builds;
 import ro.bitboy.mcpgp.platform.service.Compilation;
+import ro.bitboy.mcpgp.platform.service.Edits;
 import ro.bitboy.mcpgp.platform.service.Library;
 import ro.bitboy.mcpgp.platform.service.Servers;
 import ro.bitboy.mcpgp.platform.store.FileStore;
@@ -107,6 +108,11 @@ public class PlatformServer {
     @Bean
     Compilation compilation(Store store, PlatformConfig config) {
         return new Compilation(store, config.workspace());
+    }
+
+    @Bean
+    Edits edits(Store store, Servers servers, Compilation compilation) {
+        return new Edits(store, servers, compilation);
     }
 
     @Bean

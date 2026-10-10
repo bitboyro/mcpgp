@@ -42,11 +42,18 @@ public final class Servers {
 
     /** Adds a version; content equal to the latest version adds nothing and returns the server unchanged. */
     public Model.Server addVersion(String id, byte[] body, String contentType, String message, Access.Principal who) {
+        if (get(id).archived()) {
+            throw new ApiException(409, "CONFLICT", "server " + id + " is archived; restore it first");
+        }
+        return addVersion(id, projects.store(body, contentType), message, who);
+    }
+
+    /** Adds a stored version (an upload, or an edit of the latest one); the same content as the latest one adds nothing. */
+    public Model.Server addVersion(String id, Model.Version version, String message, Access.Principal who) {
         Model.Server server = get(id);
         if (server.archived()) {
             throw new ApiException(409, "CONFLICT", "server " + id + " is archived; restore it first");
         }
-        Model.Version version = projects.store(body, contentType);
         if (server.latest() != null && server.latest().digest().equals(version.digest())) {
             return server;
         }
