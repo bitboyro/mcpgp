@@ -55,11 +55,21 @@ class ConfigLoaderTest {
         assertThat(config.secrets()).contains("s1", "s2", "s3", ro.bitboy.mcpgp.runtime.TestCerts.PASSWORD).doesNotContain("eu");
         assertThat(config.server().transport()).isEqualTo("stdio");
         assertThat(config.audit().arguments()).isEqualTo("hashed");
-        assertThatThrownBy(() -> loader.load(ORDERS, new ConfigLoader.Options(Optional.of(REPO.resolve("examples/client/multi-instance/orders-mcp.yaml")),
+        // the multi-instance example runs as an OAuth resource server (auth.md §1.1)
+        RuntimeConfig oauth = loader.load(ORDERS, new ConfigLoader.Options(Optional.of(REPO.resolve("examples/client/multi-instance/orders-mcp.yaml")),
                 REPO, Map.of("EU_CLIENT_ID", "eu", "EU_CLIENT_SECRET", "s1", "CX_USER", "cx", "CX_PASS", "s2", "TEST_API_KEY", "s3",
                         "TEST_CA_B64", ro.bitboy.mcpgp.runtime.TestCerts.base64(CERTS.serverPem), "TEST_P12_PASS", ro.bitboy.mcpgp.runtime.TestCerts.PASSWORD,
-                        "JIRA_TOKEN", "s5"), Map.of("instances.2.tls.clientCert.path", CERTS.clientP12.toString()))))
-                .hasMessageContaining("oauth is not available in this runtime version yet");
+                        "JIRA_TOKEN", "s5"), Map.of("instances.2.tls.clientCert.path", CERTS.clientP12.toString())));
+        assertThat(oauth.server().authMode()).isEqualTo("oauth");
+        assertThat(oauth.server().auth().path("issuer").asText()).isEqualTo("https://login.acme.com");
+    }
+
+    @Test
+    void oauthNeedsAnIssuerAndThePublicUrl(@org.junit.jupiter.api.io.TempDir Path dir) throws IOException {
+        Path file = dir.resolve("orders-mcp.yaml");
+        Files.writeString(file, "server: { transport: http, auth: { mode: oauth } }\ninstances: [ { id: prod, baseUrl: \"https://o.example.com\" } ]\n");
+        assertThatThrownBy(() -> loader.load(ORDERS, new ConfigLoader.Options(Optional.of(file), dir, Map.of(), Map.of())))
+                .hasMessageContaining("/server/auth/issuer: oauth mode needs").hasMessageContaining("/server/publicUrl: oauth mode needs");
     }
 
     @Test

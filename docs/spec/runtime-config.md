@@ -157,7 +157,8 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `server.management.port` | none | health + metrics on a separate port |
 | `server.auth.mode` | `none` | `none` · `static` · `oauth`, within the build's `allowed` list |
 | `server.auth.keys[]` | — | `static` mode: `{ name, value }` per client key; `value` is a secret field |
-| `server.auth.issuer` | — | `oauth` mode: authorization server (see [auth.md](auth.md) §1.1) |
+| `server.auth.issuer` | — | `oauth` mode: authorization server (see [auth.md](auth.md) §1.1); needs `server.publicUrl` |
+| `server.auth.jwksUri` | from the issuer's metadata | `oauth` mode: the issuer's JWKS, when its metadata doesn't name it |
 | `server.auth.introspection` | — | `oauth` mode, opaque tokens: `{ url, clientId, clientSecret }` (RFC 7662) |
 | `server.auth.scopes` | — | `oauth` mode: scope → tool selection mapping |
 | `server.auth.allowInsecure` | `false` | required for `none` over HTTP on a non-loopback address |

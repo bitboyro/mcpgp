@@ -178,11 +178,12 @@
                 "additionalProperties": false
               }
             },
-            "issuer": { "type": "string", "pattern": "^https://" },
+            "issuer": { "type": "string", "pattern": "^(https://|http://(127\\.0\\.0\\.1|localhost|\\[::1\\])(:[0-9]+)?(/|$))", "description": "The authorization server: https://, or http:// only on this host" },
+            "jwksUri": { "type": "string", "pattern": "^(https://|http://(127\\.0\\.0\\.1|localhost|\\[::1\\])(:[0-9]+)?/)", "description": "The issuer's JWKS, when its metadata doesn't name it" },
             "introspection": {
               "type": "object",
               "properties": {
-                "url": { "type": "string" },
+                "url": { "type": "string", "pattern": "^(https://|http://(127\\.0\\.0\\.1|localhost|\\[::1\\])(:[0-9]+)?/)" },
                 "clientId": { "type": "string" },
                 "clientSecret": { "$ref": "#/$defs/secret" }
               },

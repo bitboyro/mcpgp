@@ -46,6 +46,12 @@
       <artifactId>mcp-json-jackson2</artifactId>
       <version>${mcp-sdk.version}</version>
     </dependency>
+    <!-- inbound OAuth: JWT access tokens checked against the issuer's JWKS (auth.md §1.1) -->
+    <dependency>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
+      <version>${nimbus-jose-jwt.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>

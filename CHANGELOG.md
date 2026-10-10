@@ -122,6 +122,11 @@ versions follow [SemVer](https://semver.org).
   and `docker-compose.yml`: HTTP, non-root, `/config` and `/data`; the customer builds the image).
   `build.image.push` and `tar` are reported as not available yet.
 
+- Runtime: inbound OAuth (`server.auth.mode: oauth`): the server is an OAuth resource server with
+  protected resource metadata (RFC 9728), JWT access tokens checked against the issuer's JWKS with
+  `aud` = this server (RFC 8707) through nimbus-jose-jwt, opaque tokens by introspection (RFC 7662),
+  and scopes that decide which tools a client sees and calls (`403 insufficient_scope`).
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 

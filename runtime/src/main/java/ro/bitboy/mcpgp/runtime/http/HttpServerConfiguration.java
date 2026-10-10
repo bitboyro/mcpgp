@@ -1,6 +1,8 @@
 package ro.bitboy.mcpgp.runtime.http;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.json.jackson2.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.server.McpSyncServer;
@@ -8,6 +10,7 @@ import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTrans
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpFilter;
+import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.catalina.connector.Connector;
@@ -23,6 +26,7 @@ import ro.bitboy.mcpgp.runtime.manifest.Manifest;
 import ro.bitboy.mcpgp.runtime.mcp.McpServerFactory;
 
 import java.io.IOException;
+import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.HashMap;
@@ -69,12 +73,50 @@ public class HttpServerConfiguration {
     }
 
     @Bean
-    FilterRegistrationBean<InboundFilter> inboundFilter(RuntimeConfig config, McpServerFactory factory) {
+    FilterRegistrationBean<InboundFilter> inboundFilter(RuntimeConfig config, McpServerFactory factory, ro.bitboy.mcpgp.runtime.Reloader reloader) {
+        RuntimeConfig.Server server = config.server();
+        OAuthTokens tokens = server.authMode().equals("oauth")
+                ? new OAuthTokens(server.auth().path("issuer").asText(), server.auth().path("jwksUri").asText(null), InboundFilter.resource(server),
+                        server.auth().path("introspection"), java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build(),
+                        Clock.systemUTC())
+                : null;
         FilterRegistrationBean<InboundFilter> registration =
-                new FilterRegistrationBean<>(new InboundFilter(config.server(), factory.audit()));
+                new FilterRegistrationBean<>(new InboundFilter(server, factory.audit(), tokens, () -> reloader.current().catalog()));
         registration.addUrlPatterns(config.server().basePath());
         registration.setAsyncSupported(true);
         registration.setOrder(1);
+        return registration;
+    }
+
+    /** {@code oauth} mode: the protected resource metadata (RFC 9728) that tells clients where to sign in. */
+    @Bean
+    ServletRegistrationBean<HttpServlet> resourceMetadata(RuntimeConfig config) {
+        RuntimeConfig.Server server = config.server();
+        boolean oauth = server.authMode().equals("oauth");
+        ObjectNode metadata = new ObjectMapper().createObjectNode();
+        if (oauth) {
+            metadata.put("resource", InboundFilter.resource(server));
+            metadata.putArray("authorization_servers").add(server.auth().path("issuer").asText());
+            ArrayNode scopes = metadata.putArray("scopes_supported");
+            server.auth().path("scopes").fieldNames().forEachRemaining(scopes::add);
+            metadata.putArray("bearer_methods_supported").add("header");
+        }
+        byte[] body = metadata.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        HttpServlet servlet = new HttpServlet() {
+            @Override
+            protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
+                if (!oauth) {
+                    response.setStatus(404);
+                    return;
+                }
+                response.setContentType("application/json");
+                response.setHeader("Cache-Control", "max-age=300");
+                response.getOutputStream().write(body);
+            }
+        };
+        String path = oauth ? URI.create(InboundFilter.resourceMetadata(server)).getRawPath() : "/.well-known/oauth-protected-resource/*";
+        ServletRegistrationBean<HttpServlet> registration = new ServletRegistrationBean<>(servlet, path, "/.well-known/oauth-protected-resource");
+        registration.setName("oauth-protected-resource");
         return registration;
     }
 

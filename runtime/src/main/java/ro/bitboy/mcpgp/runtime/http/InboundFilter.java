@@ -12,6 +12,7 @@ import ro.bitboy.mcpgp.runtime.config.RuntimeConfig;
 import ro.bitboy.mcpgp.runtime.mcp.Ids;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -22,7 +23,9 @@ import java.util.Locale;
 /**
  * Guards the MCP endpoint (auth.md §1, runtime-config §4): the Origin check against DNS rebinding,
  * then inbound auth. In {@code static} mode a bearer key is compared in constant time with every
- * configured key; the matching key's name identifies the client in audit events.
+ * configured key; the matching key's name identifies the client in audit events. In {@code oauth}
+ * mode the server is an OAuth resource server: tokens are checked by {@link OAuthTokens}, scopes by
+ * {@link ScopePolicy}; the token's subject identifies the client.
  */
 final class InboundFilter extends HttpFilter {
 
@@ -32,13 +35,30 @@ final class InboundFilter extends HttpFilter {
     private record Key(String name, byte[] digest) {
     }
 
+    /** Request attribute with the token's scopes ({@code oauth} mode). */
+    static final String SCOPES = "mcpgp.scopes";
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
     private final RuntimeConfig.Server server;
     private final List<Key> keys = new ArrayList<>();
     private final AuditLog audit;
+    private final OAuthTokens tokens;
+    private final ScopePolicy policy;
+    private final java.util.function.Supplier<ro.bitboy.mcpgp.runtime.mcp.ToolCatalog> catalog;
 
     InboundFilter(RuntimeConfig.Server server, AuditLog audit) {
+        this(server, audit, null, () -> null);
+    }
+
+    /** @param tokens the token check in {@code oauth} mode (null otherwise); @param catalog the current tools, for scopes */
+    InboundFilter(RuntimeConfig.Server server, AuditLog audit, OAuthTokens tokens,
+                  java.util.function.Supplier<ro.bitboy.mcpgp.runtime.mcp.ToolCatalog> catalog) {
         this.server = server;
         this.audit = audit;
+        this.tokens = tokens;
+        this.catalog = catalog;
+        this.policy = new ScopePolicy(server.auth().path("scopes"));
         for (JsonNode key : server.auth().path("keys")) {
             keys.add(new Key(key.path("name").asText(), digest(key.path("value").asText())));
         }
@@ -65,6 +85,12 @@ final class InboundFilter extends HttpFilter {
             }
             request.setAttribute(CLIENT, name);
         }
+        if (server.authMode().equals("oauth")) {
+            request = oauth(request, response);
+            if (request == null) {
+                return;
+            }
+        }
         String session = request.getHeader("Mcp-Session-Id");
         chain.doFilter(request, response);
         // session.start when the server hands out a session id; session.end when the client ends it
@@ -73,6 +99,139 @@ final class InboundFilter extends HttpFilter {
             sessionEvent("session.start", request);
         } else if (session != null && request.getMethod().equals("DELETE") && response.getStatus() < 300) {
             sessionEvent("session.end", request);
+        }
+    }
+
+    /**
+     * {@code oauth} mode (auth.md §1.1): the token, then the scopes for {@code tools/call} (403
+     * {@code insufficient_scope}) and {@code tools/list} (answered here with the allowed tools).
+     *
+     * @return the request to go on with, or null when this answered it
+     */
+    private HttpServletRequest oauth(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String metadata = resourceMetadata(server);
+        String header = request.getHeader("Authorization");
+        if (header == null || !header.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            deny(response, 401, "Bearer resource_metadata=\"" + metadata + "\"", "no bearer token", request);
+            return null;
+        }
+        OAuthTokens.Grant grant;
+        try {
+            grant = tokens.check(header.substring(7).strip());
+        } catch (OAuthTokens.Invalid e) {
+            deny(response, 401, "Bearer error=\"invalid_token\", resource_metadata=\"" + metadata + "\"", "invalid token: " + e.getMessage(), request);
+            return null;
+        } catch (OAuthTokens.Unavailable e) {
+            org.slf4j.LoggerFactory.getLogger(InboundFilter.class).warn("Can't check tokens: {}", e.getMessage());
+            deny(response, 503, null, "the authorization server can't be reached", request);
+            return null;
+        }
+        request.setAttribute(CLIENT, grant.subject());
+        request.setAttribute(SCOPES, grant.scopes());
+        if (!policy.restricts() || !request.getMethod().equals("POST")) {
+            return request;
+        }
+        CachedBody body = new CachedBody(request);
+        JsonNode message;
+        try {
+            message = JSON.readTree(body.bytes());
+        } catch (IOException e) {
+            return body;            // not JSON: the transport answers it
+        }
+        if (message == null || !message.isObject()) {
+            return body;
+        }
+        String method = message.path("method").asText();
+        ro.bitboy.mcpgp.runtime.mcp.ToolCatalog tools = catalog.get();
+        if (method.equals("tools/call") && tools != null) {
+            String name = message.at("/params/name").asText();
+            String target = name.equals("call_tool") ? message.at("/params/arguments/name").asText(name) : name;
+            JsonNode tool = tools.tool(target).orElse(null);
+            if (tool != null && !policy.allows(tool, grant.scopes())) {
+                String needed = String.join(" ", policy.needed(tool));
+                deny(response, 403, "Bearer error=\"insufficient_scope\", scope=\"" + needed + "\", resource_metadata=\"" + metadata + "\"",
+                        "scope for " + target, request);
+                return null;
+            }
+        } else if (method.equals("tools/list") && tools != null && message.has("id")) {
+            List<io.modelcontextprotocol.spec.McpSchema.Tool> allowed = new ArrayList<>();
+            for (JsonNode tool : tools.listed()) {
+                if (policy.allows(tool, grant.scopes())) {
+                    allowed.add(ro.bitboy.mcpgp.runtime.mcp.ToolCatalog.toMcp(tool));
+                }
+            }
+            ObjectNode answer = JSON.createObjectNode().put("jsonrpc", "2.0");
+            answer.set("id", message.get("id"));
+            answer.putObject("result").set("tools", JSON.valueToTree(allowed));
+            response.setStatus(200);
+            response.setContentType("application/json");
+            response.getOutputStream().write(JSON.writeValueAsBytes(answer));
+            return null;
+        }
+        return body;
+    }
+
+    /** RFC 9728 §3: {@code /.well-known/oauth-protected-resource} inserted before the resource's path. */
+    static String resourceMetadata(RuntimeConfig.Server server) {
+        String base = server.publicUrl().replaceAll("/+$", "");
+        URI uri = URI.create(base);
+        String origin = uri.getScheme() + "://" + uri.getRawAuthority();
+        String path = (uri.getRawPath() == null ? "" : uri.getRawPath()) + server.basePath();
+        return origin + "/.well-known/oauth-protected-resource" + path;
+    }
+
+    /** The resource this server is (RFC 8707): tokens must name it in their audience. */
+    static String resource(RuntimeConfig.Server server) {
+        return server.publicUrl().replaceAll("/+$", "") + server.basePath();
+    }
+
+    /** A request whose body was read here, so the transport can read it again. */
+    static final class CachedBody extends jakarta.servlet.http.HttpServletRequestWrapper {
+        private final byte[] body;
+
+        CachedBody(HttpServletRequest request) throws IOException {
+            super(request);
+            this.body = request.getInputStream().readAllBytes();
+        }
+
+        byte[] bytes() {
+            return body;
+        }
+
+        @Override
+        public jakarta.servlet.ServletInputStream getInputStream() {
+            java.io.ByteArrayInputStream in = new java.io.ByteArrayInputStream(body);
+            return new jakarta.servlet.ServletInputStream() {
+                @Override
+                public boolean isFinished() {
+                    return in.available() == 0;
+                }
+
+                @Override
+                public boolean isReady() {
+                    return true;
+                }
+
+                @Override
+                public void setReadListener(jakarta.servlet.ReadListener listener) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public int read() {
+                    return in.read();
+                }
+
+                @Override
+                public int read(byte[] b, int off, int len) {
+                    return in.read(b, off, len);
+                }
+            };
+        }
+
+        @Override
+        public java.io.BufferedReader getReader() {
+            return new java.io.BufferedReader(new java.io.InputStreamReader(getInputStream(), StandardCharsets.UTF_8));
         }
     }
 
@@ -109,7 +268,12 @@ final class InboundFilter extends HttpFilter {
         }
         response.setStatus(status);
         response.setContentType("application/json");
-        response.getOutputStream().write(("{\"error\":\"" + (status == 401 ? "unauthorized" : "forbidden") + "\"}")
+        String error = switch (status) {
+            case 401 -> "unauthorized";
+            case 403 -> challenge != null && challenge.contains("insufficient_scope") ? "insufficient_scope" : "forbidden";
+            default -> "unavailable";
+        };
+        response.getOutputStream().write(("{\"error\":\"" + error + "\"}")
                 .getBytes(StandardCharsets.UTF_8));
         org.slf4j.LoggerFactory.getLogger(InboundFilter.class).info("Refused {} {} from {}: {}",
                 request.getMethod(), request.getRequestURI(), request.getRemoteAddr(), reason.toLowerCase(Locale.ROOT));
