@@ -43,6 +43,9 @@ versions follow [SemVer](https://semver.org).
 - Customer commands on the server: `doctor [--quick]`, `instance list`, `instance test <id>`,
   `instance trust <id> [--base64] [--yes]` (trust on first use, saved to `certs/<id>.pem`).
 - `mcpgp explain <def> <tool>`: provenance of a tool's name, title and description.
+- Customer commands that write config: `init` (guided), `instance add <id>` / `instance remove <id>`
+  (in-place YAML edits that keep comments, `.bak`, rollback when the result doesn't load), and
+  `client add claude-code|claude-desktop|cursor|vscode` (`--print`, `--dry-run`, backup, no secrets).
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.
@@ -52,6 +55,9 @@ versions follow [SemVer](https://semver.org).
   runtime config, tools contract, audit & errors, packaging), ADRs 0001–0013, protocol compatibility policy.
 - Platform-side and client-side examples.
 - Development process, roadmap, contribution guidelines, issue and PR templates.
+
+### Changed
+- OTLP telemetry moved from M3 (P0) to M7 (P1).
 
 ### Fixed
 - audit-event schema: `args` as `{ "sha256": … }` was rejected (`oneOf` matched two branches).

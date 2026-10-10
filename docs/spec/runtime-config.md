@@ -387,6 +387,13 @@ Commands run without starting the server, take the same `--config` and `--<key> 
 and exit `0` (all checks passed), `1` (a check failed) or `2` (usage). `doctor` marks each check
 `✓`, `!` (worth a look) or `✗` (fails); `allowInlineSecrets` is always a failing check.
 
+`init` asks for the transport, client keys (HTTP `static` mode: a key is generated and shown once)
+and the instances, writes the config with `${env:…}` references and the values to `.env`
+(owner-only), then tests each instance. `instance add` / `instance remove` edit the config in place:
+YAML is edited as text, so comments and layout elsewhere stay; a `.bak` copy is kept, and a change
+after which the config doesn't load is undone. Secret variables are named `<INSTANCE>_<FIELD>`
+(`PROD_EU_PASSWORD`), never with the server's own prefix.
+
 `instance trust` never edits the config file: it saves the confirmed chain as
 `certs/<id>.pem` next to the config (or prints it with `--base64`), connects again with only that
 material, and prints the lines to add. An instance that already has `tls.ca` is refused.

@@ -118,7 +118,7 @@ Every configurable thing, grouped by concern.
 | Audit file: JSON Lines, path, rotation, retention | B→R | P0 |
 | Argument handling: none, redacted, hashed | B→R | P0 |
 | Extra audit sinks (S3-compatible, webhook, DB) | R | P2 |
-| Telemetry: OTLP push, on/off (default off), endpoint, protocol, service name | B→R | P0 |
+| Telemetry: OTLP push, on/off (default off), endpoint, protocol, service name | B→R | P1 (moved from P0, 2026-10-10) |
 | Prometheus `/metrics` (HTTP only) | R | P1 |
 | Generated OTel Collector example (incl. S3) in docs | B | P1 |
 

@@ -54,6 +54,11 @@
       <groupId>com.fasterxml.jackson.dataformat</groupId>
       <artifactId>jackson-dataformat-yaml</artifactId>
     </dependency>
+    <!-- already there through jackson-dataformat-yaml; used directly to edit config files in place -->
+    <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
