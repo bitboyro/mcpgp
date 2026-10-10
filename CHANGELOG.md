@@ -117,6 +117,11 @@ versions follow [SemVer](https://semver.org).
   page offers it with its setup. Agents run it with their own token. Guide: docs/guides/agents.md.
 - Naming: `edit` is a recognized verb (`editServer` → `server_edit`).
 
+- Packaging: the `mcpb` target (a desktop MCP Bundle with the server jar; the install dialog asks for
+  the target and its sign-in, or for the config file) and the `docker` target (`docker/Dockerfile`
+  and `docker-compose.yml`: HTTP, non-root, `/config` and `/data`; the customer builds the image).
+  `build.image.push` and `tar` are reported as not available yet.
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 
