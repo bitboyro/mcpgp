@@ -18,6 +18,7 @@ import ro.bitboy.mcpgp.runtime.mcp.McpServerFactory;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Map;
 
 /**
@@ -45,6 +46,7 @@ public class McpgpServer {
             if (context[0] != null) {
                 context[0].close();
             }
+            System.out.flush();
             System.exit(0);
         });
         context[0] = start(startup, stdio);
@@ -88,9 +90,11 @@ public class McpgpServer {
 
     @Bean(destroyMethod = "closeGracefully")
     @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mcpgp.transport", havingValue = "stdio")
-    McpSyncServer stdioServer(McpServerFactory factory, Manifest manifest, Stdio stdio) {
+    McpSyncServer stdioServer(McpServerFactory factory, Manifest manifest, RuntimeConfig config, Stdio stdio) {
+        // on stdin EOF, requests already read get as long as the slowest instance's timeout to finish
+        int longest = config.allInstances().stream().mapToInt(RuntimeConfig.Instance::timeoutSeconds).max().orElse(30);
         StdioTransport transport = new StdioTransport(new JacksonMcpJsonMapper(new ObjectMapper()), stdio.in(), stdio.out(),
-                manifest.mcpRevisions(), stdio.onClose());
+                manifest.mcpRevisions(), Duration.ofSeconds(longest + 10L), stdio.onClose());
         return factory.create(transport);
     }
 }

@@ -35,8 +35,7 @@ class StdioProcessTest {
                     {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
                     """).getBytes(StandardCharsets.UTF_8));
             in.flush();
-            Thread.sleep(2000);
-        }
+        }   // closed at once: the server must still answer what it has read before it exits
         assertThat(process.waitFor(30, TimeUnit.SECONDS)).as("process ends when stdin closes").isTrue();
         assertThat(process.exitValue()).isZero();
         List<String> stdout = Files.readAllLines(out);
