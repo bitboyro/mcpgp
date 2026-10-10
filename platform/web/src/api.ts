@@ -1,0 +1,275 @@
+// The platform API (docs/spec/platform-api.md), as the web UI uses it. The session is an HttpOnly
+// cookie; every request says it comes from the web client, which the platform requires for changes.
+
+export class ApiError extends Error {
+  readonly status: number
+  readonly code: string
+
+  constructor(status: number, code: string, detail: string) {
+    super(detail)
+    this.status = status
+    this.code = code
+  }
+}
+
+export const SIGNED_OUT = 'mcpgp:signed-out'
+
+async function send(method: string, path: string, body?: unknown, contentType?: string): Promise<Response> {
+  const headers: Record<string, string> = { Accept: 'application/json', 'X-Mcpgp-Client': 'web' }
+  let payload: BodyInit | undefined
+  if (body !== undefined) {
+    if (body instanceof Blob || body instanceof ArrayBuffer) {
+      payload = body
+      headers['Content-Type'] = contentType ?? 'application/zip'
+    } else {
+      payload = JSON.stringify(body)
+      headers['Content-Type'] = 'application/json'
+    }
+  }
+  const response = await fetch('/api/v1' + path, { method, headers, body: payload, credentials: 'same-origin' })
+  if (!response.ok) {
+    let code = 'ERROR'
+    let detail = response.statusText || String(response.status)
+    try {
+      const problem = await response.json() as { code?: string; detail?: string }
+      code = problem.code ?? code
+      detail = problem.detail ?? detail
+    } catch {
+      // not a problem document
+    }
+    if (response.status === 401 && path !== '/sessions') window.dispatchEvent(new Event(SIGNED_OUT))
+    throw new ApiError(response.status, code, detail)
+  }
+  return response
+}
+
+async function json<T>(method: string, path: string, body?: unknown, contentType?: string): Promise<T> {
+  return (await send(method, path, body, contentType)).json() as Promise<T>
+}
+
+async function text(path: string): Promise<string> {
+  return (await send('GET', path)).text()
+}
+
+const q = (params: Record<string, string | number | boolean | undefined>) => {
+  const search = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') search.set(k, String(v))
+  const s = search.toString()
+  return s ? '?' + s : ''
+}
+
+const enc = encodeURIComponent
+
+export interface Items<T> { items: T[] }
+
+export interface Identity {
+  id: string
+  kind: 'person' | 'agent' | 'pipeline'
+  name: string
+  scopes: string[]
+  created: string
+  disabled: boolean
+  tokenScopes?: string[]
+}
+
+export interface Token {
+  id: string
+  identity: string
+  scopes: string[]
+  label: string | null
+  created: string
+  expires: string | null
+  revoked: boolean
+  value?: string
+}
+
+export interface VersionRef {
+  number: number
+  digest: string
+  message?: string
+  author: string
+  created: string
+}
+
+export interface ServerSummary {
+  id: string
+  title: string
+  parent?: string
+  archived: boolean
+  latestVersion: number | null
+  updated: string
+}
+
+export interface Server extends ServerSummary {
+  created: string
+  versions: VersionRef[]
+}
+
+export interface VersionDetail extends VersionRef {
+  root: string
+  files: { path: string; sha256: string }[]
+}
+
+export interface Diagnostic {
+  level: 'error' | 'warning' | 'info'
+  code: string
+  message: string
+  location?: string | { file?: string; pointer?: string }
+}
+
+export interface Artifact { name: string; size: number; sha256: string }
+
+export interface Build {
+  id: string
+  server: string
+  version: number
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  startedBy: string
+  created: string
+  started: string | null
+  finished: string | null
+  serverVersion: string | null
+  released: boolean
+  releasedBy?: string
+  archived: boolean
+  deleted: boolean
+  artifacts: Artifact[]
+  error?: string
+}
+
+export interface Approval {
+  id: string
+  action: string
+  target: string
+  requestedBy: string
+  requestedAt: string
+  status: 'pending' | 'approved' | 'rejected'
+  decidedBy: string | null
+  decidedAt: string | null
+  comment: string | null
+}
+
+export interface Activity {
+  ts: string
+  actor: string
+  actorKind: string
+  action: string
+  target: string
+  outcome: string
+  details: Record<string, unknown>
+}
+
+export interface LibraryItem {
+  kind: string
+  name: string
+  title: string
+  reference: string
+  versions: VersionRef[]
+  updated: string
+}
+
+export interface Settings {
+  workspace: string
+  auth: { local: boolean; oidc: boolean }
+  signing: { configured: boolean }
+  retention: { archiveAfterDays: number; deleteArchivedAfterDays: number; keepLast: number }
+  guardrails: { agentBuildsPerHour: number; agentVersionsPerHour: number }
+}
+
+// The manifest (docs/spec/manifest.md): only the parts the UI shows are typed.
+export interface ProvenanceStep { step: string; value?: unknown; file?: string; pointer?: string; op?: string }
+
+export interface Tool {
+  name: string
+  title?: string
+  description?: string
+  kind: 'api' | 'pack' | 'builtin'
+  api?: string
+  pack?: string
+  handler?: string
+  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean }
+  confirm?: boolean
+  sensitive?: boolean
+  operation?: { key: string; operationId?: string; tags?: string[] }
+  inputSchema?: unknown
+  provenance?: Record<string, ProvenanceStep[]>
+  variants?: Record<string, { method: string; path: string; security?: { scheme: string; scopes?: string[] }[][] }>
+}
+
+export interface Contract { version: string; format: string; basePath?: string; default: boolean; digest: string }
+
+export interface ManifestApi {
+  id: string
+  title?: string
+  toolPrefix?: string
+  contracts: Contract[]
+  detect?: { method: string; path: string; pointer?: string; pattern?: string }
+  downstreamAuth?: { supported: string[]; identity?: string; unsatisfiedTools?: string; apiKey?: { in: string; name: string } }
+}
+
+export interface Manifest {
+  manifestVersion: string
+  server: { name: string; title?: string; version: string; instructions?: string }
+  build: { extends?: { name: string; version?: string } | null; definition?: { digest: string } }
+  apis: ManifestApi[]
+  tools: Tool[]
+  exposure: { mode: string; discoveryStyle?: string; pinned?: string[] }
+  instances: { mode: 'single' | 'multi'; mixedContracts?: string; max?: number | null }
+  packs: { id: string; version: string; tools: string[] }[]
+  policies: { confirmDestructive?: boolean; responseLimitKb?: number; redaction?: { fields: string[] } }
+  runtime: { transports?: { allowed: string[]; default: string }; inboundAuth?: { allowed: string[]; default: string } }
+  diagnostics: Diagnostic[]
+}
+
+export interface PackageFile { path: string; size: number }
+
+export const api = {
+  signInOptions: () => json<{ auth: { local: boolean; oidc: boolean } }>('GET', '/platform'),
+  signIn: (name: string, password: string) => json<Token>('POST', '/sessions', { name, password }),
+  signOut: () => json<{ signedOut: boolean }>('DELETE', '/sessions/current'),
+  me: () => json<Identity>('GET', '/me'),
+  settings: () => json<Settings>('GET', '/settings'),
+
+  servers: (archived = false) => json<Items<ServerSummary>>('GET', '/servers' + q({ archived: archived || undefined })),
+  server: (id: string) => json<Server>('GET', `/servers/${enc(id)}`),
+  createServer: (id: string, files: Record<string, string> | Blob, title?: string) =>
+    json<Server>('POST', '/servers' + q({ id, title }), files instanceof Blob ? files : { files }),
+  addVersion: (id: string, files: Record<string, string> | Blob, message?: string) =>
+    json<Server>('POST', `/servers/${enc(id)}/versions` + q({ message }), files instanceof Blob ? files : { files }),
+  version: (id: string, version: string | number) => json<VersionDetail>('GET', `/servers/${enc(id)}/versions/${version}`),
+  file: (id: string, version: string | number, path: string) =>
+    text(`/servers/${enc(id)}/versions/${version}/files/${path.split('/').map(enc).join('/')}`),
+  validate: (id: string, version: string | number) =>
+    json<{ ok?: boolean; diagnostics: Diagnostic[] }>('POST', `/servers/${enc(id)}/versions/${version}/validate`),
+  exampleConfig: (id: string, version: string | number = 'latest') => text(`/servers/${enc(id)}/versions/${version}/example-config`),
+  manifest: (id: string, version: string | number = 'latest') => json<Manifest>('GET', `/servers/${enc(id)}/versions/${version}/manifest`),
+  duplicate: (id: string, body: { id: string; title?: string }) => json<Server>('POST', `/servers/${enc(id)}/duplicate`, body),
+  variant: (id: string, body: { id: string; title?: string; pin?: boolean }) => json<Server>('POST', `/servers/${enc(id)}/variants`, body),
+  archiveServer: (id: string) => json<Server>('POST', `/servers/${enc(id)}/archive`),
+  restoreServer: (id: string) => json<Server>('POST', `/servers/${enc(id)}/restore`),
+
+  builds: (server: string, archived = false) => json<Items<Build>>('GET', `/servers/${enc(server)}/builds` + q({ archived: archived || undefined })),
+  startBuild: (server: string, body: { version?: string | number; buildNumber?: number } = {}) =>
+    json<Build>('POST', `/servers/${enc(server)}/builds`, body),
+  build: (id: string) => json<Build>('GET', `/builds/${enc(id)}`),
+  buildLog: (id: string) => text(`/builds/${enc(id)}/log`),
+  artifacts: (id: string) => json<{ items: Artifact[]; packageFiles?: PackageFile[] }>('GET', `/builds/${enc(id)}/artifacts`),
+  artifactUrl: (id: string, name: string, file?: string) => `/api/v1/builds/${enc(id)}/artifacts/${enc(name)}` + q({ file }),
+  release: (id: string) => send('POST', `/builds/${enc(id)}/release`).then(async (r) => ({ status: r.status, body: await r.json() as Build | { approval: Approval } })),
+  archiveBuild: (id: string) => json<Build>('POST', `/builds/${enc(id)}/archive`),
+  restoreBuild: (id: string) => json<Build>('POST', `/builds/${enc(id)}/restore`),
+  deleteBuild: (id: string) => json<Build>('DELETE', `/builds/${enc(id)}`),
+
+  library: () => json<{ workspace: string; items: LibraryItem[] }>('GET', '/library'),
+
+  identities: () => json<Items<Identity>>('GET', '/identities'),
+  createIdentity: (body: { kind: string; name: string; role?: string; scopes?: string[] }) => json<Identity>('POST', '/identities', body),
+  tokens: () => json<Items<Token>>('GET', '/tokens'),
+  createToken: (body: { identity?: string; label?: string; scopes?: string[]; expiresInDays?: number }) => json<Token>('POST', '/tokens', body),
+  revokeToken: (id: string) => json<Token>('DELETE', `/tokens/${enc(id)}`),
+  approvals: (status = 'pending') => json<Items<Approval>>('GET', '/approvals' + q({ status })),
+  decide: (id: string, approve: boolean, comment?: string) =>
+    json<Approval>('POST', `/approvals/${enc(id)}/${approve ? 'approve' : 'reject'}`, { comment }),
+  activity: (filter: { server?: string; actor?: string; action?: string; limit?: number } = {}) =>
+    json<Items<Activity>>('GET', '/activity' + q(filter)),
+}

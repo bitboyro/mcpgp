@@ -7,6 +7,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import ro.bitboy.mcpgp.platform.api.AuthFilter;
+import ro.bitboy.mcpgp.platform.api.WebUi;
 import ro.bitboy.mcpgp.platform.service.Access;
 import ro.bitboy.mcpgp.platform.service.Accounts;
 import ro.bitboy.mcpgp.platform.service.Guardrails;
@@ -138,6 +139,14 @@ public class PlatformServer {
         FilterRegistrationBean<AuthFilter> registration = new FilterRegistrationBean<>(new AuthFilter(access));
         registration.addUrlPatterns("/api/v1/*");
         registration.setOrder(1);
+        return registration;
+    }
+
+    @Bean
+    FilterRegistrationBean<WebUi.Headers> webHeaders() {
+        FilterRegistrationBean<WebUi.Headers> registration = new FilterRegistrationBean<>(new WebUi.Headers());
+        registration.addUrlPatterns("/*");
+        registration.setOrder(0);
         return registration;
     }
 }

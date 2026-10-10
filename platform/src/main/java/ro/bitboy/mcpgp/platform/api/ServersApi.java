@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import ro.bitboy.mcpgp.core.Compiler;
 import ro.bitboy.mcpgp.core.diag.Diagnostic;
 import ro.bitboy.mcpgp.core.manifest.ManifestWriter;
+import ro.bitboy.mcpgp.packager.ExampleConfig;
 import ro.bitboy.mcpgp.platform.service.Access;
 import ro.bitboy.mcpgp.platform.service.Compilation;
 import ro.bitboy.mcpgp.platform.service.Servers;
@@ -141,6 +142,20 @@ public class ServersApi {
     }
 
     /** {@code {id, title?}}: an independent copy of the latest version. */
+    /** The example configuration the package will ship (packaging.md): what the customer fills in. */
+    @GetMapping("/{id}/versions/{version}/example-config")
+    public ResponseEntity<byte[]> exampleConfig(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
+        who(request).require("servers:read");
+        Model.VersionRef ref = servers.version(servers.get(id), version);
+        Compilation.Preview preview = compilation.preview(servers.files(ref), ref.created());
+        if (preview.manifest() == null) {
+            throw new ApiException(422, "VALIDATION", "version " + ref.number() + " does not compile",
+                    Map.of("diagnostics", diagnostics(preview.result().diagnostics())));
+        }
+        String yaml = ExampleConfig.yaml(Json.parse(preview.manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/yaml")).body(yaml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     @PostMapping("/{id}/duplicate")
     public ResponseEntity<byte[]> duplicate(HttpServletRequest request, @PathVariable String id, @RequestBody(required = false) byte[] body) {
         Access.Principal who = who(request);

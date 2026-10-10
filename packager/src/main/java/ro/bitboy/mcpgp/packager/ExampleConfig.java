@@ -10,12 +10,12 @@ import java.util.Locale;
  * {@code <server>.example.yaml}: a commented starting point for the customer, valid against the
  * build's config schema. Secrets appear only as references; values go to {@code .env}.
  */
-final class ExampleConfig {
+public final class ExampleConfig {
 
     private ExampleConfig() {
     }
 
-    static String yaml(JsonNode manifest) {
+    public static String yaml(JsonNode manifest) {
         String server = manifest.at("/server/name").asText();
         boolean multi = manifest.at("/instances/mode").asText().equals("multi");
         List<String> lines = new ArrayList<>();
