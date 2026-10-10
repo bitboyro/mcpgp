@@ -44,6 +44,32 @@
 
   <build>
     <plugins>
+      <!-- the CLI carries the server runtime, so `mcpgp build` needs neither Maven nor the network -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>bundle-runtime</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>ro.bitboy.mcpgp</groupId>
+                  <artifactId>mcpgp-runtime</artifactId>
+                  <version>${project.version}</version>
+                  <classifier>exec</classifier>
+                  <outputDirectory>${project.build.outputDirectory}/mcpgp</outputDirectory>
+                  <destFileName>runtime.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>

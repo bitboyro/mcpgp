@@ -8,6 +8,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
+import ro.bitboy.mcpgp.cli.pack.Packager;
 import ro.bitboy.mcpgp.core.Compiler;
 import ro.bitboy.mcpgp.core.diag.Codes;
 import ro.bitboy.mcpgp.core.diag.Diagnostic;
@@ -165,7 +166,7 @@ public final class Main {
         @Parameters(paramLabel = "<definition>", description = "Root definition file (*.mcpgp.yaml).")
         Path definition;
 
-        @Option(names = "--manifest-only", description = "Write only the manifest (packaging comes in a later version).")
+        @Option(names = "--manifest-only", description = "Write only the manifest, no package.")
         boolean manifestOnly;
 
         @Option(names = "--out", paramLabel = "<dir>", defaultValue = "dist", description = "Output directory (default: ${DEFAULT-VALUE}).")
@@ -185,10 +186,6 @@ public final class Main {
 
         @Override
         public Integer call() throws IOException {
-            if (!manifestOnly) {
-                common.spec.commandLine().getErr().println("Packaging is not available yet; use --manifest-only.");
-                return ERRORS;
-            }
             Diagnostics workspaceDiagnostics = new Diagnostics();
             Workspace workspace = common.workspace(workspaceDiagnostics);
             ManifestWriter.Build build = new ManifestWriter.Build(createdAt(definition), Compiler.VERSION, version, buildNumber, source);
@@ -200,12 +197,21 @@ public final class Main {
                 return code == OK ? ERRORS : code;
             }
             ObjectNode manifest = result.manifest().get();
-            String name = manifest.at("/server/name").asText() + "-" + manifest.at("/server/version").asText();
-            Files.createDirectories(out);
-            Path file = out.resolve(name + ".manifest.json");
-            Files.writeString(file, CanonicalJson.pretty(manifest));
+            if (manifestOnly) {
+                String name = manifest.at("/server/name").asText() + "-" + manifest.at("/server/version").asText();
+                Files.createDirectories(out);
+                Path file = out.resolve(name + ".manifest.json");
+                Files.writeString(file, CanonicalJson.pretty(manifest));
+                if (!common.json && !common.quiet) {
+                    common.out().println("wrote " + file + " (" + manifest.path("tools").size() + " tools)");
+                }
+                return OK;
+            }
+            Packager.Result packaged = new Packager(() -> Main.class.getResourceAsStream(Packager.RUNTIME_RESOURCE))
+                    .build(manifest, result.definition().orElseThrow().document(), build.createdAt(), out);
+            packaged.warnings().forEach(w -> common.spec.commandLine().getErr().println("warning: " + w));
             if (!common.json && !common.quiet) {
-                common.out().println("wrote " + file + " (" + manifest.path("tools").size() + " tools)");
+                common.out().println("wrote " + packaged.zip() + " (" + manifest.path("tools").size() + " tools) and " + packaged.manifest());
             }
             return OK;
         }
