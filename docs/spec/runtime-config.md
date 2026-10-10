@@ -383,6 +383,14 @@ The server refuses to start, with a message naming the key, when:
 | `<server> instance trust <id> [--base64] [--yes]` | Fetch, show and save the certificate an instance presents |
 | `<server> client add <claude-code\|claude-desktop\|cursor\|vscode> [--print]` | Register with an MCP client |
 
+Commands run without starting the server, take the same `--config` and `--<key> <value>` options,
+and exit `0` (all checks passed), `1` (a check failed) or `2` (usage). `doctor` marks each check
+`✓`, `!` (worth a look) or `✗` (fails); `allowInlineSecrets` is always a failing check.
+
+`instance trust` never edits the config file: it saves the confirmed chain as
+`certs/<id>.pem` next to the config (or prints it with `--base64`), connects again with only that
+material, and prints the lines to add. An instance that already has `tls.ca` is refused.
+
 Examples: [examples/client](../../examples/client).
 
 ## 9. Security considerations

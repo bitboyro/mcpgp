@@ -40,6 +40,9 @@ versions follow [SemVer](https://semver.org).
   (`explain_tool`, `manifest_info`), schema (`describe_schema`) and diagnostics
   (`tls_certificate_fetch`, `connectivity_check`). Tools the runtime doesn't implement yet are not
   offered.
+- Customer commands on the server: `doctor [--quick]`, `instance list`, `instance test <id>`,
+  `instance trust <id> [--base64] [--yes]` (trust on first use, saved to `certs/<id>.pem`).
+- `mcpgp explain <def> <tool>`: provenance of a tool's name, title and description.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.

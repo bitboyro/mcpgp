@@ -1,5 +1,6 @@
 package ro.bitboy.mcpgp.cli;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -31,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 /** {@code mcpgp}: the command line (spec/cli.md). Exit codes follow cli.md §4. */
 @Command(name = "mcpgp", mixinStandardHelpOptions = true, version = Compiler.VERSION,
         description = "Generate MCP servers from OpenAPI contracts.",
-        subcommands = {Main.Validate.class, Main.Build.class})
+        subcommands = {Main.Validate.class, Main.Build.class, Main.Explain.class})
 public final class Main {
 
     static final int OK = 0;
@@ -205,6 +206,81 @@ public final class Main {
             Files.writeString(file, CanonicalJson.pretty(manifest));
             if (!common.json && !common.quiet) {
                 common.out().println("wrote " + file + " (" + manifest.path("tools").size() + " tools)");
+            }
+            return OK;
+        }
+    }
+
+    @Command(name = "explain", description = "Where a tool's name, title and description come from.")
+    static final class Explain implements Callable<Integer> {
+        @CommandLine.Mixin
+        Common common;
+
+        @Parameters(index = "0", paramLabel = "<definition>", description = "Root definition file (*.mcpgp.yaml).")
+        Path definition;
+
+        @Parameters(index = "1", paramLabel = "<tool>", description = "Tool name, as in the manifest.")
+        String tool;
+
+        @Override
+        public Integer call() {
+            Diagnostics workspaceDiagnostics = new Diagnostics();
+            Workspace workspace = common.workspace(workspaceDiagnostics);
+            Compiler.Result result = new Compiler(common.schemas).compile(definition, new Compiler.Options(workspace, false));
+            List<Diagnostic> all = new ArrayList<>(workspaceDiagnostics.all());
+            all.addAll(result.diagnostics());
+            if (result.manifest().isEmpty()) {
+                int code = common.report(definition, all);
+                return code == OK ? ERRORS : code;
+            }
+            JsonNode found = null;
+            List<String> names = new ArrayList<>();
+            for (JsonNode t : result.manifest().get().path("tools")) {
+                names.add(t.path("name").asText());
+                if (t.path("name").asText().equals(tool)) {
+                    found = t;
+                }
+            }
+            if (found == null) {
+                common.spec.commandLine().getErr().println("No tool named " + tool + " in " + definition
+                        + ". Tools: " + String.join(", ", names));
+                return ERRORS;
+            }
+            if (common.json) {
+                ObjectNode explained = new ObjectMapper().createObjectNode().put("name", tool);
+                explained.set("operation", found.path("operation"));
+                explained.set("provenance", found.path("provenance"));
+                common.out().println(CanonicalJson.compact(explained));
+                return OK;
+            }
+            PrintWriter out = common.out();
+            out.println(tool + (found.has("operation") ? "  (" + found.at("/operation/key").asText() + ")" : "  (" + found.path("kind").asText() + ")"));
+            for (String field : List.of("name", "title", "description")) {
+                JsonNode steps = found.path("provenance").path(field);
+                if (steps.isEmpty()) {
+                    continue;
+                }
+                out.println(field + ":");
+                for (JsonNode step : steps) {
+                    StringBuilder line = new StringBuilder("  " + String.format("%-18s", step.path("step").asText()));
+                    if (step.has("value")) {
+                        line.append(" ").append(step.path("value").asText());
+                    }
+                    List<String> from = new ArrayList<>();
+                    if (step.has("file")) {
+                        from.add(step.path("file").asText() + (step.has("pointer") ? "#" + step.path("pointer").asText() : ""));
+                    }
+                    if (step.has("op")) {
+                        from.add(step.path("op").asText());
+                    }
+                    if (step.has("since")) {
+                        from.add("since " + step.path("since").asText());
+                    }
+                    if (!from.isEmpty()) {
+                        line.append("   [").append(String.join(", ", from)).append("]");
+                    }
+                    out.println(line);
+                }
             }
             return OK;
         }

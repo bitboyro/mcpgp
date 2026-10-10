@@ -70,4 +70,14 @@ class MainTest {
         assertThat(run("build", "--workspace", WORKSPACE, "--out", dist.toString(), ORDERS)).isEqualTo(1);
         assertThat(err.toString()).contains("--manifest-only");
     }
+
+    @Test
+    void explainShowsProvenance() {
+        assertThat(run("explain", "--workspace", WORKSPACE, ORDERS, "orders_customer_get")).isZero();
+        assertThat(out.toString()).contains("orders_customer_get  (orders:GET:/customers/{id})")
+                .contains("vocabulary         customer_get")
+                .contains("[overrides/10-customers.yaml#/rules/0, prepend]");
+        assertThat(run("explain", "--workspace", WORKSPACE, ORDERS, "nope")).isEqualTo(1);
+        assertThat(err.toString()).contains("No tool named nope");
+    }
 }
