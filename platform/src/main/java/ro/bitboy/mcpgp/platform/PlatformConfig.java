@@ -15,7 +15,16 @@ import java.util.Map;
  * Environment variables {@code MCPGP_PLATFORM_STORAGE__ROOT}, {@code MCPGP_PLATFORM_HTTP__HOST} and
  * {@code MCPGP_PLATFORM_HTTP__PORT} override the file.
  */
-public record PlatformConfig(Path storageRoot, String host, int port) {
+public record PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention) {
+
+    /** Build retention (spec/platform-api.md §2.2); released builds and the last {@code keepLast} are never touched. */
+    public record Retention(int archiveAfterDays, int deleteArchivedAfterDays, int keepLast) {
+        public static final Retention DEFAULT = new Retention(90, 365, 10);
+    }
+
+    public PlatformConfig(Path storageRoot, String host, int port) {
+        this(storageRoot, host, port, null, Retention.DEFAULT);
+    }
 
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
 
@@ -43,7 +52,12 @@ public record PlatformConfig(Path storageRoot, String host, int port) {
         if (!storage.isAbsolute() && file != null) {
             storage = file.toAbsolutePath().getParent().resolve(storage).normalize();
         }
-        return new PlatformConfig(storage, host, port);
+        String signing = env.getOrDefault("MCPGP_PLATFORM_SIGNING__KEY", doc.at("/signing/key").asText(null));
+        JsonNode retention = doc.path("retention");
+        Retention r = new Retention(retention.path("archiveAfterDays").asInt(Retention.DEFAULT.archiveAfterDays()),
+                retention.path("deleteArchivedAfterDays").asInt(Retention.DEFAULT.deleteArchivedAfterDays()),
+                retention.path("keepLast").asInt(Retention.DEFAULT.keepLast()));
+        return new PlatformConfig(storage, host, port, signing, r);
     }
 
     static Path configFile(String[] args) {

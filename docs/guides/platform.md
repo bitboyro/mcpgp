@@ -40,4 +40,17 @@ curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
      -d '{"kind":"agent","name":"build-bot","role":"builder"}' localhost:8443/api/v1/identities
 ```
 
+Builds:
+
+```bash
+# build the latest version, then download the signed package
+curl -X POST -H "Authorization: Bearer $TOKEN" localhost:8443/api/v1/servers/orders/builds
+curl -H "Authorization: Bearer $TOKEN" localhost:8443/api/v1/builds/<id>            # status
+curl -H "Authorization: Bearer $TOKEN" localhost:8443/api/v1/builds/<id>/log
+curl -OJ -H "Authorization: Bearer $TOKEN" localhost:8443/api/v1/builds/<id>/artifacts/orders-mcp-2.0.0.zip
+```
+
+Packages are signed when `signing.key` is set (a reference, e.g. `"${env:MCPGP_SIGNING_KEY}"`; create the
+key with `mcpgp keygen`). Retention: `retention: { archiveAfterDays: 90, deleteArchivedAfterDays: 365, keepLast: 10 }`.
+
 The API describes itself at `/api/v1/openapi.json`.

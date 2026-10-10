@@ -34,7 +34,7 @@
   <dependencies>
     <dependency>
       <groupId>ro.bitboy.mcpgp</groupId>
-      <artifactId>mcpgp-core</artifactId>
+      <artifactId>mcpgp-packager</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

@@ -23,6 +23,7 @@
     <module>schemas</module>
     <module>core</module>
     <module>runtime</module>
+    <module>packager</module>
     <module>cli</module>
     <module>platform</module>
   </modules>

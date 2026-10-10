@@ -4,7 +4,7 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
-import ro.bitboy.mcpgp.cli.pack.Minisign;
+import ro.bitboy.mcpgp.packager.Minisign;
 
 import java.io.IOException;
 import java.io.OutputStream;

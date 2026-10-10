@@ -1,4 +1,4 @@
-package ro.bitboy.mcpgp.cli.pack;
+package ro.bitboy.mcpgp.packager;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

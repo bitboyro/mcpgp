@@ -63,6 +63,11 @@ versions follow [SemVer](https://semver.org).
   archive/restore with ETags, identities and tokens with scopes and roles, `init` for the first
   administrator, activity log, and the API's own OpenAPI document.
 - Naming: more verbs recognized (archive, restore, revoke, release, publish, assign, grant, …).
+- Platform builds: queued and run in order with the CLI's compiler and packager, live log,
+  artifacts (package zip, manifest, any single file of the package), signing with the platform's key
+  (`signing.key`), build numbers for rebuilds, release (people only for now), archive / restore /
+  delete (released builds archived first; records stay), daily retention.
+- `packager` module: packaging moved out of the CLI, shared by the CLI and the platform.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.
