@@ -31,7 +31,11 @@ final class Naming {
             "get", "list", "create", "update", "delete", "search", "find", "query", "add", "remove", "set",
             "put", "patch", "post", "retrieve", "fetch", "read", "modify", "change", "replace", "upload",
             "download", "send", "resend", "refund", "cancel", "approve", "reject", "start", "stop", "enable",
-            "disable", "validate", "check", "count", "export", "import", "sync", "test", "erase", "new");
+            "disable", "validate", "check", "count", "export", "import", "sync", "test", "erase", "new",
+            "archive", "restore", "revoke", "release", "publish", "unpublish", "assign", "unassign", "grant", "activate",
+            "deactivate", "lock", "unlock", "move", "copy", "clone", "duplicate", "merge", "rename", "submit", "close", "open",
+            "reset", "verify", "refresh", "accept", "decline", "execute", "run", "trigger", "schedule", "register",
+            "unregister", "subscribe", "unsubscribe", "attach", "detach", "link", "unlink", "generate", "deploy");
 
     private final String source;
     private final String fallback;

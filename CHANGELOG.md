@@ -57,6 +57,12 @@ versions follow [SemVer](https://semver.org).
   variable), TOOLS, OPERATIONS; AGENTS.md and llms.txt with `build.docs: [agents]`.
 - Package signing: Ed25519 over `SHA256SUMS` in minisign format (prehashed), `SIGNING-KEY.pub` in the
   package; `mcpgp keygen` and `mcpgp verify`.
+- `platform` module (M5): the self-hosted platform. File store (content-addressed blobs, immutable
+  versions, store format `0.1`, refused when different), servers and versions (zip or JSON uploads
+  with path and size checks), files, validate and manifest preview with the CLI's compiler,
+  archive/restore with ETags, identities and tokens with scopes and roles, `init` for the first
+  administrator, activity log, and the API's own OpenAPI document.
+- Naming: more verbs recognized (archive, restore, revoke, release, publish, assign, grant, …).
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.
