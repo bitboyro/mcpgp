@@ -8,6 +8,7 @@ public final class ToolError extends RuntimeException {
 
     private final String code;
     private final String hint;
+    private java.util.Map<String, Object> meta = java.util.Map.of();
 
     public ToolError(String code, String message, String hint) {
         super(message, null, false, false);
@@ -25,5 +26,15 @@ public final class ToolError extends RuntimeException {
 
     public String hint() {
         return hint;
+    }
+
+    /** {@code _meta} for the error result (instance, contract, correlation id). */
+    public ToolError withMeta(java.util.Map<String, Object> meta) {
+        this.meta = java.util.Map.copyOf(meta);
+        return this;
+    }
+
+    public java.util.Map<String, Object> meta() {
+        return meta;
     }
 }

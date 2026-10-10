@@ -14,6 +14,12 @@ versions follow [SemVer](https://semver.org).
 - `runtime` module (Spring Boot, MCP Java SDK): loads the embedded manifest and the operator config
   (YAML/JSON file, `.env`, environment variables, flags, secret references, startup checks) and
   serves the tool list over stdio with the `instance` enum filled in; `instances_list`.
+- Runtime: API tool calls: instance and contract selection, read-only instances, input validation
+  (schema and contract), request building (parameter styles, JSON, form, multipart with per-part
+  content types, binary bodies, body check before sending), file inputs (base64 / path within a
+  root, size caps), basic / bearer / apiKey credentials, response and error mapping with redaction
+  and `errors.detail`.
+- Conformance traffic runner (Java): runs `traffic.yaml` steps against a mock target.
 - `schemas` module: JSON Schemas (draft 2020-12) for the definition, rule files, naming policy,
   name lock file, workspace mapping, runtime config, manifest, audit event, CLI config, tool tests and
   conformance files; a validator; tests that validate every example and conformance file.
