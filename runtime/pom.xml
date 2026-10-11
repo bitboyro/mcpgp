@@ -46,6 +46,20 @@
       <artifactId>mcp-json-jackson2</artifactId>
       <version>${mcp-sdk.version}</version>
     </dependency>
+    <!-- telemetry, off by default (audit-and-errors §4): OTLP push, or a Prometheus endpoint -->
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-exporter-otlp</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-exporter-prometheus</artifactId>
+      <version>${opentelemetry-alpha.version}</version>
+    </dependency>
     <!-- inbound OAuth: JWT access tokens checked against the issuer's JWKS (auth.md §1.1) -->
     <dependency>
       <groupId>com.nimbusds</groupId>

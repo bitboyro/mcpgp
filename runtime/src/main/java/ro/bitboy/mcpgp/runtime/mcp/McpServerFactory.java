@@ -171,6 +171,8 @@ public final class McpServerFactory {
         McpSchema.CallToolResult result;
         String outcome = "ok";
         String code = null;
+        ro.bitboy.mcpgp.runtime.telemetry.Telemetry.Call traced = ro.bitboy.mcpgp.runtime.telemetry.Telemetry.current()
+                .call(name, tool == null ? null : tool.path("api").asText(null));
         try {
             if (tool == null) {
                 throw new ToolError("INPUT_VALIDATION", "Unknown tool " + name);
@@ -205,6 +207,8 @@ public final class McpServerFactory {
             result = Results.error(new ToolError("INTERNAL", "The tool failed unexpectedly; see the server log"), null);
         } finally {
             MDC.remove("cid");
+            traced.result(record.api, record.instance, record.contract, outcome, code);
+            traced.close();
         }
         result = withCorrelation(result, cid);
         auditCall(name, tool, arguments, record, outcome, code, cid, (System.nanoTime() - started) / 1_000_000, exchange);

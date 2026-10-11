@@ -57,7 +57,7 @@
         },
         "prometheus": {
           "type": "object",
-          "properties": { "path": { "type": "string" }, "port": { "$ref": "#/$defs/port" } },
+          "properties": { "port": { "$ref": "#/$defs/port" } },
           "additionalProperties": false
         },
         "serviceName": { "type": "string" },

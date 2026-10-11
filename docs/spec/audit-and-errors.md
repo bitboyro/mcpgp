@@ -71,10 +71,19 @@ upstream bodies.
 
 ## 4. Telemetry
 
-- OpenTelemetry. **Off by default.** Exporter `otlp` (push) or `prometheus` (HTTP builds).
-- Traces: one span per tool call, child span per upstream request; attributes `mcpgp.tool`,
-  `mcpgp.instance`, `mcpgp.contract`, `mcpgp.outcome`, `mcpgp.code`.
-- Metrics: `mcpgp.tool.calls` (counter), `mcpgp.tool.duration` (histogram), `mcpgp.instance.up` (gauge).
+- OpenTelemetry (SDK 1.62). **Off by default** (`telemetry.enabled`; `OTEL_SDK_DISABLED=true` keeps it
+  off). Exporter `otlp` (push; `protocol: grpc`, default endpoint `http://localhost:4317`, or
+  `http/protobuf`, default `http://localhost:4318`; `headers` are secrets) or `prometheus` (HTTP
+  servers only: an endpoint at `http://<server.host>:<telemetry.prometheus.port>/metrics`, default
+  port 9464). `signals` chooses `traces` and `metrics` (both by default; `prometheus` has metrics
+  only). Telemetry is set when the server starts; a config reload doesn't change it.
+- Traces: one span per tool call (`tool <name>`, kind server), a child span per upstream request
+  (the HTTP method, kind client, `http.response.status_code`); attributes `mcpgp.tool`, `mcpgp.api`,
+  `mcpgp.instance`, `mcpgp.contract`, `mcpgp.outcome`, `mcpgp.code`. A discovery call's inner call is
+  a child of its span.
+- Metrics: `mcpgp.tool.calls` (counter), `mcpgp.tool.duration` (histogram, seconds), both by tool, API,
+  instance, outcome and code; `mcpgp.instance.up` (gauge: 1 when the instance's last upstream
+  request got an answer, 0 when it couldn't be reached).
 - **Never** arguments, bodies or credentials.
 - Storage destinations (S3, Grafana, Datadog…) are configured in an OpenTelemetry Collector, not in
   the server. Builds include an example Collector config in `OPERATIONS.md`.
