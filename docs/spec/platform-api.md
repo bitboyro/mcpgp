@@ -52,6 +52,14 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   policy's reference, or null), `own` (what the definition sets in `naming` itself), `effective` (the
   merged policy the compiler used) and `lock: { present, entries: [{ id, name, since }] }`. Each tool's
   name steps are in the manifest's provenance; the Naming section of Tools & rules shows both.
+- `POST /servers/{id}/versions/{version}/try { tool, arguments }` (`builds:run`) calls a tool of the
+  version as an agent would, against a **mock** of its API: the server mcpgp packages runs on the
+  platform with the version's manifest, its instance (`mock`) is a loopback server that answers every
+  operation with the spec's examples (or values made from the response schemas), and nothing reaches a
+  real system. The answer: `result` (or a JSON-RPC `error`), `requests` (what the server sent to the
+  mock: method, path, query, headers without credentials, body, status) and `leftOut`. Extensions are
+  left out (custom tools, enrichers, call filters): the platform never runs builders' code; `mcpgp
+  test` runs it. A few servers stay running per version and stop after five idle minutes.
 - `GET /servers/{id}/versions/{version}/definition` returns the definition as data: `root` (the root
   file as written) and `resolved` (with what it extends, includes and its naming policy merged in).
   The pages read notices and their own rules from it.

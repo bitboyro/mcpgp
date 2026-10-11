@@ -54,6 +54,6 @@ deliver (it shows them; they change in the definition), and editing rules on the
 
 - ~~Label every target-server list on platform pages as **example** data.~~ The customer-setup
   previews show the package's example config, marked **Example data**.
-- Tools page: "Try against the mock" instead of a real test call.
+- ~~Tools page: "Try against the mock" instead of a real test call.~~ Done: Try it on a tool.
 - ~~Add a **Naming** section to Tools & rules (policy, vocabulary, limits, old → new table).~~ Done:
   Tools & rules → Naming.

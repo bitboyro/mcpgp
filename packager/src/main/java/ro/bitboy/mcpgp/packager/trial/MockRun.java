@@ -1,4 +1,4 @@
-package ro.bitboy.mcpgp.cli;
+package ro.bitboy.mcpgp.packager.trial;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,19 +27,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 /**
- * {@code mcpgp test} (cli.md §3, ci-pipeline.md §5): starts the server the CLI packages (the same runtime
+ * {@code mcpgp test} (cli.md §3, ci-pipeline.md §5) and trying tools on the platform: starts the server mcpgp packages (the same runtime
  * jar, in stdio mode) with the compiled manifest, against a {@link SpecMock} instance named {@code mock},
  * then runs a smoke check and the test cases.
  */
-final class TestRun implements AutoCloseable {
+public final class MockRun implements AutoCloseable {
 
-    static final String INSTANCE = "mock";
+    public static final String INSTANCE = "mock";
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final long TIMEOUT_SECONDS = 60;
 
     /** One case's outcome; {@code problem} is null when it passed. */
-    record Outcome(String name, String file, String problem) {
-        boolean passed() {
+    public record Outcome(String name, String file, String problem) {
+        public boolean passed() {
             return problem == null;
         }
     }
@@ -52,12 +52,12 @@ final class TestRun implements AutoCloseable {
     private final StringBuilder log = new StringBuilder();
     private int id;
 
-    TestRun(JsonNode manifest, Collection<ApiModel.Contract> contracts, InputStream runtimeJar, Path dir) throws IOException {
+    public MockRun(JsonNode manifest, Collection<ApiModel.Contract> contracts, InputStream runtimeJar, Path dir) throws IOException {
         this(manifest, contracts, runtimeJar, dir, null);
     }
 
     /** @param root the definition's folder, where extension artifacts are copied from (next to the manifest the server runs) */
-    TestRun(JsonNode manifest, Collection<ApiModel.Contract> contracts, InputStream runtimeJar, Path dir, Path root) throws IOException {
+    public MockRun(JsonNode manifest, Collection<ApiModel.Contract> contracts, InputStream runtimeJar, Path dir, Path root) throws IOException {
         this.manifest = manifest;
         this.mock = new SpecMock(contracts);
         Path jar = dir.resolve("runtime.jar");
@@ -115,7 +115,7 @@ final class TestRun implements AutoCloseable {
     }
 
     /** Starts the MCP session and checks that the server lists its tools; null when it did. */
-    String smoke() {
+    public String smoke() {
         try {
             JsonNode init = request("initialize", Map.of("protocolVersion", "2025-11-25", "capabilities", Map.of(),
                     "clientInfo", Map.of("name", "mcpgp-test", "version", ro.bitboy.mcpgp.core.Compiler.VERSION)));
@@ -141,7 +141,7 @@ final class TestRun implements AutoCloseable {
     }
 
     /** Runs the cases of one file ({@code cases: [{name, tool, args, expect}]}). */
-    List<Outcome> run(Path file) throws IOException {
+    public List<Outcome> run(Path file) throws IOException {
         JsonNode suite = new YAMLMapper().readTree(file.toFile());
         List<Outcome> outcomes = new ArrayList<>();
         int index = 0;
@@ -261,8 +261,51 @@ final class TestRun implements AutoCloseable {
         return text.length() > 200 ? text.substring(0, 200) + "…" : text;
     }
 
+    /**
+     * One tool call, as an agent makes it: the JSON-RPC answer ({@code result} or {@code error}) and the
+     * requests the mock received for it. {@code instance: mock} is dropped for tools without an instance.
+     */
+    public JsonNode call(String tool, Map<String, Object> arguments) throws IOException {
+        Map<String, Object> args = new java.util.LinkedHashMap<>(arguments == null ? Map.of() : arguments);
+        JsonNode served = tool(tool);
+        if (served != null && INSTANCE.equals(args.get("instance")) && !served.at("/inputSchema/properties").has("instance")) {
+            args.remove("instance");
+        }
+        mock.drain();
+        ObjectNode answer = JSON.createObjectNode();
+        JsonNode response = request("tools/call", Map.of("name", tool, "arguments", args));
+        if (response.has("error")) {
+            answer.set("error", response.get("error"));
+        } else {
+            answer.set("result", response.path("result"));
+        }
+        answer.set("requests", JSON.valueToTree(mock.drain()));
+        return answer;
+    }
+
+    /**
+     * The manifest without its extensions (custom tools, enrichers, call filters): for trying a server
+     * where its builders' code must not run (the platform); the list says what was left out.
+     */
+    public static ObjectNode withoutExtensions(JsonNode manifest, List<String> leftOut) {
+        ObjectNode copy = manifest.deepCopy();
+        JsonNode extensions = copy.remove("extensions");
+        if (extensions != null) {
+            extensions.path("enrichers").forEach(e -> leftOut.add("request enricher " + e.path("handler").asText()));
+            extensions.path("callFilters").forEach(f -> leftOut.add("call filter " + f.path("handler").asText()));
+        }
+        ArrayNode tools = copy.withArray("tools");
+        for (int i = tools.size() - 1; i >= 0; i--) {
+            if (tools.get(i).path("kind").asText().equals("custom")) {
+                leftOut.add("custom tool " + tools.get(i).path("name").asText());
+                tools.remove(i);
+            }
+        }
+        return copy;
+    }
+
     /** The test case files of a suite directory: its *.yaml and *.yml files, sorted. */
-    static List<Path> suite(Path dir) throws IOException {
+    public static List<Path> suite(Path dir) throws IOException {
         if (!Files.isDirectory(dir)) {
             return List.of();
         }
@@ -336,7 +379,7 @@ final class TestRun implements AutoCloseable {
     }
 
     /** The server's stderr so far, for a start that failed. */
-    String serverLog() {
+    public String serverLog() {
         synchronized (log) {
             return log.isEmpty() ? "" : "\n" + log.toString().strip();
         }
@@ -364,7 +407,7 @@ final class TestRun implements AutoCloseable {
     }
 
     /** Results as JSON for {@code --json}. */
-    static ArrayNode json(List<Outcome> outcomes) {
+    public static ArrayNode json(List<Outcome> outcomes) {
         ArrayNode list = JSON.createArrayNode();
         outcomes.forEach(o -> {
             ObjectNode node = list.addObject().put("file", o.file()).put("name", o.name()).put("passed", o.passed());

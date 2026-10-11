@@ -193,7 +193,7 @@ export interface Tool {
   name: string
   title?: string
   description?: string
-  kind: 'api' | 'pack' | 'builtin'
+  kind: 'api' | 'pack' | 'builtin' | 'custom'
   api?: string
   pack?: string
   handler?: string
@@ -258,6 +258,14 @@ export interface Operation {
   state: 'tool' | 'resource' | 'excluded' | 'hidden'
   tool?: string
   exclusion?: { kind: 'access' | 'include' | 'exclude' | 'deprecated'; reason: string; index?: number; selector?: Selector }
+}
+
+/** A tool call against a mock of the API (spec/platform-api.md §2.1). */
+export interface TryResult {
+  result?: { isError?: boolean; content?: { type: string; text?: string }[]; structuredContent?: unknown; _meta?: Record<string, unknown> }
+  error?: { code: number; message: string }
+  requests: { method: string; path: string; query?: string | null; headers: Record<string, string>; body: string; status: number }[]
+  leftOut: string[]
 }
 
 /** A notice added to tool descriptions (definition-format.md §5.1). */
@@ -352,6 +360,8 @@ export const api = {
   manifest: (id: string, version: string | number = 'latest') => json<Manifest>('GET', `/servers/${enc(id)}/versions/${version}/manifest`),
   previewEdit: (id: string, base: number, changes: Change[], operations = false) =>
     json<EditPreview>('POST', `/servers/${enc(id)}/edits`, { base, changes, dryRun: true, operations: operations || undefined }),
+  tryTool: (id: string, version: string | number, tool: string, args: unknown) =>
+    json<TryResult>('POST', `/servers/${enc(id)}/versions/${version}/try`, { tool, arguments: args }),
   definition: (id: string, version: string | number = 'latest') => json<DefinitionData>('GET', `/servers/${enc(id)}/versions/${version}/definition`),
   packagePreview: (id: string, version: string | number = 'latest') => json<PackagePreview>('GET', `/servers/${enc(id)}/versions/${version}/package`),
   naming: (id: string, version: string | number = 'latest') => json<NamingInfo>('GET', `/servers/${enc(id)}/versions/${version}/naming`),

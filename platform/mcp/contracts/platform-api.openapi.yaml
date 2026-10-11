@@ -135,6 +135,36 @@ paths:
                       present: { type: boolean }
                       entries: { type: array, items: { type: object, properties: { id: { type: string }, name: { type: string }, since: { type: string } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/versions/{version}/try:
+    parameters: [ { $ref: "#/components/parameters/ServerId" }, { $ref: "#/components/parameters/Version" } ]
+    post:
+      operationId: tryTool
+      tags: [servers]
+      summary: Try tool
+      description: Calls a tool of the version against a mock of its API (made from the spec; no real system is called) and returns the result and what was sent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tool]
+              properties:
+                tool: { type: string }
+                arguments: { type: object }
+      responses:
+        "200":
+          description: The call
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result: { type: object }
+                  error: { type: object }
+                  requests: { type: array, items: { type: object } }
+                  leftOut: { type: array, items: { type: string } }
+        default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/versions/{version}/definition:
     parameters: [ { $ref: "#/components/parameters/ServerId" }, { $ref: "#/components/parameters/Version" } ]
     get:

@@ -114,6 +114,11 @@ public class PlatformServer {
         return new Compilation(store, config.workspace());
     }
 
+    @Bean(destroyMethod = "close")
+    ro.bitboy.mcpgp.platform.service.Trials trials(Compilation compilation) {
+        return new ro.bitboy.mcpgp.platform.service.Trials(compilation);
+    }
+
     @Bean
     Edits edits(Store store, Servers servers, Compilation compilation) {
         return new Edits(store, servers, compilation);

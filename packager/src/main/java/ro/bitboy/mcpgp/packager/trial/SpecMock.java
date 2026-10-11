@@ -1,4 +1,4 @@
-package ro.bitboy.mcpgp.cli;
+package ro.bitboy.mcpgp.packager.trial;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,27 +21,37 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The mock target of {@code mcpgp test} (ci-pipeline.md §5): an HTTP server on the loopback address that
+ * The mock target of {@code mcpgp test} (ci-pipeline.md §5) and of trying a tool on the platform: an HTTP server on the loopback address that
  * answers every operation of the contracts with its first success response, using the spec's example
  * when there is one and a value made from the response schema otherwise. It never calls anything.
  */
-final class SpecMock implements AutoCloseable {
+public final class SpecMock implements AutoCloseable {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
     private static final int MAX_DEPTH = 8;
 
     /** One operation the mock answers: method and the full path (base path included) as a pattern. */
-    record Route(String method, Pattern path, ApiModel.Operation operation) {
+    record Route(String method, Pattern path, ApiModel.Operation operation, java.util.Map<String, ? extends JsonNode> schemas) {
     }
 
+    /** A request the mock received: what the server would have sent to the real API (credentials left out). */
+    public record Received(String method, String path, String query, java.util.Map<String, String> headers, String body, int status) {
+    }
+
+    /** Credentials, and what the HTTP client adds because the mock speaks plain HTTP (a real https target never sees it). */
+    private static final java.util.Set<String> HIDDEN = java.util.Set.of("authorization", "proxy-authorization", "cookie", "upgrade", "http2-settings");
+    private static final int KEEP = 20;
+    private static final int MAX_BODY = 4096;
+
     private final List<Route> routes = new ArrayList<>();
+    private final java.util.Deque<Received> received = new java.util.ArrayDeque<>();
     private final HttpServer server;
 
-    SpecMock(Collection<ApiModel.Contract> contracts) throws IOException {
+    public SpecMock(Collection<ApiModel.Contract> contracts) throws IOException {
         for (ApiModel.Contract contract : contracts) {
             for (ApiModel.Operation operation : contract.operations()) {
-                routes.add(new Route(operation.method().toUpperCase(), pattern(contract.basePath() + operation.path()), operation));
+                routes.add(new Route(operation.method().toUpperCase(), pattern(contract.basePath() + operation.path()), operation, contract.schemas()));
             }
         }
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
@@ -50,7 +60,7 @@ final class SpecMock implements AutoCloseable {
     }
 
     /** The base URL of the mock instance. */
-    String address() {
+    public String address() {
         return "http://127.0.0.1:" + server.getAddress().getPort();
     }
 
@@ -70,20 +80,45 @@ final class SpecMock implements AutoCloseable {
         return Pattern.compile(regex.append(Pattern.quote(path.substring(last))).append("/?$").toString());
     }
 
+    /** The requests received since the last call (at most the last 20), oldest first. */
+    public synchronized List<Received> drain() {
+        List<Received> list = new ArrayList<>(received);
+        received.clear();
+        return list;
+    }
+
+    private synchronized void record(HttpExchange exchange, byte[] body, int status) {
+        java.util.Map<String, String> headers = new java.util.TreeMap<>();
+        exchange.getRequestHeaders().forEach((name, values) -> {
+            String lower = name.toLowerCase(java.util.Locale.ROOT);
+            if (!HIDDEN.contains(lower) && !lower.equals("host") && !lower.equals("content-length") && !lower.equals("connection")) {
+                headers.put(lower, String.join(", ", values));
+            }
+        });
+        String text = new String(body, 0, Math.min(body.length, MAX_BODY), StandardCharsets.UTF_8) + (body.length > MAX_BODY ? "…" : "");
+        received.addLast(new Received(exchange.getRequestMethod(), exchange.getRequestURI().getRawPath(), exchange.getRequestURI().getRawQuery(),
+                java.util.Map.copyOf(headers), text, status));
+        while (received.size() > KEEP) {
+            received.removeFirst();
+        }
+    }
+
     private void handle(HttpExchange exchange) throws IOException {
         try (exchange) {
-            exchange.getRequestBody().readAllBytes();
+            byte[] requestBody = exchange.getRequestBody().readAllBytes();
             String path = exchange.getRequestURI().getRawPath();
             String method = exchange.getRequestMethod().toUpperCase();
             // a literal path wins over a template (/customers/search before /customers/{id})
             Route route = routes.stream().filter(r -> r.method().equals(method) && r.path().matcher(path).matches())
                     .min((a, b) -> Integer.compare(variables(a), variables(b))).orElse(null);
             if (route == null) {
+                record(exchange, requestBody, 404);
                 send(exchange, 404, "application/json", "{\"error\":\"the mock has no operation " + method + " " + path + "\"}");
                 return;
             }
             ApiModel.Response response = success(route.operation());
             int status = response == null ? 200 : status(response.status());
+            record(exchange, requestBody, status);
             if (response == null || response.content().isEmpty() || status == 204) {
                 exchange.sendResponseHeaders(status, -1);
                 return;
@@ -95,7 +130,7 @@ final class SpecMock implements AutoCloseable {
                 send(exchange, status, type, media.example() != null && media.example().isTextual() ? media.example().asText() : "mock");
                 return;
             }
-            JsonNode body = media.example() != null ? media.example() : value(media.schema(), 0);
+            JsonNode body = media.example() != null ? media.example() : value(media.schema(), route.schemas(), 0);
             send(exchange, status, type, JSON.writeValueAsString(body));
         }
     }
@@ -130,7 +165,19 @@ final class SpecMock implements AutoCloseable {
     }
 
     /** A value that fits the schema: its example, default, const or first enum value, else one made by type. */
-    static JsonNode value(JsonNode schema, int depth) {
+    public static JsonNode value(JsonNode schema, int depth) {
+        return value(schema, java.util.Map.of(), depth);
+    }
+
+    /** @param schemas the contract's shared schemas by name, for {@code $ref}s to them */
+    public static JsonNode value(JsonNode schema, java.util.Map<String, ? extends JsonNode> schemas, int depth) {
+        if (schema != null && schema.has("$ref") && depth < MAX_DEPTH) {
+            String ref = schema.path("$ref").asText();
+            JsonNode target = schemas.get(ref.substring(ref.lastIndexOf('/') + 1));
+            if (target != null) {
+                return value(target, schemas, depth + 1);
+            }
+        }
         if (schema == null || schema.isMissingNode() || !schema.isObject()) {
             return NODES.objectNode();
         }
@@ -150,13 +197,13 @@ final class SpecMock implements AutoCloseable {
                 if (key.equals("allOf")) {
                     ObjectNode merged = NODES.objectNode();
                     schema.path(key).forEach(part -> {
-                        if (value(part, depth + 1) instanceof ObjectNode object) {
+                        if (value(part, schemas, depth + 1) instanceof ObjectNode object) {
                             merged.setAll(object);
                         }
                     });
                     return merged;
                 }
-                return value(schema.path(key).get(0), depth + 1);
+                return value(schema.path(key).get(0), schemas, depth + 1);
             }
         }
         String type = schema.path("type").isArray() ? firstNonNull(schema.path("type")) : schema.path("type").asText("");
@@ -167,14 +214,14 @@ final class SpecMock implements AutoCloseable {
             case "object" -> {
                 ObjectNode object = NODES.objectNode();
                 if (depth < MAX_DEPTH) {
-                    schema.path("properties").fields().forEachRemaining(p -> object.set(p.getKey(), value(p.getValue(), depth + 1)));
+                    schema.path("properties").fields().forEachRemaining(p -> object.set(p.getKey(), value(p.getValue(), schemas, depth + 1)));
                 }
                 yield object;
             }
             case "array" -> {
                 ArrayNode array = NODES.arrayNode();
                 if (depth < MAX_DEPTH) {
-                    array.add(value(schema.path("items"), depth + 1));
+                    array.add(value(schema.path("items"), schemas, depth + 1));
                 }
                 yield array;
             }
