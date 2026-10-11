@@ -42,6 +42,7 @@ build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `auth
 | `session.start` / `session.end` | MCP session (HTTP stateful: when the server issues a session id, and when the client ends it with `DELETE`; sessions that just expire have no `end`) or process (stdio) |
 | `auth.inbound` | inbound auth decision: refused requests (no or unknown key, foreign `Origin`); accepted ones show as the `actor` of their events |
 | `tool.call` | every tool call |
+| `resource.read` | every resource read (tools-contract §14.1); the same fields as `tool.call` |
 | `tool.confirm` | confirmation asked / given / refused |
 | `instance.health` | instance status change (healthy, degraded, unreachable) |
 | `config.reload` | runtime config or instances reloaded |

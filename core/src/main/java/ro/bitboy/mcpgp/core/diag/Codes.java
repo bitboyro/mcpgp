@@ -41,6 +41,8 @@ public final class Codes {
     public static final String NAME_DRIFT_FROZEN = "NAME_DRIFT_FROZEN";
     public static final String RULE_MATCHES_NOTHING = "RULE_MATCHES_NOTHING";
     public static final String CONTENT_TYPE_UNKNOWN = "CONTENT_TYPE_UNKNOWN";
+    public static final String RESOURCE_NOT_GET = "RESOURCE_NOT_GET";
+    public static final String RESOURCE_NEEDS_HEADER = "RESOURCE_NEEDS_HEADER";
     public static final String DESCRIPTION_TRUNCATED = "DESCRIPTION_TRUNCATED";
     public static final String PINNED_TOOL_UNKNOWN = "PINNED_TOOL_UNKNOWN";
     public static final String PACK_UNKNOWN = "PACK_UNKNOWN";

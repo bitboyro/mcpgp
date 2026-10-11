@@ -234,6 +234,8 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 | `OPERATION_EXCLUDED` | info | an operation becomes no tool, with the reason (access, include/exclude, deprecated, hidden) |
 | `RULE_MATCHES_NOTHING` | warning | a rule matches no tool |
 | `CONTENT_TYPE_UNKNOWN` | error | a rule binds a content type the operation doesn't accept |
+| `RESOURCE_NOT_GET` | error | `expose: resource` on an operation that isn't a `GET` (tools-contract §14.1) |
+| `RESOURCE_NEEDS_HEADER` | error | `expose: resource` on an operation with a required header or cookie parameter, which a resource URI can't carry |
 | `DESCRIPTION_TRUNCATED` | warning | a description was shortened to 1024 characters |
 | `NAME_TOO_LONG` | error | a name exceeds the limit and `onTooLong: error` |
 | `NAME_COLLISION` | error | two tools get the same name and `collisions: error` |

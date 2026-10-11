@@ -100,6 +100,27 @@
       "required": ["mode"],
       "additionalProperties": false
     },
+    "resources": {
+      "type": "object",
+      "description": "GET operations exposed as MCP resources (tools-contract §14.1); absent when there are none",
+      "required": ["uriScheme", "items"],
+      "properties": {
+        "uriScheme": { "type": "string", "pattern": "^[a-z][a-z0-9+.-]*$" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "kind", "api", "uriTemplate", "mimeType", "variants"],
+            "properties": {
+              "kind": { "const": "resource" },
+              "uriTemplate": { "type": "string" },
+              "mimeType": { "type": "string" }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "policies": {
       "type": "object",
       "properties": {

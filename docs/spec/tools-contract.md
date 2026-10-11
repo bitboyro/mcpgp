@@ -316,7 +316,16 @@ A `GET` operation can be exposed as an MCP **resource** instead of a tool, with 
 - Query parameters not declared on the operation are dropped (and logged), never forwarded.
 - Text-like media types (`text/*`, JSON, XML, YAML, anything with a `charset`) are returned as text;
   everything else as base64 blob.
-- Marking a non-`GET` operation as a resource fails the build.
+- Marking a non-`GET` operation as a resource fails the build (`RESOURCE_NOT_GET`), and so does one
+  with a required header or cookie parameter, which a URI can't carry (`RESOURCE_NEEDS_HEADER`).
+- In multi-API servers the API id comes before the path: `api://orders/customers/{id}` (after the
+  instance in multi-instance builds).
+- A read takes the operation's path and declared query parameters from the URI (converted to the
+  parameter's type: integer, number, boolean) and goes the way of a tool call: validation, sign-in,
+  redaction, telemetry, and an audit event of type `resource.read`. An unknown URI → MCP's
+  resource-not-found error (`-32002`).
+- The list of resources is made when the server starts (from the configured instances); a config
+  reload applies to reads at once and to the list at the next start.
 
 ### 14.2 Prompts
 

@@ -41,6 +41,8 @@ public final class McpServerFactory {
     private final AuditLog audit;
     private final Confirmations confirmations;
     private final Clock clock;
+    /** GET operations exposed as resources (tools-contract §14.1). */
+    private final Resources resources;
     /** {@code toolsets} exposure: the toolsets sessions enable (null in other modes). */
     private final Toolsets toolsets;
     /** stdio, toolsets mode: the API tools currently registered on the server. */
@@ -66,6 +68,7 @@ public final class McpServerFactory {
             builtins.putAll(toolsets.handlers());
         }
         this.apiTools = new ApiToolHandler(manifest, config);
+        this.resources = new Resources(manifest, config);
         Packs packs = new Packs(manifest, config, catalog);
         Map<String, ToolHandler> packHandlers = packs.handlers();
         // tools without an implementation in this runtime are not offered (and said so at startup)
@@ -139,9 +142,25 @@ public final class McpServerFactory {
         for (JsonNode tool : catalog.listed()) {
             specs.add(spec(tool));
         }
+        McpSchema.ServerCapabilities.Builder capabilities = McpSchema.ServerCapabilities.builder().tools(true).logging();
+        if (resources.any()) {
+            capabilities.resources(false, false);
+            List<McpServerFeatures.SyncResourceSpecification> plain = new ArrayList<>();
+            List<McpServerFeatures.SyncResourceTemplateSpecification> templates = new ArrayList<>();
+            for (Resources.Entry entry : resources.entries()) {
+                if (entry.isTemplate()) {
+                    templates.add(new McpServerFeatures.SyncResourceTemplateSpecification(resources.template(entry),
+                            (exchange, request) -> current.get().read(exchange, request)));
+                } else {
+                    plain.add(new McpServerFeatures.SyncResourceSpecification(resources.resource(entry),
+                            (exchange, request) -> current.get().read(exchange, request)));
+                }
+            }
+            builder.uriTemplateManagerFactory(UriTemplate::new).resources(plain).resourceTemplates(templates);
+        }
         builder
                 .serverInfo(new McpSchema.Implementation(manifest.serverName(), manifest.serverTitle(), manifest.serverVersion()))
-                .capabilities(McpSchema.ServerCapabilities.builder().tools(true).logging().build())
+                .capabilities(capabilities.build())
                 .requestTimeout(Duration.ofSeconds(maxTimeout() + 30L))
                 .validateToolInputs(false)       // validated per instance contract by the runtime
                 .tools(specs);
@@ -261,9 +280,55 @@ public final class McpServerFactory {
         return result;
     }
 
+    /**
+     * A resource read (tools-contract §14.1): the URI becomes the operation's arguments, and the read goes
+     * the way of a tool call; audited as {@code resource.read}.
+     */
+    public McpSchema.ReadResourceResult read(McpSyncServerExchange exchange, McpSchema.ReadResourceRequest request) {
+        var resolved = resources.resolve(request.uri())
+                .orElseThrow(() -> io.modelcontextprotocol.spec.McpError.RESOURCE_NOT_FOUND.apply(request.uri()));
+        JsonNode resource = resolved.getKey().resource();
+        String name = resource.path("name").asText();
+        Map<String, Object> arguments = resolved.getValue();
+        CallRecord record = new CallRecord();
+        String cid = Ids.correlation();
+        long started = System.nanoTime();
+        MDC.put("cid", cid);
+        String outcome = "ok";
+        String code = null;
+        ro.bitboy.mcpgp.runtime.telemetry.Telemetry.Call traced = ro.bitboy.mcpgp.runtime.telemetry.Telemetry.current()
+                .call(name, resource.path("api").asText(null));
+        String outerSession = ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.get();
+        ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(exchange != null ? exchange.sessionId() : outerSession);
+        try {
+            return Resources.contents(request.uri(), resource, apiTools.call(exchange, resource, new LinkedHashMap<>(arguments), record));
+        } catch (ToolError e) {
+            outcome = "error";
+            code = e.code();
+            int jsonRpc = e.code().equals("INPUT_VALIDATION") ? McpSchema.ErrorCodes.INVALID_PARAMS : McpSchema.ErrorCodes.INTERNAL_ERROR;
+            throw io.modelcontextprotocol.spec.McpError.builder(jsonRpc).message(e.code() + ": " + e.getMessage()).build();
+        } catch (RuntimeException e) {
+            LOG.error("Resource {} failed", request.uri(), e);
+            outcome = "error";
+            code = "INTERNAL";
+            throw io.modelcontextprotocol.spec.McpError.builder(McpSchema.ErrorCodes.INTERNAL_ERROR).message("The read failed; see the server log").build();
+        } finally {
+            MDC.remove("cid");
+            ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(outerSession);
+            traced.result(record.api, record.instance, record.contract, outcome, code);
+            traced.close();
+            auditCall("resource.read", name, resource, arguments, record, outcome, code, cid, (System.nanoTime() - started) / 1_000_000, exchange);
+        }
+    }
+
     private void auditCall(String name, JsonNode tool, Map<String, Object> arguments, CallRecord record, String outcome,
                            String code, String cid, long latencyMs, McpSyncServerExchange exchange) {
-        ObjectNode event = audit.event("tool.call", outcome, cid);
+        auditCall("tool.call", name, tool, arguments, record, outcome, code, cid, latencyMs, exchange);
+    }
+
+    private void auditCall(String type, String name, JsonNode tool, Map<String, Object> arguments, CallRecord record, String outcome,
+                           String code, String cid, long latencyMs, McpSyncServerExchange exchange) {
+        ObjectNode event = audit.event(type, outcome, cid);
         actor(event, exchange);
         event.put("tool", name);
         putIfSet(event, "api", record.api != null ? record.api : tool == null ? null : tool.path("api").asText(null));

@@ -241,6 +241,16 @@ public final class ToolPlanner {
                 accept = List.copyOf(a);
             }
         }
+        if (!hidden && expose.equals("resource")) {
+            // a resource is read, never acted on: only GET, and everything it needs must fit in its URI
+            if (variants.values().stream().anyMatch(v -> !v.method().equalsIgnoreCase("GET"))) {
+                diagnostics.error(Codes.RESOURCE_NOT_GET, base.key() + " is exposed as a resource, but resources are GET operations only", root);
+            }
+            variants.values().stream().flatMap(v -> v.parameters().stream())
+                    .filter(p -> p.required() && (p.in().equals("header") || p.in().equals("cookie"))).findFirst()
+                    .ifPresent(p -> diagnostics.error(Codes.RESOURCE_NEEDS_HEADER, base.key() + " needs the " + p.in() + " parameter " + p.name()
+                            + ", which a resource URI can't carry; keep it a tool", root));
+        }
         if (hidden) {
             diagnostics.info(Codes.OPERATION_EXCLUDED, base.key() + " excluded: hidden by a rule", root);
             return;
