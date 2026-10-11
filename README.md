@@ -57,7 +57,7 @@ Start at [docs/README.md](docs/README.md).
   [naming](docs/spec/naming.md) · [runtime config](docs/spec/runtime-config.md) ·
   [tools contract](docs/spec/tools-contract.md) · [audit & errors](docs/spec/audit-and-errors.md) ·
   [packaging](docs/spec/packaging.md) · [compatibility](docs/spec/compatibility.md) · [CLI](docs/spec/cli.md)
-- Guides: [building in a pipeline](docs/guides/ci-pipeline.md), [running the platform](docs/guides/platform.md), [agents on the platform](docs/guides/agents.md)
+- Guides: [building in a pipeline](docs/guides/ci-pipeline.md), [running the platform](docs/guides/platform.md), [agents on the platform](docs/guides/agents.md), [writing an extension](docs/guides/extensions.md)
 - [Security & threat model](docs/security.md)
 - [Decisions (ADRs)](docs/decisions)
 - [UI design](docs/design/ui.md)

@@ -150,6 +150,25 @@
       "additionalProperties": false
     },
     "tools": { "type": "array", "items": { "$ref": "#/$defs/tool" } },
+    "extensions": {
+      "type": "object",
+      "description": "Custom code the package contains (extensions.md): jars with their checksums, and the enrichers and call filters in the order they run. Custom tools are in tools (kind custom).",
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "path": { "type": "string" }, "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" } },
+            "required": ["path", "sha256"],
+            "additionalProperties": false
+          }
+        },
+        "enrichers": { "type": "array", "items": { "$ref": "#/$defs/extensionRef" } },
+        "callFilters": { "type": "array", "items": { "$ref": "#/$defs/extensionRef" } }
+      },
+      "required": ["artifacts", "enrichers", "callFilters"],
+      "additionalProperties": false
+    },
     "packs": {
       "type": "array",
       "items": {
@@ -180,6 +199,16 @@
   "additionalProperties": false,
 
   "$defs": {
+    "extensionRef": {
+      "type": "object",
+      "properties": {
+        "handler": { "type": "string" },
+        "order": { "type": "integer" },
+        "tools": { "type": "array", "items": { "type": "string" }, "description": "The tools a call filter applies to; absent: every tool" }
+      },
+      "required": ["handler", "order"],
+      "additionalProperties": false
+    },
     "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
 
     "allowedDefault": {

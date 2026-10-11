@@ -333,7 +333,7 @@ public final class Main {
                 return ERRORS;
             }
             Packager.Result packaged = new Packager(Packager::runtimeJar)
-                    .build(manifest, document, build.createdAt(), out, signing);
+                    .build(manifest, document, Packager.Artifacts.in(result.definition().get().root()), build.createdAt(), out, signing);
             packaged.warnings().forEach(w -> common.spec.commandLine().getErr().println("warning: " + w));
             if (!common.json && !common.quiet) {
                 common.out().println("wrote " + packaged.zip() + " (" + manifest.path("tools").size() + " tools) and " + packaged.manifest());
@@ -549,7 +549,7 @@ public final class Main {
             }
             Path dir = Files.createTempDirectory("mcpgp-test-");
             List<TestRun.Outcome> outcomes = new ArrayList<>();
-            try (TestRun run = new TestRun(result.manifest().get(), result.contracts().values(), runtime, dir)) {
+            try (TestRun run = new TestRun(result.manifest().get(), result.contracts().values(), runtime, dir, result.definition().get().root())) {
                 String smoke = run.smoke();
                 outcomes.add(new TestRun.Outcome("the server starts and lists its tools", "smoke", smoke));
                 if (smoke == null) {

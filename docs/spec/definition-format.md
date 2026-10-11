@@ -245,6 +245,7 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 | `LOCK_INVALID` | error | `mcp-names.lock` doesn't match its schema |
 | `PINNED_TOOL_UNKNOWN` | error | in `hybrid` mode, `exposure.pinned` names a tool the build doesn't produce (ignored in other modes) |
 | `PACK_UNKNOWN` | warning | a pack isn't available in this version; it is left out of the build |
+| `EXTENSION_INVALID` | error | an extension can't be built: a missing or non-jar artifact, a handler that isn't a Java class name, a custom tool's input schema that isn't an object schema, or extensions declared without an artifact |
 | `MANIFEST_INVALID` | error | internal: the produced manifest doesn't match its schema (a compiler bug; please report it) |
 
 ## 10. Versioning

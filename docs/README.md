@@ -20,6 +20,7 @@
 | [guides/ci-pipeline.md](guides/ci-pipeline.md) | You want reliable builds from a git repo in CI. |
 | [guides/platform.md](guides/platform.md) | You run the platform: sign-in, the web UI, the API. |
 | [guides/agents.md](guides/agents.md) | An agent should build MCP servers on the platform. |
+| [guides/extensions.md](guides/extensions.md) | A server needs a bit of custom code. |
 | [spec/compatibility.md](spec/compatibility.md) | MCP or OpenAPI publish a new version, or you change one of our formats. |
 | [security.md](security.md) | You need the threat model or answer a security questionnaire. |
 | [decisions/](decisions) | You want to know *why* something is the way it is. |

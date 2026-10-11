@@ -130,7 +130,16 @@ public final class Builds implements AutoCloseable {
             Minisign.Keys signing = signingKey(result.definition().get().document());
             work = Files.createTempDirectory("mcpgp-build-");
             JsonNode document = result.definition().get().document();
-            Packager.Result packaged = new Packager(Packager::runtimeJar).build(result.manifest().get(), document, createdAt, work, signing);
+            // extension artifacts come from the version's files, next to the root definition
+            String folder = version.root().contains("/") ? version.root().substring(0, version.root().lastIndexOf('/') + 1) : "";
+            Packager.Artifacts extensionJars = path -> {
+                String blob = version.files().get(folder + path);
+                if (blob == null) {
+                    throw new IOException("extension artifact " + path + " is not in version " + build.version());
+                }
+                return store.blob(blob);
+            };
+            Packager.Result packaged = new Packager(Packager::runtimeJar).build(result.manifest().get(), document, extensionJars, createdAt, work, signing);
             packaged.warnings().forEach(w -> log(id, "warning: " + w));
             List<Model.Artifact> artifacts = new ArrayList<>();
             for (Path file : List.of(packaged.zip(), packaged.manifest())) {

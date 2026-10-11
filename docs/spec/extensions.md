@@ -1,6 +1,6 @@
 # Spec: extensions (custom code)
 
-Status: **draft v1** · Owner: runtime · Applies to the Java runtime; other runtimes provide the same
+Status: **v1** (Java runtime) · Owner: runtime · Applies to the Java runtime; other runtimes provide the same
 three extension kinds in their own language.
 
 Most servers need no code. When they do, three extension kinds are available. All of them are
@@ -36,11 +36,28 @@ extensions:
 ```
 
 - Name, title, description, input schema and annotations of custom tools live in the definition, not
-  in code, so they are reviewed, diffed and documented like API tools.
-- Artifacts are part of the definition project (root restriction applies) and their checksums are
-  recorded in the manifest.
+  in code, so they are reviewed, diffed and documented like API tools. Names get the same prefix as
+  pack tools (`orders_customer_health_summary` in a single-API server). `inputSchema` is inline or
+  `{ $ref: <file> }` in the project, and must be an object schema. Annotations default to
+  `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: false`, `openWorldHint: true`.
+- Artifacts are `.jar` files in the definition project (root restriction applies); their SHA-256 is
+  recorded in the manifest. Code without an artifact, a handler that isn't a Java class name or a
+  non-object input schema is `EXTENSION_INVALID`.
+- A call filter's `match` is resolved by the compiler to the API tools it selects (`tools` in the
+  manifest); without `match` it applies to every API and custom tool. Filters don't run on built-in
+  and pack tools.
+- The manifest records `extensions: { artifacts: [{ path, sha256 }], enrichers: [{ handler, order }],
+  callFilters: [{ handler, order, tools? }] }` (in the order they run); custom tools are in `tools`
+  with `kind: custom` and their `handler`.
+- On the platform, extension jars are files of the definition like any other: anyone with
+  `servers:write` can add or change them (upload the project as a zip).
 
 ## 2. Java interfaces
+
+The interfaces are in `ro.bitboy.mcpgp:mcpgp-extension-api` (package `ro.bitboy.mcpgp.extension`).
+Extension code depends on it with scope `provided`: the server brings it, and Jackson, at runtime;
+a jar must not contain them. Results are `ToolResult`: `of(JsonNode)` (structured), `text(String)` or
+`error(code, message)` with an `UPPER_SNAKE_CASE` code.
 
 ```java
 public interface CustomTool {
@@ -59,8 +76,13 @@ public interface CallFilter {
 
 `ToolContext` gives read access to: tool name, instance id, contract version, correlation id, the
 caller's identity (inbound auth), a logger that redacts secrets, and — for custom tools only — an
-`ApiClient` that calls operations of the same instance through the normal pipeline (auth, TLS,
-audit). It gives **no** access to credentials or the raw runtime config.
+`ApiClient` that calls API tools of the same server by name through the normal pipeline (validation,
+auth, TLS, audit: each such call is its own audited `tool.call`); JSON results, arrays included, come
+back as structured content. It gives **no** access to credentials or the raw runtime config.
+
+`OutgoingRequest` lets an enricher read and set headers and add query parameters. `Authorization`,
+`Proxy-Authorization`, `Cookie`, `Host`, `Content-Type`, `Content-Length` and the other transport
+headers can be neither read nor set (`IllegalArgumentException`).
 
 ## 3. Order and failures
 
@@ -80,9 +102,12 @@ call ─► call filters (by order) ─► [ validation ─► confirmation ─�
 
 ## 4. Loading
 
-- The runtime loads the declared artifacts and instantiates the declared `handler` classes; nothing
-  undeclared is picked up from the classpath.
-- A missing class, a wrong interface or a checksum mismatch fails startup.
+- The packager puts the artifacts into the server jar (`BOOT-INF/classes/mcpgp/artifacts/<path>`);
+  `OPERATIONS.md` lists them with their checksums and the handler classes. The runtime loads them
+  (or, running from a manifest file, the files next to it, as `mcpgp test` does) in their own class
+  loader whose parent is the runtime's, and instantiates the declared `handler` classes (public,
+  no-argument constructor); nothing undeclared is picked up from the classpath.
+- A missing artifact or class, a wrong interface or a checksum mismatch fails startup.
 - In codegen mode the same interfaces are used; generated code calls them at the same points.
 
 ## 5. Security considerations

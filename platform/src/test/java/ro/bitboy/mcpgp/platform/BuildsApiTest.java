@@ -121,6 +121,55 @@ class BuildsApiTest {
     }
 
     @Test
+    void extensionJarsUploadedWithTheDefinitionShipInThePackage() throws Exception {
+        Path src = dir.resolve("ext-src/com/example/ext/Hello.java");
+        Files.createDirectories(src.getParent());
+        Files.writeString(src, """
+                package com.example.ext;
+                import ro.bitboy.mcpgp.extension.*;
+                public class Hello implements CustomTool {
+                    public ToolResult call(ToolContext ctx, com.fasterxml.jackson.databind.JsonNode arguments) { return ToolResult.text("hello"); }
+                }
+                """);
+        Path classes = Files.createDirectories(dir.resolve("ext-classes"));
+        assertThat(javax.tools.ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", classes.toString(),
+                "-classpath", System.getProperty("java.class.path"), "--release", "21", src.toString())).isZero();
+        ByteArrayOutputStream jar = new ByteArrayOutputStream();
+        try (java.util.jar.JarOutputStream out = new java.util.jar.JarOutputStream(jar)) {
+            out.putNextEntry(new java.util.jar.JarEntry("com/example/ext/Hello.class"));
+            out.write(Files.readAllBytes(classes.resolve("com/example/ext/Hello.class")));
+            out.closeEntry();
+        }
+        ByteArrayOutputStream project = new ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(project)) {
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            files.put("contracts/orders-2.0.yaml", Files.readAllBytes(REPO.resolve("examples/platform/orders/contracts/orders-2.0.yaml")));
+            files.put("ext/hello.jar", jar.toByteArray());
+            files.put("hello.mcpgp.yaml", """
+                    apiVersion: mcpgp/v1
+                    kind: McpServer
+                    metadata: { name: hello-mcp }
+                    apis: [ { id: orders, contracts: [ { version: "2.0", spec: contracts/orders-2.0.yaml } ] } ]
+                    extensions:
+                      artifacts: [ { path: ext/hello.jar } ]
+                      customTools: [ { name: hello, description: Says hello., inputSchema: { type: object }, handler: com.example.ext.Hello } ]
+                    """.getBytes(StandardCharsets.UTF_8));
+            for (Map.Entry<String, byte[]> f : files.entrySet()) {
+                zip.putNextEntry(new ZipEntry(f.getKey()));
+                zip.write(f.getValue());
+                zip.closeEntry();
+            }
+        }
+        assertThat(call("POST", "/servers?id=hello-mcp", admin, project.toByteArray(), "application/zip").statusCode()).isEqualTo(201);
+        JsonNode build = build("hello-mcp", Map.of());
+        assertThat(build.path("status").asText()).as(build.toString()).isEqualTo("succeeded");
+        String zipName = build.path("artifacts").findValuesAsText("name").stream().filter(n -> n.endsWith(".zip")).findFirst().orElseThrow();
+        Map<String, byte[]> pkg = unzip(call("GET", "/builds/" + build.path("id").asText() + "/artifacts/" + zipName, admin, null, null).body());
+        assertThat(new String(pkg.get("docs/OPERATIONS.md"), StandardCharsets.UTF_8)).contains("`ext/hello.jar`");
+        assertThat(unzip(pkg.get("hello-mcp.jar"))).containsKey("BOOT-INF/classes/mcpgp/artifacts/ext/hello.jar");
+    }
+
+    @Test
     void buildsASignedPackage() throws Exception {
         JsonNode build = build("orders", Map.of());
         assertThat(build.path("status").asText()).as(new String(call("GET", "/builds/" + build.path("id").asText() + "/log", admin, null, null).body()))

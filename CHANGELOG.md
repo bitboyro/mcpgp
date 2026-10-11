@@ -179,6 +179,12 @@ versions follow [SemVer](https://semver.org).
 - Shared naming policies are edited on the platform: `POST /library/naming/{name}/edits` (dry run
   with the servers that use the policy and the versions they pin) and an editor on the Shared library
   page for verbs from HTTP methods and vocabulary.
+- Extensions (spec/extensions.md): the `mcpgp-extension-api` module (`CustomTool`,
+  `RequestEnricher`, `CallFilter`, `ToolContext`, `ToolResult`, `OutgoingRequest`, `ApiClient`); the
+  compiler checksums the declared jars, names custom tools and resolves filter matches into the
+  manifest; the packager embeds the jars and lists them in OPERATIONS.md (CLI and platform builds);
+  the runtime loads only the declared jars, checks their checksums and handler classes at startup,
+  and runs filters, enrichers and custom tools where the spec says. Guide: docs/guides/extensions.md.
 - CLI: `mcpgp names accept <def> <tool…|--all>` writes `mcp-names.lock` (renames on purpose, and
   names the file doesn't have yet).
 

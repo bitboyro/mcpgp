@@ -186,6 +186,8 @@ public final class ManifestWriter {
                     .set("requires", NODES.objectNode().put("config", false)));
         });
 
+        ObjectNode extensionsNode = extensions(definition, plans, tools, names, packPrefix, root);
+
         tools.sort(Comparator.comparing(t -> t.path("name").asText()));
         checkUnique(tools, root);
         ArrayNode toolNodes = NODES.arrayNode();
@@ -225,6 +227,9 @@ public final class ManifestWriter {
         manifest.set("policies", policies(doc, fileForms));
         manifest.set("tools", toolNodes);
         manifest.set("packs", packs);
+        if (extensionsNode != null) {
+            manifest.set("extensions", extensionsNode);
+        }
         manifest.set("schemas", schemas);
         manifest.set("diagnostics", NODES.arrayNode());
         return (ObjectNode) CanonicalJson.sorted(manifest);
@@ -594,6 +599,106 @@ public final class ManifestWriter {
                 diagnostics.error(Codes.NAME_COLLISION, "Two tools are named '" + name + "' (a built-in or pack tool clashes with another tool)", root);
             }
         }
+    }
+
+    private static final java.util.regex.Pattern CLASS_NAME = java.util.regex.Pattern.compile("^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)+$");
+
+    /**
+     * Extensions (extensions.md): checksummed artifacts, custom tools (named like pack tools, added to
+     * {@code tools}), enrichers and call filters (a filter's {@code match} resolved to the API tools it
+     * applies to); null when the definition declares none.
+     */
+    private ObjectNode extensions(ResolvedDefinition definition, List<ToolPlan> plans, List<ObjectNode> tools, BuiltinNames names,
+                                  String prefix, Location root) {
+        JsonNode ext = definition.document().path("extensions");
+        if (!ext.isObject() || ext.isEmpty()) {
+            return null;
+        }
+        ObjectNode node = NODES.objectNode();
+        ArrayNode artifacts = node.putArray("artifacts");
+        int i = 0;
+        for (JsonNode artifact : ext.path("artifacts")) {
+            Location at = root.withPointer("/extensions/artifacts/" + i++);
+            String path = artifact.path("path").asText();
+            if (!path.endsWith(".jar")) {
+                diagnostics.error(Codes.EXTENSION_INVALID, "Extension artifact '" + path + "' must be a .jar", at);
+                continue;
+            }
+            ro.bitboy.mcpgp.core.resolve.ProjectPaths.resolveLocal(path, definition.file(), definition.root(), diagnostics, at).ifPresent(file ->
+                    artifacts.addObject().put("path", relative(definition, file)).put("sha256", CanonicalJson.digest(read(file))));
+        }
+        boolean code = ext.path("customTools").size() + ext.path("enrichers").size() + ext.path("callFilters").size() > 0;
+        if (code && ext.path("artifacts").isEmpty()) {
+            diagnostics.error(Codes.EXTENSION_INVALID, "Extensions need the jar that contains them in extensions.artifacts", root.withPointer("/extensions"));
+        }
+
+        i = 0;
+        for (JsonNode custom : ext.path("customTools")) {
+            Location at = root.withPointer("/extensions/customTools/" + i++);
+            String handler = custom.path("handler").asText();
+            if (!CLASS_NAME.matcher(handler).matches()) {
+                diagnostics.error(Codes.EXTENSION_INVALID, "Handler '" + handler + "' is not a Java class name", at.withPointer(at.pointer() + "/handler"));
+                continue;
+            }
+            JsonNode schema = custom.path("inputSchema");
+            if (schema.has("$ref") && schema.size() == 1) {
+                Location ref = at.withPointer(at.pointer() + "/inputSchema/$ref");
+                schema = ro.bitboy.mcpgp.core.resolve.ProjectPaths.resolveLocal(schema.path("$ref").asText(), definition.file(), definition.root(), diagnostics, ref)
+                        .flatMap(file -> ro.bitboy.mcpgp.core.resolve.Documents.read(file, diagnostics, ref)).orElse(null);
+                if (schema == null) {
+                    continue;
+                }
+            }
+            if (!schema.path("type").asText().equals("object")) {
+                diagnostics.error(Codes.EXTENSION_INVALID, "The input schema of custom tool '" + custom.path("name").asText()
+                        + "' must be an object schema (type: object)", at.withPointer(at.pointer() + "/inputSchema"));
+                continue;
+            }
+            ObjectNode annotations = NODES.objectNode().put("readOnlyHint", false).put("destructiveHint", false)
+                    .put("idempotentHint", false).put("openWorldHint", true);
+            if (custom.path("annotations").isObject()) {
+                annotations.setAll((ObjectNode) custom.path("annotations").deepCopy());
+            }
+            String name = names.name(custom.path("name").asText(), prefix);
+            ObjectNode tool = NODES.objectNode().put("name", name).put("kind", "custom");
+            if (custom.has("title")) {
+                tool.put("title", custom.path("title").asText());
+            }
+            tool.put("description", custom.path("description").asText());
+            tool.set("annotations", annotations);
+            tool.set("inputSchema", schema.deepCopy());
+            tool.put("handler", handler);
+            tool.putObject("provenance").putArray("name").addObject().put("step", "custom").put("value", name)
+                    .put("file", root.file()).put("pointer", at.pointer() + "/name");
+            tools.add(tool);
+        }
+        for (String kind : List.of("enrichers", "callFilters")) {
+            ArrayNode list = node.putArray(kind);
+            List<ObjectNode> sorted = new ArrayList<>();
+            i = 0;
+            for (JsonNode ref : ext.path(kind)) {
+                Location at = root.withPointer("/extensions/" + kind + "/" + i);
+                String handler = ref.path("handler").asText();
+                if (!CLASS_NAME.matcher(handler).matches()) {
+                    diagnostics.error(Codes.EXTENSION_INVALID, "Handler '" + handler + "' is not a Java class name", at.withPointer(at.pointer() + "/handler"));
+                    i++;
+                    continue;
+                }
+                ObjectNode entry = NODES.objectNode().put("handler", handler).put("order", ref.path("order").asInt(100)).put("declared", i++);
+                if (ref.has("match")) {
+                    ArrayNode matched = entry.putArray("tools");
+                    plans.stream().filter(p -> p.matches(ref.get("match"))).map(ToolPlan::name).sorted().forEach(matched::add);
+                }
+                sorted.add(entry);
+            }
+            // lower order first; equal orders in declaration order
+            sorted.sort(Comparator.<ObjectNode>comparingInt(e -> e.path("order").asInt()).thenComparingInt(e -> e.path("declared").asInt()));
+            sorted.forEach(e -> {
+                e.remove("declared");
+                list.add(e);
+            });
+        }
+        return node;
     }
 
     private static ObjectNode named(String name, ObjectNode tool) {

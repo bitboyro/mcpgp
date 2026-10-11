@@ -53,11 +53,24 @@ final class TestRun implements AutoCloseable {
     private int id;
 
     TestRun(JsonNode manifest, Collection<ApiModel.Contract> contracts, InputStream runtimeJar, Path dir) throws IOException {
+        this(manifest, contracts, runtimeJar, dir, null);
+    }
+
+    /** @param root the definition's folder, where extension artifacts are copied from (next to the manifest the server runs) */
+    TestRun(JsonNode manifest, Collection<ApiModel.Contract> contracts, InputStream runtimeJar, Path dir, Path root) throws IOException {
         this.manifest = manifest;
         this.mock = new SpecMock(contracts);
         Path jar = dir.resolve("runtime.jar");
         try (runtimeJar) {
             Files.copy(runtimeJar, jar);
+        }
+        for (JsonNode artifact : manifest.at("/extensions/artifacts")) {
+            Path target = dir.resolve(artifact.path("path").asText()).normalize();
+            if (root == null || !target.startsWith(dir)) {
+                throw new IOException("extension artifact " + artifact.path("path").asText() + " can't be copied for the test");
+            }
+            Files.createDirectories(target.getParent());
+            Files.copy(root.resolve(artifact.path("path").asText()), target);
         }
         Path manifestFile = dir.resolve("manifest.json");
         Files.writeString(manifestFile, CanonicalJson.pretty(manifest));

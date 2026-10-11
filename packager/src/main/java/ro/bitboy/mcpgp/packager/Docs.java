@@ -302,6 +302,24 @@ final class Docs {
                 .append("`tool.confirm`, `auth.inbound` (refused clients), `config.reload`. Arguments are masked by default (`audit.arguments`: ")
                 .append("`redacted`, `hashed` or `none`); files appear only as name, size and SHA-256; secrets never. ")
                 .append("Rotated daily (or `hourly`, `size:<MB>`), kept `retainDays` (30).\n\n");
+        JsonNode extensions = manifest.path("extensions");
+        if (extensions.isObject()) {
+            md.append("## Custom code\n\nThis package contains code its builder wrote (extensions), loaded from the jars below and nowhere else; ")
+                    .append("a jar that doesn't match its checksum stops the server at startup. It runs with the server's permissions.\n\n")
+                    .append("| Jar | SHA-256 |\n|---|---|\n");
+            extensions.path("artifacts").forEach(a -> md.append("| `").append(a.path("path").asText()).append("` | `")
+                    .append(a.path("sha256").asText().replace("sha256:", "")).append("` |\n"));
+            md.append("\n");
+            manifest.path("tools").forEach(t -> {
+                if (t.path("kind").asText().equals("custom")) {
+                    md.append("- Custom tool `").append(t.path("name").asText()).append("`: `").append(t.path("handler").asText()).append("`\n");
+                }
+            });
+            extensions.path("enrichers").forEach(e -> md.append("- Request enricher (headers, query): `").append(e.path("handler").asText()).append("`\n"));
+            extensions.path("callFilters").forEach(f -> md.append("- Call filter: `").append(f.path("handler").asText()).append("`, ")
+                    .append(f.has("tools") ? f.path("tools").size() + " tools" : "every tool").append("\n"));
+            md.append("\n");
+        }
         md.append("## Health\n\n");
         if (http) {
             md.append("- `GET /health/live`: `200` while the process runs.\n- `GET /health/ready`: `200` when at least one instance is reachable, ")

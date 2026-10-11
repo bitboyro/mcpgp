@@ -37,7 +37,8 @@ public final class McpServerFactory {
     private final Map<String, ToolHandler> builtins = new HashMap<>();
     /** The handler of every offered tool, by tool name. */
     private final Map<String, ToolHandler> handlers = new HashMap<>();
-    private final ToolHandler apiTools;
+    private final Extensions extensions;
+    private final ro.bitboy.mcpgp.runtime.call.ApiToolHandler apiTools;
     private final AuditLog audit;
     private final Confirmations confirmations;
     private final Clock clock;
@@ -76,6 +77,10 @@ public final class McpServerFactory {
             builtins.putAll(toolsets.handlers());
         }
         this.apiTools = new ApiToolHandler(manifest, config);
+        this.extensions = Extensions.load(manifest);
+        if (!extensions.enrichers().isEmpty()) {
+            apiTools.enrichment(new ro.bitboy.mcpgp.runtime.call.Enrichment(extensions.enrichers(), (exchange, tool, record) -> context(exchange, tool, record, false)));
+        }
         this.resources = new Resources(manifest, config);
         this.prompts = new Prompts(manifest);
         Packs packs = new Packs(manifest, config, catalog);
@@ -86,6 +91,7 @@ public final class McpServerFactory {
             String name = tool.path("name").asText();
             ToolHandler handler = switch (tool.path("kind").asText()) {
                 case "api" -> apiTools;
+                case "custom" -> extensions.customTool(name, this::context);
                 case "builtin" -> builtins.get(tool.path("handler").asText());
                 case "pack" -> packHandlers.entrySet().stream().filter(e -> name.equals(e.getKey()) || name.endsWith("_" + e.getKey()))
                         .map(Map.Entry::getValue).findFirst().orElse(null);
@@ -269,21 +275,27 @@ public final class McpServerFactory {
             }
             ToolHandler handler = handlers.get(name);
             Object token = arguments.remove("confirm");
-            if (tool.path("confirm").asBoolean(false)) {
-                confirmations.check(exchange, tool, arguments, token == null ? null : token.toString(),
-                        state -> auditConfirm(tool, arguments, state, cid, exchange));
-            } else if (token != null) {
-                arguments.put("confirm", token);       // not a confirmation tool: let validation reject it
-            }
-            Object value;
-            java.util.concurrent.ScheduledFuture<?> ticker = progress(exchange, request, tool);
-            try {
-                value = handler.call(exchange, tool, arguments, record);
-            } finally {
-                if (ticker != null) {
-                    ticker.cancel(false);
+            // call filters run around the rest of the call; they never see the confirmation token (extensions.md §3)
+            java.util.function.Function<Map<String, Object>, Object> rest = args -> {
+                if (tool.path("confirm").asBoolean(false)) {
+                    confirmations.check(exchange, tool, args, token == null ? null : token.toString(),
+                            state -> auditConfirm(tool, args, state, cid, exchange));
+                } else if (token != null) {
+                    args.put("confirm", token);       // not a confirmation tool: let validation reject it
                 }
-            }
+                java.util.concurrent.ScheduledFuture<?> ticker = progress(exchange, request, tool);
+                try {
+                    return handler.call(exchange, tool, args, record);
+                } finally {
+                    if (ticker != null) {
+                        ticker.cancel(false);
+                    }
+                }
+            };
+            String kind = tool.path("kind").asText();
+            Object value = (kind.equals("api") || kind.equals("custom")) && extensions.filtered(name)
+                    ? extensions.filter(name, context(exchange, tool, record, false), arguments, rest)
+                    : rest.apply(arguments);
             if (value instanceof Discovery.Passthrough passthrough) {
                 // call_tool / invoke_operation: the inner call was audited itself; return its result as is
                 result = passthrough.result();
@@ -435,6 +447,40 @@ public final class McpServerFactory {
         } else if (exchange.getClientInfo() != null) {
             event.putObject("actor").put("kind", "client").put("id", exchange.getClientInfo().name());
         }
+    }
+
+    /** What an extension sees of a call; custom tools also get an {@link ro.bitboy.mcpgp.extension.ApiClient}. */
+    private ro.bitboy.mcpgp.extension.ToolContext context(McpSyncServerExchange exchange, JsonNode tool, CallRecord record, boolean withApi) {
+        ro.bitboy.mcpgp.extension.ApiClient api = !withApi ? null : (name, arguments) -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> args = arguments == null || arguments.isNull() ? Map.of()
+                    : new com.fasterxml.jackson.databind.ObjectMapper().convertValue(arguments, Map.class);
+            McpSchema.CallToolResult result = call(exchange, new McpSchema.CallToolRequest(name, args));
+            if (Boolean.TRUE.equals(result.isError())) {
+                Object code = result.structuredContent() instanceof Map<?, ?> m ? m.get("code") : null;
+                Object message = result.structuredContent() instanceof Map<?, ?> m ? m.get("message") : null;
+                return ro.bitboy.mcpgp.extension.ToolResult.error(code == null ? "INTERNAL" : code.toString(),
+                        message == null ? "the tool failed" : message.toString());
+            }
+            if (result.structuredContent() != null) {
+                return ro.bitboy.mcpgp.extension.ToolResult.of(new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(result.structuredContent()));
+            }
+            String text = result.content().stream().filter(c -> c instanceof McpSchema.TextContent).map(c -> ((McpSchema.TextContent) c).text())
+                    .findFirst().orElse("");
+            try {
+                // arrays and other JSON results are sent as text; extensions get them as data
+                JsonNode parsed = new com.fasterxml.jackson.databind.ObjectMapper().readTree(text);
+                if (parsed != null && (parsed.isArray() || parsed.isObject())) {
+                    return ro.bitboy.mcpgp.extension.ToolResult.of(parsed);
+                }
+            } catch (java.io.IOException e) {
+                // plain text
+            }
+            return ro.bitboy.mcpgp.extension.ToolResult.text(text);
+        };
+        Object key = exchange == null || exchange.transportContext() == null ? null : exchange.transportContext().get(CLIENT_KEY);
+        String caller = key != null ? key.toString() : exchange != null && exchange.getClientInfo() != null ? exchange.getClientInfo().name() : null;
+        return new Extensions.Context(tool.path("name").asText(), record, caller, api, apiTools::redact);
     }
 
     /** Every result carries the correlation id that its audit event has (tools-contract §6). */
