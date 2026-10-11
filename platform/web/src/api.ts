@@ -260,6 +260,26 @@ export interface Operation {
   exclusion?: { kind: 'access' | 'include' | 'exclude' | 'deprecated'; reason: string; index?: number; selector?: Selector }
 }
 
+/** A notice added to tool descriptions (definition-format.md §5.1). */
+export interface Notice { id: string; text: string; position?: 'append' | 'prepend'; match?: Selector }
+
+/** A rule of the definition (definition-format.md §5), as far as the pages read and write it. */
+export interface Rule {
+  id?: string
+  match?: Selector
+  title?: { set?: string }
+  description?: { set?: string }
+  params?: Record<string, { description?: { set?: string } }>
+  [key: string]: unknown
+}
+
+/** The definition as data: the root file as written, and the result with what it extends and includes. */
+export interface DefinitionData {
+  version?: number
+  root: { descriptions?: { notices?: Notice[] }; overrides?: { rules?: Rule[] }; [key: string]: unknown }
+  resolved: { descriptions?: { notices?: Notice[] }; [key: string]: unknown }
+}
+
 /** What a build of a version will contain, before building it (packaging.md). */
 export interface PackagePreview {
   version?: number
@@ -332,6 +352,7 @@ export const api = {
   manifest: (id: string, version: string | number = 'latest') => json<Manifest>('GET', `/servers/${enc(id)}/versions/${version}/manifest`),
   previewEdit: (id: string, base: number, changes: Change[], operations = false) =>
     json<EditPreview>('POST', `/servers/${enc(id)}/edits`, { base, changes, dryRun: true, operations: operations || undefined }),
+  definition: (id: string, version: string | number = 'latest') => json<DefinitionData>('GET', `/servers/${enc(id)}/versions/${version}/definition`),
   packagePreview: (id: string, version: string | number = 'latest') => json<PackagePreview>('GET', `/servers/${enc(id)}/versions/${version}/package`),
   naming: (id: string, version: string | number = 'latest') => json<NamingInfo>('GET', `/servers/${enc(id)}/versions/${version}/naming`),
   operations: (id: string, version: string | number = 'latest') => json<OperationList>('GET', `/servers/${enc(id)}/versions/${version}/operations`),

@@ -138,6 +138,24 @@ public final class Compilation {
         });
     }
 
+    /**
+     * The definition as data: {@code root} (the root file as written) and {@code resolved} (with what it
+     * extends and includes merged in); null when the version doesn't compile.
+     */
+    public ObjectNode definition(Model.Version version, String createdAt) {
+        return derived("definition", version, createdAt, result -> {
+            ObjectNode answer = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+            try {
+                answer.set("root", new com.fasterxml.jackson.databind.ObjectMapper(new com.fasterxml.jackson.dataformat.yaml.YAMLFactory())
+                        .readTree(store.blob(version.files().get(version.root()))));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            answer.set("resolved", result.definition().orElseThrow().document().deepCopy());
+            return answer;
+        });
+    }
+
     private ObjectNode derived(String kind, Model.Version version, String createdAt, java.util.function.Function<Compiler.Result, ObjectNode> from) {
         String key = version.digest() + "-" + libraryState();
         var cached = store.cached(kind, key);

@@ -135,6 +135,16 @@ paths:
                       present: { type: boolean }
                       entries: { type: array, items: { type: object, properties: { id: { type: string }, name: { type: string }, since: { type: string } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/versions/{version}/definition:
+    parameters: [ { $ref: "#/components/parameters/ServerId" }, { $ref: "#/components/parameters/Version" } ]
+    get:
+      operationId: getDefinition
+      tags: [servers]
+      summary: Get definition
+      description: The definition as data - the root file as written, and the result with what it extends and includes merged in.
+      responses:
+        "200": { description: Definition, content: { application/json: { schema: { type: object, properties: { version: { type: integer }, root: { type: object }, resolved: { type: object } } } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/versions/{version}/package:
     parameters: [ { $ref: "#/components/parameters/ServerId" }, { $ref: "#/components/parameters/Version" } ]
     get:

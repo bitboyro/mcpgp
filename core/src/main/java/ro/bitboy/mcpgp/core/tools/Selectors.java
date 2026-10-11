@@ -12,7 +12,9 @@ import java.util.regex.Pattern;
  * Matches selectors (definition-format §5) against operations. All given fields must match (AND);
  * list values match if any element matches (OR).
  */
-final class Selectors {
+public final class Selectors {
+
+    private static final List<String> OPERATION_KEYS = List.of("api", "tag", "method", "path", "operationId", "contract", "extension");
 
     private Selectors() {
     }
@@ -21,6 +23,9 @@ final class Selectors {
      * @param contracts the contract versions in which this operation exists (and is still selected)
      */
     static boolean matches(JsonNode selector, String api, Operation op, Collection<String> contracts) {
+        if (!selectsOperations(selector)) {
+            return false;
+        }
         if (selector.has("api") && !selector.get("api").asText().equals(api)) {
             return false;
         }
@@ -50,6 +55,49 @@ final class Selectors {
             }
         }
         return true;
+    }
+
+    /** Whether a selector can select API operations: no {@code kind}, or one that includes {@code api}, and no {@code tool}. */
+    public static boolean selectsOperations(JsonNode selector) {
+        return (!selector.has("kind") || values(selector.get("kind")).contains("api")) && !selector.has("tool");
+    }
+
+    /**
+     * Whether a selector selects a pack, built-in or custom tool: it names the kind (or tool names) and
+     * no operation keys; {@code tool} matches the name exactly or as {@code ~regex}.
+     */
+    public static boolean matchesTool(JsonNode selector, String kind, String name) {
+        if (!selector.has("kind") && !selector.has("tool")) {
+            return false;
+        }
+        if (OPERATION_KEYS.stream().anyMatch(selector::has)) {
+            return false;
+        }
+        if (selector.has("kind") && !values(selector.get("kind")).contains(kind)) {
+            return false;
+        }
+        return !selector.has("tool") || values(selector.get("tool")).stream().anyMatch(t -> text(t, name));
+    }
+
+    /**
+     * Whether a selector selects an API tool by its final name (notices, which apply after naming):
+     * the kind includes {@code api} (or isn't given), the name matches {@code tool} if given, and the
+     * operation keys match the tool's operation.
+     */
+    public static boolean matchesApiTool(JsonNode selector, ToolPlan plan) {
+        if (selector.has("kind") && !values(selector.get("kind")).contains("api")) {
+            return false;
+        }
+        if (selector.has("tool") && values(selector.get("tool")).stream().noneMatch(t -> text(t, plan.name()))) {
+            return false;
+        }
+        if (OPERATION_KEYS.stream().noneMatch(selector::has)) {
+            return true;
+        }
+        com.fasterxml.jackson.databind.node.ObjectNode operationOnly = ((com.fasterxml.jackson.databind.node.ObjectNode) selector).deepCopy();
+        operationOnly.remove("kind");
+        operationOnly.remove("tool");
+        return plan.matches(operationOnly);
     }
 
     /** Exact match, or a regular expression when the value starts with {@code ~}. */

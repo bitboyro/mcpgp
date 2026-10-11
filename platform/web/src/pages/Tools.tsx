@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { ProvenanceStep, Tool } from '../api'
 import { listedTools, useManifest } from '../serverData'
+import { useSession } from '../session'
 import { Chip, ErrorBox, Loading, PageHead, Segmented } from '../ui'
 import { NamingView } from './Naming'
 import { OperationsView } from './Operations'
+import { ToolEdit } from './ToolEdit'
 import { agentView } from './Overview'
 
 type Filter = 'all' | 'listed' | 'api' | 'pack' | 'builtin'
@@ -90,7 +92,7 @@ export function ToolsPage() {
           )}
         </section>
         <section className="stage" aria-label="Selected tool">
-          {selected ? <ToolDetail tool={selected} /> : manifest.data && <p className="empty">Pick a tool.</p>}
+          {selected ? <ToolDetail key={selected.name} id={id} tool={selected} /> : manifest.data && <p className="empty">Pick a tool.</p>}
           {manifest.data && (
             <p className="hint">Rules live in the definition's files (for example <span className="mono">overrides/*.yaml</span>); see them on{' '}
               <Link to={`/servers/${id}/sources`}>Sources</Link>.</p>
@@ -101,7 +103,9 @@ export function ToolsPage() {
   )
 }
 
-function ToolDetail({ tool }: { tool: Tool }) {
+function ToolDetail({ id, tool }: { id: string; tool: Tool }) {
+  const { can } = useSession()
+  const [editing, setEditing] = useState(false)
   const a = tool.annotations ?? {}
   const marks: [string, boolean | undefined][] = [['read only', a.readOnlyHint], ['destructive', a.destructiveHint], ['idempotent', a.idempotentHint],
     ['asks to confirm', tool.confirm], ['sensitive', tool.sensitive]]
@@ -113,7 +117,9 @@ function ToolDetail({ tool }: { tool: Tool }) {
         <h2 className="mono" style={{ overflowWrap: 'anywhere' }}>{tool.name}</h2>
         {tool.title && <p style={{ color: 'var(--stage-bright)' }}>{tool.title}</p>}
       </div>
-      {tool.description && <p>{tool.description}</p>}
+      {tool.description && <p style={{ whiteSpace: 'pre-line' }}>{tool.description}</p>}
+      {editing ? <ToolEdit id={id} tool={tool} onClose={() => setEditing(false)} />
+        : can('servers:write') && <button type="button" className="btn btn-sm btn-stage" style={{ alignSelf: 'flex-start' }} onClick={() => setEditing(true)}>Edit title and descriptions</button>}
       <div className="actions">
         {marks.filter(([, on]) => on).map(([label]) => <span key={label} className="tag">{label}</span>)}
         {tool.kind !== 'api' && <Chip tone="new">{tool.kind === 'pack' ? `pack ${tool.pack ?? ''}` : 'built-in'}</Chip>}

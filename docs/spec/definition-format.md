@@ -165,6 +165,44 @@ Operations: `set`, `prepend`, `append`, `replace: { pattern, with }`, `template`
 `overrides.include` (glob) loads rule files; `overrides.rules` adds inline rules after them.
 Rules apply **in order; later rules win**.
 
+**Other kinds of tools.** A selector without `kind` selects API operations only. `kind` (`api`, `pack`,
+`builtin`, `custom`, one or a list) widens it, and `tool` (names, or `~regex`) picks pack, built-in and
+custom tools by name: `{ kind: [api, pack, builtin, custom] }` is every tool. For tools that aren't API
+tools, rules change `title` and `description` only, and their selector must not use operation keys.
+
+**Long descriptions.** Descriptions are at most 1024 characters. When the result is longer, the spec's
+text is shortened (ending in `…`) and the rules are applied again, so what rules prepend or append
+stays whole (`DESCRIPTION_TRUNCATED` warns). Only a description that is still too long is cut at the
+end.
+
+**Rule ids.** A rule may have an `id` (`[A-Za-z0-9:._-]`). Rules with ids are found and changed by id,
+and lists of them merge by id when a variant extends a definition. The platform's Tools page writes
+its per-tool changes as inline rules with ids `ui:<operationId>` (or `ui:<tool>`).
+
+### 5.1 Notices
+
+Text added to tool descriptions, for company policy or disclaimers:
+
+```yaml
+descriptions:
+  notices:
+    - id: data-policy
+      text: "Company policy: customer data stays in the EU."     # at most 500 characters
+      position: append                                          # append (default) | prepend
+      match: { tag: [customers] }                               # optional: without it, every tool
+    - id: writes
+      text: "Changes need a ticket number in the reason."
+      match: { method: [POST, PUT, PATCH, DELETE] }
+```
+
+- A notice goes on every tool it selects, of every kind (API, pack, built-in, custom); without
+  `match`, on every tool. `match` is a selector (§5); `tool` matches final tool names, so notices can
+  name any tool.
+- Notices are applied after rules and are never cut: a description that would be too long with them
+  is shortened to make room. Several notices on one tool keep their order, separated by blank lines.
+- They show in a tool's provenance as `notice` steps; `NOTICE_MATCHES_NOTHING` warns about a notice
+  that selects no tool. A variant inherits its parent's notices (merged by `id`).
+
 ## 6. Variants
 
 ```yaml
@@ -233,6 +271,7 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 | `UNSUPPORTED_FEATURE` | info | webhooks, callbacks, links and similar are ignored (once per feature) |
 | `OPERATION_EXCLUDED` | info | an operation becomes no tool, with the reason (access, include/exclude, deprecated, hidden) |
 | `RULE_MATCHES_NOTHING` | warning | a rule matches no tool |
+| `NOTICE_MATCHES_NOTHING` | warning | a notice (`descriptions.notices`) applies to no tool |
 | `CONTENT_TYPE_UNKNOWN` | error | a rule binds a content type the operation doesn't accept |
 | `RESOURCE_NOT_GET` | error | `expose: resource` on an operation that isn't a `GET` (tools-contract §14.1) |
 | `PROMPT_UNKNOWN_ARGUMENT` | error | a prompt message uses `{{name}}` for an argument the prompt doesn't declare (tools-contract §14.2) |

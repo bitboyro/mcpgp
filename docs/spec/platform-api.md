@@ -52,6 +52,9 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   policy's reference, or null), `own` (what the definition sets in `naming` itself), `effective` (the
   merged policy the compiler used) and `lock: { present, entries: [{ id, name, since }] }`. Each tool's
   name steps are in the manifest's provenance; the Naming section of Tools & rules shows both.
+- `GET /servers/{id}/versions/{version}/definition` returns the definition as data: `root` (the root
+  file as written) and `resolved` (with what it extends, includes and its naming policy merged in).
+  The pages read notices and their own rules from it.
 - `GET /servers/{id}/versions/{version}/package` says what a build of the version will contain,
   without building it: `zip` (the name, before the build number), `formats` (`jar` always, `mcpb` and
   `docker` per `build.targets`, each with its main file), `files` (everything in the zip, as a build
@@ -63,7 +66,9 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   changes the root definition of the latest version (`base`; another number gets `409`) and saves the
   result as the next version, like an upload. `op` is `set` (`null` is a value: in a variant it removes
   what is inherited) or `remove`; `path` is a JSON Pointer, plus `[key=value]` to pick a list item
-  (`/apis/[id=orders]/select/access`; created when missing). The file is edited as text, so comments
+  (`/apis/[id=orders]/select/access`; created when missing). A path ending in `[key=value]` sets the
+  whole item (replaced, or added at the end) or, with `remove`, removes it
+  (`/descriptions/notices/[id=policy]`, `/overrides/rules/[id=ui:listAccounts]`). The file is edited as text, so comments
   and formatting elsewhere stay; when that isn't possible, the edit is refused (`422`) rather than
   rewriting the file. An edit that doesn't compile is not saved (`422` with diagnostics). With
   `dryRun` nothing is saved: the answer is the edited definition, its manifest (or diagnostics) and

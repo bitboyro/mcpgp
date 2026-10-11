@@ -158,6 +158,12 @@ public class ServersApi {
         return derived(request, id, version, compilation::naming);
     }
 
+    /** The definition as data: the root file as written, and the result with what it extends and includes merged in. */
+    @GetMapping("/{id}/versions/{version}/definition")
+    public ResponseEntity<byte[]> definition(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
+        return derived(request, id, version, compilation::definition);
+    }
+
     /** What a build of the version will contain: formats, files, the generated docs, warnings; signed as the platform signs. */
     @GetMapping("/{id}/versions/{version}/package")
     public ResponseEntity<byte[]> packagePreview(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
