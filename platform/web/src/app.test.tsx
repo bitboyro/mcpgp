@@ -211,23 +211,50 @@ describe('choosing operations', () => {
 })
 
 describe('naming', () => {
+  const manifest = (name: string, computed: string, locked: boolean) => ({
+    server: { name: 'orders-mcp', version: '2.0.0' }, exposure: { mode: 'plain' }, diagnostics: [], apis: [{ id: 'orders', toolPrefix: 'orders', contracts: [] }],
+    tools: [{ name, kind: 'api', operation: { key: 'orders:GET:/customers/{id}' },
+      provenance: { name: [{ step: 'namespace', value: computed }, ...(locked ? [{ step: 'lock', value: name, since: '1.0.0' }] : [])] } },
+    { name: 'orders_account_list', kind: 'api', operation: { key: 'orders:GET:/accounts' }, provenance: { name: [{ step: 'namespace', value: 'orders_account_list' }] } }],
+  })
+  const routes = () => ({
+    'GET /me': ME,
+    'GET /settings': SETTINGS,
+    'GET /servers/orders-mcp': { id: 'orders-mcp', title: 'Orders', archived: false, latestVersion: 3, versions: [] },
+    'GET /servers/orders-mcp/versions/latest/manifest': manifest('orders_customer_get', 'orders_customer_account_get', true),
+    'GET /servers/orders-mcp/versions/latest/naming': { extends: 'mcpgp://acme/naming/acme-standard@2', own: { vocabulary: { customer_account: 'customer' } },
+      effective: { source: 'operationId', vocabulary: { 'retrieve|fetch': 'get', customer_account: 'customer' } }, lock: { present: true, entries: [] } },
+  })
+
   it('shows the policy, the vocabulary and how each tool got its name', async () => {
-    fakeApi({
-      'GET /me': ME,
-      'GET /settings': SETTINGS,
-      'GET /servers/orders-mcp': { id: 'orders-mcp', title: 'Orders', archived: false, latestVersion: 3, versions: [] },
-      'GET /servers/orders-mcp/versions/latest/manifest': { server: { name: 'orders-mcp', version: '2.0.0' }, exposure: { mode: 'plain' }, diagnostics: [], tools: [
-        { name: 'orders_customer_get', kind: 'api', operation: { key: 'orders:GET:/customers/{id}' },
-          provenance: { name: [{ step: 'namespace', value: 'orders_customer_account_get' }, { step: 'lock', value: 'orders_customer_get', since: '1.0.0' }] } },
-      ] },
-      'GET /servers/orders-mcp/versions/latest/naming': { extends: 'mcpgp://acme/naming/acme-standard@2', own: { vocabulary: { customer_account: 'customer' } },
-        effective: { source: 'operationId', vocabulary: { customer_account: 'customer' } }, lock: { present: true, entries: [] } },
-    })
+    fakeApi(routes())
     renderAt('/servers/orders-mcp/tools?view=naming')
     expect(await screen.findByText('mcpgp://acme/naming/acme-standard@2')).toBeTruthy()
     expect(screen.getByRole('table', { name: 'Vocabulary' }).textContent).toContain('customer_accountcustomerthis server')
     await waitFor(() => expect(screen.getByRole('table', { name: 'Tool names' }).textContent).toContain('now: orders_customer_account_get'))
     expect(screen.getByRole('tab', { name: 'Would change (1)' })).toBeTruthy()
+  })
+
+  it('adds a vocabulary entry, shows which names change, and saves', async () => {
+    const { calls } = fakeApi({
+      ...routes(),
+      'POST /servers/orders-mcp/edits': (c: { body: { dryRun?: boolean } }) => (c.body.dryRun
+        ? { base: 3, digest: 'sha256:x', definition: '', manifest: { ...manifest('orders_customer_get', 'orders_customer_get', true),
+          tools: [manifest('orders_customer_get', 'orders_customer_get', true).tools[0],
+            { name: 'orders_acct_list', kind: 'api', operation: { key: 'orders:GET:/accounts' }, provenance: { name: [{ step: 'namespace', value: 'orders_acct_list' }] } }] } }
+        : { id: 'orders-mcp', latestVersion: 4, versions: [] }),
+    })
+    renderAt('/servers/orders-mcp/tools?view=naming')
+    await userEvent.type(await screen.findByLabelText('Words'), 'account')
+    await userEvent.type(screen.getByLabelText('Become'), 'acct')
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    const changes = await screen.findByRole('table', { name: 'Name changes' })
+    await waitFor(() => expect(changes.textContent).toContain('orders_account_listorders_acct_list'))
+    expect(screen.getByText(/breaks agents, prompts and clients/)).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Save as version 4' }))
+    await waitFor(() => expect(calls.filter((c) => c.method === 'POST' && !(c.body as { dryRun?: boolean }).dryRun)).toHaveLength(1))
+    expect(calls.filter((c) => c.method === 'POST').at(-1)!.body).toEqual({ base: 3, message: 'Naming: account → acct',
+      changes: [{ op: 'set', path: '/naming/vocabulary/account', value: 'acct' }] })
   })
 })
 

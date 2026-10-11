@@ -63,8 +63,11 @@ final class Naming {
         order = policy.path("shape").path("order").asText("object_verb");
         casing = policy.path("shape").path("case").asText("snake");
         singular = policy.path("shape").path("number").asText("singular").equals("singular");
-        policy.path("vocabulary").fields().forEachRemaining(f -> vocabulary.put(
-                Pattern.compile("(?<=^|_)(?:" + f.getKey() + ")(?=_|$)"), f.getValue().asText()));
+        policy.path("vocabulary").fields().forEachRemaining(f -> {
+            if (!f.getValue().isNull()) {         // null switches off an inherited entry
+                vocabulary.put(Pattern.compile("(?<=^|_)(?:" + f.getKey() + ")(?=_|$)"), f.getValue().asText());
+            }
+        });
         serverPrefix = policy.path("namespace").path("server").asText("");
         perApi = policy.path("namespace").path("perApi").asBoolean(true);
         profile = policy.path("limits").path("profile").asText("strict");

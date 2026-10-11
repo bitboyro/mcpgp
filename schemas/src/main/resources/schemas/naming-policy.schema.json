@@ -25,7 +25,7 @@
       },
       "additionalProperties": false
     },
-    "vocabulary": { "type": "object", "additionalProperties": { "type": "string" } },
+    "vocabulary": { "type": "object", "additionalProperties": { "type": ["string", "null"] }, "description": "words (a|b) → replacement; null removes an entry the extended policy has" },
     "namespace": {
       "type": "object",
       "properties": {
