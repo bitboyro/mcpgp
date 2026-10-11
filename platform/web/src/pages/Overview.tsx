@@ -221,7 +221,7 @@ function Choices({ id, original, shown, editable, pending, pick, variant }: {
   )
 }
 
-function DefinitionDiff({ id, version, after }: { id: string; version: number; after?: string }) {
+export function DefinitionDiff({ id, version, after }: { id: string; version: number; after?: string }) {
   const detail = useQuery({ queryKey: ['version', id, version], queryFn: () => api.version(id, version) })
   const root = detail.data?.root
   const before = useQuery({ queryKey: ['file', id, version, root], queryFn: () => api.file(id, version, root!), enabled: !!root })

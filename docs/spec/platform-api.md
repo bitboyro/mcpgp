@@ -42,6 +42,12 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
 - `POST /servers/{id}/versions/{version}/validate` returns the compiler's diagnostics.
 - `GET /servers/{id}/versions/{version}/manifest` returns the manifest (compiled on demand, cached by
   digest): what agents will get, with provenance. This is what the UI's previews show.
+- `GET /servers/{id}/versions/{version}/operations` lists every operation of the version's contracts
+  per API, with the API's `select` and, per operation, `state`: `tool` or `resource` (with its `tool`
+  name), `excluded` (left out by `select`, with `exclusion: { kind, reason, index?, selector? }`:
+  `kind` is `access`, `include`, `exclude` or `deprecated`; for `exclude`, the first matching entry and
+  its index), or `hidden` (by a rule). The Tools & rules page turns operations on and off from it,
+  writing `select` through the edits below. A version that doesn't compile gets `422`.
 - `GET /servers/{id}/versions/{version}/example-config` returns the example configuration the
   version's package will ship (what the customer fills in), with secrets as references only.
 - **Edits:** `POST /servers/{id}/edits { base, changes: [{ op, path, value }], message?, dryRun? }`
@@ -52,7 +58,8 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   and formatting elsewhere stay; when that isn't possible, the edit is refused (`422`) rather than
   rewriting the file. An edit that doesn't compile is not saved (`422` with diagnostics). With
   `dryRun` nothing is saved: the answer is the edited definition, its manifest (or diagnostics) and
-  example configuration, which is how the UI previews unsaved changes.
+  example configuration, which is how the UI previews unsaved changes; `operations: true` adds the
+  operation list (as `GET …/operations` gives it) for the edited definition.
 - **Duplicate:** `POST /servers/{id}/duplicate { id, title }`: an independent copy of the current
   version's files. **Variant:** `POST /servers/{id}/variants { id, title, pin? }`: a new server whose
   definition `extends` this one (`@latest`, or `@<version>` with `pin`) and stores only its overrides.

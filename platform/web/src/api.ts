@@ -229,6 +229,36 @@ export interface PackageFile { path: string; size: number }
 
 export interface Change { op: 'set' | 'remove'; path: string; value?: unknown }
 
+/** An API's `select` block (definition-format.md §4). */
+export interface Select {
+  access?: 'read-only' | 'read-write' | 'all'
+  include?: Selector | Selector[]
+  exclude?: Selector | Selector[]
+  deprecated?: 'hide' | 'show' | 'mark'
+  [key: string]: unknown
+}
+
+export type Selector = Record<string, unknown>
+
+export interface Operation {
+  key: string
+  method: string
+  path: string
+  operationId?: string
+  summary?: string
+  deprecated: boolean
+  tags: string[]
+  contracts: string[]
+  state: 'tool' | 'resource' | 'excluded' | 'hidden'
+  tool?: string
+  exclusion?: { kind: 'access' | 'include' | 'exclude' | 'deprecated'; reason: string; index?: number; selector?: Selector }
+}
+
+export interface OperationList {
+  version?: number
+  apis: { id: string; title: string; select: Select; operations: Operation[] }[]
+}
+
 export interface EditPreview {
   base: number
   digest: string
@@ -236,6 +266,7 @@ export interface EditPreview {
   manifest?: Manifest
   exampleConfig?: string
   diagnostics?: Diagnostic[]
+  operations?: OperationList
 }
 
 export const api = {
@@ -258,8 +289,9 @@ export const api = {
     json<{ ok?: boolean; diagnostics: Diagnostic[] }>('POST', `/servers/${enc(id)}/versions/${version}/validate`),
   exampleConfig: (id: string, version: string | number = 'latest') => text(`/servers/${enc(id)}/versions/${version}/example-config`),
   manifest: (id: string, version: string | number = 'latest') => json<Manifest>('GET', `/servers/${enc(id)}/versions/${version}/manifest`),
-  previewEdit: (id: string, base: number, changes: Change[]) =>
-    json<EditPreview>('POST', `/servers/${enc(id)}/edits`, { base, changes, dryRun: true }),
+  previewEdit: (id: string, base: number, changes: Change[], operations = false) =>
+    json<EditPreview>('POST', `/servers/${enc(id)}/edits`, { base, changes, dryRun: true, operations: operations || undefined }),
+  operations: (id: string, version: string | number = 'latest') => json<OperationList>('GET', `/servers/${enc(id)}/versions/${version}/operations`),
   saveEdit: (id: string, base: number, changes: Change[], message?: string) =>
     json<Server>('POST', `/servers/${enc(id)}/edits`, { base, changes, message }),
   duplicate: (id: string, body: { id: string; title?: string }) => json<Server>('POST', `/servers/${enc(id)}/duplicate`, body),

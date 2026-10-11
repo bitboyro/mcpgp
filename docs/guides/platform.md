@@ -41,8 +41,14 @@ version), **Builds** (download, release, archive, delete) and **Activity**; plus
 API as everyone else; nothing it does is UI-only. On Overview, the server's settings (what agents
 see, what they may do, target servers, transports, confirmation, packs) can be changed on the page:
 the preview shows the result before anything is saved, Review shows the lines of the definition that
-change, and Save makes the next version. Everything else is changed in the files (upload a new
-version on Sources).
+change, and Save makes the next version. On Tools & rules, **Operations** lists every operation of the
+contracts with a switch: on makes it a tool (or resource), off leaves it out, and each operation that
+is off says why (`excluded by tag system`, `read and write: no deletes`, `hidden by a rule`). Turning a
+tool off adds one `select.exclude` entry for that operation (or one `{ tag: [...] }` entry for a whole
+tag); turning an operation on undoes what left it out, and when that reaches further (removing a broad
+exclude entry, changing `access`), the page says so and asks first. Unsaved switches are previewed by
+the platform, and saving makes the next version, as on Overview. Operations a rule hides change in the
+rule's file. Everything else is changed in the files (upload a new version on Sources).
 
 **Company sign-in.** Add `auth.oidc` (SSO) or `auth.ldap` (the directory) to `platform.yaml`; the
 sign-in page then offers them (the keys: [spec/platform-api.md §7](../spec/platform-api.md#7-platform-configuration-and-storage)).

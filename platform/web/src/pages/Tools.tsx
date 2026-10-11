@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { ProvenanceStep, Tool } from '../api'
 import { listedTools, useManifest } from '../serverData'
 import { Chip, ErrorBox, Loading, PageHead, Segmented } from '../ui'
+import { OperationsView } from './Operations'
 import { agentView } from './Overview'
 
 type Filter = 'all' | 'listed' | 'api' | 'pack' | 'builtin'
@@ -31,11 +32,26 @@ export function ToolsPage() {
   const selected = manifest.data?.tools.find((t) => t.name === selectedName)
   const operations = manifest.data ? manifest.data.diagnostics.filter((d) => d.code === 'OPERATION_EXCLUDED').length : 0
   const apiCount = manifest.data?.tools.filter((t) => t.kind === 'api').length ?? 0
+  const view = params.get('view') === 'operations' ? 'operations' : 'tools'
+  const switcher = (
+    <Segmented role="tab" label="View" value={view} onChange={(v) => setParams(v === 'operations' ? { view: v } : {}, { replace: true })}
+      options={[['tools', 'Tools'], ['operations', 'Operations']]} />
+  )
+
+  if (view === 'operations') {
+    return (
+      <>
+        <PageHead title="Tools & rules" sub="Every operation of the contracts. Switch one on to make it a tool, off to leave it out.">{switcher}</PageHead>
+        <OperationsView id={id} />
+      </>
+    )
+  }
 
   return (
     <>
       <PageHead title="Tools & rules"
-        sub={manifest.data ? `${apiCount} of ${apiCount + operations} operations become tools. Pick one to see exactly what the agent gets, and why.` : undefined} />
+        sub={manifest.data ? <>{apiCount} of {apiCount + operations} operations become tools. Pick one to see exactly what the agent gets, and why.{' '}
+          <Link to="?view=operations">Choose operations</Link></> : undefined}>{switcher}</PageHead>
       <div className="body">
         <section className="col" aria-label="Tools">
           <ErrorBox error={manifest.error} />

@@ -159,6 +159,11 @@ versions follow [SemVer](https://semver.org).
   server's next version on a platform (`MCPGP_TOKEN`), with `--build`, `--verify-local` (the
   platform's build must give agents the same as the local compile) and `--release`.
 - Compiler model: media types keep their `example` (or first of `examples`).
+- Platform: `GET /servers/{id}/versions/{version}/operations` lists every operation with what became
+  of it (tool, resource, excluded by `select` and by which clause, hidden by a rule); edit dry runs
+  take `operations: true`. Tools & rules → Operations: a switch per operation, with filters by text,
+  state and tag, that writes `select` (one exclude entry per tool, or per tag; turning on what a
+  broader clause leaves out asks first), previewed before saving as the next version.
 
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).

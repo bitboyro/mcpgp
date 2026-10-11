@@ -112,6 +112,26 @@ public final class Compilation {
         return new Preview(text, result);
     }
 
+    /** Every operation and what became of it ({@link Operations}), cached like the preview; null when the version doesn't compile. */
+    public ObjectNode operations(Model.Version version, String createdAt) {
+        String key = version.digest() + "-" + libraryState();
+        var cached = store.cached("operations", key);
+        if (cached.isPresent()) {
+            try {
+                return (ObjectNode) new com.fasterxml.jackson.databind.ObjectMapper().readTree(cached.get());
+            } catch (IOException e) {
+                // compile again
+            }
+        }
+        Compiler.Result result = compile(version, new ManifestWriter.Build(Instant.parse(createdAt), Compiler.VERSION, null, null, null));
+        if (!result.ok() || result.definition().isEmpty()) {
+            return null;
+        }
+        ObjectNode operations = Operations.of(result);
+        store.cache("operations", key, CanonicalJson.compact(operations).getBytes(StandardCharsets.UTF_8));
+        return operations;
+    }
+
     /** Changes whenever a library item or server gets a new version (a reference may then resolve differently). */
     private String libraryState() {
         StringBuilder state = new StringBuilder();
