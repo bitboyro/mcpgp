@@ -156,3 +156,56 @@ describe('all servers', () => {
     expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ id: 'orders-lite', pin: false })
   })
 })
+
+describe('choosing operations', () => {
+  const accounts = { key: 'orders:GET:/accounts', method: 'GET', path: '/accounts', operationId: 'listAccounts', deprecated: false, tags: ['accounts'], contracts: ['2.0'] }
+  const users = { key: 'orders:GET:/users', method: 'GET', path: '/users', operationId: 'listUsers', deprecated: false, tags: ['users-roles'], contracts: ['2.0'] }
+  const select = { exclude: [{ tag: ['users-roles'] }] }
+  const list = (accountsOn: boolean) => ({
+    version: 3,
+    apis: [{ id: 'orders', title: 'Orders', select: accountsOn ? select : { exclude: [...select.exclude, { operationId: 'listAccounts' }] }, operations: [
+      accountsOn ? { ...accounts, state: 'tool', tool: 'orders_account_list' }
+        : { ...accounts, state: 'excluded', exclusion: { kind: 'exclude', reason: 'excluded by select.exclude', index: 1, selector: { operationId: 'listAccounts' } } },
+      { ...users, state: 'excluded', exclusion: { kind: 'exclude', reason: 'excluded by select.exclude', index: 0, selector: { tag: ['users-roles'] } } },
+    ] }],
+  })
+
+  it('turns a tool off, previews it, and saves the next version', async () => {
+    const { calls } = fakeApi({
+      'GET /me': ME,
+      'GET /settings': SETTINGS,
+      'GET /servers/orders-mcp': { id: 'orders-mcp', title: 'Orders', archived: false, latestVersion: 3, versions: [] },
+      'GET /servers/orders-mcp/versions/3/operations': list(true),
+      'POST /servers/orders-mcp/edits': (c: { body: { dryRun?: boolean } }) => (c.body.dryRun
+        ? { base: 3, digest: 'sha256:x', definition: 'apis: []\n', operations: list(false) }
+        : { id: 'orders-mcp', latestVersion: 4, versions: [] }),
+    })
+    renderAt('/servers/orders-mcp/tools?view=operations')
+    const toggle = await screen.findByRole('switch', { name: 'GET /accounts' })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByText('excluded by tag users-roles')).toBeTruthy()
+    await userEvent.click(toggle)
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'GET /accounts' }).getAttribute('aria-checked')).toBe('false'))
+    const change = { op: 'set', path: '/apis/[id=orders]/select/exclude', value: [{ tag: ['users-roles'] }, { operationId: 'listAccounts' }] }
+    expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ base: 3, changes: [change], dryRun: true, operations: true })
+    expect(screen.getByText('0 on, 1 off')).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save as version 4' }))
+    await waitFor(() => expect(calls.filter((c) => c.method === 'POST')).toHaveLength(2))
+    expect(calls.filter((c) => c.method === 'POST')[1].body).toEqual({ base: 3, changes: [change], message: 'Tools & rules: off: orders_account_list' })
+  })
+
+  it('asks before turning on what a broader entry leaves out', async () => {
+    fakeApi({
+      'GET /me': ME,
+      'GET /settings': SETTINGS,
+      'GET /servers/orders-mcp': { id: 'orders-mcp', title: 'Orders', archived: false, latestVersion: 3, versions: [] },
+      'GET /servers/orders-mcp/versions/3/operations': list(true),
+    })
+    renderAt('/servers/orders-mcp/tools?view=operations')
+    await userEvent.click(await screen.findByRole('switch', { name: 'GET /users' }))
+    expect(screen.getByRole('alertdialog').textContent).toContain('removes the exclude entry “tag users-roles”')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+  })
+})

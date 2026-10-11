@@ -128,25 +128,45 @@ public final class ToolPlanner {
 
     /** Why an operation is not selected in one contract, or null when it is. */
     private static String selectionReason(JsonNode select, String api, Operation op, String version) {
+        Exclusion exclusion = exclusion(select, api, op, version);
+        return exclusion == null ? null : exclusion.reason();
+    }
+
+    /**
+     * Why {@code select} leaves an operation out of a contract, or null when it doesn't.
+     *
+     * @param kind     {@code access}, {@code include}, {@code exclude} or {@code deprecated}
+     * @param index    for {@code exclude}: the first matching entry (0 when {@code exclude} is one selector)
+     * @param selector for {@code exclude}: that entry
+     */
+    public record Exclusion(String kind, String reason, Integer index, JsonNode selector) {
+    }
+
+    public static Exclusion exclusion(JsonNode select, String api, Operation op, String version) {
         String access = select.path("access").asText("read-write");
         boolean read = op.method().equals("GET") || op.method().equals("HEAD");
         if (access.equals("read-only") && !read) {
-            return "access: read-only";
+            return new Exclusion("access", "access: read-only", null, null);
         }
         if (access.equals("read-write") && op.method().equals("DELETE")) {
-            return "access: read-write";
+            return new Exclusion("access", "access: read-write", null, null);
         }
         List<String> versions = List.of(version);
         JsonNode include = select.get("include");
         if (include != null && list(include).stream().noneMatch(s -> Selectors.matches(s, api, op, versions))) {
-            return "not included";
+            return new Exclusion("include", "not included", null, null);
         }
         JsonNode exclude = select.get("exclude");
-        if (exclude != null && list(exclude).stream().anyMatch(s -> Selectors.matches(s, api, op, versions))) {
-            return "excluded by select.exclude";
+        if (exclude != null) {
+            List<JsonNode> entries = list(exclude);
+            for (int i = 0; i < entries.size(); i++) {
+                if (Selectors.matches(entries.get(i), api, op, versions)) {
+                    return new Exclusion("exclude", "excluded by select.exclude", i, entries.get(i));
+                }
+            }
         }
         if (op.deprecated() && select.path("deprecated").asText("hide").equals("hide")) {
-            return "deprecated";
+            return new Exclusion("deprecated", "deprecated", null, null);
         }
         return null;
     }

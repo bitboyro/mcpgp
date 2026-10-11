@@ -146,6 +146,21 @@ public class ServersApi {
         return Json.ok(preview.manifest());
     }
 
+    /** Every operation of the version's contracts: a tool, a resource, left out by {@code select} (and by what), or hidden by a rule. */
+    @GetMapping("/{id}/versions/{version}/operations")
+    public ResponseEntity<byte[]> operations(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
+        who(request).require("servers:read");
+        Model.VersionRef ref = servers.version(servers.get(id), version);
+        com.fasterxml.jackson.databind.node.ObjectNode operations = compilation.operations(servers.files(ref), ref.created());
+        if (operations == null) {
+            Compiler.Result result = compilation.compile(servers.files(ref), new ManifestWriter.Build(Instant.parse(ref.created()), Compiler.VERSION, null, null, null));
+            throw new ApiException(422, "VALIDATION", "version " + ref.number() + " does not compile",
+                    Map.of("diagnostics", diagnostics(result.diagnostics())));
+        }
+        operations.put("version", ref.number());
+        return Json.ok(operations);
+    }
+
     /** {@code {id, title?}}: an independent copy of the latest version. */
     /**
      * Changes made on the server's pages: {@code {base, changes: [{op, path, value}], message?, dryRun?}}.
@@ -172,6 +187,9 @@ public class ServersApi {
                 JsonNode manifest = Json.parse(result.preview().manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 answer.put("manifest", manifest);
                 answer.put("exampleConfig", ExampleConfig.yaml(manifest));
+                if (json.path("operations").asBoolean(false)) {
+                    answer.put("operations", compilation.operations(result.version(), Instant.now().toString()));
+                }
             } else {
                 answer.put("diagnostics", diagnostics(result.preview().result().diagnostics()));
             }

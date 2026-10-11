@@ -100,6 +100,16 @@ paths:
       responses:
         "200": { description: Manifest, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/versions/{version}/operations:
+    parameters: [ { $ref: "#/components/parameters/ServerId" }, { $ref: "#/components/parameters/Version" } ]
+    get:
+      operationId: listOperations
+      tags: [servers]
+      summary: List operations
+      description: Every operation of the version's contracts and what became of it (tool, resource, excluded by select and why, hidden by a rule).
+      responses:
+        "200": { description: Operations per API, content: { application/json: { schema: { $ref: "#/components/schemas/OperationList" } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/versions/{version}/example-config:
     get:
       operationId: getExampleConfig
@@ -135,6 +145,7 @@ paths:
                 base: { type: integer, description: The latest version number the changes were made on }
                 message: { type: string }
                 dryRun: { type: boolean, default: false }
+                operations: { type: boolean, default: false, description: With dryRun, also list the operations of the edited definition }
                 changes:
                   type: array
                   maxItems: 50
@@ -601,6 +612,40 @@ components:
         created: { type: string, format: date-time }
         updated: { type: string, format: date-time }
         versions: { type: array, items: { $ref: "#/components/schemas/VersionRef" } }
+    OperationList:
+      type: object
+      properties:
+        version: { type: integer }
+        apis:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              title: { type: string }
+              select: { type: object, description: The API's select block as the definition has it }
+              operations:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key: { type: string }
+                    method: { type: string }
+                    path: { type: string }
+                    operationId: { type: string }
+                    summary: { type: string }
+                    deprecated: { type: boolean }
+                    tags: { type: array, items: { type: string } }
+                    contracts: { type: array, items: { type: string } }
+                    state: { enum: [tool, resource, excluded, hidden] }
+                    tool: { type: string }
+                    exclusion:
+                      type: object
+                      properties:
+                        kind: { enum: [access, include, exclude, deprecated] }
+                        reason: { type: string }
+                        index: { type: integer }
+                        selector: { type: object }
     ServerList:
       type: object
       properties:
