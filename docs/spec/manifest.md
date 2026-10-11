@@ -39,6 +39,7 @@ Full example: [examples/manifest/orders-mcp.manifest.json](../../examples/manife
   "apis":        [ … ],   // APIs, contracts, auth, paging (§4)
   "exposure":    { … },   // plain / discovery / toolsets / hybrid (§4)
   "resources":   { … },   // GET operations exposed as resources, when there are any (tools-contract §14.1)
+  "prompts":     [ … ],   // prompt templates, when there are any (tools-contract §14.2)
   "policies":    { … },   // safety, files, redaction, defaults and limits for runtime config (§4)
   "tools":       [ … ],   // every tool, sorted by name (§5)
   "packs":       [ … ],   // support packs and their requirements (§6)

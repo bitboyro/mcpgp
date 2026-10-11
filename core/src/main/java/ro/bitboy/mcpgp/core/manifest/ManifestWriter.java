@@ -213,6 +213,10 @@ public final class ManifestWriter {
             exposureNode.set("toolsets", toolsets(exposure.path("toolsets"), plans.stream().filter(p -> !p.expose().equals("resource")).toList()));
         }
         manifest.set("exposure", exposureNode);
+        ArrayNode prompts = prompts(doc.path("prompts"), names, severalApis ? null : prefix(apis.get(0)), root);
+        if (!prompts.isEmpty()) {
+            manifest.set("prompts", prompts);
+        }
         if (!resourceNodes.isEmpty()) {
             ObjectNode resources = manifest.putObject("resources").put("uriScheme", doc.at("/resources/uriScheme").asText("api"));
             ArrayNode items = resources.putArray("items");
@@ -439,6 +443,41 @@ public final class ManifestWriter {
         });
         tool.set("provenance", provenance);
         return tool;
+    }
+
+    private static final java.util.regex.Pattern PLACEHOLDER = java.util.regex.Pattern.compile("\\{\\{\\s*([A-Za-z0-9_]+)\\s*}}");
+
+    /**
+     * The definition's prompts (tools-contract §14.2): names through the naming pipeline (with the API
+     * prefix in single-API servers), arguments and message templates as written; a placeholder for an
+     * argument the prompt doesn't declare fails the build.
+     */
+    private ArrayNode prompts(JsonNode defined, BuiltinNames names, String prefix, Location root) {
+        ArrayNode out = NODES.arrayNode();
+        for (int i = 0; i < defined.size(); i++) {
+            JsonNode prompt = defined.get(i);
+            ObjectNode node = NODES.objectNode().put("name", names.name(prompt.path("name").asText(), prefix));
+            putIfSet(node, "description", prompt.path("description").asText(null));
+            java.util.Set<String> declared = new java.util.LinkedHashSet<>();
+            ArrayNode arguments = node.putArray("arguments");
+            prompt.path("arguments").forEach(a -> {
+                declared.add(a.path("name").asText());
+                arguments.add(a.deepCopy());
+            });
+            ArrayNode messages = node.putArray("messages");
+            for (JsonNode message : prompt.path("messages")) {
+                java.util.regex.Matcher m = PLACEHOLDER.matcher(message.path("content").asText());
+                while (m.find()) {
+                    if (!declared.contains(m.group(1))) {
+                        diagnostics.error(Codes.PROMPT_UNKNOWN_ARGUMENT, "Prompt " + prompt.path("name").asText() + " uses {{" + m.group(1)
+                                + "}}, which isn't one of its arguments", root.withPointer("/prompts/" + i));
+                    }
+                }
+                messages.add(message.deepCopy());
+            }
+            out.add(node);
+        }
+        return out;
     }
 
     /**

@@ -148,6 +148,11 @@ versions follow [SemVer](https://semver.org).
   `resources/list`, `resources/templates/list` and `resources/read` through the same path as tool
   calls, audited as `resource.read`.
 
+- Prompts: the definition's prompt templates in the manifest (names through the naming pipeline,
+  placeholders checked); the runtime serves `prompts/list`, `prompts/get` and `completion/complete`
+  for enum arguments. Progress: `notifications/progress` every second during upstream calls when the
+  client sent a `progressToken`.
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 
