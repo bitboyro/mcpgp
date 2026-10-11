@@ -384,9 +384,16 @@ Rules for both styles:
 
 ### 15.3 Toolsets
 
-- Groups from `exposure.toolsets` (default: one per tag).
+- Groups from `exposure.toolsets` (`{ <name>: { match: <selector>, description } }`), or one per tag (an
+  operation's first tag; `other` without one). The compiler resolves them: the manifest lists each
+  toolset's tools.
 - `toolsets_list` → `[{ name, description, tools: <count>, enabled }]`; `toolset_enable(name)` /
-  `toolset_disable(name)` change the session's tool list and send `notifications/tools/list_changed`.
+  `toolset_disable(name)` change **the session's** tool list and send it
+  `notifications/tools/list_changed` (over HTTP only to that session, on its open `GET` stream if it has
+  one; a session without one sees the change at its next `tools/list`).
+- `tools/list` has the built-in and pack tools, plus the tools of the session's enabled toolsets. A
+  call to a tool whose toolsets are all disabled → `TOOLSET_DISABLED`, naming them.
+- What a session enabled lasts for the session (a config reload keeps it) and is forgotten when it ends.
 - Requires clients that refresh on `list_changed`; for others, use `discovery`.
 
 ### 15.4 Clients with their own tool search

@@ -203,8 +203,8 @@ public final class ManifestWriter {
             exposureNode.set("pinned", exposure.get("pinned").deepCopy());
         }
         exposureNode.put("plainSearch", exposure.path("plainSearch").asBoolean(false));
-        if (exposure.has("toolsets")) {
-            exposureNode.set("toolsets", exposure.get("toolsets").deepCopy());
+        if (mode.equals("toolsets")) {
+            exposureNode.set("toolsets", toolsets(exposure.path("toolsets"), plans));
         }
         manifest.set("exposure", exposureNode);
         manifest.set("policies", policies(doc, fileForms));
@@ -521,6 +521,38 @@ public final class ManifestWriter {
         ArrayNode allowed = NODES.arrayNode();
         values.forEach(allowed::add);
         return NODES.objectNode().<ObjectNode>set("allowed", allowed).put("default", defaultValue);
+    }
+
+    /**
+     * The toolsets, resolved (tools-contract §15.3): {@code { <name>: { description, tools: [names] } }},
+     * from {@code exposure.toolsets} selectors, or one per tag (an operation's first tag; {@code other}
+     * without one). The runtime enables and disables them per session.
+     */
+    static ObjectNode toolsets(JsonNode defined, List<ToolPlan> plans) {
+        java.util.Map<String, ObjectNode> sets = new java.util.TreeMap<>();
+        if (defined.isObject() && !defined.isEmpty()) {
+            defined.properties().forEach(e -> {
+                ObjectNode set = NODES.objectNode().put("description", e.getValue().path("description").asText(""));
+                ArrayNode tools = set.putArray("tools");
+                plans.stream().filter(p -> p.matches(e.getValue().path("match"))).map(ToolPlan::name).sorted().forEach(tools::add);
+                sets.put(e.getKey(), set);
+            });
+        } else {
+            java.util.Map<String, java.util.List<String>> byTag = new java.util.TreeMap<>();
+            for (ToolPlan plan : plans) {
+                String tag = plan.tags().isEmpty() ? "other" : plan.tags().getFirst();
+                byTag.computeIfAbsent(tag, t -> new ArrayList<>()).add(plan.name());
+            }
+            byTag.forEach((tag, names) -> {
+                ObjectNode set = NODES.objectNode().put("description", "Operations tagged " + tag);
+                ArrayNode tools = set.putArray("tools");
+                names.stream().sorted().forEach(tools::add);
+                sets.put(tag, set);
+            });
+        }
+        ObjectNode out = NODES.objectNode();
+        sets.forEach(out::set);
+        return out;
     }
 
     /** A digest over several files: SHA256SUMS-style lines ({@code <hex>  <relative path>}), sorted by path. */

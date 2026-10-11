@@ -133,6 +133,11 @@ versions follow [SemVer](https://semver.org).
   `mcpgp.tool.duration`, `mcpgp.instance.up`; never arguments, bodies or credentials. Generated
   OPERATIONS.md has a Telemetry section with an OpenTelemetry Collector example.
 
+- Toolsets exposure: the compiler resolves `exposure.toolsets` (selectors, or one per tag) into the
+  manifest; the runtime implements `toolsets_list`, `toolset_enable` and `toolset_disable` per session
+  (stdio: the server's tool list; HTTP: `tools/list` per session and `list_changed` to that session
+  only), and refuses tools of disabled toolsets with `TOOLSET_DISABLED`.
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 

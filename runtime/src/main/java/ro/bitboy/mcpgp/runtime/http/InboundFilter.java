@@ -19,6 +19,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Guards the MCP endpoint (auth.md §1, runtime-config §4): the Origin check against DNS rebinding,
@@ -47,13 +48,20 @@ final class InboundFilter extends HttpFilter {
     private final ScopePolicy policy;
     private final java.util.function.Supplier<ro.bitboy.mcpgp.runtime.mcp.ToolCatalog> catalog;
 
+    private final ro.bitboy.mcpgp.runtime.mcp.Toolsets toolsets;
+
     InboundFilter(RuntimeConfig.Server server, AuditLog audit) {
-        this(server, audit, null, () -> null);
+        this(server, audit, null, () -> null, null);
     }
 
-    /** @param tokens the token check in {@code oauth} mode (null otherwise); @param catalog the current tools, for scopes */
+    /**
+     * @param tokens   the token check in {@code oauth} mode (null otherwise)
+     * @param catalog  the current tools, for scopes and per-session lists
+     * @param toolsets {@code toolsets} exposure: each session's tool list (null otherwise)
+     */
     InboundFilter(RuntimeConfig.Server server, AuditLog audit, OAuthTokens tokens,
-                  java.util.function.Supplier<ro.bitboy.mcpgp.runtime.mcp.ToolCatalog> catalog) {
+                  java.util.function.Supplier<ro.bitboy.mcpgp.runtime.mcp.ToolCatalog> catalog, ro.bitboy.mcpgp.runtime.mcp.Toolsets toolsets) {
+        this.toolsets = toolsets;
         this.server = server;
         this.audit = audit;
         this.tokens = tokens;
@@ -90,6 +98,11 @@ final class InboundFilter extends HttpFilter {
             if (request == null) {
                 return;
             }
+        } else if (toolsets != null && request.getMethod().equals("POST")) {
+            request = toolList(request, response, null);
+            if (request == null) {
+                return;
+            }
         }
         String session = request.getHeader("Mcp-Session-Id");
         chain.doFilter(request, response);
@@ -99,6 +112,9 @@ final class InboundFilter extends HttpFilter {
             sessionEvent("session.start", request);
         } else if (session != null && request.getMethod().equals("DELETE") && response.getStatus() < 300) {
             sessionEvent("session.end", request);
+            if (toolsets != null) {
+                toolsets.forget(session);
+            }
         }
     }
 
@@ -128,7 +144,7 @@ final class InboundFilter extends HttpFilter {
         }
         request.setAttribute(CLIENT, grant.subject());
         request.setAttribute(SCOPES, grant.scopes());
-        if (!policy.restricts() || !request.getMethod().equals("POST")) {
+        if (!(policy.restricts() || toolsets != null) || !request.getMethod().equals("POST")) {
             return request;
         }
         CachedBody body = new CachedBody(request);
@@ -154,21 +170,53 @@ final class InboundFilter extends HttpFilter {
                 return null;
             }
         } else if (method.equals("tools/list") && tools != null && message.has("id")) {
-            List<io.modelcontextprotocol.spec.McpSchema.Tool> allowed = new ArrayList<>();
-            for (JsonNode tool : tools.listed()) {
-                if (policy.allows(tool, grant.scopes())) {
-                    allowed.add(ro.bitboy.mcpgp.runtime.mcp.ToolCatalog.toMcp(tool));
-                }
-            }
-            ObjectNode answer = JSON.createObjectNode().put("jsonrpc", "2.0");
-            answer.set("id", message.get("id"));
-            answer.putObject("result").set("tools", JSON.valueToTree(allowed));
-            response.setStatus(200);
-            response.setContentType("application/json");
-            response.getOutputStream().write(JSON.writeValueAsBytes(answer));
+            answerToolList(request, response, message, tools, grant.scopes());
             return null;
         }
         return body;
+    }
+
+    /** Without OAuth, in toolsets mode: {@code tools/list} answered per session; other requests go on. */
+    private HttpServletRequest toolList(HttpServletRequest request, HttpServletResponse response, Set<String> scopes) throws IOException {
+        CachedBody body = new CachedBody(request);
+        JsonNode message;
+        try {
+            message = JSON.readTree(body.bytes());
+        } catch (IOException e) {
+            return body;
+        }
+        ro.bitboy.mcpgp.runtime.mcp.ToolCatalog tools = catalog.get();
+        if (message != null && message.isObject() && message.path("method").asText().equals("tools/list") && message.has("id") && tools != null) {
+            answerToolList(request, response, message, tools, scopes);
+            return null;
+        }
+        return body;
+    }
+
+    /**
+     * {@code tools/list} for this request's session: the listed tools, plus (toolsets mode) the tools of the
+     * session's enabled toolsets, less (oauth) what the token's scopes don't allow.
+     */
+    private void answerToolList(HttpServletRequest request, HttpServletResponse response, JsonNode message,
+                                ro.bitboy.mcpgp.runtime.mcp.ToolCatalog tools, Set<String> scopes) throws IOException {
+        List<JsonNode> candidates = new ArrayList<>(tools.listed());
+        if (toolsets != null) {
+            for (String name : toolsets.visible(request.getHeader("Mcp-Session-Id"))) {
+                tools.tool(name).ifPresent(candidates::add);
+            }
+        }
+        List<io.modelcontextprotocol.spec.McpSchema.Tool> allowed = new ArrayList<>();
+        for (JsonNode tool : candidates) {
+            if (scopes == null || policy.allows(tool, scopes)) {
+                allowed.add(ro.bitboy.mcpgp.runtime.mcp.ToolCatalog.toMcp(tool));
+            }
+        }
+        ObjectNode answer = JSON.createObjectNode().put("jsonrpc", "2.0");
+        answer.set("id", message.get("id"));
+        answer.putObject("result").set("tools", JSON.valueToTree(allowed));
+        response.setStatus(200);
+        response.setContentType("application/json");
+        response.getOutputStream().write(JSON.writeValueAsBytes(answer));
     }
 
     /** RFC 9728 §3: {@code /.well-known/oauth-protected-resource} inserted before the resource's path. */

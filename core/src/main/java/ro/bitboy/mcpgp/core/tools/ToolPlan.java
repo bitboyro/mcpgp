@@ -37,6 +37,11 @@ public record ToolPlan(
         Map<String, Operation> variants,
         Map<String, List<Provenance>> provenance) {
 
+    /** Whether a selector (definition-format §5) matches this tool's operation in any of its contracts. */
+    public boolean matches(com.fasterxml.jackson.databind.JsonNode selector) {
+        return variants.values().stream().anyMatch(op -> Selectors.matches(selector, api, op, variants.keySet()));
+    }
+
     public record Annotations(boolean readOnlyHint, boolean destructiveHint, boolean idempotentHint, boolean openWorldHint) {
     }
 

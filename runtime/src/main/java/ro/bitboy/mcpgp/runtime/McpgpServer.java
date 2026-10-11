@@ -158,6 +158,9 @@ public class McpgpServer {
         int longest = config.allInstances().stream().mapToInt(RuntimeConfig.Instance::timeoutSeconds).max().orElse(30);
         StdioTransport transport = new StdioTransport(new JacksonMcpJsonMapper(new ObjectMapper()), stdio.in(), stdio.out(),
                 manifest.mcpRevisions(), Duration.ofSeconds(longest + 10L), stdio.onClose());
-        return factory.create(transport);
+        McpSyncServer server = factory.create(transport);
+        // toolsets: the one session's enabled toolsets become the server's tool list
+        factory.toolsets().ifPresent(toolsets -> toolsets.onListChanged(session -> factory.showToolsets(server, session)));
+        return server;
     }
 }

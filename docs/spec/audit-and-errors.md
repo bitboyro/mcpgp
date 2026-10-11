@@ -54,6 +54,7 @@ build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `auth
 | `INPUT_VALIDATION` | arguments don't match the schema (or the instance's contract), or a file input is rejected (with a reason) | `isError` |
 | `INSTANCE_REQUIRED` / `INSTANCE_UNKNOWN` | missing or unknown `instance` | `isError`, lists valid names |
 | `NOT_AVAILABLE_ON_INSTANCE` | operation not in that instance's contract, or instance read-only | `isError` |
+| `TOOLSET_DISABLED` | toolsets mode: the tool's toolsets are not enabled for this session | `isError` |
 | `CONFIRMATION_REQUIRED` | destructive tool needs confirmation | `isError` + `confirm` token |
 | `AUTH_INBOUND` | client not allowed | JSON-RPC / HTTP 401/403 |
 | `AUTH_DOWNSTREAM` | target server rejected credentials or scope | `isError` |
