@@ -172,6 +172,10 @@ versions follow [SemVer](https://semver.org).
   and warnings of the next build, without building; `Packager.preview` shares the build's code) and a
   page that shows the formats, how the server runs, the docs as they ship (rendered, links between
   them open in place), the contents and the pipeline commands.
+- Tools & rules → Naming: vocabulary entries (add, change, remove, override or switch off a shared
+  policy's) and prefixes (`apis[].toolPrefix`, `naming.namespace.server`) are edited on the page,
+  previewed with the tool names that change and those the lock file keeps, and saved as the next
+  version. Naming policies: a `null` vocabulary entry switches off one of the extended policy.
 - CLI: `mcpgp names accept <def> <tool…|--all>` writes `mcp-names.lock` (renames on purpose, and
   names the file doesn't have yet).
 

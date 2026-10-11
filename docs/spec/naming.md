@@ -18,7 +18,7 @@ source ─► normalize ─► shape ─► vocabulary ─► rules ─► expli
 | 1 | **Source** | operation → raw string | `naming.source`, `naming.fallback` |
 | 2 | **Normalize** | raw → lowercase words | `naming.normalize` |
 | 3 | **Shape** | words → ordered, cased name | `naming.shape` |
-| 4 | **Vocabulary** | glossary substitutions | `naming.vocabulary` |
+| 4 | **Vocabulary** | glossary substitutions (`null` switches off an entry of the extended policy) | `naming.vocabulary` |
 | 5 | **Rules** | override rules on `name` | `overrides` (definition-format §5) |
 | 6 | **Explicit** | per-tool `name: { set }` wins | `overrides` |
 | 7 | **Namespace** | add prefixes | `naming.namespace`, `apis[].toolPrefix` |

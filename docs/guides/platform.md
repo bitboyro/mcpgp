@@ -52,7 +52,12 @@ the platform, and saving makes the next version, as on Overview. Operations a ru
 rule's file. **Naming** shows the naming policy in words (and which settings the server adds to a
 shared policy), the vocabulary, and every tool's name with how it came about: from the policy, set by
 a rule, or kept by `mcp-names.lock`, including names the lock keeps although the policy would now
-give another one (accept those with `mcpgp names accept`). Everything else is changed in the files (upload a new version on Sources).
+give another one (accept those with `mcpgp names accept`). Vocabulary and prefixes can be changed
+there: add or change an entry, remove the server's own, override or switch off one of a shared
+policy (written as `null` in the server's `naming`), and set each API's `toolPrefix` and the server
+prefix (`naming.namespace.server`). Before saving, the page shows which tool names change and which
+the lock file keeps; renaming a tool breaks clients that call it. A prefix or suffix for chosen tools
+only is a rule (`name: { prepend | append }`) in the definition's files. Everything else is changed in the files (upload a new version on Sources).
 
 **Company sign-in.** Add `auth.oidc` (SSO) or `auth.ldap` (the directory) to `platform.yaml`; the
 sign-in page then offers them (the keys: [spec/platform-api.md §7](../spec/platform-api.md#7-platform-configuration-and-storage)).
