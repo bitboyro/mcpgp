@@ -88,6 +88,29 @@ public class HttpServerConfiguration {
         return registration;
     }
 
+    /**
+     * {@code telemetry.exporter: prometheus}: the metrics for Prometheus to scrape, beside health (on the
+     * management port when one is set); {@code 404} with any other telemetry setting.
+     */
+    @Bean
+    ServletRegistrationBean<HttpServlet> metrics() {
+        HttpServlet servlet = new HttpServlet() {
+            @Override
+            protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
+                var scrape = ro.bitboy.mcpgp.runtime.telemetry.Telemetry.current().scrape();
+                if (scrape.isEmpty()) {
+                    response.setStatus(404);
+                    return;
+                }
+                response.setContentType(ro.bitboy.mcpgp.runtime.telemetry.Telemetry.scrapeContentType());
+                response.getOutputStream().write(scrape.get());
+            }
+        };
+        ServletRegistrationBean<HttpServlet> registration = new ServletRegistrationBean<>(servlet, "/metrics");
+        registration.setName("metrics");
+        return registration;
+    }
+
     /** {@code oauth} mode: the protected resource metadata (RFC 9728) that tells clients where to sign in. */
     @Bean
     ServletRegistrationBean<HttpServlet> resourceMetadata(RuntimeConfig config) {
@@ -128,7 +151,7 @@ public class HttpServerConfiguration {
         return registration;
     }
 
-    /** With a management port, health answers only there and the MCP endpoint only on the main port. */
+    /** With a management port, health and metrics answer only there and the MCP endpoint only on the main port. */
     @Bean
     FilterRegistrationBean<HttpFilter> portSeparation(RuntimeConfig config) {
         Integer management = config.server().managementPort();
@@ -138,8 +161,9 @@ public class HttpServerConfiguration {
                     throws IOException, ServletException {
                 if (management != null) {
                     boolean onManagement = request.getLocalPort() == management;
-                    boolean healthPath = request.getRequestURI().startsWith("/health/");
-                    if (onManagement != healthPath) {
+                    String uri = request.getRequestURI();
+                    boolean operational = uri.startsWith("/health/") || uri.equals("/metrics");
+                    if (onManagement != operational) {
                         response.setStatus(404);
                         return;
                     }

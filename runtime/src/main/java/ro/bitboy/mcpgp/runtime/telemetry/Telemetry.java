@@ -16,7 +16,7 @@ import io.opentelemetry.exporter.otlp.http.metrics.OtlpHttpMetricExporter;
 import io.opentelemetry.exporter.otlp.http.trace.OtlpHttpSpanExporter;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
-import io.opentelemetry.exporter.prometheus.PrometheusHttpServer;
+import io.opentelemetry.exporter.prometheus.PrometheusMetricReader;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
 import io.opentelemetry.sdk.metrics.SdkMeterProviderBuilder;
 import io.opentelemetry.sdk.metrics.export.MetricExporter;
@@ -57,6 +57,8 @@ public final class Telemetry implements AutoCloseable {
 
     private final SdkTracerProvider tracing;
     private final SdkMeterProvider metering;
+    /** {@code exporter: prometheus}: what {@code /metrics} answers with (on the management port, else the main one). */
+    private final PrometheusMetricReader prometheus;
     private final Tracer tracer;
     private final LongCounter calls;
     private final DoubleHistogram duration;
@@ -66,14 +68,16 @@ public final class Telemetry implements AutoCloseable {
     private Telemetry() {
         this.tracing = null;
         this.metering = null;
+        this.prometheus = null;
         this.tracer = null;
         this.calls = null;
         this.duration = null;
     }
 
-    private Telemetry(SdkTracerProvider tracing, SdkMeterProvider metering, String version) {
+    private Telemetry(SdkTracerProvider tracing, SdkMeterProvider metering, PrometheusMetricReader prometheus, String version) {
         this.tracing = tracing;
         this.metering = metering;
+        this.prometheus = prometheus;
         this.tracer = tracing == null ? null : tracing.get("ro.bitboy.mcpgp.runtime", version);
         if (metering != null) {
             Meter meter = metering.get("ro.bitboy.mcpgp.runtime");
@@ -99,9 +103,8 @@ public final class Telemetry implements AutoCloseable {
      * Starts telemetry from the {@code telemetry} config, unless it is off (the default, or
      * {@code OTEL_SDK_DISABLED=true}).
      *
-     * @param host the address the Prometheus endpoint listens on (the server's host)
      */
-    public static synchronized Telemetry start(JsonNode config, String serviceName, String version, String host, Map<String, String> env) {
+    public static synchronized Telemetry start(JsonNode config, String serviceName, String version, Map<String, String> env) {
         current.close();
         current = OFF;
         if (!config.path("enabled").asBoolean(false) || "true".equalsIgnoreCase(env.get("OTEL_SDK_DISABLED"))) {
@@ -130,11 +133,13 @@ public final class Telemetry implements AutoCloseable {
             tracing = SdkTracerProvider.builder().setResource(resource).addSpanProcessor(BatchSpanProcessor.builder(spans).build()).build();
         }
         SdkMeterProvider metering = null;
+        PrometheusMetricReader prometheus = null;
         if (signals.contains("metrics")) {
             SdkMeterProviderBuilder meters = SdkMeterProvider.builder().setResource(resource);
             if (exporter.equals("prometheus")) {
-                JsonNode prometheus = config.path("prometheus");
-                meters.registerMetricReader(PrometheusHttpServer.builder().setHost(host).setPort(prometheus.path("port").asInt(9464)).build());
+                // read when /metrics is asked for; the server's own port serves it, the exporter opens none
+                prometheus = PrometheusMetricReader.builder().build();
+                meters.registerMetricReader(prometheus);
             } else {
                 MetricExporter metrics = protocol.equals("grpc")
                         ? OtlpGrpcMetricExporter.builder().setEndpoint(endpoint).setHeaders(() -> headers).build()
@@ -143,10 +148,28 @@ public final class Telemetry implements AutoCloseable {
             }
             metering = meters.build();
         }
-        current = new Telemetry(tracing, metering, version);
-        LOG.info("Telemetry on: {} ({}), {}", exporter, exporter.equals("otlp") ? protocol + " to " + endpoint : "port "
-                + config.at("/prometheus/port").asInt(9464), signals);
+        current = new Telemetry(tracing, metering, prometheus, version);
+        LOG.info("Telemetry on: {} ({}), {}", exporter, exporter.equals("otlp") ? protocol + " to " + endpoint : "/metrics", signals);
         return current;
+    }
+
+    /** The metrics in the Prometheus text format, when {@code exporter: prometheus}; empty otherwise. */
+    public java.util.Optional<byte[]> scrape() {
+        if (prometheus == null) {
+            return java.util.Optional.empty();
+        }
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        try {
+            io.prometheus.metrics.expositionformats.PrometheusTextFormatWriter.create().write(out, prometheus.collect());
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        return java.util.Optional.of(out.toByteArray());
+    }
+
+    /** The {@code Content-Type} of {@link #scrape()}. */
+    public static String scrapeContentType() {
+        return io.prometheus.metrics.expositionformats.PrometheusTextFormatWriter.CONTENT_TYPE;
     }
 
     /** A span for one tool call, current until it is closed (so upstream requests and inner calls become its children). */

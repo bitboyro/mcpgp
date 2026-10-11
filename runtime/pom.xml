@@ -59,6 +59,17 @@
       <groupId>io.opentelemetry</groupId>
       <artifactId>opentelemetry-exporter-prometheus</artifactId>
       <version>${opentelemetry-alpha.version}</version>
+      <exclusions>
+        <!-- /metrics is served on the server's own management (or main) port, not by a server of the exporter's -->
+        <exclusion>
+          <groupId>io.prometheus</groupId>
+          <artifactId>prometheus-metrics-exporter-httpserver</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-exposition-textformats</artifactId>
     </dependency>
     <!-- inbound OAuth: JWT access tokens checked against the issuer's JWKS (auth.md §1.1) -->
     <dependency>

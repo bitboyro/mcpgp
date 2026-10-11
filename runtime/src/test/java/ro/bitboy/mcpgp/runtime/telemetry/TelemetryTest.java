@@ -74,29 +74,58 @@ class TelemetryTest {
 
     @Test
     void isOffByDefaultAndWhenTheEnvironmentSaysSo() throws Exception {
-        assertThat(Telemetry.start(JSON.readTree("{}"), "orders-mcp", "2.0.0", "127.0.0.1", Map.of())).isSameAs(Telemetry.current());
+        assertThat(Telemetry.start(JSON.readTree("{}"), "orders-mcp", "2.0.0", Map.of())).isSameAs(Telemetry.current());
         Telemetry.Call call = Telemetry.current().call("x", "orders");
         call.close();     // nothing to record, nothing fails
-        Telemetry off = Telemetry.start(JSON.readTree("{\"enabled\":true}"), "orders-mcp", "2.0.0", "127.0.0.1", Map.of("OTEL_SDK_DISABLED", "true"));
-        assertThat(off).isSameAs(Telemetry.start(JSON.readTree("{}"), "orders-mcp", "2.0.0", "127.0.0.1", Map.of()));
+        Telemetry off = Telemetry.start(JSON.readTree("{\"enabled\":true}"), "orders-mcp", "2.0.0", Map.of("OTEL_SDK_DISABLED", "true"));
+        assertThat(off).isSameAs(Telemetry.start(JSON.readTree("{}"), "orders-mcp", "2.0.0", Map.of()));
     }
 
     @Test
     void prometheusShowsCallsDurationsAndInstancesButNoArguments() throws Exception {
-        int port = freePort();
-        Telemetry.start(JSON.readTree("{\"enabled\":true,\"exporter\":\"prometheus\",\"prometheus\":{\"port\":" + port + "}}"),
-                "orders-mcp", "2.0.0", "127.0.0.1", Map.of());
+        Telemetry.start(JSON.readTree("{\"enabled\":true,\"exporter\":\"prometheus\"}"), "orders-mcp", "2.0.0", Map.of());
         McpServerFactory server = server();
         target.respond(MockTarget.Response.json(200, "{\"id\":\"c-1\"}"));
         callCustomer(server);
         server.call(null, new McpSchema.CallToolRequest("orders_customer_get", Map.of("instance", "nowhere", "path", Map.of("id", "x")), null));
 
-        String metrics = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/metrics")).build(),
-                HttpResponse.BodyHandlers.ofString()).body();
+        String metrics = new String(Telemetry.current().scrape().orElseThrow(), StandardCharsets.UTF_8);
         assertThat(metrics).contains("mcpgp_tool_calls_total{").contains("mcpgp_tool=\"orders_customer_get\"").contains("mcpgp_outcome=\"ok\"")
                 .contains("mcpgp_outcome=\"error\"").contains("mcpgp_tool_duration_seconds_bucket").contains("mcpgp_instance_up{")
                 .contains("mcpgp_instance=\"prod-eu\"").contains("service_name=\"orders-mcp\"");
         assertThat(metrics).doesNotContain(SECRET_ARGUMENT);
+        assertThat(Telemetry.scrapeContentType()).startsWith("text/plain");
+    }
+
+    @Test
+    void metricsAreServedBesideHealthNotBesideTheMcpEndpoint() throws Exception {
+        target = new MockTarget();
+        int port = freePort();
+        int management = freePort();
+        Path file = dir.resolve("orders-mcp.yaml");
+        Files.writeString(file, """
+                server:
+                  transport: http
+                  port: %d
+                  management: { port: %d }
+                  auth: { mode: static, keys: [ { name: team-a, value: "${env:KEY}" } ] }
+                telemetry: { enabled: true, exporter: prometheus }
+                instances:
+                  - { id: prod-eu, baseUrl: "%s" }
+                """.formatted(port, management, target.address()));
+        var startup = ro.bitboy.mcpgp.runtime.Startup.load(new String[] {"--manifest", REPO.resolve("examples/manifest/orders-mcp.manifest.json").toString(),
+                "--config", file.toString(), "--storage.root", dir.resolve("data").toString()}, Map.of("KEY", "k-team-a-0123456789"), dir);
+        try (var context = ro.bitboy.mcpgp.runtime.McpgpServer.start(startup, new ro.bitboy.mcpgp.runtime.McpgpServer.Stdio(System.in, System.out, () -> { }))) {
+            HttpClient http = HttpClient.newHttpClient();
+            HttpResponse<String> onManagement = http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + management + "/metrics")).build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertThat(onManagement.statusCode()).isEqualTo(200);
+            assertThat(onManagement.headers().firstValue("Content-Type").orElse("")).startsWith("text/plain");
+            assertThat(http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/metrics")).build(),
+                    HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(404);
+        }
+        // a server without exporter: prometheus has no metrics to show
+        assertThat(Telemetry.current().scrape()).isEmpty();
     }
 
     @Test
@@ -112,7 +141,7 @@ class TelemetryTest {
         try {
             JsonNode config = JSON.readTree("{\"enabled\":true,\"otlp\":{\"protocol\":\"http/protobuf\",\"endpoint\":\"http://127.0.0.1:"
                     + collector.getAddress().getPort() + "\",\"headers\":{\"x-api-key\":\"collector-key\"}}}");
-            Telemetry.start(config, "orders-mcp", "2.0.0", "127.0.0.1", Map.of());
+            Telemetry.start(config, "orders-mcp", "2.0.0", Map.of());
             McpServerFactory server = server();
             target.respond(MockTarget.Response.json(200, "{\"id\":\"c-1\"}"));
             callCustomer(server);

@@ -96,7 +96,7 @@ public class McpgpServer {
     @Bean(destroyMethod = "close")
     ro.bitboy.mcpgp.runtime.telemetry.Telemetry telemetry(Manifest manifest, RuntimeConfig config) {
         return ro.bitboy.mcpgp.runtime.telemetry.Telemetry.start(config.telemetry(), manifest.serverName(), manifest.serverVersion(),
-                config.server().host(), System.getenv());
+                System.getenv());
     }
 
     @Bean

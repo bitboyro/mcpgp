@@ -315,7 +315,8 @@ final class Docs {
                 .append("`mcpgp.tool.duration`, `mcpgp.instance.up`) to your OpenTelemetry Collector over OTLP (`telemetry.otlp.endpoint`, ")
                 .append("`protocol: grpc` or `http/protobuf`)");
         if (http) {
-            md.append(", or serves the metrics for Prometheus (`exporter: prometheus`: `http://<host>:9464/metrics`, `telemetry.prometheus.port`)");
+            md.append(", or serves the metrics for Prometheus to scrape (`exporter: prometheus`: `GET /metrics`, beside health on the ")
+                    .append("management port when one is set; no other port opens)");
         }
         md.append(". Spans and metrics carry tool, API, instance, contract, outcome and error code; never arguments, bodies or credentials. ")
                 .append("Where the data goes from there (Grafana, Datadog, S3, …) is set in the Collector:\n\n```yaml\n")

@@ -179,7 +179,6 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `telemetry.enabled` | `false` | also honours `OTEL_SDK_DISABLED` |
 | `telemetry.exporter` | `otlp` | `otlp` · `prometheus` (HTTP only) |
 | `telemetry.otlp.endpoint` / `protocol` | `http://localhost:4317` / `grpc` | `http/protobuf`: default `http://localhost:4318` |
-| `telemetry.prometheus.port` | `9464` | `exporter: prometheus`: metrics at `/metrics` on this port |
 | `telemetry.signals` | `[traces, metrics]` | |
 | `telemetry.serviceName` | server name | |
 | `logging.level` | `info` | stdio: stderr or file only |
@@ -225,12 +224,11 @@ directory is created with owner-only permissions; config and `.env` usually live
 ### 4.3 Health and logs
 
 - **Health** (HTTP servers, on the management port or the main port when none is set; with a
-  management port, health answers only there and the MCP endpoint only on the main port):
+  management port, health and metrics answer only there and the MCP endpoint only on the main port):
   - `GET /health/live` → `200 {"status":"up"}` while the process runs.
   - `GET /health/ready` → `200` when configuration is loaded and at least one instance is reachable;
     `503` otherwise. Body: `{"status":"up|down|degraded","instances":{"prod-eu":"up","partner-x":"down"}}`.
-  - `GET /metrics` when `telemetry.exporter: prometheus`, on `telemetry.prometheus.port` (default 9464;
-    audit-and-errors §4).
+  - `GET /metrics` when `telemetry.exporter: prometheus` (audit-and-errors §4).
 - **Operational logs** (separate from the audit file): one JSON object per line with `ts`, `level`,
   `logger`, `message`, `cid`; levels `error`, `warn`, `info`, `debug`. HTTP servers log to stderr
   (container convention); stdio servers log to `<storage.root>/logs/` (or stderr if set), **never

@@ -74,8 +74,8 @@ upstream bodies.
 - OpenTelemetry (SDK 1.62). **Off by default** (`telemetry.enabled`; `OTEL_SDK_DISABLED=true` keeps it
   off). Exporter `otlp` (push; `protocol: grpc`, default endpoint `http://localhost:4317`, or
   `http/protobuf`, default `http://localhost:4318`; `headers` are secrets) or `prometheus` (HTTP
-  servers only: an endpoint at `http://<server.host>:<telemetry.prometheus.port>/metrics`, default
-  port 9464). `signals` chooses `traces` and `metrics` (both by default; `prometheus` has metrics
+  servers only: `GET /metrics` beside health, on the management port when one is set, else on the
+  main port; no other port opens). Stdio servers can push but never listen. `signals` chooses `traces` and `metrics` (both by default; `prometheus` has metrics
   only). Telemetry is set when the server starts; a config reload doesn't change it.
 - Traces: one span per tool call (`tool <name>`, kind server), a child span per upstream request
   (the HTTP method, kind client, `http.response.status_code`); attributes `mcpgp.tool`, `mcpgp.api`,
