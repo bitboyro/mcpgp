@@ -13,15 +13,42 @@ import java.util.Map;
 
 /**
  * {@code platform.yaml} (spec/platform-api.md §7): where the store lives and where the API listens.
- * Environment variables {@code MCPGP_PLATFORM_STORAGE__ROOT}, {@code MCPGP_PLATFORM_HTTP__HOST} and
- * {@code MCPGP_PLATFORM_HTTP__PORT} override the file.
+ * Environment variables {@code MCPGP_PLATFORM_<SECTION>__<KEY>} override the file (the list is in
+ * spec/platform-api.md §7).
+ *
+ * @param postgres the PostgreSQL store, or null for the file store at {@code storageRoot}
+ * @param admin    the first administrator, created at start when the store has no identities yet, or null
  */
 public record PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
-                             boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl) {
+                             boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl, Postgres postgres,
+                             Admin admin) {
+
+    public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
+                          boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl) {
+        this(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl, null, null);
+    }
 
     public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
                           boolean localAccounts, Guardrails guardrails) {
         this(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, null, null, null);
+    }
+
+    /** {@code storage.type: postgres}: a JDBC URL, the account, its password as a reference, and the schema. */
+    public record Postgres(String url, String user, String password, String schema, int poolSize) {
+    }
+
+    /** The first administrator, a local account; {@code password} is a reference. */
+    public record Admin(String name, String password) {
+    }
+
+    public PlatformConfig withPostgres(Postgres postgres) {
+        return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
+                postgres, admin);
+    }
+
+    public PlatformConfig withAdmin(Admin admin) {
+        return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
+                postgres, admin);
     }
 
     /**
@@ -83,10 +110,11 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
                 throw new UncheckedIOException("Cannot read " + file, e);
             }
         }
-        String type = doc.at("/storage/type").asText("files");
-        if (!type.equals("files")) {
-            throw new IllegalArgumentException("storage.type " + type + " is not available yet; use files");
+        String type = env.getOrDefault("MCPGP_PLATFORM_STORAGE__TYPE", doc.at("/storage/type").asText("files"));
+        if (!type.equals("files") && !type.equals("postgres")) {
+            throw new IllegalArgumentException("storage.type: files or postgres, not " + type);
         }
+        Postgres postgres = type.equals("postgres") ? postgres(doc.path("storage"), env) : null;
         String root = env.getOrDefault("MCPGP_PLATFORM_STORAGE__ROOT",
                 doc.at("/storage/root").asText(Path.of(System.getProperty("user.home"), ".mcpgp-platform").toString()));
         String host = env.getOrDefault("MCPGP_PLATFORM_HTTP__HOST", doc.at("/http/host").asText("127.0.0.1"));
@@ -109,8 +137,34 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
         Guardrails g = new Guardrails(guard.path("agentBuildsPerHour").asInt(Guardrails.DEFAULT.agentBuildsPerHour()),
                 guard.path("agentVersionsPerHour").asInt(Guardrails.DEFAULT.agentVersionsPerHour()));
         String publicUrl = env.getOrDefault("MCPGP_PLATFORM_HTTP__PUBLIC_URL", doc.at("/http/publicUrl").asText(null));
+        if (publicUrl != null && !publicUrl.startsWith("https://") && !publicUrl.startsWith("http://")) {
+            throw new IllegalArgumentException("http.publicUrl must start with https:// (or http:// for a local test)");
+        }
+        String adminName = env.getOrDefault("MCPGP_PLATFORM_ADMIN__NAME", doc.at("/admin/name").asText(null));
+        Admin admin = null;
+        if (adminName != null && !adminName.isBlank()) {
+            String password = env.getOrDefault("MCPGP_PLATFORM_ADMIN__PASSWORD", doc.at("/admin/password").asText(null));
+            if (password == null || !Secrets.isReference(password)) {
+                throw new IllegalArgumentException("admin.password is required and must be a reference (${env:…} or ${file:…})");
+            }
+            admin = new Admin(adminName, password);
+        }
         return new PlatformConfig(storage, host, port, signing, r, workspace, local, g, oidc(doc.at("/auth/oidc")), ldap(doc.at("/auth/ldap")),
-                publicUrl == null ? null : publicUrl.replaceAll("/+$", ""));
+                publicUrl == null ? null : publicUrl.replaceAll("/+$", ""), postgres, admin);
+    }
+
+    private static Postgres postgres(JsonNode node, Map<String, String> env) {
+        String url = env.getOrDefault("MCPGP_PLATFORM_STORAGE__URL", node.path("url").asText(null));
+        if (url == null || !url.startsWith("jdbc:postgresql://")) {
+            throw new IllegalArgumentException("storage.url is required for postgres: jdbc:postgresql://host:5432/database");
+        }
+        String password = env.getOrDefault("MCPGP_PLATFORM_STORAGE__PASSWORD", node.path("password").asText(null));
+        if (password != null && !Secrets.isReference(password)) {
+            throw new IllegalArgumentException("storage.password must be a reference (${env:…} or ${file:…})");
+        }
+        int pool = Integer.parseInt(env.getOrDefault("MCPGP_PLATFORM_STORAGE__POOL_SIZE", node.path("poolSize").asText("10")));
+        return new Postgres(url, env.getOrDefault("MCPGP_PLATFORM_STORAGE__USER", node.path("user").asText(null)), password,
+                env.getOrDefault("MCPGP_PLATFORM_STORAGE__SCHEMA", node.path("schema").asText("mcpgp")), pool);
     }
 
     private static Oidc oidc(JsonNode node) {

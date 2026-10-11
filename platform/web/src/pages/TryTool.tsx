@@ -47,6 +47,9 @@ export function TryTool({ id, tool }: { id: string; tool: Tool }) {
           {run.data.leftOut.length > 0 && (
             <div className="note">Custom code isn’t run on the platform; left out: {run.data.leftOut.join(', ')}. <span className="mono">mcpgp test</span> runs it.</div>
           )}
+          {run.data.via && (
+            <div className="note">This tool isn’t in <span className="mono">tools/list</span>; it was called through <span className="mono">{run.data.via}</span>, as an agent would.</div>
+          )}
           {run.data.error && <div className="note note-bad">{run.data.error.message}</div>}
           {result && (
             <>

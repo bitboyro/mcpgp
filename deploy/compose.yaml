@@ -1,0 +1,32 @@
+# The platform with the file store on a volume (docs/guides/self-hosting.md).
+#   cd deploy && cp .env.example .env && docker compose up -d --build
+# With PostgreSQL instead: docker compose -f compose.yaml -f compose.postgres.yaml up -d --build
+name: mcpgp
+
+services:
+  platform:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: ${MCPGP_IMAGE:-mcpgp-platform:local}
+    restart: unless-stopped
+    ports:
+      - "${MCPGP_BIND:-127.0.0.1}:${MCPGP_PORT:-8443}:8443"
+    environment:
+      MCPGP_PLATFORM_HTTP__PUBLIC_URL: ${MCPGP_PUBLIC_URL:-http://localhost:8443}
+      MCPGP_PLATFORM_WORKSPACE: ${MCPGP_WORKSPACE:-acme}
+      # the first administrator, created on the first start only (a local account)
+      MCPGP_PLATFORM_ADMIN__NAME: ${MCPGP_ADMIN:-admin}
+      MCPGP_PLATFORM_ADMIN__PASSWORD: "$${file:/run/secrets/admin_password}"
+    volumes:
+      - ./platform.yaml:/etc/mcpgp/platform.yaml:ro
+      - platform-data:/var/lib/mcpgp
+    secrets:
+      - admin_password
+
+volumes:
+  platform-data: {}
+
+secrets:
+  admin_password:
+    file: ./secrets/admin_password

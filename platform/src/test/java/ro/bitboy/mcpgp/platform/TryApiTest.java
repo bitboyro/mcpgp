@@ -33,6 +33,18 @@ class TryApiTest extends PlatformTestBase {
     }
 
     @Test
+    void aToolBehindDiscoveryIsCalledThroughCallTool() throws Exception {
+        // orders-mcp is hybrid: only pinned tools are in tools/list, the rest are reached with call_tool
+        JsonNode answer = tryTool(Map.of("tool", "orders_account_list", "arguments", Map.of("instance", "mock")));
+        assertThat(answer.path("via").asText()).isEqualTo("call_tool");
+        assertThat(answer.has("error")).as(answer.toString()).isFalse();
+        assertThat(answer.at("/requests/0/method").asText()).isEqualTo("GET");
+
+        assertThat(tryTool(Map.of("tool", "orders_customer_list", "arguments", Map.of("instance", "mock", "query", Map.of("accountId", "a-1"))))
+                .has("via")).isFalse();
+    }
+
+    @Test
     void aToolIsRequired() throws Exception {
         assertThat(send(bearer("POST", "/api/v1/servers/orders-mcp/versions/latest/try", JSON.writeValueAsBytes(Map.of()))).statusCode()).isEqualTo(422);
     }
