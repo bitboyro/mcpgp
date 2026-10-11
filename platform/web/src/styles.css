@@ -105,6 +105,9 @@ code, pre, .mono { font-family: var(--mono); }
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
   padding: 18px 28px; border-bottom: 1px solid var(--line); background: var(--surface);
 }
+/* the text takes the free width, so the actions keep their place whatever the subtitle's length */
+.page-head > div:first-child { flex: 1 1 320px; min-width: 0; }
+.page-head > .actions { margin-left: auto; align-self: flex-start; }
 .page-head h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
 .page-head p { font-size: 14px; color: var(--muted); }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
