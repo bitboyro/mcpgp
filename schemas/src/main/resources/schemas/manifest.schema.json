@@ -86,7 +86,16 @@
         "discoveryStyle": { "enum": ["search", "catalog"] },
         "pinned": { "type": "array", "items": { "type": "string" } },
         "plainSearch": { "type": "boolean" },
-        "toolsets": { "type": "object" }
+        "toolsets": {
+          "type": "object",
+          "description": "toolsets mode: the groups, resolved; each lists its tools",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["description", "tools"],
+            "properties": { "description": { "type": "string" }, "tools": { "type": "array", "items": { "type": "string" } } },
+            "additionalProperties": false
+          }
+        }
       },
       "required": ["mode"],
       "additionalProperties": false

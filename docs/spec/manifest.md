@@ -37,7 +37,7 @@ Full example: [examples/manifest/orders-mcp.manifest.json](../../examples/manife
   "runtime":     { … },   // what the runtime must support (§3)
   "instances":   { … },   // single/multi and policies (§4)
   "apis":        [ … ],   // APIs, contracts, auth, paging (§4)
-  "exposure":    { … },   // plain / discovery / hybrid (§4)
+  "exposure":    { … },   // plain / discovery / toolsets / hybrid (§4)
   "policies":    { … },   // safety, files, redaction, defaults and limits for runtime config (§4)
   "tools":       [ … ],   // every tool, sorted by name (§5)
   "packs":       [ … ],   // support packs and their requirements (§6)
@@ -94,6 +94,9 @@ Full example: [examples/manifest/orders-mcp.manifest.json](../../examples/manife
 }],
 
 "exposure": { "mode": "hybrid", "pinned": ["orders_customer_get"], "plainSearch": false },
+// toolsets mode: the groups, resolved
+"exposure": { "mode": "toolsets", "toolsets": { "customers": { "description": "Operations tagged customers",
+              "tools": ["orders_customer_create", "orders_customer_list"] } } },
 
 "policies": {
   "confirmDestructive": true,

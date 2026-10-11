@@ -59,7 +59,14 @@ public class HttpServerConfiguration {
 
     @Bean(destroyMethod = "closeGracefully")
     McpSyncServer httpServer(McpServerFactory factory, Manifest manifest, HttpServletStreamableServerTransportProvider servlet) {
-        return factory.create(new RevisionLimitedTransport(servlet, manifest.mcpRevisions()));
+        McpSyncServer server = factory.create(new RevisionLimitedTransport(servlet, manifest.mcpRevisions()));
+        // toolsets: each session has its own tool list (InboundFilter answers tools/list); tell only that session
+        // (a client without an open GET stream can't receive it; it sees the change at its next tools/list)
+        factory.toolsets().ifPresent(toolsets -> toolsets.onListChanged(session -> servlet
+                .notifyClient(session, io.modelcontextprotocol.spec.McpSchema.METHOD_NOTIFICATION_TOOLS_LIST_CHANGED, null)
+                .subscribe(done -> { }, e -> org.slf4j.LoggerFactory.getLogger(HttpServerConfiguration.class)
+                        .debug("No tools/list_changed for session {}: {}", session, e.getMessage()))));
+        return server;
     }
 
     @Bean
@@ -81,7 +88,8 @@ public class HttpServerConfiguration {
                         Clock.systemUTC())
                 : null;
         FilterRegistrationBean<InboundFilter> registration =
-                new FilterRegistrationBean<>(new InboundFilter(server, factory.audit(), tokens, () -> reloader.current().catalog()));
+                new FilterRegistrationBean<>(new InboundFilter(server, factory.audit(), tokens, () -> reloader.current().catalog(),
+                        factory.toolsets().orElse(null)));
         registration.addUrlPatterns(config.server().basePath());
         registration.setAsyncSupported(true);
         registration.setOrder(1);

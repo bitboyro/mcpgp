@@ -41,6 +41,10 @@ public final class McpServerFactory {
     private final AuditLog audit;
     private final Confirmations confirmations;
     private final Clock clock;
+    /** {@code toolsets} exposure: the toolsets sessions enable (null in other modes). */
+    private final Toolsets toolsets;
+    /** stdio, toolsets mode: the API tools currently registered on the server. */
+    private final java.util.Set<String> shown = java.util.concurrent.ConcurrentHashMap.newKeySet();
     /** Who handles calls of the registered tools: this factory, or its replacement after a config reload. */
     private volatile java.util.function.Supplier<McpServerFactory> current = () -> this;
 
@@ -57,6 +61,10 @@ public final class McpServerFactory {
         this.catalog = new ToolCatalog(manifest, config);
         builtins.put("instances_list", new InstancesList(manifest, config));
         builtins.putAll(new Discovery(manifest, config, catalog, this::call).handlers());
+        this.toolsets = Toolsets.active(manifest) ? Toolsets.of(manifest) : null;
+        if (toolsets != null) {
+            builtins.putAll(toolsets.handlers());
+        }
         this.apiTools = new ApiToolHandler(manifest, config);
         Packs packs = new Packs(manifest, config, catalog);
         Map<String, ToolHandler> packHandlers = packs.handlers();
@@ -85,6 +93,32 @@ public final class McpServerFactory {
 
     public ToolCatalog catalog() {
         return catalog;
+    }
+
+    /** The toolsets, in {@code toolsets} exposure; empty otherwise. */
+    public java.util.Optional<Toolsets> toolsets() {
+        return java.util.Optional.ofNullable(toolsets);
+    }
+
+    /**
+     * stdio, toolsets mode: registers the tools of the session's enabled toolsets and removes the others;
+     * the SDK tells the client its tool list changed.
+     */
+    public void showToolsets(McpSyncServer server, String session) {
+        java.util.Set<String> wanted = toolsets.visible(session);
+        for (String name : wanted) {
+            catalog.tool(name).ifPresent(tool -> {
+                if (shown.add(name)) {
+                    server.addTool(spec(tool));
+                }
+            });
+        }
+        for (String name : java.util.List.copyOf(shown)) {
+            if (!wanted.contains(name)) {
+                server.removeTool(name);
+                shown.remove(name);
+            }
+        }
     }
 
     /** Transport-context key with the authenticated client's key name (HTTP, static mode). */
@@ -176,6 +210,14 @@ public final class McpServerFactory {
         try {
             if (tool == null) {
                 throw new ToolError("INPUT_VALIDATION", "Unknown tool " + name);
+            }
+            if (toolsets != null && tool.path("kind").asText().equals("api")) {
+                java.util.Optional<List<String>> blocked = toolsets.blocked(name, Toolsets.session(exchange));
+                if (blocked.isPresent()) {
+                    throw new ToolError("TOOLSET_DISABLED", blocked.get().isEmpty() ? "Tool " + name + " is in no toolset"
+                            : "Tool " + name + " is in the toolset " + String.join(" or ", blocked.get()) + ", which is not enabled",
+                            "Enable it with toolset_enable, then call the tool");
+                }
             }
             ToolHandler handler = handlers.get(name);
             Object token = arguments.remove("confirm");
