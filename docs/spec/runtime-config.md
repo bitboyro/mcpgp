@@ -180,6 +180,7 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `telemetry.exporter` | `otlp` | `otlp` · `prometheus` (HTTP only) |
 | `telemetry.otlp.endpoint` / `protocol` | `http://localhost:4317` / `grpc` | `http/protobuf`: default `http://localhost:4318` |
 | `telemetry.signals` | `[traces, metrics]` | |
+| `packs.recording.retainDays` | `14` | recordings older than this are removed at start (packaging §4.1) |
 | `telemetry.serviceName` | server name | |
 | `logging.level` | `info` | stdio: stderr or file only |
 | `allowInlineSecrets` | `false` | local experiments only; see §2.3 |

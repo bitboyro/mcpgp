@@ -181,9 +181,14 @@ class DiscoveryAndPacksTest {
     void toolsWithoutAnImplementationAreNotOffered() throws IOException {
         start("");
         assertThat(server.catalog().listed()).extracting(t -> t.path("name").asText())
-                .contains("search_tools", "orders_audit_list", "orders_explain_tool")
-                .noneMatch(name -> name.contains("recording"));
-        McpSchema.CallToolResult recording = call("orders_recording_start", Map.of("description", "x"));
-        assertThat(((McpSchema.TextContent) recording.content().get(0)).text()).contains("Unknown tool");
+                .contains("search_tools", "orders_audit_list", "orders_explain_tool", "orders_recording_start");
+        // a pack tool from a newer compiler that this runtime doesn't know
+        com.fasterxml.jackson.databind.node.ObjectNode root = (com.fasterxml.jackson.databind.node.ObjectNode) ORDERS.root().deepCopy();
+        root.withArray("tools").addObject().put("name", "orders_mystery_do").put("kind", "pack").put("pack", "mystery")
+                .put("title", "Mystery").put("description", "From the future.").putObject("inputSchema").put("type", "object");
+        McpServerFactory newer = new McpServerFactory(Manifest.of(root), config);
+        assertThat(newer.catalog().tool("orders_mystery_do")).isEmpty();
+        McpSchema.CallToolResult mystery = newer.call(null, new McpSchema.CallToolRequest("orders_mystery_do", Map.of(), null));
+        assertThat(((McpSchema.TextContent) mystery.content().get(0)).text()).contains("Unknown tool");
     }
 }

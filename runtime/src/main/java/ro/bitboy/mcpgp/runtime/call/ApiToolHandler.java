@@ -32,6 +32,8 @@ public final class ApiToolHandler implements ToolHandler {
     private final InputValidator validator = new InputValidator();
     private final RequestBuilder requests;
     private final Upstream upstream;
+    /** The recording pack, or null when the build doesn't have it. */
+    private final Recordings recordings;
     private final ResponseMapper responses;
 
     public ApiToolHandler(Manifest manifest, RuntimeConfig config) {
@@ -47,6 +49,7 @@ public final class ApiToolHandler implements ToolHandler {
         });
         Redactor redactor = new Redactor(config.secrets());
         this.upstream = new Upstream(apiKeys, redactor);
+        this.recordings = recordings(manifest, config, apiKeys);
         this.responses = new ResponseMapper(manifest.policies().path("responseLimitKb").asInt(256),
                 config.errorDetail(), redactor);
     }
@@ -82,12 +85,47 @@ public final class ApiToolHandler implements ToolHandler {
             LOG.debug("{} {} → {}", request.method(), variant.path("path").asText(), instance.id());
             // security: [] marks a public operation: no credentials (auth.md §2.2)
             boolean publicOperation = variant.path("security").isArray() && variant.path("security").isEmpty();
-            HttpResponse<byte[]> response = upstream.send(instance, request, publicOperation);
+            HttpResponse<byte[]> response;
+            Recordings.RuntimeConfig_Instance recorded = new Recordings.RuntimeConfig_Instance(instance.api(), instance.id());
+            try {
+                response = upstream.send(instance, request, publicOperation);
+            } catch (RuntimeException e) {
+                if (recordings != null) {
+                    recordings.capture(tool.path("name").asText(), recorded, request, null, e.getMessage());
+                }
+                throw e;
+            }
+            if (recordings != null) {
+                recordings.capture(tool.path("name").asText(), recorded, request, response, null);
+            }
             record.status = response.statusCode();
             return responses.map(response, instance.id(), meta, record);
         } catch (ToolError e) {
             throw e.meta().isEmpty() ? e.withMeta(meta) : e;
         }
+    }
+
+    /** The recording pack's store, when the build has the pack (packaging.md §4.1). */
+    static Recordings recordings(Manifest manifest, RuntimeConfig config, Map<String, JsonNode> apiKeys) {
+        boolean pack = false;
+        for (JsonNode p : manifest.root().path("packs")) {
+            pack |= p.path("id").asText().equals("recording");
+        }
+        if (!pack) {
+            return null;
+        }
+        java.util.Set<String> fields = new java.util.HashSet<>();
+        manifest.policies().at("/redaction/fields").forEach(f -> fields.add(f.asText()));
+        java.util.Set<String> keyHeaders = new java.util.HashSet<>();
+        apiKeys.values().forEach(placement -> {
+            if (placement.path("in").asText("header").equals("header")) {
+                keyHeaders.add(placement.path("name").asText());
+            } else {
+                fields.add(placement.path("name").asText());        // an API key in the query is masked there
+            }
+        });
+        return Recordings.of(config.storageRoot(), fields, keyHeaders, config.secrets(),
+                manifest.policies().path("responseLimitKb").asInt(256) * 1024, config.packs().path("recording").path("retainDays").asInt(14));
     }
 
     private RuntimeConfig.Instance instance(Manifest.Api api, Map<String, Object> arguments) {
