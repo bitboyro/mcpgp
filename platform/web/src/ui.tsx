@@ -12,6 +12,7 @@ const paths: Record<string, ReactNode> = {
   connections: <path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4" />,
   sources: <path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />,
   package: <path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8" />,
+  deliver: <path d="M12 3v12M7 10l5 5 5-5M4 19h16" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
   mark: <path d="M4 7h7M4 12h16M13 17h7" />,
 }

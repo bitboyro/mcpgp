@@ -71,11 +71,51 @@ public final class Packager {
     }
 
     /** @param signing the builder's key to sign {@code SHA256SUMS} with; null for an unsigned package */
-    public Result build(ObjectNode manifest, JsonNode definition, Instant time, Path out, Minisign.Keys signing) throws IOException {
+    /** One way the package can be installed: {@code jar} (always), {@code mcpb}, {@code docker}; {@code file} is its main file. */
+    public record Format(String id, String file) {
+    }
+
+    /**
+     * What a build of this definition will contain, without building it: the formats, every file of the
+     * package (in the order {@link #build} writes them), the generated docs in full, and the warnings.
+     */
+    public record Preview(String zip, List<Format> formats, List<String> files, Map<String, String> docs, List<String> warnings) {
+    }
+
+    public static Preview preview(ObjectNode manifest, JsonNode definition, boolean signed) throws IOException {
         String server = manifest.at("/server/name").asText();
-        String version = manifest.at("/server/version").asText();
-        String base = server + "-" + version;
+        String base = server + "-" + manifest.at("/server/version").asText();
         List<String> warnings = new ArrayList<>();
+        java.util.Set<String> targets = targets(definition, warnings);
+        List<Format> formats = new ArrayList<>(List.of(new Format("jar", server + ".jar")));
+        java.util.Set<String> names = new java.util.LinkedHashSet<>(List.of(server + ".jar"));
+        if (targets.contains("mcpb")) {
+            formats.add(new Format("mcpb", base + ".mcpb"));
+            names.add(base + ".mcpb");
+        }
+        if (targets.contains("docker")) {
+            java.util.Set<String> container = Container.files(manifest, definition, warnings).keySet();
+            formats.add(new Format("docker", container.stream().filter(n -> n.contains("compose")).findFirst()
+                    .orElse(container.iterator().next())));
+            names.addAll(container);
+        }
+        names.addAll(List.of("manifest.json", "server.config.schema.json", server + ".example.yaml"));
+        Map<String, String> docs = new Docs(manifest, ConfigSchema.generate(manifest), signed, names).generate(agentDocs(definition));
+        names.addAll(docs.keySet());
+        if (signed) {
+            names.add("SIGNING-KEY.pub");
+        } else {
+            warnings.add("the package is not signed (set build.sign.key to sign SHA256SUMS)");
+        }
+        names.add("SHA256SUMS");
+        if (signed) {
+            names.add("SHA256SUMS.sig");
+        }
+        return new Preview(base + ".zip", List.copyOf(formats), List.copyOf(names), docs, List.copyOf(warnings));
+    }
+
+    /** {@code build.targets}, with a warning for each one this version can't build, and for a generation mode it can't use. */
+    private static java.util.Set<String> targets(JsonNode definition, List<String> warnings) {
         for (JsonNode target : definition.at("/build/targets")) {
             if (!TARGETS.contains(target.asText())) {
                 warnings.add("build target " + target.asText() + " is not available in this version; the package has the jar only");
@@ -87,6 +127,24 @@ public final class Packager {
         if (!mode.equals("runtime")) {
             warnings.add("generation.mode " + mode + " is not available in this version; the server works from its manifest");
         }
+        return targets;
+    }
+
+    private static boolean agentDocs(JsonNode definition) {
+        for (JsonNode audience : definition.at("/build/docs")) {
+            if (audience.asText().equals("agents")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public Result build(ObjectNode manifest, JsonNode definition, Instant time, Path out, Minisign.Keys signing) throws IOException {
+        String server = manifest.at("/server/name").asText();
+        String version = manifest.at("/server/version").asText();
+        String base = server + "-" + version;
+        List<String> warnings = new ArrayList<>();
+        java.util.Set<String> targets = targets(definition, warnings);
 
         Files.createDirectories(out);
         Path staging = Files.createTempDirectory(out, ".staging-");
@@ -122,11 +180,7 @@ public final class Packager {
             ObjectNode configSchema = ConfigSchema.generate(manifest);
             files.put("server.config.schema.json", write(staging, "server.config.schema.json", CanonicalJson.pretty(configSchema)));
             files.put(server + ".example.yaml", write(staging, server + ".example.yaml", ExampleConfig.yaml(manifest)));
-            boolean agents = false;
-            for (JsonNode audience : definition.at("/build/docs")) {
-                agents |= audience.asText().equals("agents");
-            }
-            for (Map.Entry<String, String> doc : new Docs(manifest, configSchema, signing != null, files.keySet()).generate(agents).entrySet()) {
+            for (Map.Entry<String, String> doc : new Docs(manifest, configSchema, signing != null, files.keySet()).generate(agentDocs(definition)).entrySet()) {
                 files.put(doc.getKey(), write(staging, doc.getKey(), doc.getValue()));
             }
             if (signing != null) {

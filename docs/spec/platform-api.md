@@ -52,6 +52,11 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   policy's reference, or null), `own` (what the definition sets in `naming` itself), `effective` (the
   merged policy the compiler used) and `lock: { present, entries: [{ id, name, since }] }`. Each tool's
   name steps are in the manifest's provenance; the Naming section of Tools & rules shows both.
+- `GET /servers/{id}/versions/{version}/package` says what a build of the version will contain,
+  without building it: `zip` (the name, before the build number), `formats` (`jar` always, `mcpb` and
+  `docker` per `build.targets`, each with its main file), `files` (everything in the zip, as a build
+  writes it), `docs` (each generated document in full), `warnings`, and `signed` (whether the platform
+  signs its builds). Package & deliver shows it.
 - `GET /servers/{id}/versions/{version}/example-config` returns the example configuration the
   version's package will ship (what the customer fills in), with secrets as references only.
 - **Edits:** `POST /servers/{id}/edits { base, changes: [{ op, path, value }], message?, dryRun? }`

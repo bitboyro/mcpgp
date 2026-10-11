@@ -135,6 +135,29 @@ paths:
                       present: { type: boolean }
                       entries: { type: array, items: { type: object, properties: { id: { type: string }, name: { type: string }, since: { type: string } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/versions/{version}/package:
+    parameters: [ { $ref: "#/components/parameters/ServerId" }, { $ref: "#/components/parameters/Version" } ]
+    get:
+      operationId: previewPackage
+      tags: [builds]
+      summary: Preview package
+      description: What a build of the version will contain, without building it - formats, files, the generated docs and warnings.
+      responses:
+        "200":
+          description: The package a build would make
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: integer }
+                  zip: { type: string }
+                  formats: { type: array, items: { type: object, properties: { id: { enum: [jar, mcpb, docker] }, file: { type: string } } } }
+                  files: { type: array, items: { type: string } }
+                  docs: { type: object, additionalProperties: { type: string } }
+                  warnings: { type: array, items: { type: string } }
+                  signed: { type: boolean }
+        default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/versions/{version}/example-config:
     get:
       operationId: getExampleConfig

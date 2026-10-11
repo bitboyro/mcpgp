@@ -230,3 +230,30 @@ describe('naming', () => {
     expect(screen.getByRole('tab', { name: 'Would change (1)' })).toBeTruthy()
   })
 })
+
+describe('package & deliver', () => {
+  it('shows the formats, the docs as they ship and the contents before a build', async () => {
+    fakeApi({
+      'GET /me': ME,
+      'GET /settings': SETTINGS,
+      'GET /servers/orders-mcp': { id: 'orders-mcp', title: 'Orders', archived: false, latestVersion: 3, versions: [] },
+      'GET /servers/orders-mcp/versions/latest/manifest': { server: { name: 'orders-mcp', version: '2.0.0' }, exposure: { mode: 'plain' }, diagnostics: [],
+        tools: [], packs: [{ id: 'audit', version: '1', tools: [] }], runtime: { transports: { allowed: ['stdio'], default: 'stdio' } } },
+      'GET /servers/orders-mcp/versions/3': { number: 3, root: 'orders.mcpgp.yaml', files: [] },
+      'GET /servers/orders-mcp/builds': { items: [] },
+      'GET /servers/orders-mcp/versions/3/package': { zip: 'orders-mcp-2.0.0.zip', signed: false, warnings: ['the package is not signed'],
+        formats: [{ id: 'jar', file: 'orders-mcp.jar' }, { id: 'mcpb', file: 'orders-mcp-2.0.0.mcpb' }],
+        files: ['orders-mcp.jar', 'orders-mcp-2.0.0.mcpb', 'docs/INSTALL.md', 'SHA256SUMS'],
+        docs: { 'docs/README.md': '# Orders', 'docs/INSTALL.md': '# Installing Orders\n\nSee [the config](CONFIGURATION.md).', 'docs/CONFIGURATION.md': '# Configuration' } },
+    })
+    renderAt('/servers/orders-mcp/package')
+    expect(await screen.findByRole('heading', { name: 'Installing Orders' })).toBeTruthy()
+    const formats = screen.getByRole('region', { name: 'Package settings' }).textContent!
+    expect(formats).toContain('Desktop bundle (.mcpb)')
+    expect(formats).toContain('Not signed')
+    await userEvent.click(screen.getByRole('button', { name: 'the config' }))
+    expect(screen.getByRole('heading', { name: 'Configuration' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('tab', { name: 'Pipeline' }))
+    expect(screen.getByText(/mcpgp build orders\.mcpgp\.yaml --frozen-lock/)).toBeTruthy()
+  })
+})

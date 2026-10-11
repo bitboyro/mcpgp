@@ -47,9 +47,8 @@ Built into the platform jar and served by it (`WebUi`), on the API's own origin.
 | Shared library | `/library` | items by kind (adding them is API / CLI) |
 | API & agents | `/agents` | identities, tokens (shown once), guardrails, approvals, agent activity |
 
-Not yet: "Describe a change" (proposals from a description), Package & deliver's formats and docs
-(`build.targets` isn't in the manifest, so it needs the resolved definition), and editing tools and
-rules on the page. The platform MCP server comes with M7.
+Not yet: "Describe a change" (proposals from a description), choosing formats and docs on Package &
+deliver (it shows them; they change in the definition), and editing rules on the page. The platform MCP server comes with M7.
 
 ## Known follow-ups
 

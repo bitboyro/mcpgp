@@ -88,6 +88,29 @@ class PackageTest {
     }
 
     @Test
+    void thePreviewListsWhatTheBuildWrites() throws Exception {
+        ro.bitboy.mcpgp.core.Compiler.Result result = new ro.bitboy.mcpgp.core.Compiler(new ro.bitboy.mcpgp.schemas.Schemas()).compile(
+                EXAMPLES.resolve("orders/orders.mcpgp.yaml"), new ro.bitboy.mcpgp.core.Compiler.Options(
+                        ro.bitboy.mcpgp.core.resolve.Workspace.load(EXAMPLES.resolve("workspace/mcpgp-workspace.yaml"), new ro.bitboy.mcpgp.schemas.Schemas(),
+                                new ro.bitboy.mcpgp.core.diag.Diagnostics()), false,
+                        new ro.bitboy.mcpgp.core.manifest.ManifestWriter.Build(java.time.Instant.ofEpochSecond(1791542400L), ro.bitboy.mcpgp.core.Compiler.VERSION,
+                                null, 3, null)));
+        Packager.Preview preview = Packager.preview(result.manifest().orElseThrow(), result.definition().orElseThrow().document(), true);
+        List<String> names = new ArrayList<>();
+        try (ZipFile file = new ZipFile(zip.toFile())) {
+            Collections.list(file.entries()).forEach(e -> names.add(e.getName()));
+        }
+        assertThat(preview.zip()).isEqualTo(zip.getFileName().toString());
+        assertThat(preview.files()).containsExactlyInAnyOrderElementsOf(names);
+        assertThat(preview.formats()).extracting(Packager.Format::id).containsExactly("jar", "mcpb", "docker");
+        assertThat(preview.formats()).extracting(Packager.Format::file)
+                .containsExactly("orders-mcp.jar", "orders-mcp-2.0.0+3.mcpb", "docker/docker-compose.yml");
+        assertThat(preview.docs().get("docs/INSTALL.md")).isEqualTo(new String(entry(zip, "docs/INSTALL.md"), StandardCharsets.UTF_8));
+        assertThat(Packager.preview(result.manifest().get(), result.definition().get().document(), false).warnings())
+                .anyMatch(w -> w.contains("not signed"));
+    }
+
+    @Test
     void theJarEmbedsTheManifestAndKeepsNestedJarsStored(@TempDir Path tmp) throws IOException {
         Path jar = tmp.resolve("orders-mcp.jar");
         Files.write(jar, entry(zip, "orders-mcp.jar"));

@@ -122,6 +122,22 @@ public final class Compilation {
         return derived("naming", version, createdAt, result -> NamingView.of(result, version, store));
     }
 
+    /**
+     * What a build of the version will contain (packaging.md): formats, files and the generated docs,
+     * without building it; null when the version doesn't compile.
+     */
+    public ObjectNode packagePreview(Model.Version version, String createdAt, boolean signed) {
+        return derived("package-" + (signed ? "signed" : "unsigned"), version, createdAt, result -> {
+            try {
+                ro.bitboy.mcpgp.packager.Packager.Preview preview = ro.bitboy.mcpgp.packager.Packager.preview(result.manifest().orElseThrow(),
+                        result.definition().orElseThrow().document(), signed);
+                return (ObjectNode) new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(preview);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
     private ObjectNode derived(String kind, Model.Version version, String createdAt, java.util.function.Function<Compiler.Result, ObjectNode> from) {
         String key = version.digest() + "-" + libraryState();
         var cached = store.cached(kind, key);
