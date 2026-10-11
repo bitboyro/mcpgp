@@ -42,7 +42,11 @@ the package's files and the pipeline commands, all before building), **Builds** 
 API as everyone else; nothing it does is UI-only. On Overview, the server's settings (what agents
 see, what they may do, target servers, transports, confirmation, packs) can be changed on the page:
 the preview shows the result before anything is saved, Review shows the lines of the definition that
-change, and Save makes the next version. On Tools & rules, **Operations** lists every operation of the
+change, and Save makes the next version. On Overview, **Notices on tool descriptions** adds company policy or disclaimers to every tool, a
+tag's tools, the tools that change data, or chosen tools; notices are never cut off. On Tools & rules,
+**Edit title and descriptions** on a tool changes its title, description and parameter descriptions
+(saved as an inline rule of the definition, shown under "Why it looks like this"; **Back to the spec**
+removes it). On Tools & rules, **Operations** lists every operation of the
 contracts with a switch: on makes it a tool (or resource), off leaves it out, and each operation that
 is off says why (`excluded by tag system`, `read and write: no deletes`, `hidden by a rule`). Turning a
 tool off adds one `select.exclude` entry for that operation (or one `{ tag: [...] }` entry for a whole

@@ -185,6 +185,12 @@ versions follow [SemVer](https://semver.org).
   manifest; the packager embeds the jars and lists them in OPERATIONS.md (CLI and platform builds);
   the runtime loads only the declared jars, checks their checksums and handler classes at startup,
   and runs filters, enrichers and custom tools where the spec says. Guide: docs/guides/extensions.md.
+- Descriptions: `descriptions.notices` add text (company policy, disclaimers) to the descriptions of
+  every tool or the tools a selector picks, of every kind, never cut off; rule selectors take `kind`
+  and `tool`, so rules reach pack, built-in and custom tools; a too-long description loses spec text
+  first, so what rules add stays whole; rules may have an `id`. Overview edits notices; Tools & rules
+  edits a tool's title, description and parameter descriptions (an inline `ui:` rule). Platform: whole
+  list items set or removed by `[key=value]` in edits, and `GET …/definition`.
 - CLI: `mcpgp names accept <def> <tool…|--all>` writes `mcp-names.lock` (renames on purpose, and
   names the file doesn't have yet).
 

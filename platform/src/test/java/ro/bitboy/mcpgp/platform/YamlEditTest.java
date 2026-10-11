@@ -130,4 +130,40 @@ class YamlEditTest {
         assertThatThrownBy(() -> YamlEdit.apply("a: 1\n", List.of(set("exposure", "1")))).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> YamlEdit.apply("a: 1\n", List.of(new Change("move", "/a", null)))).isInstanceOf(ApiException.class);
     }
+
+    @Test
+    void wholeListItemsAreSetAndRemovedByTheirKey() throws Exception {
+        String source = """
+                # a definition
+                overrides:
+                  include: overrides/*.yaml
+                  rules:
+                    - id: keep
+                      match: { tag: orders }
+                      description: { append: " (kept)" }   # stays
+                    - id: ui:listAccounts
+                      match: { operationId: listAccounts }
+                      title: { set: Old }
+                exposure: { mode: plain }
+                """;
+        String replaced = YamlEdit.apply(source, List.of(set("/overrides/rules/[id=ui:listAccounts]",
+                "{ \"match\": { \"operationId\": \"listAccounts\" }, \"title\": { \"set\": \"New\" } }")));
+        assertThat(at(replaced, "/overrides/rules/1/title/set").asText()).isEqualTo("New");
+        assertThat(at(replaced, "/overrides/rules/1/id").asText()).isEqualTo("ui:listAccounts");
+        assertThat(replaced).contains("description: { append: \" (kept)\" }   # stays").contains("# a definition");
+
+        String added = YamlEdit.apply(replaced, List.of(set("/overrides/rules/[id=ui:createNote]", "{ \"match\": { \"operationId\": \"createNote\" } }")));
+        assertThat(at(added, "/overrides/rules").size()).isEqualTo(3);
+        assertThat(at(added, "/overrides/rules/2/id").asText()).isEqualTo("ui:createNote");
+
+        String removed = YamlEdit.apply(added, List.of(new Change("remove", "/overrides/rules/[id=ui:listAccounts]", null)));
+        assertThat(at(removed, "/overrides/rules").findValuesAsText("id")).containsExactly("keep", "ui:createNote");
+        assertThat(removed).contains("# stays");
+
+        // a list that isn't there yet
+        String notices = YamlEdit.apply(source, List.of(set("/descriptions/notices/[id=policy]", "{ \"text\": \"Audited.\" }")));
+        assertThat(at(notices, "/descriptions/notices/0/text").asText()).isEqualTo("Audited.");
+        String none = YamlEdit.apply(notices, List.of(new Change("remove", "/descriptions/notices/[id=policy]", null)));
+        assertThat(at(none, "/descriptions/notices").size()).isZero();
+    }
 }

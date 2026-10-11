@@ -93,6 +93,27 @@
     "runtimeDefaults": { "$ref": "#/$defs/runtimeDefaults" },
     "generation": { "$ref": "#/$defs/generation" },
     "extensions": { "$ref": "#/$defs/extensions" },
+    "descriptions": {
+      "type": "object",
+      "description": "Text added to tool descriptions (definition-format.md §5.1).",
+      "properties": {
+        "notices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "pattern": "^[A-Za-z0-9:._-]{1,128}$" },
+              "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+              "position": { "enum": ["append", "prepend"] },
+              "match": { "$ref": "#/$defs/selector" }
+            },
+            "required": ["text"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "build": { "$ref": "#/$defs/build" }
   },
   "required": ["apiVersion", "kind", "metadata"],
@@ -225,7 +246,15 @@
         "path": { "$ref": "#/$defs/stringOrList" },
         "operationId": { "type": "string" },
         "contract": { "type": "string" },
-        "extension": { "type": "object" }
+        "extension": { "type": "object" },
+        "kind": {
+          "description": "The kinds of tools it selects; without it, API tools only.",
+          "oneOf": [
+            { "enum": ["api", "pack", "builtin", "custom"] },
+            { "type": "array", "items": { "enum": ["api", "pack", "builtin", "custom"] }, "minItems": 1 }
+          ]
+        },
+        "tool": { "$ref": "#/$defs/stringOrList", "description": "Tool names (or ~regex). Rules: pack, built-in and custom tools only; notices: any tool, by its final name." }
       },
       "additionalProperties": false,
       "minProperties": 1
@@ -269,6 +298,7 @@
     "rule": {
       "type": "object",
       "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9:._-]{1,128}$", "description": "Optional; lets tools (and the platform's pages) find and change this rule" },
         "match": { "$ref": "#/$defs/selector" },
         "name": { "$ref": "#/$defs/textOp" },
         "title": { "$ref": "#/$defs/textOp" },

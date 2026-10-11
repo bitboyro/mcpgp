@@ -7,7 +7,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /** The text operations of rules: set, prepend, append, replace, template (definition-format §5). */
-final class TextOps {
+public final class TextOps {
 
     private static final Pattern VARIABLE = Pattern.compile("\\{\\{\\s*([a-zA-Z]+)\\s*}}");
 
@@ -15,11 +15,11 @@ final class TextOps {
     }
 
     /** The operation's name ({@code set}, {@code prepend}, …), for provenance. */
-    static String kind(JsonNode op) {
+    public static String kind(JsonNode op) {
         return op.fieldNames().next();
     }
 
-    static String apply(JsonNode op, String current, Map<String, String> variables) {
+    public static String apply(JsonNode op, String current, Map<String, String> variables) {
         String value = current == null ? "" : current;
         if (op.has("set")) {
             return render(op.get("set").asText(), variables);

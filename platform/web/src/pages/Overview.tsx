@@ -6,6 +6,7 @@ import { PACKS, choices, diffLines, packChange, packOn } from '../choices'
 import { AUTH_LABELS, EXPOSURE, counts, listedTools, useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
 import { ErrorBox, Loading, PageHead, Segmented, ago } from '../ui'
+import { NoticesCard } from './Notices'
 
 type Tab = 'agent' | 'customer' | 'package' | 'checks' | 'changes'
 
@@ -59,10 +60,11 @@ export function OverviewPage() {
       setSaving(false)
       setTab('agent')
       setMessage('')
-      for (const key of ['server', 'manifest', 'servers', 'example-config', 'version']) await queryClient.invalidateQueries({ queryKey: [key] })
+      for (const key of ['server', 'manifest', 'servers', 'example-config', 'version', 'definition']) await queryClient.invalidateQueries({ queryKey: [key] })
     },
   })
   const editable = can('servers:write') && !!manifest.data && !server.data?.archived
+  const definition = useQuery({ queryKey: ['definition', id, base], queryFn: () => api.definition(id, base), enabled: base > 0 && !!manifest.data, retry: false })
 
   const pick = (key: string, label: string, original: boolean, change: Change) => {
     setPending((now) => {
@@ -123,6 +125,7 @@ export function OverviewPage() {
             <Choices id={id} original={manifest.data} shown={shown} editable={editable} pending={pending} pick={pick}
               variant={!!(server.data?.parent || manifest.data.build.extends)} />
           )}
+          {manifest.data && <NoticesCard manifest={manifest.data} definition={definition.data} editable={editable} pending={pending} pick={pick} />}
           {server.data && (
             <div className="card">
               <h2>Definition</h2>

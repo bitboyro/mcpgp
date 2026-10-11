@@ -31,7 +31,7 @@ import java.util.Set;
  */
 public final class ToolPlanner {
 
-    private static final int DESCRIPTION_LIMIT = 1024;
+    public static final int DESCRIPTION_LIMIT = 1024;
     private static final Map<String, String> DEFAULT_SUFFIXES = Map.of(
             "multipart/form-data", "multipart",
             "application/x-www-form-urlencoded", "form",
@@ -115,7 +115,9 @@ public final class ToolPlanner {
         }
 
         for (SourcedRule rule : definition.rules()) {
-            if (!usedRules.contains(rule)) {
+            // rules for pack, built-in and custom tools are checked when those tools are written
+            JsonNode match = rule.rule().path("match");
+            if (!usedRules.contains(rule) && !match.has("kind") && !match.has("tool")) {
                 diagnostics.warning(Codes.RULE_MATCHES_NOTHING, "Rule matches no tool", rule.location());
             }
         }
@@ -171,6 +173,19 @@ public final class ToolPlanner {
         return null;
     }
 
+    /** The spec's description with the description rules applied in order, and the steps for provenance. */
+    private static String describe(String spec, String pointer, List<Map.Entry<SourcedRule, Map<String, String>>> rules, List<Provenance> provenance) {
+        String description = spec;
+        provenance.add(new Provenance("spec", description, null, pointer, null, null));
+        for (Map.Entry<SourcedRule, Map<String, String>> entry : rules) {
+            ObjectNode rule = entry.getKey().rule();
+            Location at = entry.getKey().location();
+            description = TextOps.apply(rule.get("description"), description, entry.getValue());
+            provenance.add(new Provenance("rule", description, at.file(), at.pointer(), TextOps.kind(rule.get("description")), null));
+        }
+        return description;
+    }
+
     private static List<JsonNode> list(JsonNode node) {
         List<JsonNode> result = new ArrayList<>();
         if (node.isArray()) {
@@ -201,10 +216,11 @@ public final class ToolPlanner {
         steps.forEach(s -> nameProvenance.add(Provenance.of(s.step(), s.value())));
 
         String title = base.summary() != null ? base.summary() : humanize(name);
-        String description = base.description() != null ? base.description() : base.summary() == null ? "" : base.summary();
+        String specDescription = base.description() != null ? base.description() : base.summary() == null ? "" : base.summary();
+        String descriptionPointer = base.pointer() + (base.description() != null ? "/description" : "/summary");
         List<Provenance> titleProvenance = new ArrayList<>(List.of(new Provenance("spec", title, null, base.pointer() + "/summary", null, null)));
-        List<Provenance> descriptionProvenance = new ArrayList<>(List.of(new Provenance("spec", description, null,
-                base.pointer() + (base.description() != null ? "/description" : "/summary"), null, null)));
+        // description rules run after the loop, so a description that is too long can lose spec text instead of what rules add
+        List<Map.Entry<SourcedRule, Map<String, String>>> descriptionRules = new ArrayList<>();
 
         Annotations annotations = defaults(base.method());
         boolean hidden = false;
@@ -233,8 +249,7 @@ public final class ToolPlanner {
                 titleProvenance.add(new Provenance("rule", title, at.file(), at.pointer(), TextOps.kind(rule.get("title")), null));
             }
             if (rule.has("description")) {
-                description = TextOps.apply(rule.get("description"), description, variables);
-                descriptionProvenance.add(new Provenance("rule", description, at.file(), at.pointer(), TextOps.kind(rule.get("description")), null));
+                descriptionRules.add(Map.entry(sourced, new LinkedHashMap<>(variables)));
             }
             rule.path("params").fields().forEachRemaining(p -> {
                 if (p.getValue().has("description")) {
@@ -275,12 +290,19 @@ public final class ToolPlanner {
             diagnostics.info(Codes.OPERATION_EXCLUDED, base.key() + " excluded: hidden by a rule", root);
             return;
         }
-        if (base.deprecated() && api.path("select").path("deprecated").asText("hide").equals("mark")) {
-            description = description + " (Deprecated.)";
-        }
+        String deprecatedNote = base.deprecated() && api.path("select").path("deprecated").asText("hide").equals("mark") ? " (Deprecated.)" : "";
+        List<Provenance> descriptionProvenance = new ArrayList<>();
+        String description = describe(specDescription, descriptionPointer, descriptionRules, descriptionProvenance) + deprecatedNote;
         if (description.length() > DESCRIPTION_LIMIT) {
+            // shorten the spec's text so what rules prepend or append (a disclaimer, say) stays whole
+            int excess = description.length() - DESCRIPTION_LIMIT + 1;
+            String shortened = specDescription.length() > excess ? specDescription.substring(0, specDescription.length() - excess).stripTrailing() + "…" : "";
+            descriptionProvenance.clear();
+            description = describe(shortened, descriptionPointer, descriptionRules, descriptionProvenance) + deprecatedNote;
+            if (description.length() > DESCRIPTION_LIMIT) {
+                description = description.substring(0, DESCRIPTION_LIMIT - 1) + "…";
+            }
             diagnostics.warning(Codes.DESCRIPTION_TRUNCATED, base.key() + ": description shortened to " + DESCRIPTION_LIMIT + " characters", root);
-            description = description.substring(0, DESCRIPTION_LIMIT - 1) + "…";
         }
         boolean needsConfirm = confirm != null ? confirm : confirmDestructive && annotations.destructiveHint();
 

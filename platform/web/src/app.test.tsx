@@ -311,3 +311,48 @@ describe('shared naming policy', () => {
       changes: [{ op: 'set', path: '/methodVerbs/PUT', value: 'upsert' }] })
   })
 })
+
+describe('descriptions', () => {
+  const tool = { name: 'orders_order_refund', kind: 'api', title: 'Refund order', description: 'Refunds an order.',
+    operation: { key: 'orders:POST:/orders/{id}/refund', operationId: 'refundOrder', tags: ['orders'] },
+    inputSchema: { type: 'object', properties: { path: { type: 'object', properties: { id: { type: 'string' } } } } },
+    provenance: { description: [{ step: 'spec', value: 'Refunds an order.' }] } }
+  const manifest = { server: { name: 'orders-mcp', version: '2.0.0' }, exposure: { mode: 'plain' }, diagnostics: [], apis: [{ id: 'orders', contracts: [] }],
+    tools: [tool], packs: [], instances: { mode: 'single' }, runtime: { transports: { allowed: ['stdio'], default: 'stdio' } }, policies: {}, build: {} }
+  const routes = () => ({
+    'GET /me': ME,
+    'GET /settings': SETTINGS,
+    'GET /servers/orders-mcp': { id: 'orders-mcp', title: 'Orders', archived: false, latestVersion: 3, versions: [] },
+    'GET /servers/orders-mcp/versions/latest/manifest': manifest,
+    'GET /servers/orders-mcp/versions/3/definition': { root: {}, resolved: {} },
+    'GET /servers/orders-mcp/builds': { items: [] },
+  })
+
+  it('adds a notice for the tools that change data', async () => {
+    const { calls } = fakeApi({ ...routes(), 'POST /servers/orders-mcp/edits': { base: 3, digest: 'x', definition: '', manifest } })
+    renderAt('/servers/orders-mcp')
+    await userEvent.click(await screen.findByRole('button', { name: 'Add notice' }))
+    await userEvent.type(screen.getByLabelText('Text'), 'Changes need a ticket.')
+    await userEvent.click(screen.getByRole('radio', { name: 'Tools that change data' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true))
+    expect((calls.find((c) => c.method === 'POST')!.body as { changes: unknown[] }).changes).toEqual([{ op: 'set', path: '/descriptions/notices/[id=changes-need-a-ticket]',
+      value: { text: 'Changes need a ticket.', match: { method: ['POST', 'PUT', 'PATCH', 'DELETE'] } } }])
+    expect(screen.getByText('after the description of tools that change data')).toBeTruthy()
+  })
+
+  it('changes one tool\'s title and parameter description as a rule', async () => {
+    const { calls } = fakeApi({ ...routes(), 'POST /servers/orders-mcp/edits': { id: 'orders-mcp', latestVersion: 4, versions: [] } })
+    renderAt('/servers/orders-mcp/tools?tool=orders_order_refund')
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit title and descriptions' }))
+    const title = screen.getByLabelText('Title')
+    await userEvent.clear(title)
+    await userEvent.type(title, 'Refund an order')
+    await userEvent.type(screen.getByLabelText('path.id'), 'The order.')
+    await userEvent.click(screen.getByRole('button', { name: 'Save as version 4' }))
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true))
+    expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ base: 3, message: 'Tools & rules: orders_order_refund title and descriptions', changes: [{
+      op: 'set', path: '/overrides/rules/[id=ui:refundOrder]',
+      value: { match: { operationId: 'refundOrder' }, title: { set: 'Refund an order' }, params: { 'path.id': { description: { set: 'The order.' } } } } }] })
+  })
+})

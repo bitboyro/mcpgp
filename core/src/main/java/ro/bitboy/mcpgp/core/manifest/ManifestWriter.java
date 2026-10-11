@@ -187,6 +187,8 @@ public final class ManifestWriter {
         });
 
         ObjectNode extensionsNode = extensions(definition, plans, tools, names, packPrefix, root);
+        toolRules(definition, plans, tools);
+        notices(definition, plans, tools, root);
 
         tools.sort(Comparator.comparing(t -> t.path("name").asText()));
         checkUnique(tools, root);
@@ -599,6 +601,113 @@ public final class ManifestWriter {
                 diagnostics.error(Codes.NAME_COLLISION, "Two tools are named '" + name + "' (a built-in or pack tool clashes with another tool)", root);
             }
         }
+    }
+
+    /**
+     * Rules for pack, built-in and custom tools (definition-format §5): a selector with {@code kind}
+     * and/or {@code tool} and no operation keys; they change titles and descriptions. A rule with
+     * {@code kind} or {@code tool} that selects no tool at all is reported here (the planner reports
+     * the others).
+     */
+    private void toolRules(ResolvedDefinition definition, List<ToolPlan> plans, List<ObjectNode> tools) {
+        for (ResolvedDefinition.SourcedRule sourced : definition.rules()) {
+            JsonNode match = sourced.rule().path("match");
+            if (!match.has("kind") && !match.has("tool")) {
+                continue;
+            }
+            boolean used = plans.stream().anyMatch(p -> p.matches(match));
+            for (ObjectNode tool : tools) {
+                String kind = tool.path("kind").asText();
+                if (kind.equals("api") || !ro.bitboy.mcpgp.core.tools.Selectors.matchesTool(match, kind, tool.path("name").asText())) {
+                    continue;
+                }
+                used = true;
+                Map<String, String> variables = Map.of("name", tool.path("name").asText());
+                for (String field : List.of("title", "description")) {
+                    JsonNode op = sourced.rule().get(field);
+                    if (op == null) {
+                        continue;
+                    }
+                    String value = ro.bitboy.mcpgp.core.tools.TextOps.apply(op, tool.path(field).asText(""), variables);
+                    tool.put(field, value);
+                    ObjectNode step = provenanceSteps(tool, field).addObject().put("step", "rule").put("value", value)
+                            .put("file", sourced.location().file()).put("op", ro.bitboy.mcpgp.core.tools.TextOps.kind(op));
+                    if (sourced.location().pointer() != null) {
+                        step.put("pointer", sourced.location().pointer());
+                    }
+                }
+            }
+            if (!used) {
+                diagnostics.warning(Codes.RULE_MATCHES_NOTHING, "Rule matches no tool", sourced.location());
+            }
+        }
+    }
+
+    /**
+     * Notices (definition-format §5.1): text prepended or appended to the description of every tool a
+     * notice selects (every tool without {@code match}). Notices are never cut; a description that
+     * would be too long with them is shortened to make room.
+     */
+    private void notices(ResolvedDefinition definition, List<ToolPlan> plans, List<ObjectNode> tools, Location root) {
+        JsonNode notices = definition.document().at("/descriptions/notices");
+        if (!notices.isArray() || notices.isEmpty()) {
+            return;
+        }
+        Map<String, ToolPlan> byName = new LinkedHashMap<>();
+        plans.forEach(p -> byName.put(p.name(), p));
+        Map<ObjectNode, List<String>> before = new java.util.IdentityHashMap<>();
+        Map<ObjectNode, List<String>> after = new java.util.IdentityHashMap<>();
+        int index = 0;
+        for (JsonNode notice : notices) {
+            Location at = root.withPointer("/descriptions/notices/" + index++);
+            JsonNode match = notice.get("match");
+            boolean prepend = notice.path("position").asText("append").equals("prepend");
+            String text = notice.path("text").asText().strip();
+            int matched = 0;
+            for (ObjectNode tool : tools) {
+                String kind = tool.path("kind").asText();
+                ToolPlan plan = byName.get(tool.path("name").asText());
+                boolean selected = match == null
+                        || (kind.equals("api") ? plan != null && ro.bitboy.mcpgp.core.tools.Selectors.matchesApiTool(match, plan)
+                        : ro.bitboy.mcpgp.core.tools.Selectors.matchesTool(match, kind, tool.path("name").asText()));
+                if (!selected) {
+                    continue;
+                }
+                matched++;
+                (prepend ? before : after).computeIfAbsent(tool, t -> new ArrayList<>()).add(text);
+                provenanceSteps(tool, "description").addObject().put("step", "notice").put("value", text)
+                        .put("file", at.file()).put("pointer", at.pointer());
+            }
+            if (matched == 0) {
+                diagnostics.warning(Codes.NOTICE_MATCHES_NOTHING, "Notice applies to no tool", at);
+            }
+        }
+        for (ObjectNode tool : tools) {
+            List<String> pre = before.getOrDefault(tool, List.of());
+            List<String> post = after.getOrDefault(tool, List.of());
+            if (pre.isEmpty() && post.isEmpty()) {
+                continue;
+            }
+            String description = tool.path("description").asText("");
+            int added = pre.stream().mapToInt(t -> t.length() + 2).sum() + post.stream().mapToInt(t -> t.length() + 2).sum();
+            int room = ro.bitboy.mcpgp.core.tools.ToolPlanner.DESCRIPTION_LIMIT - added;
+            if (description.length() > room) {
+                description = room > 1 ? description.substring(0, room - 1).stripTrailing() + "…" : "";
+                diagnostics.warning(Codes.DESCRIPTION_TRUNCATED, tool.path("name").asText() + ": description shortened to make room for notices", root);
+            }
+            List<String> parts = new ArrayList<>(pre);
+            if (!description.isEmpty()) {
+                parts.add(description);
+            }
+            parts.addAll(post);
+            tool.put("description", String.join("\n\n", parts));
+        }
+    }
+
+    /** The tool's provenance steps for a field, created when missing. */
+    private static ArrayNode provenanceSteps(ObjectNode tool, String field) {
+        ObjectNode provenance = tool.has("provenance") ? (ObjectNode) tool.get("provenance") : tool.putObject("provenance");
+        return provenance.has(field) ? (ArrayNode) provenance.get(field) : provenance.putArray(field);
     }
 
     private static final java.util.regex.Pattern CLASS_NAME = java.util.regex.Pattern.compile("^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)+$");

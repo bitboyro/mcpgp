@@ -141,8 +141,21 @@ public final class YamlEdit {
                 current = child;
             } else {
                 Select select = (Select) segment;
-                if (!current.isArray() || last) {
-                    throw ApiException.validation("path: [" + select.key() + "=…] picks an item of a list, and must be followed by a key");
+                if (!current.isArray()) {
+                    throw ApiException.validation("path: [" + select.key() + "=…] picks an item of a list");
+                }
+                if (last) {
+                    // the whole item: replaced, or added at the end
+                    ObjectNode item = item(select, value);
+                    ArrayNode array = (ArrayNode) current;
+                    for (int n = 0; n < array.size(); n++) {
+                        if (array.get(n).isObject() && select.value().equals(array.get(n).path(select.key()).asText(null))) {
+                            array.set(n, item);
+                            return root;
+                        }
+                    }
+                    array.add(item);
+                    return root;
                 }
                 JsonNode found = null;
                 for (JsonNode item : current) {
@@ -169,8 +182,28 @@ public final class YamlEdit {
         }
         if (current instanceof ObjectNode object && path.getLast() instanceof Key key) {
             object.remove(key.name());
+        } else if (current instanceof ArrayNode array && path.getLast() instanceof Select select) {
+            for (int n = array.size() - 1; n >= 0; n--) {
+                if (array.get(n).isObject() && select.value().equals(array.get(n).path(select.key()).asText(null))) {
+                    array.remove(n);
+                }
+            }
         }
         return root;
+    }
+
+    /** A whole list item: a mapping, with the key it is picked by. */
+    private static ObjectNode item(Select select, JsonNode value) {
+        if (value == null || !value.isObject()) {
+            throw ApiException.validation("path: a whole [" + select.key() + "=…] item is set to a mapping");
+        }
+        ObjectNode item = JsonNodeFactory.instance.objectNode().put(select.key(), select.value());
+        value.properties().forEach(e -> {
+            if (!e.getKey().equals(select.key())) {
+                item.set(e.getKey(), e.getValue());
+            }
+        });
+        return item;
     }
 
     private static JsonNode child(JsonNode node, Segment segment) {
@@ -256,6 +289,10 @@ public final class YamlEdit {
                 current = next;
             } else if (current instanceof SequenceNode sequence && rest.getFirst() instanceof Select select) {
                 Node item = item(sequence, select);
+                if (rest.size() == 1) {
+                    ObjectNode whole = item(select, value);
+                    return item == null ? appendItem(text, sequence, whole) : replace(text, item, render(whole));
+                }
                 if (item == null) {
                     JsonNode created = nested(rest.subList(1, rest.size()), value);
                     ObjectNode newItem = JsonNodeFactory.instance.objectNode().put(select.key(), select.value());
@@ -283,6 +320,25 @@ public final class YamlEdit {
             if (current == null) {
                 return source;
             }
+        }
+        if (current instanceof SequenceNode sequence && path.getLast() instanceof Select select) {
+            Node item = item(sequence, select);
+            if (item == null) {
+                return source;
+            }
+            if (sequence.getFlowStyle() == DumperOptions.FlowStyle.FLOW || sequence.getValue().size() == 1) {
+                ArrayNode data = (ArrayNode) read(slice(text, sequence));
+                for (int n = data.size() - 1; n >= 0; n--) {
+                    if (select.value().equals(data.get(n).path(select.key()).asText(null))) {
+                        data.remove(n);
+                    }
+                }
+                return replace(text, sequence, render(data));
+            }
+            int itemStart = text.offset(item.getStartMark());
+            int start = text.lineStart(source.lastIndexOf('-', itemStart));
+            int end = Math.min(source.length(), text.lineEnd(endOf(text, item)) + 1);
+            return source.substring(0, start) + source.substring(end);
         }
         if (!(current instanceof MappingNode mapping) || !(path.getLast() instanceof Key key)) {
             return source;
@@ -402,6 +458,10 @@ public final class YamlEdit {
     private static JsonNode nested(List<Segment> path, JsonNode value) {
         JsonNode result = value;
         for (int i = path.size() - 1; i >= 0; i--) {
+            if (path.get(i) instanceof Select select && i == path.size() - 1) {
+                result = JsonNodeFactory.instance.arrayNode().add(item(select, value));
+                continue;
+            }
             if (!(path.get(i) instanceof Key key)) {
                 throw ApiException.validation("path: a new [key=value] item must be followed by its keys");
             }
