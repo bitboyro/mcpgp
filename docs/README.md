@@ -27,6 +27,7 @@
 | [design/ui.md](design/ui.md) | You work on the web UI. |
 | [process/development.md](process/development.md) | Before your first change. |
 | [process/roadmap.md](process/roadmap.md) | You want to know what comes next. |
+| [process/release-gate.md](process/release-gate.md) | You are working on the release gate (planned after 0.1.0). |
 
 Examples that follow these specs live in [../examples](../examples).
 
