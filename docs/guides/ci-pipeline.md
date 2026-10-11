@@ -80,7 +80,7 @@ change spec or rules ─► pull request ─► CI: validate · diff · build ·
 cases:
   - name: list customers works
     tool: orders_customer_list
-    args: { instance: mock, query: { account: "a-1", limit: 5 } }
+    args: { instance: mock, query: { accountId: "a-1", limit: 5 } }
     expect: { ok: true }
   - name: delete asks for confirmation
     tool: orders_customer_delete
@@ -92,9 +92,30 @@ cases:
     expect: { code: INSTANCE_UNKNOWN }
 ```
 
-In tests, the mock target is always called `mock` and answers with the spec's examples.
+In tests, the mock target is always called `mock` and answers with the spec's examples (or values
+made from the response schemas). `instance: mock` is dropped for single-instance builds, so the same
+cases work for both. Details: [cli.md §3.2](../spec/cli.md#32-test).
 
 ## 6. Using the platform at the same time
+
+### 6.1 Pushing to the platform
+
+When the platform builds and releases, CI hands it the definition after the checks:
+
+```yaml
+      - name: Push to the platform
+        if: github.ref == 'refs/heads/main'
+        env:
+          MCPGP_PLATFORM: https://mcpgp.example.internal
+          MCPGP_TOKEN: "${{ secrets.MCPGP_TOKEN }}"     # a pipeline identity's token
+        run: mcpgp push servers/orders/orders.mcpgp.yaml --build --verify-local --message "${{ github.event.head_commit.message }}"
+```
+
+The platform keeps the version, builds and signs it; `--verify-local` fails the job if its build
+differs from what CI tested. Add `--release` to release it as well. Only the files the definition
+uses are sent ([cli.md §3.3](../spec/cli.md#33-push)).
+
+### 6.2 Git sources
 
 Link the repo on the platform as a **git source** (Sources page). Then:
 - the platform shows previews, diffs and builds for every branch and tag;

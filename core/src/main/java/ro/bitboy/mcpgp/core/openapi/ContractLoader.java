@@ -473,9 +473,18 @@ public final class ContractLoader {
                     }
                 });
                 result.add(new MediaType(f.getKey(), f.getValue().path("schema").isMissingNode() ? null : f.getValue().get("schema"),
-                        Map.copyOf(encoding)));
+                        Map.copyOf(encoding), example(f.getValue())));
             });
             return List.copyOf(result);
+        }
+
+        /** A media type's {@code example}, else the value of the first of its {@code examples}. */
+        private static JsonNode example(JsonNode media) {
+            if (media.has("example")) {
+                return media.get("example");
+            }
+            Iterator<JsonNode> examples = media.path("examples").elements();
+            return examples.hasNext() ? examples.next().get("value") : null;
         }
 
         private static JsonNode firstContentSchema(JsonNode content) {
@@ -503,7 +512,7 @@ public final class ContractLoader {
                     content = new ArrayList<>();
                     if (response.has("schema")) {
                         for (String media : produces) {
-                            content.add(new MediaType(media, response.get("schema"), Map.of()));
+                            content.add(new MediaType(media, response.get("schema"), Map.of(), response.path("examples").get(media)));
                         }
                     }
                 } else {

@@ -2,7 +2,7 @@
 cases:
   - name: list customers works
     tool: orders_customer_list
-    args: { instance: mock, query: { account: "a-1", limit: 5 } }
+    args: { instance: mock, query: { accountId: "a-1", limit: 5 } }
     expect: { ok: true }
 
   - name: refund is a write tool and returns the order
