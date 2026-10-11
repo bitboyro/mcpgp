@@ -24,6 +24,31 @@ Milestones, in order. Each ends with something demonstrable. Scope per item: see
 | **0.2.0** (next) | Passwords in the web UI: **Change password** in the account menu (current password, the new one twice); **Set password** on a person in API & agents, for admins (a temporary password, optionally to be changed at the next sign-in); **Unlock** for accounts locked after wrong passwords. Company accounts show none of this. |
 | TODO, not yet scheduled | Marked TODO in the docs: CLI `diff` (PR comments against the last release), `preview`, `try`, `migrate` (with the first `apiVersion` v2), `--no-color`, `release.versionFrom` other than `contract`, `platform:` in the repository config; git and URL sources on the platform; a native CLI binary |
 
+## Main priorities
+
+Work that matters more than its place in the list suggests; scheduled between releases, not after
+everything else.
+
+**UX and wording review of the platform** (added 2026-10-11). A full pass over the web UI as someone
+new to mcpgp would meet it, from the first sign-in to a released build delivered to a customer:
+
+1. **Walk every page and flow** with a fresh installation and no prior context: where does a new
+   user not know what to do next, what a control will do, or why something happened? Empty states,
+   first-run guidance, order of steps, what is shown before it is needed.
+2. **Inventory the texts** (labels, hints, notes, errors, confirmations) and mark the ones that only
+   make sense with context the user may not have: internal terms (manifest, contract, variant, lock
+   file, pinned version, exposure modes, packs, provenance, instance, `mcpgp://` references, select
+   and exclude entries), spec section names, abbreviations, and hints that explain *how* without
+   *why*.
+3. **Fix**: plain-language copy, a short explanation where a term has to stay (inline, or a "what's
+   this" that links to [concepts.md](../concepts.md)), the same word for the same thing across UI,
+   API errors and docs, and a prioritized list of UX changes that need more than words.
+4. **Check with people**: one or two colleagues who haven't seen the platform try the main flows;
+   what they stumble on goes back into the list.
+
+Outcome: a list of findings with the fixes made, and a wording guide in [../design/ui.md](../design/ui.md)
+so new texts follow it.
+
 Deferred: harness-lab comparison; per-user downstream identity; other languages.
 
 Last, and only after they are thought through (2026-10-11): the issue-tracker, skills and agent-feedback
