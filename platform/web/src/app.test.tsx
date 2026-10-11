@@ -356,3 +356,27 @@ describe('descriptions', () => {
       value: { match: { operationId: 'refundOrder' }, title: { set: 'Refund an order' }, params: { 'path.id': { description: { set: 'The order.' } } } } }] })
   })
 })
+
+describe('trying a tool', () => {
+  it('calls the tool against the mock and shows the result and the request', async () => {
+    const tool = { name: 'orders_order_refund', kind: 'api', title: 'Refund order', description: 'Refunds.',
+      operation: { key: 'orders:POST:/orders/{id}/refund', operationId: 'refundOrder' },
+      inputSchema: { type: 'object', required: ['instance', 'path'], properties: { instance: { type: 'string' }, path: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } } } } }
+    const { calls } = fakeApi({
+      'GET /me': ME,
+      'GET /settings': SETTINGS,
+      'GET /servers/orders-mcp': { id: 'orders-mcp', title: 'Orders', archived: false, latestVersion: 3, versions: [] },
+      'GET /servers/orders-mcp/versions/latest/manifest': { server: { name: 'orders-mcp', version: '2.0.0' }, exposure: { mode: 'plain' }, diagnostics: [], apis: [], tools: [tool] },
+      'POST /servers/orders-mcp/versions/3/try': new Response(JSON.stringify({ result: { structuredContent: { id: 'o-1', status: 'refunded' } },
+        requests: [{ method: 'POST', path: '/api/v2/orders/example/refund', query: null, headers: { accept: 'application/json' }, body: '{}', status: 200 }], leftOut: [] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    })
+    renderAt('/servers/orders-mcp/tools?tool=orders_order_refund')
+    await userEvent.click(await screen.findByRole('button', { name: 'Try it' }))
+    expect((screen.getByLabelText('Arguments') as HTMLTextAreaElement).value).toContain('"instance": "mock"')
+    await userEvent.click(screen.getByRole('button', { name: 'Call the tool' }))
+    expect((await screen.findByLabelText('Result')).textContent).toContain('"status": "refunded"')
+    expect(screen.getByLabelText('Request').textContent).toContain('POST /api/v2/orders/example/refund  → 200')
+    expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ tool: 'orders_order_refund', arguments: { instance: 'mock', path: { id: 'example' } } })
+  })
+})

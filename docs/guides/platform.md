@@ -44,7 +44,9 @@ see, what they may do, target servers, transports, confirmation, packs) can be c
 the preview shows the result before anything is saved, Review shows the lines of the definition that
 change, and Save makes the next version. On Overview, **Notices on tool descriptions** adds company policy or disclaimers to every tool, a
 tag's tools, the tools that change data, or chosen tools; notices are never cut off. On Tools & rules,
-**Edit title and descriptions** on a tool changes its title, description and parameter descriptions
+**Try it** on a tool calls it against a mock of the API (made from the spec's examples; nothing
+reaches a real system) and shows what the agent gets back and the HTTP request the server sent;
+extensions are left out there (`mcpgp test` runs them). **Edit title and descriptions** on a tool changes its title, description and parameter descriptions
 (saved as an inline rule of the definition, shown under "Why it looks like this"; **Back to the spec**
 removes it). On Tools & rules, **Operations** lists every operation of the
 contracts with a switch: on makes it a tool (or resource), off leaves it out, and each operation that

@@ -95,8 +95,12 @@ class TestCommandTest {
                     "tags": { "type": "array", "items": { "enum": ["a", "b"] } }, "note": { "type": ["null", "string"], "example": "hi" },
                     "both": { "allOf": [ { "properties": { "x": { "const": 1 } } }, { "properties": { "y": { "default": true } } } ] } } }
                 """);
-        assertThat(SpecMock.value(schema, 0).toString()).isEqualTo(json.readTree("""
+        assertThat(ro.bitboy.mcpgp.packager.trial.SpecMock.value(schema, 0).toString()).isEqualTo(json.readTree("""
                 { "id": "00000000-0000-4000-8000-000000000000", "n": 3, "tags": ["a"], "note": "hi", "both": { "x": 1, "y": true } }
                 """).toString());
+        // a $ref to a shared schema
+        JsonNode order = json.readTree("{ \"type\": \"object\", \"properties\": { \"status\": { \"enum\": [\"open\", \"paid\"] } } }");
+        assertThat(ro.bitboy.mcpgp.packager.trial.SpecMock.value(json.readTree("{ \"$ref\": \"#/components/schemas/Order\" }"),
+                java.util.Map.of("Order", order), 0).toString()).isEqualTo("{\"status\":\"open\"}");
     }
 }

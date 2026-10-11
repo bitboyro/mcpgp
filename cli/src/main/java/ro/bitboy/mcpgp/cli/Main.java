@@ -10,6 +10,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import ro.bitboy.mcpgp.packager.Minisign;
 import ro.bitboy.mcpgp.packager.Packager;
+import ro.bitboy.mcpgp.packager.trial.MockRun;
 import ro.bitboy.mcpgp.core.Compiler;
 import ro.bitboy.mcpgp.core.diag.Codes;
 import ro.bitboy.mcpgp.core.diag.Diagnostic;
@@ -542,16 +543,16 @@ public final class Main {
                 return INTERNAL;
             }
             Path cases = suite != null ? suite : definition.toAbsolutePath().getParent().resolve("tests");
-            List<Path> files = TestRun.suite(cases);
+            List<Path> files = MockRun.suite(cases);
             if (suite != null && files.isEmpty()) {
                 common.spec.commandLine().getErr().println("error: no test case files (*.yaml) in " + suite);
                 return USAGE;
             }
             Path dir = Files.createTempDirectory("mcpgp-test-");
-            List<TestRun.Outcome> outcomes = new ArrayList<>();
-            try (TestRun run = new TestRun(result.manifest().get(), result.contracts().values(), runtime, dir, result.definition().get().root())) {
+            List<MockRun.Outcome> outcomes = new ArrayList<>();
+            try (MockRun run = new MockRun(result.manifest().get(), result.contracts().values(), runtime, dir, result.definition().get().root())) {
                 String smoke = run.smoke();
-                outcomes.add(new TestRun.Outcome("the server starts and lists its tools", "smoke", smoke));
+                outcomes.add(new MockRun.Outcome("the server starts and lists its tools", "smoke", smoke));
                 if (smoke == null) {
                     for (Path file : files) {
                         outcomes.addAll(run.run(file));
@@ -563,9 +564,9 @@ public final class Main {
             long failed = outcomes.stream().filter(o -> !o.passed()).count();
             PrintWriter out = common.out();
             if (common.json) {
-                out.println(CanonicalJson.compact(TestRun.json(outcomes)));
+                out.println(CanonicalJson.compact(MockRun.json(outcomes)));
             } else {
-                for (TestRun.Outcome o : outcomes) {
+                for (MockRun.Outcome o : outcomes) {
                     if (!o.passed()) {
                         out.println("✗ " + o.file() + ": " + o.name() + ": " + o.problem());
                     } else if (!common.quiet) {

@@ -185,6 +185,11 @@ versions follow [SemVer](https://semver.org).
   manifest; the packager embeds the jars and lists them in OPERATIONS.md (CLI and platform builds);
   the runtime loads only the declared jars, checks their checksums and handler classes at startup,
   and runs filters, enrichers and custom tools where the spec says. Guide: docs/guides/extensions.md.
+- Try a tool against a mock: `POST /servers/{id}/versions/{version}/try` runs the packaged server on
+  the platform against a mock made from the spec (no real system is called; extensions left out) and
+  answers the result and the requests it sent; Tools & rules → Try it. The mock and runner of
+  `mcpgp test` moved to the packager (`ro.bitboy.mcpgp.packager.trial`), and the mock now resolves
+  `$ref`s to shared schemas and records what it receives.
 - Descriptions: `descriptions.notices` add text (company policy, disclaimers) to the descriptions of
   every tool or the tools a selector picks, of every kind, never cut off; rule selectors take `kind`
   and `tool`, so rules reach pack, built-in and custom tools; a too-long description loses spec text

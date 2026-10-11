@@ -7,6 +7,7 @@ import { Chip, ErrorBox, Loading, PageHead, Segmented } from '../ui'
 import { NamingView } from './Naming'
 import { OperationsView } from './Operations'
 import { ToolEdit } from './ToolEdit'
+import { TryTool } from './TryTool'
 import { agentView } from './Overview'
 
 type Filter = 'all' | 'listed' | 'api' | 'pack' | 'builtin'
@@ -106,6 +107,7 @@ export function ToolsPage() {
 function ToolDetail({ id, tool }: { id: string; tool: Tool }) {
   const { can } = useSession()
   const [editing, setEditing] = useState(false)
+  const [trying, setTrying] = useState(false)
   const a = tool.annotations ?? {}
   const marks: [string, boolean | undefined][] = [['read only', a.readOnlyHint], ['destructive', a.destructiveHint], ['idempotent', a.idempotentHint],
     ['asks to confirm', tool.confirm], ['sensitive', tool.sensitive]]
@@ -119,7 +121,14 @@ function ToolDetail({ id, tool }: { id: string; tool: Tool }) {
       </div>
       {tool.description && <p style={{ whiteSpace: 'pre-line' }}>{tool.description}</p>}
       {editing ? <ToolEdit id={id} tool={tool} onClose={() => setEditing(false)} />
-        : can('servers:write') && <button type="button" className="btn btn-sm btn-stage" style={{ alignSelf: 'flex-start' }} onClick={() => setEditing(true)}>Edit title and descriptions</button>}
+        : (
+          <div className="actions">
+            {can('servers:write') && <button type="button" className="btn btn-sm btn-stage" onClick={() => setEditing(true)}>Edit title and descriptions</button>}
+            {can('builds:run') && tool.kind !== 'custom' && <button type="button" className="btn btn-sm btn-stage" aria-pressed={trying} onClick={() => setTrying(!trying)}>
+              {trying ? 'Close the try' : 'Try it'}</button>}
+          </div>
+        )}
+      {trying && !editing && <TryTool id={id} tool={tool} />}
       <div className="actions">
         {marks.filter(([, on]) => on).map(([label]) => <span key={label} className="tag">{label}</span>)}
         {tool.kind !== 'api' && <Chip tone="new">{tool.kind === 'pack' ? `pack ${tool.pack ?? ''}` : 'built-in'}</Chip>}

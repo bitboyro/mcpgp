@@ -41,10 +41,12 @@ public class ServersApi {
     private final ro.bitboy.mcpgp.platform.PlatformConfig config;
     private final ro.bitboy.mcpgp.platform.service.Guardrails guardrails;
     private final Edits edits;
+    private final ro.bitboy.mcpgp.platform.service.Trials trials;
 
     public ServersApi(Store store, Servers servers, Compilation compilation, ro.bitboy.mcpgp.platform.PlatformConfig config,
-                      ro.bitboy.mcpgp.platform.service.Guardrails guardrails, Edits edits) {
+                      ro.bitboy.mcpgp.platform.service.Guardrails guardrails, Edits edits, ro.bitboy.mcpgp.platform.service.Trials trials) {
         this.edits = edits;
+        this.trials = trials;
         this.store = store;
         this.servers = servers;
         this.compilation = compilation;
@@ -156,6 +158,29 @@ public class ServersApi {
     @GetMapping("/{id}/versions/{version}/naming")
     public ResponseEntity<byte[]> naming(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
         return derived(request, id, version, compilation::naming);
+    }
+
+    /**
+     * Calls a tool of the version against a mock of its API (no real system is contacted):
+     * {@code {tool, arguments}} → {@code {result | error, requests, leftOut}}.
+     */
+    @PostMapping("/{id}/versions/{version}/try")
+    public ResponseEntity<byte[]> tryTool(HttpServletRequest request, @PathVariable String id, @PathVariable String version,
+                                          @RequestBody(required = false) byte[] body) {
+        who(request).require("builds:run");
+        if (body != null && body.length > 64 * 1024) {
+            throw ApiException.validation("the arguments are larger than 64 KB");
+        }
+        JsonNode json = Json.parse(body);
+        String tool = json.path("tool").asText("");
+        if (tool.isEmpty()) {
+            throw ApiException.validation("tool: the tool to call");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> arguments = json.path("arguments").isObject()
+                ? new com.fasterxml.jackson.databind.ObjectMapper().convertValue(json.path("arguments"), Map.class) : Map.of();
+        Model.VersionRef ref = servers.version(servers.get(id), version);
+        return Json.ok(trials.call(servers.files(ref), ref.created(), tool, arguments));
     }
 
     /** The definition as data: the root file as written, and the result with what it extends and includes merged in. */
