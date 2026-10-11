@@ -88,8 +88,12 @@ public final class ApiModel {
 
     /**
      * @param encoding for multipart and form bodies: allowed content types per part name
+     * @param example  the media type's example ({@code example}, or the first of {@code examples}); null if none
      */
-    public record MediaType(String name, JsonNode schema, Map<String, List<String>> encoding) {
+    public record MediaType(String name, JsonNode schema, Map<String, List<String>> encoding, JsonNode example) {
+        public MediaType(String name, JsonNode schema, Map<String, List<String>> encoding) {
+            this(name, schema, encoding, null);
+        }
     }
 
     /** One response status with its media types ({@code status} is "200", "2XX" or "default"). */

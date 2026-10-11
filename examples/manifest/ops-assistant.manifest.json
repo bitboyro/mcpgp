@@ -5,7 +5,7 @@
         {
           "basePath": "/api/v2",
           "default": true,
-          "digest": "sha256:535d848c8812c9c937320af75cce9931e51f0817225e65cb5e6b17fe6d4f8859",
+          "digest": "sha256:df7e73122cf4a6ea6b22e1141cd6296e333033183e716b0a1fe8cad116e87e04",
           "format": "openapi-3.1",
           "version": "2.0"
         }
@@ -90,7 +90,7 @@
     "cli": "0.1.0",
     "createdAt": "2026-10-10T12:00:00Z",
     "definition": {
-      "digest": "sha256:adf60b86f7f37fa970ca30767b2a1ea43b4c2a14e59b85b6968ad49d8f78bdb8",
+      "digest": "sha256:12bfccd17b2ba50180424e1aaac55d788b505d7e0a6b31b961d2b849f4bb3b8c",
       "name": "ops-assistant"
     },
     "extends": null,

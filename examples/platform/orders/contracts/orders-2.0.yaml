@@ -197,6 +197,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Order' }
+              example: { id: o-1001, customerId: c-1, status: refunded, total: 25 }
         default: { $ref: '#/components/responses/Problem' }
   /invoices/overdue:
     get:

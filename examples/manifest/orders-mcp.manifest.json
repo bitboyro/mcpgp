@@ -12,7 +12,7 @@
         {
           "basePath": "/api/v2",
           "default": true,
-          "digest": "sha256:22ed3cc09afaccb368cdae8f147aeba57d5cf985a05b3741bcae8b3a2bcda9a5",
+          "digest": "sha256:82b1d8e46ee1ccb6f0d4dda91076c8f426b6e4a7c8ecbe4aab5a887125200bba",
           "format": "openapi-3.1",
           "version": "2.0"
         }
@@ -54,7 +54,7 @@
     "cli": "0.1.0",
     "createdAt": "2026-10-09T10:40:00Z",
     "definition": {
-      "digest": "sha256:b4e5df26e772bc7c427155a46d29cd8c50a4feb9b63a3c0069b7e68ad6fadb85",
+      "digest": "sha256:1ac717676b7c51e0ffa47ad10a874a680fc1b69782f98a5db0dc8bc329352ec6",
       "name": "orders-mcp",
       "source": "git+https://git.example.com/integration/mcp-defs.git#9c41e7a"
     },

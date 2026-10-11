@@ -152,6 +152,13 @@ versions follow [SemVer](https://semver.org).
   placeholders checked); the runtime serves `prompts/list`, `prompts/get` and `completion/complete`
   for enum arguments. Progress: `notifications/progress` every second during upstream calls when the
   client sent a `progressToken`.
+- CLI: `mcpgp init [--from-spec <file|url>]` scaffolds a definition project (and a first
+  `tests/smoke.yaml`); `mcpgp test` starts the packaged runtime in stdio mode against a mock made
+  from the specs (response examples, else values from the schemas) and runs a smoke check and the
+  test cases (exit code 4 on failures); `mcpgp push` uploads the files the definition uses as the
+  server's next version on a platform (`MCPGP_TOKEN`), with `--build`, `--verify-local` (the
+  platform's build must give agents the same as the local compile) and `--release`.
+- Compiler model: media types keep their `example` (or first of `examples`).
 
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
