@@ -2,8 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, type Change } from '../api'
-import { nameRows, policyLines, unusedLockEntries, vocabulary, type NameRow } from '../naming'
-import { apiPrefix, removeWord, renames, serverPrefix, setWord, switchOff, validPrefix, validWord, vocabularyPath, wordsKey } from '../namingEdits'
+import { methodVerbs, nameRows, policyLines, unusedLockEntries, vocabulary, type NameRow } from '../naming'
+import { apiPrefix, methodVerb, removeWord, validVerb, renames, serverPrefix, setWord, switchOff, validPrefix, validWord, vocabularyPath, wordsKey } from '../namingEdits'
 import { useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
 import { ErrorBox, Loading, Segmented } from '../ui'
@@ -151,6 +151,17 @@ export function NamingView({ id }: { id: string }) {
                   onPick={(v) => put(v ? `server prefix ${v}` : 'no server prefix', serverPrefix(v), v === (naming.data!.effective.namespace?.server ?? ''))} />
               </div>
             )}
+            <div className="card">
+              <h2>Verbs from HTTP methods</h2>
+              <p className="hint">Used when an operation has no operationId: the name is the path's nouns and this verb
+                (<span className="mono">PUT /customers/{'{id}'}</span> → <span className="mono">customer_{methodVerbs(naming.data).find((v) => v.method === 'PUT')!.verb}</span>).</p>
+              <div className="filters">
+                {methodVerbs(naming.data).map((v) => (
+                  <WordField key={v.method + (pending[methodVerb(v.method, '').path] ? '*' : '')} label={v.label} current={v.verb} own={v.own && !!naming.data!.extends}
+                    disabled={!editable} onPick={(w) => put(`${v.label} → ${w}`, methodVerb(v.method, w), w === v.verb)} />
+                ))}
+              </div>
+            </div>
             <div className="card">
               <h2>Vocabulary</h2>
               <p className="hint">Words in names that become other words, after the name is shaped.</p>
@@ -308,6 +319,26 @@ function PrefixField({ label, current, disabled, required, onPick }: {
         onChange={(e) => setValue(e.target.value.trim().toLowerCase())} onBlur={pick}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); pick() } }} />
       {!ok && <span className="hint">Lowercase letters, digits and _, starting with a letter (at most 32).</span>}
+    </label>
+  )
+}
+
+/** One method's verb: a short input that reports a valid word when it leaves the field (or on Enter). */
+function WordField({ label, current, own, disabled, onPick }: {
+  label: string
+  current: string
+  own: boolean
+  disabled: boolean
+  onPick: (value: string) => void
+}) {
+  const [value, setValue] = useState(current)
+  const ok = validVerb(value)
+  const pick = () => { if (ok) onPick(value) }
+  return (
+    <label className="field" style={{ flex: '1 1 140px' }}><span>{label}{own && <> <span className="tag">this server</span></>}</span>
+      <input className="input mono" value={value} disabled={disabled} aria-invalid={!ok}
+        onChange={(e) => setValue(e.target.value.trim().toLowerCase())} onBlur={pick}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); pick() } }} />
     </label>
   )
 }

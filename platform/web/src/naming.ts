@@ -56,11 +56,24 @@ export function policyLines(naming: NamingInfo): PolicyLine[] {
     { label: 'Words split at', value: (e.normalize?.split ?? ['camel', 'pascal', 'kebab', 'dot', 'slash']).map((s) => SPLIT[s] ?? s).join(', '), own: own.normalize?.split !== undefined },
     { label: 'Words dropped', value: (e.normalize?.dropWords ?? []).join(', ') || 'none', own: own.normalize?.dropWords !== undefined },
     { label: 'Shape', value: `${order === 'verb_object' ? 'verb, then noun' : 'noun, then verb'} (${casing === 'camel' ? example.replace(/_(\w)/g, (_, c: string) => c.toUpperCase()) : casing === 'kebab' ? example.replace('_', '-') : example}), ${e.shape?.number === 'plural' ? 'plural' : 'singular'} nouns`, own: own.shape !== undefined },
+    { label: 'Verbs from methods', value: METHOD_VERBS.map(([m, fallback]) => `${m === 'LIST' ? 'GET list' : m} ${e.methodVerbs?.[m] ?? fallback}`).join(', '), own: own.methodVerbs !== undefined },
     { label: 'Prefixes', value: [e.namespace?.perApi === false ? 'no API prefix in single-API servers' : 'the API\'s toolPrefix', e.namespace?.server ? `then ${e.namespace.server}_` : ''].filter(Boolean).join(', '), own: own.namespace !== undefined },
     { label: 'Limits', value: profile === 'strict' ? 'at most 64 characters, a–z 0–9 _' : 'at most 128 characters, letters, digits, _ . -', own: own.limits?.profile !== undefined },
     { label: 'Too long', value: (e.limits?.onTooLong ?? 'shorten-then-hash') === 'error' ? 'an error' : 'shortened, then hashed', own: own.limits?.onTooLong !== undefined },
     { label: 'Same name twice', value: (e.collisions ?? 'error') === 'suffix-number' ? 'numbered (_2, _3)' : 'an error', own: own.collisions !== undefined },
   ]
+}
+
+export const METHOD_VERBS: [string, string, string][] = [
+  ['LIST', 'list', 'GET on a collection'], ['GET', 'get', 'GET on one item'], ['POST', 'create', 'POST'],
+  ['PUT', 'replace', 'PUT'], ['PATCH', 'update', 'PATCH'], ['DELETE', 'delete', 'DELETE'],
+]
+
+/** The verb names get from each HTTP method (when there's no operationId), and whether the server sets it. */
+export function methodVerbs(naming: NamingInfo): { method: string; label: string; verb: string; own: boolean }[] {
+  return METHOD_VERBS.map(([method, fallback, label]) => ({
+    method, label, verb: naming.effective.methodVerbs?.[method] ?? fallback, own: naming.own.methodVerbs?.[method] !== undefined,
+  }))
 }
 
 /** Vocabulary entries, with where each one comes from. */

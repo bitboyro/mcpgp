@@ -34,6 +34,12 @@ export function removeWord(words: string): Change {
   return { op: 'remove', path: vocabularyPath(words) }
 }
 
+export const validVerb = (value: string) => /^[a-z][a-z0-9]{0,31}$/.test(value)
+
+export function methodVerb(method: string, verb: string): Change {
+  return { op: 'set', path: `/naming/methodVerbs/${method}`, value: verb }
+}
+
 export function apiPrefix(api: string, prefix: string): Change {
   return { op: 'set', path: `/apis/[id=${api}]/toolPrefix`, value: prefix }
 }
