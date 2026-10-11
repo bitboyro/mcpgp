@@ -16,7 +16,7 @@ import java.util.Set;
  */
 public final class Library {
 
-    public static final Set<String> KINDS = Set.of("contracts", "naming", "rules", "packs", "templates");
+    public static final Set<String> KINDS = Set.of("contracts", "naming", "rules", "notices", "packs", "templates");
 
     private final Store store;
     private final Projects projects;
@@ -34,6 +34,7 @@ public final class Library {
             throw new ApiException(409, "CONFLICT", kind + "/" + name + " exists; add a version instead");
         }
         Model.Version version = projects.storeItem(body, contentType, root);
+        checkContent(kind, version);
         String now = Instant.now().toString();
         Model.LibraryItem item = store.saveLibraryItem(new Model.LibraryItem(kind, name, title == null ? name : title, now, now,
                 List.of(new Model.VersionRef(1, version.digest(), message, who.identity().name(), now)), 0), -1);
@@ -44,6 +45,7 @@ public final class Library {
     public Model.LibraryItem addVersion(String kind, String name, String root, byte[] body, String contentType, String message, Access.Principal who) {
         Model.LibraryItem item = get(kind, name);
         Model.Version version = projects.storeItem(body, contentType, root);
+        checkContent(kind, version);
         if (item.latest() != null && item.latest().digest().equals(version.digest())) {
             return item;
         }
@@ -62,17 +64,46 @@ public final class Library {
         return saved;
     }
 
-    /** An edit of a naming policy: the edited file, the schema's problems with it (empty when it's valid). */
+    /** Shared notices must match their schema (servers would fail to compile otherwise); other kinds are checked where they're used. */
+    private void checkContent(String kind, Model.Version version) {
+        if (!kind.equals("notices")) {
+            return;
+        }
+        List<String> problems = problems(kind, new String(store.blob(version.files().get(version.root())), java.nio.charset.StandardCharsets.UTF_8));
+        if (!problems.isEmpty()) {
+            throw new ApiException(422, "VALIDATION", "not a valid set of notices: " + String.join("; ", problems));
+        }
+    }
+
+    /** The schema's problems with an item's root file (naming policies and shared notices). */
+    private List<String> problems(String kind, String text) {
+        List<String> problems = new ArrayList<>();
+        try {
+            com.fasterxml.jackson.databind.JsonNode doc = new com.fasterxml.jackson.databind.ObjectMapper(
+                    new com.fasterxml.jackson.dataformat.yaml.YAMLFactory()).readTree(text);
+            if (doc == null) {
+                return List.of("the file is empty");
+            }
+            schemas.problems(kind.equals("notices") ? ro.bitboy.mcpgp.schemas.SchemaKind.NOTICES : ro.bitboy.mcpgp.schemas.SchemaKind.NAMING_POLICY, doc)
+                    .forEach(p -> problems.add((p.pointer() == null || p.pointer().isEmpty() ? "" : p.pointer() + ": ") + p.message()));
+        } catch (java.io.IOException e) {
+            problems.add("not valid YAML: " + e.getMessage());
+        }
+        return problems;
+    }
+
+    /** An edit of a naming policy or a set of shared notices: the edited file, the schema's problems with it (empty when it's valid). */
     public record Edit(String text, List<String> problems) {
     }
 
     /**
-     * Applies changes to the latest version of a naming policy (spec/platform-api.md §2.3), keeping the
-     * file's comments and layout like server edits; {@code base} must be the latest version number.
+     * Applies changes to the latest version of a naming policy or a set of shared notices
+     * (spec/platform-api.md §2.3), keeping the file's comments and layout like server edits; {@code base}
+     * must be the latest version number.
      */
     public Edit preview(String kind, String name, int base, List<YamlEdit.Change> changes) {
-        if (!kind.equals("naming")) {
-            throw ApiException.validation("only naming policies can be edited on the platform; add a version of " + kind + " items instead");
+        if (!kind.equals("naming") && !kind.equals("notices")) {
+            throw ApiException.validation("only naming policies and shared notices can be edited on the platform; add a version of " + kind + " items instead");
         }
         if (changes == null || changes.isEmpty()) {
             throw ApiException.validation("changes: at least one");
@@ -84,23 +115,15 @@ public final class Library {
         }
         Model.Version files = store.version(item.latest().digest()).orElseThrow();
         String text = YamlEdit.apply(new String(store.blob(files.files().get(files.root())), java.nio.charset.StandardCharsets.UTF_8), changes);
-        List<String> problems = new ArrayList<>();
-        try {
-            com.fasterxml.jackson.databind.JsonNode policy = new com.fasterxml.jackson.databind.ObjectMapper(
-                    new com.fasterxml.jackson.dataformat.yaml.YAMLFactory()).readTree(text);
-            schemas.problems(ro.bitboy.mcpgp.schemas.SchemaKind.NAMING_POLICY, policy)
-                    .forEach(p -> problems.add((p.pointer() == null || p.pointer().isEmpty() ? "" : p.pointer() + ": ") + p.message()));
-        } catch (java.io.IOException e) {
-            problems.add("not valid YAML: " + e.getMessage());
-        }
-        return new Edit(text, List.copyOf(problems));
+        return new Edit(text, List.copyOf(problems(kind, text)));
     }
 
-    /** Saves an edit of a naming policy as its next version; refused when the result isn't a valid policy. */
+    /** Saves an edit of a naming policy or shared notices as its next version; refused when the result isn't valid. */
     public Model.LibraryItem saveEdit(String kind, String name, int base, List<YamlEdit.Change> changes, String message, Access.Principal who) {
         Edit edit = preview(kind, name, base, changes);
         if (!edit.problems().isEmpty()) {
-            throw new ApiException(422, "VALIDATION", "with these changes the policy isn't valid: " + String.join("; ", edit.problems()));
+            throw new ApiException(422, "VALIDATION", "with these changes the " + (kind.equals("naming") ? "policy" : "set of notices")
+                    + " isn't valid: " + String.join("; ", edit.problems()));
         }
         Model.Version files = store.version(get(kind, name).latest().digest()).orElseThrow();
         byte[] body;
@@ -112,7 +135,10 @@ public final class Library {
         return addVersion(kind, name, files.root(), body, "application/json", message, who);
     }
 
-    /** The servers whose latest version extends this naming policy, and the version each one pins (null: the latest). */
+    /**
+     * The servers whose latest version uses this item, and the version each one pins (null: the latest):
+     * naming policies through {@code naming.extends}, shared notices through {@code descriptions.include}.
+     */
     public List<Map<String, Object>> usedBy(String kind, String name, String workspace) {
         java.util.regex.Pattern reference = java.util.regex.Pattern.compile("^mcpgp://" + java.util.regex.Pattern.quote(workspace) + "/"
                 + java.util.regex.Pattern.quote(kind) + "/" + java.util.regex.Pattern.quote(name) + "(?:@(\\w+))?$");
@@ -127,13 +153,23 @@ public final class Library {
                 continue;
             }
             try {
-                String ref = yaml.readTree(store.blob(files.files().get(files.root()))).at("/naming/extends").asText("");
-                java.util.regex.Matcher m = reference.matcher(ref);
-                if (m.matches()) {
-                    Map<String, Object> user = new java.util.LinkedHashMap<>();
-                    user.put("server", server.id());
-                    user.put("pinned", m.group(1) == null || m.group(1).equals("latest") ? null : m.group(1));
-                    users.add(user);
+                com.fasterxml.jackson.databind.JsonNode doc = yaml.readTree(store.blob(files.files().get(files.root())));
+                List<String> refs = new ArrayList<>();
+                com.fasterxml.jackson.databind.JsonNode used = doc.at(kind.equals("notices") ? "/descriptions/include" : "/naming/extends");
+                if (used.isTextual()) {
+                    refs.add(used.asText());
+                } else {
+                    used.forEach(r -> refs.add(r.asText()));
+                }
+                for (String ref : refs) {
+                    java.util.regex.Matcher m = reference.matcher(ref);
+                    if (m.matches()) {
+                        Map<String, Object> user = new java.util.LinkedHashMap<>();
+                        user.put("server", server.id());
+                        user.put("pinned", m.group(1) == null || m.group(1).equals("latest") ? null : m.group(1));
+                        users.add(user);
+                        break;
+                    }
                 }
             } catch (java.io.IOException e) {
                 // not readable: it doesn't compile either

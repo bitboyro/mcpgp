@@ -14,11 +14,13 @@ import java.util.Map;
  * @param file       the root definition file
  * @param root       the project root (the root file's directory)
  * @param document   the merged definition; {@code api} is normalized to {@code apis}; {@code extends},
- *                   {@code overrides} and {@code naming.extends} are removed
+ *                   {@code overrides}, {@code naming.extends} and {@code descriptions.include} are removed
+ *                   (included notices are in {@code descriptions.notices})
  * @param rules      every rule in application order, with where it came from
  * @param contracts  each contract's spec file and overlay files
  * @param parent     the parent's name, for variants; null otherwise
  * @param files      every file read, for digests
+ * @param noticeSources for notices that came from {@code descriptions.include}: notice id → the reference
  */
 public record ResolvedDefinition(
         Path file,
@@ -27,7 +29,13 @@ public record ResolvedDefinition(
         List<SourcedRule> rules,
         Map<ContractKey, ContractFiles> contracts,
         String parent,
-        List<Path> files) {
+        List<Path> files,
+        Map<String, String> noticeSources) {
+
+    public ResolvedDefinition(Path file, Path root, ObjectNode document, List<SourcedRule> rules, Map<ContractKey, ContractFiles> contracts,
+                              String parent, List<Path> files) {
+        this(file, root, document, rules, contracts, parent, files, Map.of());
+    }
 
     /** A rule and where it was declared. */
     public record SourcedRule(ObjectNode rule, Location location) {

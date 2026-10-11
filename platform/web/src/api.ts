@@ -170,6 +170,8 @@ export interface LibraryItem {
   updated: string
   /** Naming policies: the policy as data, and the servers that extend it (`pinned`: the version they pin, null for the latest). */
   policy?: NamingPolicy | null
+  /** Shared notices: the set as data; `usedBy` lists the servers that include it. */
+  set?: NoticeSet | null
   root?: string
   usedBy?: { server: string; pinned: string | null }[]
 }
@@ -286,9 +288,17 @@ export interface Rule {
 /** The definition as data: the root file as written, and the result with what it extends and includes. */
 export interface DefinitionData {
   version?: number
-  root: { descriptions?: { notices?: Notice[] }; overrides?: { rules?: Rule[] }; [key: string]: unknown }
+  root: { descriptions?: { include?: string | string[]; notices?: Notice[] }; overrides?: { rules?: Rule[] }; [key: string]: unknown }
   resolved: { descriptions?: { notices?: Notice[] }; [key: string]: unknown }
+  /** Notices from `descriptions.include`: notice id → the shared item, `mcpgp://acme/notices/company-policy@1`. */
+  noticeSources?: Record<string, string>
 }
+
+/** A set of shared notices, the library kind `notices` (definition-format.md §5.1). */
+export interface NoticeSet { title?: string; notices: Notice[] }
+
+/** What applying shared notices did to one server. */
+export interface ApplyResult { server: string; status: 'updated' | 'unchanged' | 'inherited' | 'failed'; version?: number; from?: string; error?: string }
 
 /** What a build of a version will contain, before building it (packaging.md). */
 export interface PackagePreview {
@@ -395,6 +405,10 @@ export const api = {
     json<LibraryEditPreview>('POST', `/library/${enc(kind)}/${enc(name)}/edits`, { base, changes, dryRun: true }),
   saveLibraryEdit: (kind: string, name: string, base: number, changes: Change[], message?: string) =>
     json<LibraryItem>('POST', `/library/${enc(kind)}/${enc(name)}/edits`, { base, changes, message }),
+  createLibraryItem: (kind: string, name: string, title: string, files: Record<string, string>) =>
+    json<LibraryItem>('POST', `/library/${enc(kind)}` + q({ name, title }), { files }),
+  applyNotices: (name: string, body: { servers?: string[]; version?: number; message?: string }) =>
+    json<{ results: ApplyResult[] }>('POST', `/library/notices/${enc(name)}/apply`, body),
 
   identities: () => json<Items<Identity>>('GET', '/identities'),
   createIdentity: (body: { kind: string; name: string; role?: string; scopes?: string[] }) => json<Identity>('POST', '/identities', body),

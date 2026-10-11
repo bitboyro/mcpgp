@@ -288,7 +288,8 @@
         "line": { "type": "integer" },
         "pointer": { "type": "string" },
         "op": { "type": "string" },
-        "since": { "type": "string" }
+        "since": { "type": "string" },
+        "from": { "type": "string", "description": "The shared item the step comes from, as referenced: mcpgp://<workspace>/<kind>/<name>@<version>." }
       },
       "required": ["step"],
       "additionalProperties": false

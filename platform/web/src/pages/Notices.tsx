@@ -1,6 +1,9 @@
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import type { Change, DefinitionData, Manifest, Notice } from '../api'
+import { Link } from 'react-router-dom'
+import { api, type Change, type DefinitionData, type Manifest, type Notice } from '../api'
 import { describeScope, noticeId, noticePath, removeNotice, scopeMatch, scopeOf, setNotice, type Scope } from '../descriptions'
+import { INCLUDE_PATH, includeChange, includeList, noticeRef, parseNoticeRef, withSet, withoutSet } from '../sharedNotices'
 import { Segmented } from '../ui'
 
 interface Props {
@@ -24,7 +27,18 @@ export function NoticesCard({ manifest, definition, editable, pending, pick }: P
   const [tag, setTag] = useState('')
   const [chosen, setChosen] = useState<string[]>([])
 
+  const library = useQuery({ queryKey: ['library'], queryFn: api.library })
+  const [adding, setAdding] = useState('')
   const own = new Set((definition?.root.descriptions?.notices ?? []).map((n) => n.id))
+  const sources = definition?.noticeSources ?? {}
+  // the shared sets this server includes, with what is about to change
+  const writtenSets = includeList(definition?.root.descriptions?.include)
+  const sets = pending[INCLUDE_PATH] ? (pending[INCLUDE_PATH].change.op === 'remove' ? [] : (pending[INCLUDE_PATH].change.value as string[])) : writtenSets
+  const offered = (library.data?.items ?? []).filter((i) => i.kind === 'notices' && !sets.some((r) => parseNoticeRef(r)?.name === i.name))
+  const pickSets = (next: string[], label: string) => {
+    const change = includeChange(writtenSets, next)
+    pick(INCLUDE_PATH, label, change === null, change ?? { op: 'set', path: INCLUDE_PATH, value: next })
+  }
   const notices: Notice[] = [...(definition?.resolved.descriptions?.notices ?? [])]
   for (const p of Object.values(pending)) {
     const id = /\[id=([^\]]+)]$/.exec(p.change.path)?.[1]
@@ -66,15 +80,63 @@ export function NoticesCard({ manifest, definition, editable, pending, pick }: P
       </div>
       <p className="hint">Company policy, disclaimers: text added to the descriptions of every tool or of chosen tools. Never cut off;
         a long description is shortened to make room.</p>
+      <div className="rows" aria-label="Shared notices">
+        {sets.map((ref) => {
+          const parsed = parseNoticeRef(ref)
+          const item = (library.data?.items ?? []).find((i) => i.kind === 'notices' && i.name === parsed?.name)
+          const latest = item?.versions.at(-1)?.number
+          return (
+            <div key={ref} className="row" style={{ background: 'none', padding: '6px 0' }}>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                Shared: {parsed && item ? <Link to={`/library?notices=${parsed.name}`}>{item.title}</Link> : <span className="mono">{ref}</span>}
+                {' '}<span className="meta mono">{parsed ? `@${parsed.version ?? 'latest'}` : ''}</span>
+                {pending[INCLUDE_PATH] && !writtenSets.includes(ref) && <> <span className="tag">changed</span></>}
+              </span>
+              {editable && parsed && (
+                <span className="actions">
+                  {latest !== undefined && parsed.version !== null && parsed.version !== String(latest) && library.data && (
+                    <button type="button" className="btn btn-sm" onClick={() => pickSets(withSet(sets, noticeRef(library.data!.workspace, parsed.name, latest)),
+                      `shared notices ${parsed.name} → @${latest}`)}>Use @{latest}</button>
+                  )}
+                  <button type="button" className="btn btn-sm" onClick={() => pickSets(withoutSet(sets, parsed.name), `stop using shared notices ${parsed.name}`)}>Remove</button>
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      {editable && offered.length > 0 && library.data && (
+        <form className="filters" aria-label="Use shared notices" onSubmit={(e) => {
+          e.preventDefault()
+          const item = offered.find((i) => i.name === adding)
+          const latest = item?.versions.at(-1)?.number
+          if (!item || latest === undefined) return
+          pickSets(withSet(sets, noticeRef(library.data!.workspace, item.name, latest)), `use shared notices ${item.name}@${latest}`)
+          setAdding('')
+        }}>
+          <label className="field" style={{ flex: '1 1 200px' }}>Shared notices from the library
+            <select className="input" value={adding} onChange={(e) => setAdding(e.target.value)}>
+              <option value="">Choose…</option>
+              {offered.map((i) => <option key={i.name} value={i.name}>{i.title} (notices/{i.name})</option>)}
+            </select>
+          </label>
+          <button type="submit" className="btn btn-sm" style={{ alignSelf: 'flex-end' }} disabled={!adding}>Use</button>
+        </form>
+      )}
       {notices.length === 0 && editing === null && <p className="empty">No notices.</p>}
       <div className="rows">
-        {notices.map((n) => (
-          <div key={n.id} className="row" style={{ background: 'none', padding: '10px 0', alignItems: 'flex-start' }}>
+        {notices.map((n) => {
+          // a notice of a set that is about to be removed goes with it
+          const gone = !!sources[n.id] && !sets.some((r) => r === sources[n.id] || parseNoticeRef(r)?.name === parseNoticeRef(sources[n.id])?.name)
+          return (
+          <div key={n.id} className="row" style={{ background: 'none', padding: '10px 0', alignItems: 'flex-start', ...(gone ? { textDecoration: 'line-through', opacity: 0.6 } : {}) }}>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ overflowWrap: 'anywhere' }}>{n.text}</span><br />
               <span className="hint">{n.position === 'prepend' ? 'before' : 'after'} the description of {describeScope(n.match)}</span>
               {pending[noticePath(n.id)] && <> <span className="tag">changed</span></>}
-              {!own.has(n.id) && !pending[noticePath(n.id)] && <> <span className="tag">inherited</span></>}
+              {!own.has(n.id) && !pending[noticePath(n.id)] && (sources[n.id]
+                ? <> <span className="tag">from {sources[n.id].replace(/^mcpgp:\/\/[^/]+\/notices\//, '')}</span></>
+                : <> <span className="tag">inherited</span></>)}
             </span>
             {editable && editing === null && (own.has(n.id) || pending[noticePath(n.id)]) && (
               <span className="actions">
@@ -83,7 +145,8 @@ export function NoticesCard({ manifest, definition, editable, pending, pick }: P
               </span>
             )}
           </div>
-        ))}
+          )
+        })}
       </div>
       {editing !== null && (
         <form className="list" aria-label="Notice" onSubmit={(e) => { e.preventDefault(); if (valid) save() }}>

@@ -97,19 +97,13 @@
       "type": "object",
       "description": "Text added to tool descriptions (definition-format.md §5.1).",
       "properties": {
+        "include": {
+          "$ref": "#/$defs/stringOrList",
+          "description": "Shared notices: mcpgp://<workspace>/notices/<name>@<version> library items (or files in the project); their notices come first, and a notice of this definition with the same id replaces one."
+        },
         "notices": {
           "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string", "pattern": "^[A-Za-z0-9:._-]{1,128}$" },
-              "text": { "type": "string", "minLength": 1, "maxLength": 500 },
-              "position": { "enum": ["append", "prepend"] },
-              "match": { "$ref": "#/$defs/selector" }
-            },
-            "required": ["text"],
-            "additionalProperties": false
-          }
+          "items": { "$ref": "#/$defs/notice" }
         }
       },
       "additionalProperties": false
@@ -258,6 +252,18 @@
       },
       "additionalProperties": false,
       "minProperties": 1
+    },
+
+    "notice": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9:._-]{1,128}$" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "position": { "enum": ["append", "prepend"] },
+        "match": { "$ref": "#/$defs/selector" }
+      },
+      "required": ["text"],
+      "additionalProperties": false
     },
 
     "httpMethod": { "enum": ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH", "TRACE", "QUERY"] },

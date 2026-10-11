@@ -321,8 +321,8 @@ paths:
     post:
       operationId: editLibraryItem
       tags: [library]
-      summary: Edit naming policy
-      description: Changes the latest version of a naming policy (base) and saves it as the next version; with dryRun, returns the edited file, its problems and the servers that use it.
+      summary: Edit naming policy or notices
+      description: Changes the latest version of a naming policy or a set of shared notices (base) and saves it as the next version; with dryRun, returns the edited file, its problems and the servers that use it.
       requestBody:
         required: true
         content:
@@ -341,6 +341,48 @@ paths:
       responses:
         "200": { description: The dry run's result, content: { application/json: { schema: { type: object } } } }
         "201": { description: The new version, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /library/{kind}/{name}/apply:
+    parameters:
+      - { $ref: "#/components/parameters/Kind" }
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: applySharedNotices
+      tags: [library]
+      summary: Apply shared notices
+      description: >
+        Shared notices (kind notices) on servers: adds mcpgp://<workspace>/notices/<name>@<version> to each
+        server's descriptions.include, or moves servers that include it to that version. Without servers,
+        every server that isn't archived; without version, the latest. Each changed server gets its next
+        version; variants of a chosen server inherit the notices. Needs servers:write.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                servers: { type: array, items: { type: string } }
+                version: { type: integer }
+                message: { type: string }
+      responses:
+        "200":
+          description: What happened to each server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        server: { type: string }
+                        status: { enum: [updated, unchanged, inherited, failed] }
+                        version: { type: integer }
+                        from: { type: string }
+                        error: { type: string }
         default: { $ref: "#/components/responses/Problem" }
   /library/{kind}/{name}/versions:
     parameters: [ { $ref: "#/components/parameters/Kind" }, { name: name, in: path, required: true, schema: { type: string } } ]
@@ -696,7 +738,7 @@ components:
     ServerId: { name: id, in: path, required: true, schema: { type: string } }
     Version: { name: version, in: path, required: true, description: A version number or latest, schema: { type: string } }
     BuildId: { name: build, in: path, required: true, schema: { type: string } }
-    Kind: { name: kind, in: path, required: true, schema: { enum: [contracts, naming, rules, packs, templates] } }
+    Kind: { name: kind, in: path, required: true, schema: { enum: [contracts, naming, rules, notices, packs, templates] } }
     IfMatch: { name: If-Match, in: header, description: The server's ETag, for optimistic concurrency, schema: { type: string } }
   responses:
     Problem:

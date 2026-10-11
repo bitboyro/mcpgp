@@ -38,7 +38,9 @@ class DescriptionsApiTest extends PlatformTestBase {
         JsonNode manifest = json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null)));
         assertThat(tool(manifest, "orders_customer_list").path("description").asText()).endsWith("Company policy: customer data stays in the EU.");
         assertThat(tool(manifest, "orders_account_list").path("title").asText()).isEqualTo("Accounts");
-        assertThat(tool(manifest, "orders_account_list").path("description").asText()).isEqualTo("Every account.");
+        // the rule's text, then the shared policy orders-mcp includes (acme-policy)
+        assertThat(tool(manifest, "orders_account_list").path("description").asText())
+                .isEqualTo("Every account.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.");
 
         JsonNode definition = json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/definition", null)));
         assertThat(definition.at("/root/descriptions/notices/0/id").asText()).isEqualTo("policy");

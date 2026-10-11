@@ -152,6 +152,9 @@ public final class Compilation {
                 throw new UncheckedIOException(e);
             }
             answer.set("resolved", result.definition().orElseThrow().document().deepCopy());
+            // notices from descriptions.include: id → the shared item they come from
+            com.fasterxml.jackson.databind.node.ObjectNode sources = answer.putObject("noticeSources");
+            result.definition().get().noticeSources().forEach(sources::put);
             return answer;
         });
     }

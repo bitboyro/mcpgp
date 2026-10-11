@@ -64,7 +64,7 @@ public final class DefinitionResolver {
     }
 
     /** A definition file after its own resolution and its parent's merge. */
-    private record Partial(ObjectNode document, List<SourcedRule> rules, String parent) {
+    private record Partial(ObjectNode document, List<SourcedRule> rules, String parent, Map<String, String> noticeSources) {
     }
 
     /** State of one resolution run. */
@@ -102,6 +102,13 @@ public final class DefinitionResolver {
                 document = (ObjectNode) expanded;
 
                 resolveNaming(document, file, root, location);
+                Set<String> ownNotices = new HashSet<>();
+                document.at("/descriptions/notices").forEach(n -> {
+                    if (n.hasNonNull("id")) {
+                        ownNotices.add(n.get("id").asText());
+                    }
+                });
+                Map<String, String> noticeSources = resolveNotices(document, file, root, location);
                 List<SourcedRule> rules = collectRules(document.path("overrides"), file, root, location);
                 document.remove("overrides");
                 resolveContracts(document, file, root, location);
@@ -124,8 +131,13 @@ public final class DefinitionResolver {
                     List<SourcedRule> combined = new ArrayList<>(p.rules());
                     combined.addAll(rules);
                     rules = combined;
+                    // the parent's included notices stay included, unless this definition replaces them
+                    Map<String, String> sources = new LinkedHashMap<>(p.noticeSources());
+                    sources.keySet().removeAll(ownNotices);
+                    sources.putAll(noticeSources);
+                    noticeSources = sources;
                 }
-                return Optional.of(new Partial(document, rules, parent));
+                return Optional.of(new Partial(document, rules, parent, Map.copyOf(noticeSources)));
             } finally {
                 stack.pop();
             }
@@ -176,7 +188,7 @@ public final class DefinitionResolver {
                 return Optional.empty();
             }
             return Optional.of(new ResolvedDefinition(file, primaryRoot, document, List.copyOf(partial.rules()),
-                    Map.copyOf(contracts), partial.parent(), List.copyOf(files)));
+                    Map.copyOf(contracts), partial.parent(), List.copyOf(files), partial.noticeSources()));
         }
 
         // ---------------------------------------------------------------- pieces
@@ -212,6 +224,71 @@ public final class DefinitionResolver {
             Optional<Path> policyFile = reference(ref, file, root, location.withPointer("/naming/extends"));
             policyFile.flatMap(this::namingPolicy).ifPresent(policy ->
                     document.set("naming", new Merger(diagnostics, location).merge(policy, own)));
+        }
+
+        /**
+         * {@code descriptions.include}: the notices of the shared sets come first, in order (a later set's
+         * notice replaces an earlier one with the same id); a notice of this definition with the same id
+         * replaces the shared one in place, others follow. Returns notice id → reference for the included ones.
+         */
+        private Map<String, String> resolveNotices(ObjectNode document, Path file, Path root, Location location) {
+            JsonNode descriptions = document.get("descriptions");
+            if (descriptions == null || !descriptions.has("include")) {
+                return Map.of();
+            }
+            JsonNode include = ((ObjectNode) descriptions).remove("include");
+            List<String> refs = new ArrayList<>();
+            if (include.isTextual()) {
+                refs.add(include.asText());
+            } else {
+                include.forEach(r -> refs.add(r.asText()));
+            }
+            Map<String, JsonNode> shared = new LinkedHashMap<>();
+            Map<String, String> sources = new LinkedHashMap<>();
+            for (int i = 0; i < refs.size(); i++) {
+                String ref = refs.get(i);
+                Location at = location.withPointer(include.isTextual() ? "/descriptions/include" : "/descriptions/include/" + i);
+                Optional<Path> setFile = reference(ref, file, root, at);
+                if (setFile.isEmpty()) {
+                    continue;
+                }
+                Location setLocation = location(setFile.get());
+                if (!enter(setFile.get(), setLocation)) {
+                    continue;
+                }
+                try {
+                    readValidated(setFile.get(), SchemaKind.NOTICES, Codes.NOTICES_INVALID, setLocation).ifPresent(set ->
+                            set.path("notices").forEach(n -> {
+                                shared.remove(n.get("id").asText());
+                                shared.put(n.get("id").asText(), n);
+                                sources.put(n.get("id").asText(), ref);
+                            }));
+                } finally {
+                    stack.pop();
+                }
+            }
+            ArrayNode merged = JsonNodeFactory.instance.arrayNode();
+            Map<String, JsonNode> own = new LinkedHashMap<>();
+            List<JsonNode> unnamed = new ArrayList<>();
+            descriptions.path("notices").forEach(n -> {
+                if (n.hasNonNull("id")) {
+                    own.put(n.get("id").asText(), n);
+                } else {
+                    unnamed.add(n);
+                }
+            });
+            shared.forEach((id, n) -> {
+                if (own.containsKey(id)) {
+                    merged.add(own.remove(id));
+                    sources.remove(id);
+                } else {
+                    merged.add(n.deepCopy());
+                }
+            });
+            own.values().forEach(merged::add);
+            unnamed.forEach(merged::add);
+            ((ObjectNode) descriptions).set("notices", merged);
+            return sources;
         }
 
         private Optional<ObjectNode> namingPolicy(Path file) {

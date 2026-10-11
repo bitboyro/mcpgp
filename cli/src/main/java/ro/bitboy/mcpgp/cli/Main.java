@@ -496,7 +496,9 @@ public final class Main {
                         line.append(" ").append(step.path("value").asText());
                     }
                     List<String> from = new ArrayList<>();
-                    if (step.has("file")) {
+                    if (step.has("from")) {
+                        from.add("from " + step.path("from").asText());     // a shared item, not a line of this project
+                    } else if (step.has("file")) {
                         from.add(step.path("file").asText() + (step.has("pointer") ? "#" + step.path("pointer").asText() : ""));
                     }
                     if (step.has("op")) {

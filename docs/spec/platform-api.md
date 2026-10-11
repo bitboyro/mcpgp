@@ -61,8 +61,9 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   left out (custom tools, enrichers, call filters): the platform never runs builders' code; `mcpgp
   test` runs it. A few servers stay running per version and stop after five idle minutes.
 - `GET /servers/{id}/versions/{version}/definition` returns the definition as data: `root` (the root
-  file as written) and `resolved` (with what it extends, includes and its naming policy merged in).
-  The pages read notices and their own rules from it.
+  file as written), `resolved` (with what it extends, includes and its naming policy merged in) and
+  `noticeSources` (notice id → the shared set it comes from). The pages read notices and their own
+  rules from it.
 - `GET /servers/{id}/versions/{version}/package` says what a build of the version will contain,
   without building it: `zip` (the name, before the build number), `formats` (`jar` always, `mcpb` and
   `docker` per `build.targets`, each with its main file), `files` (everything in the zip, as a build
@@ -124,6 +125,21 @@ server edits (comments and layout kept; `base` must be the latest version, else 
 answers `{ text, problems, usedBy }`, a save makes the next version (`422` when the result isn't a
 valid naming policy). A new version reaches servers that don't pin one; pinned servers keep theirs
 until their definition moves. Other kinds are versioned by upload.
+
+**Shared notices** (kind `notices`, definition-format.md §5.1) work the same way: a new version is
+checked against the notices schema (`422` when it doesn't match); `GET /library/notices/{name}` adds
+`set` (the latest version as data), `root` and `usedBy` (servers whose latest version includes it in
+`descriptions.include`); `POST /library/notices/{name}/edits` edits it (notices as whole items,
+`/notices/[id=…]`). And they can be put on many servers at once:
+
+`POST /library/notices/{name}/apply { servers?, version?, message? }` (scope `servers:write`) adds
+`mcpgp://<workspace>/notices/<name>@<version>` to each server's `descriptions.include`, or moves a
+server that includes the set at another version to this one. Without `servers`: every server that
+isn't archived; without `version`: the latest. Each changed server gets its next version (an edit
+like any other; one that wouldn't compile is left alone). The answer has one line per server:
+`{ server, status: updated | unchanged | inherited | failed, version?, from?, error? }`; a variant
+of a chosen server is `inherited` (it gets the notices from its parent). The activity log records
+`library.apply`.
 
 ## 3. Identities, sign-in and scopes
 

@@ -62,6 +62,8 @@ class LibraryApiTest {
                 .isEqualTo(201);
         assertThat(call("POST", "/library/naming/acme-standard/versions", files(Map.of("acme-standard.yaml",
                 new String(naming, StandardCharsets.UTF_8)))).statusCode()).isEqualTo(201);
+        assertThat(call("POST", "/library/notices?name=acme-policy", files(Map.of("acme-policy.yaml",
+                Files.readString(EXAMPLES.resolve("workspace/notices/acme-policy.yaml"))))).statusCode()).isEqualTo(201);
         assertThat(call("POST", "/servers?id=orders-mcp", project(EXAMPLES.resolve("orders"), Map.of())).statusCode()).isEqualTo(201);
     }
 

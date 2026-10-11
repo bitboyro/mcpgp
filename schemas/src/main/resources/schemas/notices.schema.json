@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bitboyro.github.io/mcpgp/schemas/notices.schema.json",
+  "title": "mcpgp shared notices",
+  "description": "A shared set of notices, the library kind notices (mcpgp://<workspace>/notices/<name>@<version>), included by definitions with descriptions.include. See docs/spec/definition-format.md section 5.1.",
+  "type": "object",
+  "properties": {
+    "title": { "type": "string", "description": "What the set is for, in a few words." },
+    "notices": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "allOf": [{ "$ref": "definition.schema.json#/$defs/notice" }],
+        "required": ["id"]
+      }
+    }
+  },
+  "required": ["notices"],
+  "additionalProperties": false
+}
