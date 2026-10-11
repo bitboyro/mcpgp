@@ -87,7 +87,7 @@ MCPGP_TEST_POSTGRES_URL=jdbc:postgresql://127.0.0.1:55432/mcpgp MCPGP_TEST_POSTG
 
 - **Platform and CLI:** SemVer. `0.x` until the definition format is accepted as v1.
 - **Definition format:** `apiVersion: mcpgp/vN`; breaking changes only in a new N with automatic
-  migration (`mcpgp migrate`).
+  migration (`mcpgp migrate`, TODO: built with the first v2).
 - **Manifest, runtime config, audit event:** each has its own version field; additive changes only
   within a version.
 - **Release steps:**

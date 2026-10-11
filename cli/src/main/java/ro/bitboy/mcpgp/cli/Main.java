@@ -33,9 +33,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 /** {@code mcpgp}: the command line (spec/cli.md). Exit codes follow cli.md §4. */
-@Command(name = "mcpgp", mixinStandardHelpOptions = true, version = Compiler.VERSION,
+@Command(name = "mcpgp", mixinStandardHelpOptions = true, scope = CommandLine.ScopeType.INHERIT, version = Compiler.VERSION,
         description = "Generate MCP servers from OpenAPI contracts.",
-        subcommands = {Main.Init.class, Main.Validate.class, Main.Build.class, Main.Explain.class, Main.Names.class, Main.Test.class, Main.PushCommand.class, Main.Keygen.class, Main.Verify.class})
+        subcommands = {Main.Init.class, Main.Validate.class, Main.Build.class, Main.Explain.class, Main.Names.class, Main.Test.class, Main.PushCommand.class, Main.Keygen.class, Main.Sign.class, Main.Verify.class})
 public final class Main {
 
     static final int OK = 0;
@@ -43,10 +43,25 @@ public final class Main {
     static final int USAGE = 2;
     static final int NAME_DRIFT = 3;
     static final int TESTS_FAILED = 4;
+    static final int VERSION_MISMATCH = 5;
     static final int INTERNAL = 10;
 
     /** Environment, replaceable in tests. */
     static Map<String, String> env = System.getenv();
+
+    /** Where the repository config is looked for (the working directory), replaceable in tests. */
+    static Path cwd = Path.of("");
+
+    /** The repository config of this run ({@code .mcpgp/config.yaml}), or null. */
+    static RepoConfig repo;
+
+    @Option(names = "--config", paramLabel = "<file>", scope = CommandLine.ScopeType.INHERIT,
+            description = "The repository config; default: the nearest .mcpgp/config.yaml.")
+    Path config;
+
+    @Option(names = "--ignore-version", scope = CommandLine.ScopeType.INHERIT,
+            description = "Run although the CLI version differs from cli: in .mcpgp/config.yaml.")
+    boolean ignoreVersion;
 
     public static void main(String[] args) {
         System.exit(run(new PrintWriter(System.out, true, StandardCharsets.UTF_8),
@@ -61,7 +76,46 @@ public final class Main {
             commandLine.getErr().println("internal error: " + e);
             return INTERNAL;
         });
+        cli.setExecutionStrategy(parseResult -> {
+            Integer help = CommandLine.executeHelpRequest(parseResult);
+            if (help != null) {
+                return help;
+            }
+            Main main = parseResult.commandSpec().commandLine().getCommand();
+            int checked = loadRepo(main, err);
+            return checked != OK ? checked : new CommandLine.RunLast().execute(parseResult);
+        });
         return cli.execute(args);
+    }
+
+    /** Reads the repository config and checks the CLI version it pins (cli.md §1, exit code 5). */
+    static int loadRepo(Main main, PrintWriter err) {
+        try {
+            repo = RepoConfig.find(main.config, cwd);
+        } catch (IOException | IllegalArgumentException e) {
+            err.println("error: " + (e instanceof IOException ? "can't read the repository config: " : "") + e.getMessage());
+            repo = null;
+            return ERRORS;
+        }
+        if (repo == null) {
+            return OK;
+        }
+        repo.notYet().forEach(w -> err.println("warning: " + w));
+        if (!repo.cli().equals(Compiler.VERSION) && !main.ignoreVersion) {
+            err.println("error: " + repo.file() + " pins mcpgp " + repo.cli() + ", this is " + Compiler.VERSION
+                    + ". Use mcpgp " + repo.cli() + ", change cli: in the config, or pass --ignore-version.");
+            return VERSION_MISMATCH;
+        }
+        return OK;
+    }
+
+    /** The servers of {@code --all}: those listed in the repository config. */
+    static List<Path> allServers(PrintWriter err) {
+        if (repo == null) {
+            err.println("error: --all needs a repository config (" + RepoConfig.FILE + " with servers:), or --config <file>");
+            return null;
+        }
+        return repo.servers();
     }
 
     /** Options shared by every command. */
@@ -81,9 +135,11 @@ public final class Main {
 
         Schemas schemas = new Schemas();
 
+        /** {@code --workspace}, else the repository config's {@code workspace}, else none. */
         Workspace workspace(Diagnostics diagnostics) {
-            return workspace == null ? Workspace.none()
-                    : Workspace.load(workspace.resolve("mcpgp-workspace.yaml"), schemas, diagnostics);
+            Path dir = workspace != null ? workspace : repo != null ? repo.workspace() : null;
+            return dir == null ? Workspace.none()
+                    : Workspace.load(dir.resolve("mcpgp-workspace.yaml"), schemas, diagnostics);
         }
 
         PrintWriter out() {
@@ -120,6 +176,24 @@ public final class Main {
             }
             return exitCode(diagnostics);
         }
+    }
+
+    /** The definitions a command works on: the ones named, or with {@code --all} the repository config's; null after a usage error. */
+    static List<Path> definitions(Common common, boolean all, List<Path> named) {
+        PrintWriter err = common.spec.commandLine().getErr();
+        boolean any = named != null && !named.isEmpty();
+        if (all && any) {
+            err.println("error: give definitions or --all, not both");
+            return null;
+        }
+        if (all) {
+            return allServers(err);
+        }
+        if (!any) {
+            err.println("error: give a definition (*.mcpgp.yaml), or --all for the servers in " + RepoConfig.FILE);
+            return null;
+        }
+        return named;
     }
 
     static int exitCode(List<Diagnostic> diagnostics) {
@@ -254,13 +328,20 @@ public final class Main {
         @Option(names = "--frozen-lock", description = "Fail when a tool name would differ from mcp-names.lock.")
         boolean frozenLock;
 
-        @Parameters(arity = "1..*", paramLabel = "<definition>", description = "Root definition files (*.mcpgp.yaml).")
+        @Parameters(arity = "0..*", paramLabel = "<definition>", description = "Root definition files (*.mcpgp.yaml).")
         List<Path> definitions;
+
+        @Option(names = "--all", description = "Every server in the repository config (.mcpgp/config.yaml).")
+        boolean all;
 
         @Override
         public Integer call() {
+            List<Path> chosen = definitions(common, all, definitions);
+            if (chosen == null) {
+                return USAGE;
+            }
             int code = OK;
-            for (Path definition : definitions) {
+            for (Path definition : chosen) {
                 Diagnostics workspaceDiagnostics = new Diagnostics();
                 Workspace workspace = common.workspace(workspaceDiagnostics);
                 Compiler.Result result = new Compiler(common.schemas).compile(definition,
@@ -276,18 +357,21 @@ public final class Main {
         }
     }
 
-    @Command(name = "build", description = "Compile and package a definition.")
+    @Command(name = "build", description = "Compile and package definitions.")
     static final class Build implements Callable<Integer> {
         @CommandLine.Mixin
         Common common;
 
-        @Parameters(paramLabel = "<definition>", description = "Root definition file (*.mcpgp.yaml).")
-        Path definition;
+        @Parameters(arity = "0..*", paramLabel = "<definition>", description = "Root definition files (*.mcpgp.yaml).")
+        List<Path> definitions;
+
+        @Option(names = "--all", description = "Every server in the repository config (.mcpgp/config.yaml).")
+        boolean all;
 
         @Option(names = "--manifest-only", description = "Write only the manifest, no package.")
         boolean manifestOnly;
 
-        @Option(names = "--out", paramLabel = "<dir>", defaultValue = "dist", description = "Output directory (default: ${DEFAULT-VALUE}).")
+        @Option(names = "--out", paramLabel = "<dir>", description = "Output directory (default: out: in the repository config, else dist).")
         Path out;
 
         @Option(names = "--version", paramLabel = "<v>", description = "Server version; default: the default contract's version.")
@@ -304,6 +388,19 @@ public final class Main {
 
         @Override
         public Integer call() throws IOException {
+            List<Path> chosen = definitions(common, all, definitions);
+            if (chosen == null) {
+                return USAGE;
+            }
+            Path dir = out != null ? out : repo != null && repo.out() != null ? repo.out() : Path.of("dist");
+            int code = OK;
+            for (Path definition : chosen) {
+                code = Math.max(code, build(definition, dir));
+            }
+            return code;
+        }
+
+        private int build(Path definition, Path out) throws IOException {
             Diagnostics workspaceDiagnostics = new Diagnostics();
             Workspace workspace = common.workspace(workspaceDiagnostics);
             ManifestWriter.Build build = new ManifestWriter.Build(createdAt(definition), Compiler.VERSION, version, buildNumber, source);
@@ -520,14 +617,33 @@ public final class Main {
         @CommandLine.Mixin
         Common common;
 
-        @Parameters(paramLabel = "<definition>", description = "Root definition file (*.mcpgp.yaml).")
-        Path definition;
+        @Parameters(arity = "0..*", paramLabel = "<definition>", description = "Root definition files (*.mcpgp.yaml).")
+        List<Path> definitions;
+
+        @Option(names = "--all", description = "Every server in the repository config (.mcpgp/config.yaml), each with its own tests/.")
+        boolean all;
 
         @Option(names = "--suite", paramLabel = "<dir>", description = "Test case files (*.yaml); default: tests/ next to the definition.")
         Path suite;
 
         @Override
         public Integer call() throws IOException {
+            List<Path> chosen = definitions(common, all, definitions);
+            if (chosen == null) {
+                return USAGE;
+            }
+            if (suite != null && chosen.size() > 1) {
+                common.spec.commandLine().getErr().println("error: --suite applies to one definition; with several, each uses its own tests/");
+                return USAGE;
+            }
+            int code = OK;
+            for (Path definition : chosen) {
+                code = Math.max(code, test(definition));
+            }
+            return code;
+        }
+
+        private int test(Path definition) throws IOException {
             Diagnostics workspaceDiagnostics = new Diagnostics();
             Workspace workspace = common.workspace(workspaceDiagnostics);
             Compiler.Result result = new Compiler(common.schemas).compile(definition, new Compiler.Options(workspace, false));
@@ -787,12 +903,70 @@ public final class Main {
         }
     }
 
-    @Command(name = "verify", description = "Verify a package: the signature of SHA256SUMS and every file's checksum.")
+    @Command(name = "sign", description = "Sign a release directory: SHA256SUMS over its files and SHA256SUMS.sig (minisign), for what you publish.")
+    static final class Sign implements Callable<Integer> {
+        @CommandLine.Spec
+        CommandLine.Model.CommandSpec spec;
+
+        @Parameters(paramLabel = "<dir>", description = "The directory to sign, e.g. dist/ after mcpgp build.")
+        Path dir;
+
+        @Option(names = "--key", paramLabel = "<ref>",
+                description = "The secret key as a reference: ${env:NAME} or ${file:path}. Default: sign.key in the repository config, else ${env:MCPGP_SIGNING_KEY}.")
+        String key;
+
+        @Override
+        public Integer call() throws Exception {
+            PrintWriter err = spec.commandLine().getErr();
+            if (!Files.isDirectory(dir)) {
+                err.println("error: " + dir + " is not a directory");
+                return USAGE;
+            }
+            String reference = key != null ? key : repo != null && repo.signKey() != null ? repo.signKey() : "${env:MCPGP_SIGNING_KEY}";
+            Minisign.Keys keys;
+            try {
+                keys = signingKey(com.fasterxml.jackson.databind.node.TextNode.valueOf(reference), repo != null ? repo.root() : cwd.toAbsolutePath());
+            } catch (IllegalArgumentException e) {
+                err.println("error: the signing key (" + reference + "): " + e.getMessage());
+                return ERRORS;
+            }
+            java.util.TreeMap<String, byte[]> files = releaseFiles(dir);
+            if (files.isEmpty()) {
+                err.println("error: " + dir + " has no files to sign");
+                return ERRORS;
+            }
+            StringBuilder sums = new StringBuilder();
+            files.forEach((name, data) -> sums.append(Packager.sha256(data)).append("  ").append(name).append('\n'));
+            byte[] text = sums.toString().getBytes(StandardCharsets.UTF_8);
+            String comment = "timestamp:" + createdAt(dir.resolve("SHA256SUMS")).getEpochSecond() + "\tfile:SHA256SUMS";
+            Files.write(dir.resolve("SHA256SUMS"), text);
+            Files.writeString(dir.resolve("SHA256SUMS.sig"), Minisign.sign(keys, text, comment));
+            spec.commandLine().getOut().println("signed " + files.size() + " files in " + dir + " (SHA256SUMS, SHA256SUMS.sig; key id "
+                    + Minisign.keyIdText(keys.keyId()) + "); check with mcpgp verify " + dir + " --key mcpgp.pub");
+            return OK;
+        }
+    }
+
+    /** The files of a release directory (not in subfolders), without its own SHA256SUMS and signature. */
+    static java.util.TreeMap<String, byte[]> releaseFiles(Path dir) throws IOException {
+        java.util.TreeMap<String, byte[]> files = new java.util.TreeMap<>();
+        try (java.util.stream.Stream<Path> list = Files.list(dir)) {
+            for (Path file : list.filter(Files::isRegularFile).toList()) {
+                String name = file.getFileName().toString();
+                if (!name.equals("SHA256SUMS") && !name.equals("SHA256SUMS.sig")) {
+                    files.put(name, Files.readAllBytes(file));
+                }
+            }
+        }
+        return files;
+    }
+
+    @Command(name = "verify", description = "Verify a package, or a directory signed with mcpgp sign: the signature of SHA256SUMS and every file's checksum.")
     static final class Verify implements Callable<Integer> {
         @CommandLine.Spec
         CommandLine.Model.CommandSpec spec;
 
-        @Parameters(paramLabel = "<zip>", description = "The package.")
+        @Parameters(paramLabel = "<zip|dir>", description = "The package, or a directory signed with mcpgp sign.")
         Path zip;
 
         @Option(names = "--key", paramLabel = "<pub>", required = true,
@@ -803,15 +977,25 @@ public final class Main {
         public Integer call() throws Exception {
             PrintWriter writer = spec.commandLine().getOut();
             java.util.Map<String, byte[]> entries = new java.util.TreeMap<>();
-            try (java.util.zip.ZipFile file = new java.util.zip.ZipFile(zip.toFile())) {
-                for (java.util.zip.ZipEntry entry : java.util.Collections.list(file.entries())) {
-                    entries.put(entry.getName(), file.getInputStream(entry).readAllBytes());
+            if (Files.isDirectory(zip)) {
+                entries.putAll(releaseFiles(zip));
+                for (String own : List.of("SHA256SUMS", "SHA256SUMS.sig")) {
+                    if (Files.isRegularFile(zip.resolve(own))) {
+                        entries.put(own, Files.readAllBytes(zip.resolve(own)));
+                    }
+                }
+            } else {
+                try (java.util.zip.ZipFile file = new java.util.zip.ZipFile(zip.toFile())) {
+                    for (java.util.zip.ZipEntry entry : java.util.Collections.list(file.entries())) {
+                        entries.put(entry.getName(), file.getInputStream(entry).readAllBytes());
+                    }
                 }
             }
             byte[] sums = entries.get("SHA256SUMS");
             byte[] sig = entries.get("SHA256SUMS.sig");
             if (sums == null || sig == null) {
-                writer.println("✗ the package has no " + (sums == null ? "SHA256SUMS" : "SHA256SUMS.sig"));
+                writer.println("✗ " + (Files.isDirectory(zip) ? "the directory" : "the package") + " has no "
+                        + (sums == null ? "SHA256SUMS" : "SHA256SUMS.sig"));
                 return ERRORS;
             }
             try {
@@ -844,7 +1028,7 @@ public final class Main {
                     ok = false;
                 }
             }
-            writer.println(ok ? "✓ all " + listed.size() + " files match SHA256SUMS" : "✗ the package was changed");
+            writer.println(ok ? "✓ all " + listed.size() + " files match SHA256SUMS" : "✗ " + (Files.isDirectory(zip) ? "the directory" : "the package") + " was changed");
             return ok ? OK : ERRORS;
         }
     }

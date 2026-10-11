@@ -128,8 +128,12 @@ curl -X PUT https://mcpgp.example.com/api/v1/identities/<your id>/password \
 
 ## 6. Sign packages
 
+With the CLI (`mcpgp-cli-<version>.zip` from the release, Java 21+), or its image without installing
+anything:
+
 ```bash
 mcpgp keygen --out keys            # keys/mcpgp.key (secret), keys/mcpgp.pub (publish it)
+# or: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/keys":/work docker.io/<account>/mcpgp-cli:0.1.0 keygen
 cp keys/mcpgp.key secrets/signing_key && chmod 644 secrets/signing_key
 ```
 

@@ -20,8 +20,9 @@ Milestones, in order. Each ends with something demonstrable. Scope per item: see
 
 | Version | Contents |
 |---|---|
-| **0.1.0** (being prepared) | M1–M8 and M9 so far: compiler, runtime, packaging, CLI, the platform and its web UI, the Docker image, Docker Compose, the PostgreSQL store |
+| **0.1.0** (being prepared) | M1–M8 and M9 so far: compiler, runtime, packaging, the CLI (zip, jar and image; `--all`, the version pin, `sign`), the platform and its web UI, the Docker images, Docker Compose, the PostgreSQL store |
 | **0.2.0** (next) | Passwords in the web UI: **Change password** in the account menu (current password, the new one twice); **Set password** on a person in API & agents, for admins (a temporary password, optionally to be changed at the next sign-in); **Unlock** for accounts locked after wrong passwords. Company accounts show none of this. |
+| TODO, not yet scheduled | Marked TODO in the docs: CLI `diff` (PR comments against the last release), `preview`, `try`, `migrate` (with the first `apiVersion` v2), `--no-color`, `release.versionFrom` other than `contract`, `platform:` in the repository config; git and URL sources on the platform; a native CLI binary |
 
 Deferred: harness-lab comparison; per-user downstream identity; other languages.
 

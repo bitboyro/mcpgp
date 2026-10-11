@@ -290,7 +290,7 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 ## 10. Versioning
 
 `apiVersion` changes only for breaking format changes. Every new `apiVersion` ships with an automatic
-migration (`mcpgp migrate`) and a migration note in the changelog.
+migration (`mcpgp migrate`, TODO: built with the first v2) and a migration note in the changelog.
 
 ## 11. Security considerations
 

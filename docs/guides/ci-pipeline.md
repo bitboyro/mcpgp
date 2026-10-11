@@ -1,8 +1,8 @@
 # Guide: building MCP servers in a pipeline
 
 You have OpenAPI specs and want a reliable, reviewed MCP server package out of CI every time. The
-pattern: **a git repository is the source of truth; CI validates, diffs, builds, tests, signs and
-publishes.** The platform is optional: it can link the same repo as a git source.
+pattern: **a git repository is the source of truth; CI validates, builds, tests, signs and
+publishes.** The platform is optional: CI can push the same definitions to it (§6).
 
 ## 1. Set up a definitions repository
 
@@ -10,7 +10,7 @@ One repo for one server, or one repo for several servers that share policies:
 
 ```
 mcp-servers/
-├─ .mcpgp/config.yaml              CLI version, servers, output, signing
+├─ .mcpgp/config.yaml              CLI version, servers, workspace, output, signing
 ├─ workspace/                      shared naming policy, rule sets (mcpgp:// references)
 ├─ servers/
 │  ├─ orders/
@@ -24,54 +24,73 @@ mcp-servers/
 └─ .github/workflows/mcp.yml       (or .gitlab-ci.yml)
 ```
 
-Start it with:
+`.mcpgp/config.yaml` ([cli.md §2](../spec/cli.md#2-repository-config-mcpgpconfigyaml)):
+
+```yaml
+cli: 0.1.0                         # the exact CLI version; another version refuses to run (exit 5)
+workspace: workspace
+servers:                           # what --all works on
+  - servers/orders/orders.mcpgp.yaml
+  - servers/orders-readonly/orders-readonly.mcpgp.yaml
+out: dist
+sign:
+  key: ${env:MCPGP_SIGNING_KEY}    # for mcpgp sign
+```
+
+Start a server with:
 
 ```bash
 mcpgp init --from-spec ./orders-2.0.yaml
 ```
 
+Get the CLI from the release (`mcpgp-cli-<version>.zip`, Java 21+), or use the CLI image
+`docker.io/<account>/mcpgp-cli:<version>` in CI ([cli.md §1](../spec/cli.md#1-installation-and-pinning)).
 Full example: [examples/pipeline](../../examples/pipeline).
 
 ## 2. Day-to-day flow
 
 ```
-change spec or rules ─► pull request ─► CI: validate · diff · build · test ─► review ─► merge
-                                                                                         │
-                                              tag v1.5.0 ─► CI: build · test · sign · publish
+change spec or rules ─► pull request ─► CI: validate · build · test ─► review ─► merge
+                                                                                 │
+                                         tag v1.5.0 ─► CI: build · test · sign · publish
 ```
 
 **On every pull request**
-1. `mcpgp validate --all`: the definition and rules are valid.
-2. `mcpgp diff --all --against last-release --format md`: posted as a PR comment
-   ("+3 tools, 1 removed, 12 descriptions changed").
-3. `mcpgp build --all --frozen-lock`: fails if a tool name would change without being accepted.
-4. `mcpgp test --all`: starts each built server against a mock generated from the specs and runs
-   `tools/list` plus your test cases.
+1. `mcpgp validate --all`: the definitions and rules are valid.
+2. `mcpgp build --all --frozen-lock`: packages every server; fails (exit 3) if a tool name would
+   change without being accepted with `mcpgp names accept`.
+3. `mcpgp test --all`: starts each server against a mock made from its specs and runs `tools/list`
+   plus the test cases in its `tests/` folder.
+4. **TODO (not in 0.1.0):** `mcpgp diff --all --against last-release --format md` as a PR comment
+   ("+3 tools, 1 removed, 12 descriptions changed"). Until then, reviewers read the definition
+   changes and the build log.
 
 **On a release tag**
-1. Same steps, with `--version` from the tag.
-2. `mcpgp sign dist/`, then publish the zip (release assets, artifact store, or container
-   registry for the Docker image). Optionally `mcpgp push` to register the build on the platform.
+1. The same steps. The server version follows the API (contract) version; `--version` overrides it.
+2. `mcpgp sign dist/`: a `SHA256SUMS` over the files in `dist/` and its signature, for what you
+   publish. Packages are signed inside as well when the definition has `build.sign.key`. Customers
+   check both with `mcpgp verify` and your public key.
+3. Publish `dist/` (release assets, artifact store). Optionally `mcpgp push` registers the build on
+   the platform (§6).
 
 ## 3. What keeps it reliable
 
 | Risk | Guard |
 |---|---|
-| Different CLI behaviour between runs | CLI version pinned in `.mcpgp/config.yaml`; container image pinned by digest |
-| Spec changed under you | Specs committed in the repo; URL sources need a checksum |
+| Different CLI behaviour between runs | CLI version pinned in `.mcpgp/config.yaml` (exit code 5 on a mismatch); the CLI image pinned by digest |
+| Spec changed under you | Specs committed in the repo |
 | Tool silently renamed | `mcp-names.lock` + `--frozen-lock`; renames need `mcpgp names accept` in the PR |
-| Unreviewed tool changes | `diff` against the last release posted on every PR |
-| Build not reproducible | Byte-identical output for the same inputs (`SOURCE_DATE_EPOCH`) |
-| Package tampered with | Signed `SHA256SUMS`; customers run `verify` |
-| Secrets leaking | CI needs no upstream credentials at all: tests use mocks ([ADR-0011](../decisions/0011-platform-never-calls-targets.md)). Only the signing key and registry credentials are CI secrets |
+| Unreviewed tool changes | Definition and lock changes reviewed in the PR (**TODO:** `diff` posted on every PR) |
+| Build not reproducible | Byte-identical output for the same inputs (`SOURCE_DATE_EPOCH`, else the commit time) |
+| Package tampered with | Signed `SHA256SUMS` in each package and over `dist/`; customers run `mcpgp verify` |
+| Secrets leaking | CI needs no upstream credentials at all: tests use mocks ([ADR-0011](../decisions/0011-platform-never-calls-targets.md)). Only the signing key and the platform token are CI secrets |
 
 ## 4. When the upstream API publishes a new spec
 
-1. Open a PR that replaces or adds the contract file (a scheduled job can do this from an
-   allow-listed URL and open the PR automatically).
-2. The PR comment shows exactly what changes for agents: new tools, changed parameters, tools that
-   disappear, names that would drift.
-3. Adjust rules if needed, accept intended renames, merge, tag.
+1. Open a PR that replaces or adds the contract file.
+2. CI shows what breaks: validation errors, names that would drift (`--frozen-lock`), failing test
+   cases. **TODO:** the `diff` comment listing new tools, changed parameters and removed tools.
+3. Adjust rules if needed, accept intended renames (`mcpgp names accept`), merge, tag.
 
 ## 5. Tool test cases (optional)
 
@@ -115,9 +134,9 @@ The platform keeps the version, builds and signs it; `--verify-local` fails the 
 differs from what CI tested. Add `--release` to release it as well. Only the files the definition
 uses are sent ([cli.md §3.3](../spec/cli.md#33-push)).
 
-### 6.2 Git sources
+### 6.2 Git sources (TODO, not in 0.1.0)
 
-Link the repo on the platform as a **git source** (Sources page). Then:
-- the platform shows previews, diffs and builds for every branch and tag;
-- edits made in the web UI become **commits on a branch with a PR**, never direct changes, so
-  git stays the source of truth and the same CI checks apply.
+Planned: link the repo on the platform as a **git source** (Sources page). Then the platform would
+show previews and builds for every branch and tag, and edits made in the web UI would become
+**commits on a branch with a PR**, never direct changes, so git stays the source of truth and the
+same CI checks apply. Until then, use `mcpgp push` (§6.1).

@@ -4,8 +4,9 @@
 package, and ship it to your customers. They run it on their own infrastructure, connected
 only to their own systems. It never calls back to the platform or to you.
 
-> Status: **early implementation.** Specs, examples and process are in place; the JSON Schemas
-> (milestone M1) are being built. See [docs/process/roadmap.md](docs/process/roadmap.md).
+> Status: **0.1.0, the first release.** The compiler, the runtime and packaging, the CLI and the
+> self-hosted platform with its web UI work end to end; formats may still change before 1.0. What's
+> next: [docs/process/roadmap.md](docs/process/roadmap.md).
 
 ## What it does
 
@@ -37,6 +38,36 @@ only to their own systems. It never calls back to the platform or to you.
 
 Java first; other languages later, driven by a language-neutral manifest.
 
+## Getting started
+
+**The CLI** (Java 21+): download `mcpgp-cli-<version>.zip` from the
+[releases](https://github.com/bitboyro/mcpgp/releases), unzip it and put its `bin/` on your PATH. In
+CI, use the image `docker.io/<account>/mcpgp-cli:<version>` instead.
+
+```bash
+mcpgp init --from-spec ./openapi.yaml        # a definition project from your spec; prints its file name
+mcpgp validate my-api-mcp.mcpgp.yaml
+mcpgp test my-api-mcp.mcpgp.yaml             # the server against a mock made from the spec
+mcpgp build my-api-mcp.mcpgp.yaml            # dist/<server>-<version>.zip, ready to deliver
+```
+
+The examples work as they are: `cd examples/pipeline && mcpgp validate --all && mcpgp test --all`.
+Building in CI: [docs/guides/ci-pipeline.md](docs/guides/ci-pipeline.md).
+
+**The platform** (web UI, REST API, builds for a team), with Docker Compose:
+
+```bash
+cd deploy
+chmod 700 secrets && openssl rand -base64 24 > secrets/admin_password && chmod 644 secrets/admin_password
+cp .env.example .env
+docker compose up -d --build --wait          # then open http://localhost:8443, user admin
+```
+
+PostgreSQL, TLS, company sign-in and backups: [docs/guides/self-hosting.md](docs/guides/self-hosting.md).
+
+**Building from source** (Java 21, Maven 3.9): `mvn verify`; the CLI is then
+`cli/target/mcpgp-cli-<version>-exec.jar`, the platform `platform/target/mcpgp-platform-<version>-exec.jar`.
+
 ## Two sides
 
 | | **Platform side** (you, the builder) | **Client side** (your customer, the operator) |
@@ -57,7 +88,7 @@ Start at [docs/README.md](docs/README.md).
   [naming](docs/spec/naming.md) · [runtime config](docs/spec/runtime-config.md) ·
   [tools contract](docs/spec/tools-contract.md) · [audit & errors](docs/spec/audit-and-errors.md) ·
   [packaging](docs/spec/packaging.md) · [compatibility](docs/spec/compatibility.md) · [CLI](docs/spec/cli.md)
-- Guides: [building in a pipeline](docs/guides/ci-pipeline.md), [running the platform](docs/guides/platform.md), [agents on the platform](docs/guides/agents.md), [writing an extension](docs/guides/extensions.md)
+- Guides: [building in a pipeline](docs/guides/ci-pipeline.md), [self-hosting the platform](docs/guides/self-hosting.md) ([deployment](docs/deployment.md)), [running the platform](docs/guides/platform.md), [agents on the platform](docs/guides/agents.md), [writing an extension](docs/guides/extensions.md)
 - [Security & threat model](docs/security.md)
 - [Decisions (ADRs)](docs/decisions)
 - [UI design](docs/design/ui.md)

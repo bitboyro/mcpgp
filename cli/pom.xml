@@ -62,6 +62,22 @@
           </archive>
         </configuration>
       </plugin>
+      <!-- mcpgp-cli-<version>-exec.jar: the CLI with everything it needs, for java -jar and the launcher scripts -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+            <configuration>
+              <classifier>exec</classifier>
+              <mainClass>ro.bitboy.mcpgp.cli.Main</mainClass>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>

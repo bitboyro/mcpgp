@@ -1,10 +1,13 @@
 name: publish
 
-# The platform image on Docker Hub (docs/guides/self-hosting.md):
-#   push to main          → <user>/mcpgp-platform:main, :sha-<commit>
-#   tag vX.Y.Z            → :X.Y.Z, :X.Y, :latest (and :X from 1.0.0), plus a GitHub release
+# The images on Docker Hub, <user>/mcpgp-platform (docs/guides/self-hosting.md) and <user>/mcpgp-cli
+# (spec/cli.md §1), with the same tags:
+#   push to main          → :main, :sha-<commit>
+#   tag vX.Y.Z            → :X.Y.Z, :X.Y, :latest (and :X from 1.0.0), plus a GitHub release with the
+#                           CLI (zip and jar) and SHA256SUMS
 #   Run workflow (manual) → the branch it runs on, as :<branch>, or the tag you type in
-# Needs the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker Hub access token, read & write).
+# Needs the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker Hub access token, read &
+# write). Optional: MCPGP_RELEASE_SIGNING_KEY (a minisign key from mcpgp keygen) signs the release files.
 
 on:
   push:
@@ -27,8 +30,17 @@ concurrency:
 jobs:
   image:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.meta.outputs.version }}
+    strategy:
+      matrix:
+        include:
+          - image: mcpgp-platform
+            file: deploy/Dockerfile
+            title: mcpgp platform
+            description: "Generates MCP servers from OpenAPI: web UI, REST API, builds"
+          - image: mcpgp-cli
+            file: deploy/cli.Dockerfile
+            title: mcpgp CLI
+            description: "The mcpgp command line, for CI: validate, build, test, sign, push"
     steps:
       - uses: actions/checkout@v4
 
@@ -51,7 +63,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/mcpgp-platform
+          images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}
           flavor: latest=false
           tags: |
             type=semver,pattern={{version}}
@@ -63,20 +75,20 @@ jobs:
             type=ref,event=branch,enable=${{ github.event_name == 'workflow_dispatch' && inputs.tag == '' }}
             type=raw,value=${{ inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.tag != '' }}
           labels: |
-            org.opencontainers.image.title=mcpgp platform
-            org.opencontainers.image.description=Generates MCP servers from OpenAPI: web UI, REST API, builds
+            org.opencontainers.image.title=${{ matrix.title }}
+            org.opencontainers.image.description=${{ matrix.description }}
 
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: deploy/Dockerfile
+          file: ${{ matrix.file }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           provenance: mode=max
           sbom: true
 
@@ -92,6 +104,24 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: The CLI, zip and jar
+        run: |
+          mvn -B -q -pl cli -am package -DskipTests
+          cli/src/dist/assemble.sh "${GITHUB_REF_NAME#v}" release
+      - name: Sign the release files (when MCPGP_RELEASE_SIGNING_KEY is set)
+        env:
+          MCPGP_RELEASE_SIGNING_KEY: ${{ secrets.MCPGP_RELEASE_SIGNING_KEY }}
+        run: |
+          if [ -n "$MCPGP_RELEASE_SIGNING_KEY" ]; then
+            java -jar "release/mcpgp-cli-${GITHUB_REF_NAME#v}.jar" sign release --key '${env:MCPGP_RELEASE_SIGNING_KEY}'
+          else
+            (cd release && sha256sum -- * > SHA256SUMS)
+          fi
       - name: Release notes from the CHANGELOG
         env:
           VERSION: ${{ github.ref_name }}
@@ -100,8 +130,14 @@ jobs:
           v="${VERSION#v}"
           awk -v v="$v" '$0 ~ "^## " v "( |$)" {on=1; next} /^## / && on {exit} on' CHANGELOG.md > notes.md
           test -s notes.md
-          { printf '## Docker image\n\n```bash\ndocker pull docker.io/%s/mcpgp-platform:%s\n```\n\nSetting it up: docs/guides/self-hosting.md\n\n' "$IMAGE_USER" "$v"; cat notes.md; } > release.md
+          {
+            printf '## Install\n\n'
+            printf -- '- Platform image: `docker pull docker.io/%s/mcpgp-platform:%s` (setting it up: docs/guides/self-hosting.md)\n' "$IMAGE_USER" "$v"
+            printf -- '- CLI image, for CI: `docker.io/%s/mcpgp-cli:%s`\n' "$IMAGE_USER" "$v"
+            printf -- '- CLI: `mcpgp-cli-%s.zip` below (Java 21+); unzip it and put `bin/` on your PATH; checksums in `SHA256SUMS`\n\n' "$v"
+            cat notes.md
+          } > release.md
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes-file release.md --verify-tag
+        run: gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes-file release.md --verify-tag release/*

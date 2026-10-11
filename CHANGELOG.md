@@ -11,10 +11,26 @@ The first release: the compiler, the runtime and packaging, the CLI, and the sel
 with its web UI, published as the Docker image `mcpgp-platform` (see
 [docs/guides/self-hosting.md](docs/guides/self-hosting.md)).
 
+### Known limitations
+- Not in this release (marked TODO in the docs): `mcpgp diff`, `preview`, `try`, `migrate`,
+  `--no-color`; `release.versionFrom` other than `contract` and `platform:` in `.mcpgp/config.yaml`;
+  git and URL sources on the platform; a native CLI binary.
+- The web UI has no password page yet: local accounts' passwords are set through the API (0.2.0).
+- One platform process per store; builds run one at a time.
+
 ### Added
-- Publishing: the platform image for `linux/amd64` and `linux/arm64` on Docker Hub, with an SBOM and
-  build provenance: `:main` and `:sha-<commit>` from `main`, `:X.Y.Z`, `:X.Y` and `:latest` from
-  release tags, and branch images on request (Run workflow). Release tags also make the GitHub release.
+- The CLI as a download: `mcpgp-cli-<version>.zip` (launchers `bin/mcpgp`, `bin/mcpgp.cmd`, Java 21+)
+  and `mcpgp-cli-<version>.jar` on the GitHub release, and the CLI image `mcpgp-cli` for CI.
+- CLI: `.mcpgp/config.yaml` is used: `--all` on `validate`, `build` and `test` (its `servers`), the
+  version pin (`cli`, exit code 5, `--ignore-version`), `workspace` and `out` as defaults, `--config`.
+- CLI: `mcpgp sign <dir>` signs a release directory (`SHA256SUMS`, `SHA256SUMS.sig`); `mcpgp verify`
+  checks a signed directory as well as a package; `--help` on every command.
+- Publishing: the platform and CLI images for `linux/amd64` and `linux/arm64` on Docker Hub, with an
+  SBOM and build provenance: `:main` and `:sha-<commit>` from `main`, `:X.Y.Z`, `:X.Y` and `:latest`
+  from release tags, and branch images on request (Run workflow). Release tags also make the GitHub
+  release with the CLI files and `SHA256SUMS`.
+- The pipeline example works as it is: its config points at the example servers, and the orders
+  server's test cases live in `examples/platform/orders/tests/`.
 - Self-hosting: the platform image (`deploy/Dockerfile`, non-root, health check) and Docker Compose
   files for the file store, PostgreSQL, package signing and company sign-in; `deploy/smoke-test.py`
   checks an installation end to end. Docs: [docs/deployment.md](docs/deployment.md) and
