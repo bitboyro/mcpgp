@@ -309,6 +309,23 @@ final class Docs {
         } else {
             md.append("stdio servers have no health endpoint; use `java -jar ").append(server).append(".jar doctor`.\n");
         }
+        md.append("\n## Telemetry\n\n");
+        md.append("Off by default; nothing is sent anywhere unless you turn it on. With `telemetry.enabled: true` the server sends ")
+                .append("OpenTelemetry traces (one span per tool call, a child per upstream request) and metrics (`mcpgp.tool.calls`, ")
+                .append("`mcpgp.tool.duration`, `mcpgp.instance.up`) to your OpenTelemetry Collector over OTLP (`telemetry.otlp.endpoint`, ")
+                .append("`protocol: grpc` or `http/protobuf`)");
+        if (http) {
+            md.append(", or serves the metrics for Prometheus to scrape (`exporter: prometheus`: `GET /metrics`, beside health on the ")
+                    .append("management port when one is set; no other port opens)");
+        }
+        md.append(". Spans and metrics carry tool, API, instance, contract, outcome and error code; never arguments, bodies or credentials. ")
+                .append("Where the data goes from there (Grafana, Datadog, S3, …) is set in the Collector:\n\n```yaml\n")
+                .append("# ").append(server).append(".yaml\ntelemetry:\n  enabled: true\n  otlp: { endpoint: http://otel-collector:4317, protocol: grpc }\n\n")
+                .append("# otel-collector.yaml\nreceivers:\n  otlp:\n    protocols: { grpc: { endpoint: 0.0.0.0:4317 }, http: { endpoint: 0.0.0.0:4318 } }\n")
+                .append("processors:\n  batch: {}\nexporters:\n  awss3:                       # or otlphttp, prometheusremotewrite, datadog, …\n")
+                .append("    s3uploader: { region: eu-central-1, s3_bucket: mcp-telemetry, s3_prefix: ").append(server).append(" }\n")
+                .append("service:\n  pipelines:\n    traces:  { receivers: [otlp], processors: [batch], exporters: [awss3] }\n")
+                .append("    metrics: { receivers: [otlp], processors: [batch], exporters: [awss3] }\n```\n");
         md.append("\n## Commands\n\n| Command | Does |\n|---|---|\n");
         md.append("| `doctor [--quick]` | checks the config and each instance (DNS, TCP, TLS) |\n");
         md.append("| `reload` | applies config changes to the running server (it also watches its files) |\n");

@@ -127,6 +127,12 @@ versions follow [SemVer](https://semver.org).
   `aud` = this server (RFC 8707) through nimbus-jose-jwt, opaque tokens by introspection (RFC 7662),
   and scopes that decide which tools a client sees and calls (`403 insufficient_scope`).
 
+- Config schema: `telemetry.prometheus` (`path`, `port`) removed; `/metrics` uses the server's ports.
+- Runtime: telemetry, off by default (OpenTelemetry SDK): OTLP push (gRPC or HTTP) or Prometheus
+  `/metrics` beside health (management port); a span per tool call with a child per upstream request; `mcpgp.tool.calls`,
+  `mcpgp.tool.duration`, `mcpgp.instance.up`; never arguments, bodies or credentials. Generated
+  OPERATIONS.md has a Telemetry section with an OpenTelemetry Collector example.
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 

@@ -55,6 +55,19 @@ final class Upstream {
      * @param publicOperation the operation declares {@code security: []}: no credentials are sent
      */
     HttpResponse<byte[]> send(RuntimeConfig.Instance instance, RequestBuilder.UpstreamRequest request, boolean publicOperation) {
+        ro.bitboy.mcpgp.runtime.telemetry.Telemetry.Upstream traced = ro.bitboy.mcpgp.runtime.telemetry.Telemetry.current()
+                .upstream(instance.api(), instance.id(), request.method());
+        Integer status = null;
+        try {
+            HttpResponse<byte[]> response = sendUntraced(instance, request, publicOperation);
+            status = response.statusCode();
+            return response;
+        } finally {
+            traced.end(status);
+        }
+    }
+
+    private HttpResponse<byte[]> sendUntraced(RuntimeConfig.Instance instance, RequestBuilder.UpstreamRequest request, boolean publicOperation) {
         String key = instance.api() + "/" + instance.id();
         Client client = clients.computeIfAbsent(key, k -> client(instance, instance.tlsContext()));
         HttpResponse<byte[]> response;

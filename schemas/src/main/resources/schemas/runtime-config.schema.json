@@ -55,11 +55,6 @@
           },
           "additionalProperties": false
         },
-        "prometheus": {
-          "type": "object",
-          "properties": { "path": { "type": "string" }, "port": { "$ref": "#/$defs/port" } },
-          "additionalProperties": false
-        },
         "serviceName": { "type": "string" },
         "signals": { "type": "array", "items": { "enum": ["traces", "metrics", "logs"] } }
       },

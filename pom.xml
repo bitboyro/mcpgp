@@ -44,6 +44,8 @@
     <mcp-sdk.version>2.0.1</mcp-sdk.version>
     <!-- inbound OAuth (auth.md §1.1); the version Spring Security 7.1 uses -->
     <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
+    <!-- telemetry (audit-and-errors §4): the SDK comes with Spring Boot's BOM (1.62.0); the Prometheus exporter is versioned apart -->
+    <opentelemetry-alpha.version>1.62.0-alpha</opentelemetry-alpha.version>
   </properties>
 
   <dependencyManagement>

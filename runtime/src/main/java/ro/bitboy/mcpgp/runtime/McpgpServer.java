@@ -92,8 +92,15 @@ public class McpgpServer {
         return startup.config();
     }
 
+    /** Telemetry, off by default (audit-and-errors §4); flushed when the server stops. */
+    @Bean(destroyMethod = "close")
+    ro.bitboy.mcpgp.runtime.telemetry.Telemetry telemetry(Manifest manifest, RuntimeConfig config) {
+        return ro.bitboy.mcpgp.runtime.telemetry.Telemetry.start(config.telemetry(), manifest.serverName(), manifest.serverVersion(),
+                System.getenv());
+    }
+
     @Bean
-    McpServerFactory mcpServerFactory(Manifest manifest, RuntimeConfig config) {
+    McpServerFactory mcpServerFactory(Manifest manifest, RuntimeConfig config, ro.bitboy.mcpgp.runtime.telemetry.Telemetry telemetry) {
         return new McpServerFactory(manifest, config);
     }
 

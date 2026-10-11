@@ -126,11 +126,12 @@ public final class ConfigLoader {
         Path storage = storageRoot(name, resolved);
         Map<String, List<RuntimeConfig.Instance>> instances = instances(manifest, resolved, baseDir, problems, warnings);
         RuntimeConfig.Files files = files(manifest, resolved.path("files"), storage, baseDir, problems);
+        if (resolved.path("telemetry").path("enabled").asBoolean(false) && resolved.at("/telemetry/exporter").asText("otlp").equals("prometheus")
+                && !server.transport().equals("http")) {
+            problems.add("/telemetry/exporter: prometheus needs the http transport (a scrape endpoint); use otlp for stdio servers");
+        }
         if (!problems.isEmpty()) {
             throw new ConfigException(problems);
-        }
-        if (resolved.path("telemetry").path("enabled").asBoolean(false)) {
-            warnings.add("telemetry.enabled is set, but this runtime version has no telemetry yet; nothing is exported");
         }
         JsonNode audit = resolved.path("audit");
         RuntimeConfig.Audit auditConfig = new RuntimeConfig.Audit(
