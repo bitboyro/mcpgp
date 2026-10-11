@@ -345,12 +345,17 @@ prompts:
 - Mustache placeholders; a missing required argument fails the request; a missing optional one
   renders empty.
 - Prompt names go through the naming pipeline (prefix included).
-- Argument completion (`completion/complete`) is offered from an `enum` when the argument declares one.
+- Argument completion (`completion/complete`) is offered from an `enum` when the argument declares one
+  (values starting with what was typed, ignoring case; at most 100); a value outside the enum is an
+  error.
+- A placeholder for an argument the prompt doesn't declare fails the build (`PROMPT_UNKNOWN_ARGUMENT`).
+- Errors (unknown prompt, missing required argument) are JSON-RPC `-32602`.
 
 ### 14.3 Progress
 
 While an upstream call is in progress, the server sends `notifications/progress` at a fixed interval
-(default 1 s, below the read timeout) when the client sent a `progressToken`. Requires a stateful
+(default 1 s, below the read timeout) when the client sent a `progressToken`: `progress` is the
+seconds waited so far (no `total`), `message` "Waiting for <api> (<n> s)". Requires a stateful
 connection (stdio, or stateful Streamable HTTP); on stateless HTTP it is silently unavailable.
 
 ## 15. Exposure modes

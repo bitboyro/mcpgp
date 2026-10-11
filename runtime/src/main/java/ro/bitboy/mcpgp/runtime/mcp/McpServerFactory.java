@@ -43,6 +43,14 @@ public final class McpServerFactory {
     private final Clock clock;
     /** GET operations exposed as resources (tools-contract §14.1). */
     private final Resources resources;
+    /** Prompt templates from the definition (tools-contract §14.2). */
+    private final Prompts prompts;
+    /** Sends progress notifications while upstream calls run (tools-contract §14.3). */
+    private static final java.util.concurrent.ScheduledExecutorService PROGRESS = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "mcpgp-progress");
+        t.setDaemon(true);
+        return t;
+    });
     /** {@code toolsets} exposure: the toolsets sessions enable (null in other modes). */
     private final Toolsets toolsets;
     /** stdio, toolsets mode: the API tools currently registered on the server. */
@@ -69,6 +77,7 @@ public final class McpServerFactory {
         }
         this.apiTools = new ApiToolHandler(manifest, config);
         this.resources = new Resources(manifest, config);
+        this.prompts = new Prompts(manifest);
         Packs packs = new Packs(manifest, config, catalog);
         Map<String, ToolHandler> packHandlers = packs.handlers();
         // tools without an implementation in this runtime are not offered (and said so at startup)
@@ -157,6 +166,23 @@ public final class McpServerFactory {
                 }
             }
             builder.uriTemplateManagerFactory(UriTemplate::new).resources(plain).resourceTemplates(templates);
+        }
+        if (prompts.any()) {
+            capabilities.prompts(false);
+            List<McpServerFeatures.SyncPromptSpecification> promptSpecs = new ArrayList<>();
+            for (McpSchema.Prompt prompt : prompts.list()) {
+                promptSpecs.add(new McpServerFeatures.SyncPromptSpecification(prompt, (exchange, request) -> current.get().prompts.get(request)));
+            }
+            builder.prompts(promptSpecs);
+            if (!prompts.completable().isEmpty()) {
+                capabilities.completions();
+                List<McpServerFeatures.SyncCompletionSpecification> completions = new ArrayList<>();
+                for (String name : prompts.completable()) {
+                    completions.add(new McpServerFeatures.SyncCompletionSpecification(new McpSchema.PromptReference(name),
+                            (exchange, request) -> current.get().prompts.complete(request)));
+                }
+                builder.completions(completions);
+            }
         }
         builder
                 .serverInfo(new McpSchema.Implementation(manifest.serverName(), manifest.serverTitle(), manifest.serverVersion()))
@@ -249,7 +275,15 @@ public final class McpServerFactory {
             } else if (token != null) {
                 arguments.put("confirm", token);       // not a confirmation tool: let validation reject it
             }
-            Object value = handler.call(exchange, tool, arguments, record);
+            Object value;
+            java.util.concurrent.ScheduledFuture<?> ticker = progress(exchange, request, tool);
+            try {
+                value = handler.call(exchange, tool, arguments, record);
+            } finally {
+                if (ticker != null) {
+                    ticker.cancel(false);
+                }
+            }
             if (value instanceof Discovery.Passthrough passthrough) {
                 // call_tool / invoke_operation: the inner call was audited itself; return its result as is
                 result = passthrough.result();
@@ -278,6 +312,28 @@ public final class McpServerFactory {
         result = withCorrelation(result, cid);
         auditCall(name, tool, arguments, record, outcome, code, cid, (System.nanoTime() - started) / 1_000_000, exchange);
         return result;
+    }
+
+    /**
+     * While an API tool's upstream call runs, {@code notifications/progress} every second to a client that
+     * sent a {@code progressToken} (tools-contract §14.3); null when there is nothing to report.
+     */
+    private java.util.concurrent.ScheduledFuture<?> progress(McpSyncServerExchange exchange, McpSchema.CallToolRequest request, JsonNode tool) {
+        Object token = request.meta() == null ? null : request.meta().get("progressToken");
+        if (token == null || exchange == null || !tool.path("kind").asText().equals("api")) {
+            return null;
+        }
+        long started = System.nanoTime();
+        String api = tool.path("api").asText();
+        return PROGRESS.scheduleAtFixedRate(() -> {
+            try {
+                double seconds = (System.nanoTime() - started) / 1e9;
+                exchange.progressNotification(new McpSchema.ProgressNotification(token, Math.floor(seconds), null,
+                        "Waiting for " + api + " (" + Math.round(seconds) + " s)"));
+            } catch (RuntimeException e) {
+                LOG.debug("Progress for {} couldn't be sent: {}", tool.path("name").asText(), e.getMessage());
+            }
+        }, 1, 1, java.util.concurrent.TimeUnit.SECONDS);
     }
 
     /**

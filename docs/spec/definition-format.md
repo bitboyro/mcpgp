@@ -235,6 +235,7 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 | `RULE_MATCHES_NOTHING` | warning | a rule matches no tool |
 | `CONTENT_TYPE_UNKNOWN` | error | a rule binds a content type the operation doesn't accept |
 | `RESOURCE_NOT_GET` | error | `expose: resource` on an operation that isn't a `GET` (tools-contract §14.1) |
+| `PROMPT_UNKNOWN_ARGUMENT` | error | a prompt message uses `{{name}}` for an argument the prompt doesn't declare (tools-contract §14.2) |
 | `RESOURCE_NEEDS_HEADER` | error | `expose: resource` on an operation with a required header or cookie parameter, which a resource URI can't carry |
 | `DESCRIPTION_TRUNCATED` | warning | a description was shortened to 1024 characters |
 | `NAME_TOO_LONG` | error | a name exceeds the limit and `onTooLong: error` |
