@@ -9,47 +9,68 @@ pipelines run. The web UI and the REST API use the same compiler and packager.
 
 | Form | Use |
 |---|---|
-| Container image `mcpgp:<version>` | CI (recommended): nothing to install, version pinned by tag + digest |
-| Single binary / jar, with `SHA256SUMS` | Developer machines, air-gapped CI |
+| Container image `docker.io/<account>/mcpgp-cli:<version>` (`mcpgp` on the PATH, git included) | CI (recommended): nothing to install, version pinned by tag + digest |
+| `mcpgp-cli-<version>.zip` from the GitHub release: `bin/mcpgp` (and `bin/mcpgp.cmd`), `lib/mcpgp-cli.jar`; checksums in the release's `SHA256SUMS` | Developer machines, air-gapped CI. Needs Java 21+ (`JAVA_HOME`, else `java` on the PATH); `MCPGP_JAVA_OPTS` adds JVM options |
+| `mcpgp-cli-<version>.jar` from the release | `java -jar mcpgp-cli-<version>.jar …` |
+| **TODO:** a single native binary | Without Java |
 
-Pin the version in the repo: `.mcpgp/config.yaml` → `cli: 0.4.2`. The CLI refuses to run with a
-different version unless `--ignore-version` is given.
+Pin the version in the repo: `.mcpgp/config.yaml` → `cli: 0.1.0`. The CLI refuses to run with a
+different version (exit code 5) unless `--ignore-version` is given. Help (`--help`, `-h`) and
+`--version` always work.
 
 ## 2. Repository config (`.mcpgp/config.yaml`)
 
+The CLI uses the nearest `.mcpgp/config.yaml` from the working directory upwards, or the file given
+with `--config`. Paths in it are relative to the repository root (the folder holding `.mcpgp/`). It
+is checked against `schemas/cli-config.schema.json`.
+
 ```yaml
-cli: 0.4.2                     # exact CLI version this repo is built with
-workspace: workspace           # local folder for mcpgp:// references (or `platform: <url>`)
+cli: 0.1.0                     # exact CLI version this repo is built with
+workspace: workspace           # local folder for mcpgp:// references (default for --workspace)
 servers:                       # definitions in this repo
   - servers/orders/orders.mcpgp.yaml
   - servers/orders-readonly/orders-readonly.mcpgp.yaml
 out: dist
 release:
-  versionFrom: contract        # contract (default: the API version) | git-tag | file:VERSION | flag
-  baseline: last-release       # what `diff` compares against
+  versionFrom: contract        # contract (default: the API version); TODO: git-tag | file:VERSION | flag
+  baseline: last-release       # TODO: what `diff` compares against
 sign:
-  key: ${env:MCPGP_SIGNING_KEY}
+  key: ${env:MCPGP_SIGNING_KEY}  # the key `mcpgp sign` uses (a reference)
 ```
+
+| Key | Used by |
+|---|---|
+| `cli` | every command: the version pin |
+| `servers` | `validate --all`, `build --all`, `test --all` |
+| `workspace` | every command that compiles, when `--workspace` isn't given |
+| `out` | `build`, when `--out` isn't given (default `dist`) |
+| `sign.key` | `sign`, when `--key` isn't given (default `${env:MCPGP_SIGNING_KEY}`) |
+| `release.versionFrom` | only `contract` for now; other values warn and fall back to the contract (**TODO**) |
+| `release.baseline` | **TODO** (`diff`) |
+| `platform` | **TODO**: `mcpgp://` references from a platform instead of `workspace`; warns |
 
 ## 3. Commands
 
 | Command | Does |
 |---|---|
 | `mcpgp init [--from-spec <file\|url>] [--name <n>] [--out <dir>]` | Scaffold a definition project: the definition, the spec under `contracts/`, and `tests/smoke.yaml` with cases for read tools that need no arguments (§3.1) |
-| `mcpgp validate [<def>…]` | Schema + compiler checks; no output files |
-| `mcpgp preview <def> [--tools] [--customer] [--format md\|json]` | What the agent gets / what the customer configures |
+| `mcpgp validate <def…\|--all>` | Schema + compiler checks; no output files |
+| `mcpgp preview <def> [--tools] [--customer] [--format md\|json]` | **TODO (not in 0.1.0)** What the agent gets / what the customer configures. Until then: `build --manifest-only`, or the platform's pages |
 | `mcpgp explain <def> <tool>` | Provenance of a tool's name, title, description |
-| `mcpgp diff <def> [--against <tag\|manifest.json\|last-release>] [--format md\|json]` | Added, removed and changed tools, schemas and names (informational) |
+| `mcpgp diff <def> [--against <tag\|manifest.json\|last-release>] [--format md\|json]` | **TODO (not in 0.1.0)** Added, removed and changed tools, schemas and names (informational) |
 | `mcpgp names accept <def> <tool…\|--all>` | Write the names the policy gives now into `mcp-names.lock`: accepts renames (a breaking change for clients) and locks names the file doesn't have yet; tools by current name, new name or operation id. Existing entries keep their order, and entries of tools not in the build stay |
 | `mcpgp build <def…\|--all> [--version <v>] [--build-number <n>] [--source <uri>] [--frozen-lock] [--manifest-only] [--out <dir>]` | Compile + package: `dist/<name>-<version>.zip` and `dist/<name>-<version>.manifest.json`; `--manifest-only` writes only the manifest |
-| `mcpgp test <def> [--suite tests/]` | Start the server against a mock made from the specs; run a smoke check and the test cases (§3.2) |
+| `mcpgp test <def…\|--all> [--suite tests/]` | Start the server against a mock made from the specs; run a smoke check and the test cases (§3.2). With several definitions each uses its own `tests/` |
 | `mcpgp keygen [--out <dir>]` | Create a signing key pair (`mcpgp.key`, secret; `mcpgp.pub`, to publish) |
-| `mcpgp verify <zip> --key <pub>` | Check the signature of `SHA256SUMS` and every file against it; extra or changed files fail |
-| `mcpgp migrate <def>` | Upgrade a definition to the current `apiVersion` |
-| `mcpgp try <def> --target <url>` | Run the server locally against a real target the developer's machine can reach (never in CI by default) |
+| `mcpgp sign <dir> [--key <ref>]` | Sign a release directory (§3.4): `SHA256SUMS` over its files and `SHA256SUMS.sig` |
+| `mcpgp verify <zip\|dir> --key <pub>` | Check the signature of `SHA256SUMS` and every file against it, in a package or a signed directory; extra or changed files fail |
+| `mcpgp migrate <def>` | **TODO (not in 0.1.0; there is one `apiVersion` so far)** Upgrade a definition to the current `apiVersion` |
+| `mcpgp try <def> --target <url>` | **TODO (not in 0.1.0)** Run the server locally against a real target the developer's machine can reach (never in CI by default). Until then: run the built package with a config pointing at the target |
 | `mcpgp push <def> [--platform <url>] [--server <id>] [--message <text>] [--build] [--verify-local] [--release]` | Upload the definition project to a platform as its server's next version; optionally build, compare and release it there (§3.3) |
 
-Global flags: `--config`, `--workspace`, `--json` (machine-readable output), `--quiet`, `--no-color`.
+Global flags: `--config <file>`, `--ignore-version`, `--help`, `--version`; on the commands that
+compile: `--workspace`, `--json` (machine-readable output), `--quiet`. **TODO:** `--no-color` (the
+output has no colour yet).
 
 ### 3.1 `init`
 
@@ -108,6 +129,15 @@ with the same compiler, so there is one way for packages to come about.
 - `--release` (implies `--build`) releases the build; for an agent's token it requests an approval
   instead, which a person decides (platform-api.md §5).
 - `--json` prints `{server, version, created, build, status, serverVersion, released | approval, ok}`.
+
+### 3.4 `sign`
+
+`mcpgp sign dist/` writes `dist/SHA256SUMS` (`<sha256>  <file>` for every file directly in the
+directory, sorted) and `dist/SHA256SUMS.sig` (minisign, Ed25519), replacing earlier ones. It signs
+what you publish next to the packages; each package is signed inside by `build` when the
+definition has `build.sign.key` (a package's signature can't be added afterwards: its docs and files
+say whether it is signed). The key is a reference (`--key '${env:NAME}'` or `${file:path}`), never
+the key itself. Customers check with `mcpgp verify dist/ --key mcpgp.pub`, or with `minisign -V`.
 
 ## 4. Exit codes
 

@@ -72,9 +72,8 @@ jobs:
         run: |
           openssl rand -base64 24 > secrets/admin_password
           openssl rand -base64 24 > secrets/db_password
-          (cd .. && mvn -B -q install -DskipTests && mvn -B -q -pl cli dependency:build-classpath -Dmdep.outputFile=/tmp/cli.cp)
-          java -cp "$(ls ../cli/target/mcpgp-cli-*.jar):$(cat /tmp/cli.cp)" \
-            ro.bitboy.mcpgp.cli.Main keygen --out /tmp/key
+          (cd .. && mvn -B -q -pl cli -am package -DskipTests)
+          java -jar ../cli/target/mcpgp-cli-*-exec.jar keygen --out /tmp/key
           cp /tmp/key/mcpgp.key secrets/signing_key
           chmod 644 secrets/*_password secrets/signing_key
           cp .env.example .env
@@ -100,6 +99,29 @@ jobs:
       - name: Logs
         if: always()
         run: docker compose logs --no-color | tail -200
+
+  cli-image:
+    # the CLI image as CI jobs use it: mcpgp on the PATH, the repository mounted
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the CLI image
+        run: docker build -f deploy/cli.Dockerfile -t mcpgp-cli:ci .
+      - name: validate --all and test --all in the pipeline example
+        run: |
+          docker run --rm -v "$PWD":/work -w /work/examples/pipeline mcpgp-cli:ci validate --all
+          docker run --rm -v "$PWD":/work -w /work/examples/pipeline mcpgp-cli:ci test --all --quiet
+          docker run --rm --entrypoint sh mcpgp-cli:ci -c 'mcpgp --version && git --version'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: The CLI zip and its launcher
+        run: |
+          mvn -B -q -pl cli -am package -DskipTests
+          cli/src/dist/assemble.sh "$(python3 -c 'import xml.etree.ElementTree as E; print(E.parse("pom.xml").getroot().find("{http://maven.apache.org/POM/4.0.0}version").text)')" /tmp/release
+          cd /tmp/release && unzip -q mcpgp-cli-*.zip && mcpgp-cli-*/bin/mcpgp --version
 
   links:
     runs-on: ubuntu-latest

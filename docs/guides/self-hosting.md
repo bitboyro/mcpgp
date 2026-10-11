@@ -46,6 +46,10 @@ Edit `.env`:
 
 ## 3. Start it
 
+**With the published image** (no build on the host): set `MCPGP_IMAGE` in `.env` to a release,
+e.g. `MCPGP_IMAGE=docker.io/<account>/mcpgp-platform:0.1.0`, then `docker compose pull platform`
+and leave `--build` out of the commands below. **Or build it here** from the repository, as below.
+
 Pick the store ([../deployment.md §4](../deployment.md#4-storage) compares them):
 
 ```bash
@@ -124,8 +128,12 @@ curl -X PUT https://mcpgp.example.com/api/v1/identities/<your id>/password \
 
 ## 6. Sign packages
 
+With the CLI (`mcpgp-cli-<version>.zip` from the release, Java 21+), or its image without installing
+anything:
+
 ```bash
 mcpgp keygen --out keys            # keys/mcpgp.key (secret), keys/mcpgp.pub (publish it)
+# or: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/keys":/work docker.io/<account>/mcpgp-cli:0.1.0 keygen
 cp keys/mcpgp.key secrets/signing_key && chmod 644 secrets/signing_key
 ```
 
@@ -181,8 +189,11 @@ on the backups.
 ## 10. Upgrade
 
 ```bash
-git pull                                  # or set MCPGP_IMAGE to the new tag
-docker compose up -d --build --wait
+# the published image: set MCPGP_IMAGE in .env to the new version, then
+docker compose pull platform && docker compose up -d --wait
+
+# or built here
+git pull && docker compose up -d --build --wait
 ```
 
 Read the [CHANGELOG](../../CHANGELOG.md) first and back up. If the platform logs that the store

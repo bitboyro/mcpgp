@@ -29,8 +29,8 @@ class TestCommandTest {
 
     @Test
     void theExampleSuitePassesAgainstTheMock() {
+        // the suite is tests/ next to the definition
         int code = run("test", "--workspace", EXAMPLES.resolve("platform/workspace").toString(),
-                "--suite", EXAMPLES.resolve("pipeline/servers/orders/tests").toString(),
                 EXAMPLES.resolve("platform/orders/orders.mcpgp.yaml").toString());
         assertThat(code).as(out + "\n" + err).isZero();
         assertThat(out.toString()).contains("✓ smoke: the server starts and lists its tools")

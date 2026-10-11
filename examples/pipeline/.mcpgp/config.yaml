@@ -1,11 +1,10 @@
-cli: 0.4.2
-workspace: workspace
-servers:
-  - servers/orders/orders.mcpgp.yaml
-  - servers/orders-readonly/orders-readonly.mcpgp.yaml
+cli: 0.1.0                    # the exact CLI version this repository is built with
+workspace: ../platform/workspace
+servers:                      # what --all builds; here the example servers next to this folder
+  - ../platform/orders/orders.mcpgp.yaml
+  - ../platform/orders-readonly/orders-readonly.mcpgp.yaml
 out: dist
 release:
   versionFrom: contract       # server version = API version
-  baseline: last-release
 sign:
   key: ${env:MCPGP_SIGNING_KEY}

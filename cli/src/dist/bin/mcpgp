@@ -1,0 +1,19 @@
+#!/bin/sh
+# mcpgp: runs the CLI jar of this installation (lib/mcpgp-cli.jar) with Java 21 or newer,
+# from JAVA_HOME when it is set, else the java on PATH. MCPGP_JAVA_OPTS adds JVM options.
+self=$0
+while [ -h "$self" ]; do                 # follow links, e.g. /usr/local/bin/mcpgp -> …/bin/mcpgp
+    link=$(readlink "$self")
+    case $link in
+        /*) self=$link ;;
+        *) self=$(dirname "$self")/$link ;;
+    esac
+done
+home=$(cd "$(dirname "$self")/.." && pwd)
+if [ -n "$JAVA_HOME" ]; then java=$JAVA_HOME/bin/java; else java=java; fi
+if ! command -v "$java" >/dev/null 2>&1; then
+    echo "mcpgp needs Java 21 or newer: install it, or set JAVA_HOME" >&2
+    exit 10
+fi
+# shellcheck disable=SC2086
+exec "$java" $MCPGP_JAVA_OPTS -jar "$home/lib/mcpgp-cli.jar" "$@"
