@@ -138,6 +138,10 @@ versions follow [SemVer](https://semver.org).
   (stdio: the server's tool list; HTTP: `tools/list` per session and `list_changed` to that session
   only), and refuses tools of disabled toolsets with `TOOLSET_DISABLED`.
 
+- Runtime: the recording pack (`recording_start`, `recording_stop`, `recording_list`,
+  `recording_sessions`): a session's upstream calls, redacted before storage (secrets, redaction
+  fields, credential headers), capped, owner-only, with retention.
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 

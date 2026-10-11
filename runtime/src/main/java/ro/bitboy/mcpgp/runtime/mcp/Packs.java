@@ -18,7 +18,7 @@ import java.util.stream.Stream;
 
 /**
  * The P0 support packs (packaging.md §4.1) that need nothing outside the server: audit, introspection,
- * schema and diagnostics (via {@link Probe}). Recording comes later; its tools are not offered until then.
+ * schema, diagnostics (via {@link Probe}) and recording (via {@link ro.bitboy.mcpgp.runtime.call.Recordings}).
  */
 final class Packs {
 
@@ -43,7 +43,53 @@ final class Packs {
         handlers.put("describe_schema", (exchange, tool, args, record) -> describeSchema(args));
         handlers.put("tls_certificate_fetch", (exchange, tool, args, record) -> Probe.certificate(instance(args)));
         handlers.put("connectivity_check", (exchange, tool, args, record) -> Probe.connectivity(instance(args)));
+        ro.bitboy.mcpgp.runtime.call.Recordings recordings = recordings();
+        if (recordings != null) {
+            handlers.put("recording_start", (exchange, tool, args, record) -> recording(() -> recordings.start(Toolsets.session(exchange),
+                    text(args.get("description")))));
+            handlers.put("recording_stop", (exchange, tool, args, record) -> recording(() -> recordings.stop(Toolsets.session(exchange),
+                    text(args.get("findings")))));
+            handlers.put("recording_list", (exchange, tool, args, record) -> recording(() -> Paging.page(
+                    recordings.calls(Toolsets.session(exchange), text(args.get("session"))), args.get("cursor"), limit(args))));
+            handlers.put("recording_sessions", (exchange, tool, args, record) -> recording(() -> Paging.page(recordings.sessions(),
+                    args.get("cursor"), limit(args))));
+        }
         return handlers;
+    }
+
+    // ---------------------------------------------------------------------- recording
+
+    private ro.bitboy.mcpgp.runtime.call.Recordings recordings() {
+        boolean pack = false;
+        for (JsonNode p : manifest.root().path("packs")) {
+            pack |= p.path("id").asText().equals("recording");
+        }
+        if (!pack) {
+            return null;
+        }
+        java.util.Set<String> fields = new java.util.HashSet<>();
+        manifest.policies().at("/redaction/fields").forEach(f -> fields.add(f.asText()));
+        // the same store the API tools record into (it is shared per storage root)
+        return ro.bitboy.mcpgp.runtime.call.Recordings.of(config.storageRoot(), fields, java.util.Set.of(), config.secrets(),
+                manifest.policies().path("responseLimitKb").asInt(256) * 1024, config.packs().path("recording").path("retainDays").asInt(14));
+    }
+
+    private static Object recording(java.util.function.Supplier<Object> action) {
+        try {
+            return action.get();
+        } catch (IllegalStateException e) {
+            throw new ToolError("INPUT_VALIDATION", e.getMessage(), "Use recording_sessions to see the recordings");
+        } catch (IllegalArgumentException e) {
+            throw new ToolError("INPUT_VALIDATION", e.getMessage());
+        }
+    }
+
+    private static String text(Object value) {
+        return value == null ? null : value.toString();
+    }
+
+    private static int limit(Map<String, Object> args) {
+        return args.get("limit") instanceof Number n ? Math.max(1, Math.min(200, n.intValue())) : 50;
     }
 
     // ---------------------------------------------------------------------- audit

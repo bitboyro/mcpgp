@@ -207,6 +207,9 @@ public final class McpServerFactory {
         String code = null;
         ro.bitboy.mcpgp.runtime.telemetry.Telemetry.Call traced = ro.bitboy.mcpgp.runtime.telemetry.Telemetry.current()
                 .call(name, tool == null ? null : tool.path("api").asText(null));
+        // the recording pack captures the upstream calls of this session (a discovery call's inner call keeps it)
+        String outerSession = ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.get();
+        ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(exchange != null ? exchange.sessionId() : outerSession);
         try {
             if (tool == null) {
                 throw new ToolError("INPUT_VALIDATION", "Unknown tool " + name);
@@ -249,6 +252,7 @@ public final class McpServerFactory {
             result = Results.error(new ToolError("INTERNAL", "The tool failed unexpectedly; see the server log"), null);
         } finally {
             MDC.remove("cid");
+            ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(outerSession);
             traced.result(record.api, record.instance, record.contract, outcome, code);
             traced.close();
         }

@@ -88,7 +88,7 @@ permissions: [support.recording]
 - A pack whose `requires.config` is missing at runtime does not register its tools and logs why.
 - A pack configured **incompletely** (e.g. issue tracker URL without a token) fails startup with an
   error free of secrets, instead of registering broken tools.
-- Initial packs (P0), none of which needs anything outside the server: schema (`describe_schema`), audit,
+- Initial packs (P0), none of which needs anything outside the server (all implemented): schema (`describe_schema`), audit,
   diagnostics (`tls_certificate_fetch`, connectivity), health, recording, introspection.
 - Later (P1), because they need external systems or files: issue tracker (Jira),
   skills, agent feedback.
@@ -98,7 +98,7 @@ permissions: [support.recording]
 | Pack | Tools | Behaviour |
 |---|---|---|
 | audit | `audit_list` | Reads the audit file, newest first, paged; filters by tool, instance, outcome, time. |
-| recording | `recording_start` (description) · `recording_stop` (findings) · `recording_list` · `recording_sessions` | Named, dated sessions capturing upstream request/response pairs, bodies included, redacted before storage. A recording doubles as a configuration capture (its GETs) and a behaviour probe (its writes). |
+| recording | `recording_start` (description) · `recording_stop` (findings) · `recording_list` · `recording_sessions` | Named, dated sessions capturing the upstream request/response pairs of **one MCP session** (one running recording per session), bodies included, redacted before storage: secret values, the definition's `redaction.fields` (JSON at any depth, query and form fields), credential and API-key headers; bodies capped at `responseLimitKb`, at most 1000 calls. Stored owner-only under `<storage.root>/recordings/<id>/`; removed after `packs.recording.retainDays` (14) when the server starts. A recording doubles as a configuration capture (its GETs) and a behaviour probe (its writes). |
 | diagnostics | `tls_certificate_fetch`, connectivity and auth checks | Read-only; `tls_certificate_fetch` returns PEM chain, subject, issuer, validity, SHA-256 and a hostname warning; limited to configured instance hosts by default. |
 | issue tracker | `issue_<area>_create` / `_list` per configured area · `comment_create` / `comment_list` | Areas are configured by the operator with a title, a description and a destination (`local` file store or an issue tracker such as Jira). Area descriptions tell the agent to **list before creating** to avoid duplicates. |
 | skills | `skill_get` · `skill_update` · `skill_improve` · `skill_history` · `skill_test_generate` | Confined to configured paths. `skill_improve` **never applies a change**: it returns the current content and asks the agent to propose the change as an issue; `skill_update` only on an explicit user request. Every update is versioned in `skill_history`. |
