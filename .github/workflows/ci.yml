@@ -72,9 +72,8 @@ jobs:
         run: |
           openssl rand -base64 24 > secrets/admin_password
           openssl rand -base64 24 > secrets/db_password
-          (cd .. && mvn -B -q install -DskipTests && mvn -B -q -pl cli dependency:build-classpath -Dmdep.outputFile=/tmp/cli.cp)
-          java -cp "$(ls ../cli/target/mcpgp-cli-*.jar):$(cat /tmp/cli.cp)" \
-            ro.bitboy.mcpgp.cli.Main keygen --out /tmp/key
+          (cd .. && mvn -B -q -pl cli -am package -DskipTests)
+          java -jar ../cli/target/mcpgp-cli-*-exec.jar keygen --out /tmp/key
           cp /tmp/key/mcpgp.key secrets/signing_key
           chmod 644 secrets/*_password secrets/signing_key
           cp .env.example .env
