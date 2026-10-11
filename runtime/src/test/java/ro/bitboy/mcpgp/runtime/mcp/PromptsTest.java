@@ -21,9 +21,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -49,10 +54,13 @@ class PromptsTest {
     MockTarget target;
     ConfigurableApplicationContext context;
     int port;
-    int id = 1;
+    final AtomicInteger id = new AtomicInteger(1);
+    /** One client for the whole test: a client per call leaves hundreds of selector threads and pipes open. */
+    final HttpClient http = HttpClient.newHttpClient();
 
     @AfterEach
     void stop() {
+        http.close();
         if (context != null) {
             context.close();
         }
@@ -131,6 +139,32 @@ class PromptsTest {
         assertThat(completion.at("/result/completion/values")).extracting(JsonNode::asText).containsExactly("formal");
     }
 
+    /**
+     * Regression: a handler that throws must still get its whole error reply out. With handlers offloaded to
+     * boundedElastic, Reactor could interrupt the worker while it wrote the reply; Tomcat then failed the write,
+     * the response ended without its last chunk and the SDK dropped the session.
+     */
+    @Test
+    void errorRepliesSurviveConcurrentCalls() throws Exception {
+        start();
+        String session = session();
+        ExecutorService pool = Executors.newFixedThreadPool(16);
+        try {
+            List<Future<JsonNode>> replies = new ArrayList<>();
+            for (int i = 0; i < 800; i++) {
+                replies.add(pool.submit(() -> message(rpc(session, "prompts/get",
+                        Map.of("name", "orders_refund_review", "arguments", Map.of("order_id", "o", "tone", "loud"))))));
+            }
+            for (Future<JsonNode> reply : replies) {
+                assertThat(reply.get().at("/error/code").asInt()).as("%s", reply.get()).isEqualTo(-32602);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        // the session is still there
+        assertThat(message(rpc(session, "prompts/list", Map.of())).at("/result/prompts/0/name").asText()).isEqualTo("orders_refund_review");
+    }
+
     @Test
     void slowCallsReportProgressWhenAsked() throws Exception {
         start();
@@ -156,7 +190,7 @@ class PromptsTest {
     }
 
     String session() throws Exception {
-        HttpResponse<String> init = post(null, Map.of("jsonrpc", "2.0", "id", id++, "method", "initialize", "params",
+        HttpResponse<String> init = post(null, Map.of("jsonrpc", "2.0", "id", id.getAndIncrement(), "method", "initialize", "params",
                 Map.of("protocolVersion", "2025-11-25", "capabilities", Map.of(), "clientInfo", Map.of("name", "t", "version", "1"))));
         assertThat(message(init).at("/result/capabilities").has("prompts")).isTrue();
         assertThat(message(init).at("/result/capabilities").has("completions")).isTrue();
@@ -166,7 +200,7 @@ class PromptsTest {
     }
 
     HttpResponse<String> rpc(String session, String method, Object params) throws Exception {
-        return post(session, Map.of("jsonrpc", "2.0", "id", id++, "method", method, "params", params));
+        return post(session, Map.of("jsonrpc", "2.0", "id", id.getAndIncrement(), "method", method, "params", params));
     }
 
     static JsonNode message(HttpResponse<String> response) throws Exception {
@@ -189,6 +223,6 @@ class PromptsTest {
         if (session != null) {
             request.header("Mcp-Session-Id", session);
         }
-        return HttpClient.newHttpClient().send(request.build(), HttpResponse.BodyHandlers.ofString());
+        return http.send(request.timeout(Duration.ofSeconds(30)).build(), HttpResponse.BodyHandlers.ofString());
     }
 }

@@ -147,9 +147,15 @@ public final class McpServerFactory {
         return configure(McpServer.sync(transport));
     }
 
-    /** Streamable HTTP. */
+    /**
+     * Streamable HTTP. Handlers run on the request thread, which the servlet transport blocks until the
+     * reply is written anyway. Offloading them ({@code subscribeOn(boundedElastic)}, the SDK default) races
+     * when a handler throws: Reactor cancels the scheduled task from the request thread while the worker is
+     * writing the error reply, the interrupt makes Tomcat fail the write, and the SDK cuts the response
+     * short and drops the session.
+     */
     public McpSyncServer create(io.modelcontextprotocol.spec.McpStreamableServerTransportProvider transport) {
-        return configure(McpServer.sync(transport));
+        return configure(McpServer.sync(transport).immediateExecution(true));
     }
 
     private McpSyncServer configure(McpServer.SyncSpecification<?> builder) {
