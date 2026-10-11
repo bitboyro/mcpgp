@@ -6,6 +6,16 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- Self-hosting: the platform image (`deploy/Dockerfile`, non-root, health check) and Docker Compose
+  files for the file store, PostgreSQL, package signing and company sign-in; `deploy/smoke-test.py`
+  checks an installation end to end. Docs: [docs/deployment.md](docs/deployment.md) and
+  [docs/guides/self-hosting.md](docs/guides/self-hosting.md).
+- Platform: the PostgreSQL store (`storage.type: postgres`), next to the file store, which stays the
+  default; one platform process per store; `copy-store --from <dir>` moves a file store's data into it.
+- Platform: the first administrator from the config (`admin.name`, `admin.password` as a reference),
+  `GET /healthz`, `MCPGP_PLATFORM_STORAGE__*` and `MCPGP_PLATFORM_ADMIN__*` variables, `deployment:`
+  warnings at start, and `Secure` session cookies whenever `http.publicUrl` is `https://`.
+
 - `core` module, the compiler: multi-file definition resolution, Swagger 2.0 / OpenAPI 3.0 / 3.1
   loading with overlays, selection, rules, the naming pipeline with `mcp-names.lock`, grouped input
   schemas, and a deterministic manifest validated against its schema.
@@ -208,6 +218,11 @@ versions follow [SemVer](https://semver.org).
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 
 ### Fixed
+- **Try it** and `mcpgp test`: tools that a hybrid or discovery server doesn't list are called through
+  `call_tool` (or `invoke_operation`), as an agent would, instead of failing with "Tool not found".
+- Mock servers for **Try it** and `mcpgp test` run with a small fixed heap, and don't inherit
+  `JAVA_TOOL_OPTIONS`.
+- The page header's actions (the Tools / Operations / Naming switcher) keep their place.
 - Discovery: in multi-API servers, `search_tools` matched every API's tools against the first API's
   instance of the given id (and its contract), so tools of other APIs sharing that id went missing.
 - audit-event schema: `args` as `{ "sha256": … }` was rejected (`oneOf` matched two branches).

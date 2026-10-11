@@ -1,0 +1,12 @@
+# Signs built packages with the key in secrets/signing_key (`mcpgp keygen`; docs/guides/self-hosting.md).
+# Add it to any combination: docker compose -f compose.yaml [-f compose.postgres.yaml] -f compose.signing.yaml up -d
+services:
+  platform:
+    environment:
+      MCPGP_PLATFORM_SIGNING__KEY: "$${file:/run/secrets/signing_key}"
+    secrets:
+      - signing_key
+
+secrets:
+  signing_key:
+    file: ./secrets/signing_key

@@ -79,6 +79,11 @@ public final class FileStore implements Store {
         }
     }
 
+    @Override
+    public String describe() {
+        return "files (" + root + ")";
+    }
+
     // ---------------------------------------------------------------------- servers
 
     @Override
@@ -119,10 +124,7 @@ public final class FileStore implements Store {
     }
 
     private Path serverFile(String id) {
-        if (!id.matches("[a-z0-9][a-z0-9-]{1,62}")) {
-            throw new IllegalArgumentException("invalid server id " + id);
-        }
-        return root.resolve("servers").resolve(id).resolve("server.json");
+        return root.resolve("servers").resolve(StoreKeys.serverId(id)).resolve("server.json");
     }
 
     // ---------------------------------------------------------------------- library
@@ -165,9 +167,7 @@ public final class FileStore implements Store {
     }
 
     private Path libraryFile(String kind, String name) {
-        if (!kind.matches("[a-z]{2,20}") || !name.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,79}")) {
-            throw new IllegalArgumentException("invalid library item");
-        }
+        StoreKeys.libraryItem(kind, name);
         return root.resolve("library").resolve(kind).resolve(name).resolve("item.json");
     }
 
@@ -193,9 +193,7 @@ public final class FileStore implements Store {
     }
 
     private Path blobFile(String digest) {
-        if (!digest.matches("[0-9a-f]{64}")) {
-            throw new IllegalArgumentException("invalid digest");
-        }
+        StoreKeys.digest(digest);
         return root.resolve("blobs/sha256").resolve(digest.substring(0, 2)).resolve(digest);
     }
 
@@ -213,9 +211,7 @@ public final class FileStore implements Store {
     }
 
     private Path versionFile(String digest) {
-        if (!digest.matches("[0-9a-f]{64}")) {
-            throw new IllegalArgumentException("invalid digest");
-        }
+        StoreKeys.digest(digest);
         return root.resolve("versions").resolve(digest + ".json");
     }
 
@@ -291,17 +287,11 @@ public final class FileStore implements Store {
     }
 
     private Path buildDir(String id) {
-        if (!id.matches("b-[0-9a-zA-Z]{6,40}")) {
-            throw new IllegalArgumentException("invalid build id");
-        }
-        return root.resolve("builds").resolve(id);
+        return root.resolve("builds").resolve(StoreKeys.buildId(id));
     }
 
     private Path buildFilePath(String build, String name) {
-        if (!name.matches("[A-Za-z0-9][A-Za-z0-9._+-]{0,200}")) {
-            throw new IllegalArgumentException("invalid artifact name");
-        }
-        return buildDir(build).resolve("artifacts").resolve(name);
+        return buildDir(build).resolve("artifacts").resolve(StoreKeys.artifactName(name));
     }
 
     // ---------------------------------------------------------------------- identities
@@ -423,9 +413,7 @@ public final class FileStore implements Store {
     }
 
     private Path cacheFile(String kind, String key) {
-        if (!kind.matches("[a-z-]+") || !key.matches("[0-9a-z.-]+")) {
-            throw new IllegalArgumentException("invalid cache key");
-        }
+        StoreKeys.cacheKey(kind, key);
         return root.resolve("cache").resolve(kind).resolve(key);
     }
 

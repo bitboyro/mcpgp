@@ -93,7 +93,7 @@ public class SignInSecurity {
             finish(request, response, "/sign-in?error=no-access");
             return;
         }
-        response.addHeader(HttpHeaders.SET_COOKIE, AccountsApi.sessionCookie(request, token.value(), Accounts.SESSION).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, AccountsApi.sessionCookie(request, token.value(), Accounts.SESSION, config.publicUrl()).toString());
         finish(request, response, "/");
     }
 

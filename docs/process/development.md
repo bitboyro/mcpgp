@@ -70,9 +70,18 @@ A change is done when:
 | Wire | Every multipart, binary-upload and binary-download tool called against a capture mock; asserts `Content-Type`, `Accept`, body size, part names (tools-contract §13.5). Runs for the runtime and every generated client | `conformance/wire` |
 | Integration | Built package started with an example runtime config against a mock server generated from the spec | CI job |
 | Security | Path traversal, SSRF allowlist, redaction, `allowInsecure` guardrail, secret references | dedicated suite |
+| Store | The same platform tests on both stores: `FileStoreTest` / `PostgresStoreTest` (the store contract), and every platform API test again on PostgreSQL when `MCPGP_TEST_POSTGRES_URL` is set | `platform/`, CI job `postgres` |
+| Deployment | The image and Docker Compose with PostgreSQL and signing, checked with `deploy/smoke-test.py`, including a restart | CI job `deploy` |
 
 Rules: no test may call a real external system; mocks come from spec examples or recorded fixtures
 with secrets removed.
+
+The platform tests on PostgreSQL, locally (any throwaway database; each test class gets its own schema):
+
+```bash
+docker run -d --name mcpgp-pg -e POSTGRES_USER=mcpgp -e POSTGRES_PASSWORD=test -e POSTGRES_DB=mcpgp -p 55432:5432 postgres:17-alpine
+MCPGP_TEST_POSTGRES_URL=jdbc:postgresql://127.0.0.1:55432/mcpgp MCPGP_TEST_POSTGRES_PASSWORD=test mvn -pl platform test
+```
 
 ## 7. Versioning and releases
 

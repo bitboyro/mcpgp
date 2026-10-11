@@ -63,7 +63,7 @@ public class AccountsApi {
         Access.IssuedToken token = accounts.signIn(json.path("name").asText(null), json.path("password").asText(null));
         Map<String, Object> result = IdentitiesApi.token(token.record());
         if (AuthFilter.isWeb(request)) {
-            return ResponseEntity.status(201).header(HttpHeaders.SET_COOKIE, sessionCookie(request, token.value(), Accounts.SESSION).toString())
+            return ResponseEntity.status(201).header(HttpHeaders.SET_COOKIE, sessionCookie(request, token.value(), Accounts.SESSION, config.publicUrl()).toString())
                     .contentType(MediaType.APPLICATION_JSON).body(Json.status(201, result).getBody());
         }
         result.put("value", token.value());
@@ -82,7 +82,7 @@ public class AccountsApi {
                 token.expires(), true));
         store.append(new Model.Activity(Instant.now().toString(), who.identity().name(), who.identity().kind(), "signout",
                 who.identity().name(), "ok", Map.of("token", token.id())));
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, sessionCookie(request, "", Duration.ZERO).toString())
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, sessionCookie(request, "", Duration.ZERO, config.publicUrl()).toString())
                 .contentType(MediaType.APPLICATION_JSON).body(Json.ok(Map.of("signedOut", true)).getBody());
     }
 
@@ -117,8 +117,10 @@ public class AccountsApi {
         return auth;
     }
 
-    public static ResponseCookie sessionCookie(HttpServletRequest request, String value, Duration maxAge) {
-        boolean https = request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"));
+    /** Secure when the request came over https, or when the platform's public address is https (behind a TLS proxy). */
+    public static ResponseCookie sessionCookie(HttpServletRequest request, String value, Duration maxAge, String publicUrl) {
+        boolean https = request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"))
+                || (publicUrl != null && publicUrl.startsWith("https://"));
         return ResponseCookie.from(AuthFilter.COOKIE, value).httpOnly(true).secure(https).sameSite("Strict").path("/").maxAge(maxAge).build();
     }
 

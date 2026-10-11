@@ -1,0 +1,40 @@
+# Adds PostgreSQL and switches the platform's store to it (docs/guides/self-hosting.md):
+#   docker compose -f compose.yaml -f compose.postgres.yaml up -d --build
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mcpgp
+      POSTGRES_USER: mcpgp
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    secrets:
+      - db_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcpgp -d mcpgp"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # no published port: only the platform reaches the database
+
+  platform:
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MCPGP_PLATFORM_STORAGE__TYPE: postgres
+      MCPGP_PLATFORM_STORAGE__URL: jdbc:postgresql://db:5432/mcpgp
+      MCPGP_PLATFORM_STORAGE__USER: mcpgp
+      MCPGP_PLATFORM_STORAGE__PASSWORD: "$${file:/run/secrets/db_password}"
+    secrets:
+      - admin_password
+      - db_password
+
+volumes:
+  db-data: {}
+
+secrets:
+  db_password:
+    file: ./secrets/db_password

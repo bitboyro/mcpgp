@@ -266,6 +266,8 @@ export interface TryResult {
   error?: { code: number; message: string }
   requests: { method: string; path: string; query?: string | null; headers: Record<string, string>; body: string; status: number }[]
   leftOut: string[]
+  /** Set when the server doesn't list the tool (hybrid or discovery exposure): the discovery tool it was called through. */
+  via?: string
 }
 
 /** A notice added to tool descriptions (definition-format.md §5.1). */

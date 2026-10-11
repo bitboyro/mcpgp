@@ -237,8 +237,17 @@ with filters: `target`, `server` (the server's own entries and those of its buil
 workspace: acme                    # the <workspace> of mcpgp:// references (default local)
 http: { host: 0.0.0.0, port: 8443, publicUrl: https://mcpgp.acme.internal }   # publicUrl: for the OIDC callback behind a proxy
 storage:
-  type: files                      # files (now) | postgres (later)
-  root: /var/lib/mcpgp
+  type: files                      # files (the default) | postgres
+  root: /var/lib/mcpgp             # files: the directory
+  # type: postgres
+  # url: jdbc:postgresql://db:5432/mcpgp
+  # user: mcpgp
+  # password: "${file:/run/secrets/db_password}"
+  # schema: mcpgp                  # the default; created when missing
+  # poolSize: 10                   # the default
+admin:                             # the first administrator (a local account), created when the store has no identities
+  name: ana
+  password: "${file:/run/secrets/admin_password}"
 auth:
   local: { enabled: true }
   oidc:                            # company SSO
@@ -262,14 +271,30 @@ specHosts: []                      # hosts definitions may fetch specs from (non
 retention: { archiveAfterDays: 90, deleteArchivedAfterDays: 365, keepLast: 10 }
 ```
 
+Environment variables override the file: `MCPGP_PLATFORM_WORKSPACE`, `MCPGP_PLATFORM_HTTP__HOST`,
+`…HTTP__PORT`, `…HTTP__PUBLIC_URL`, `…STORAGE__TYPE`, `…STORAGE__ROOT`, `…STORAGE__URL`,
+`…STORAGE__USER`, `…STORAGE__PASSWORD`, `…STORAGE__SCHEMA`, `…STORAGE__POOL_SIZE`, `…SIGNING__KEY`,
+`…ADMIN__NAME`, `…ADMIN__PASSWORD` (all with the prefix `MCPGP_PLATFORM_`). Secrets (`password`,
+`clientSecret`, `bindPassword`, `signing.key`) are references, in the file and in the environment
+alike. `http.publicUrl` is `https://` (or `http://` for a local test); when it is `https://`, session
+cookies are always `Secure`. At start the platform logs `deployment:` warnings for settings unfit for
+a shared installation ([../deployment.md §10](../deployment.md#10-warnings-at-start)).
+
+Commands of the platform jar: `init --admin <name>` (the first administrator, once, printing a
+one-time admin token), `copy-store --from <directory>` (copies a file store into the configured,
+empty store, with build packages, build logs and the activity log), and no command: run.
+
 ### 7.1 Storage
 
-All data goes through one store interface; two implementations are planned:
+All data goes through one store interface with two implementations; both pass the same tests:
 
 | Store | For | Status |
 |---|---|---|
 | **files** | single-node installations: a directory on disk; backup is a copy of it | M5 |
-| **postgres** | larger installations, several platform nodes; files in the database or object storage | later |
+| **postgres** | shared installations: records as JSON in one schema, file contents as `bytea`; backup with `pg_dump` | ✓ ([ADR-0015](../decisions/0015-postgres-store.md)) |
+
+Either store serves one platform process: the file store per directory, PostgreSQL per schema (an
+advisory lock held while the store is open; a second process is refused at start).
 
 File store layout:
 
@@ -285,10 +310,20 @@ File store layout:
 └─ activity/activity-YYYY-MM.jsonl
 ```
 
+PostgreSQL tables (schema `mcpgp`): `store_info` (the format), `servers`, `library`, `versions`,
+`blobs`, `builds`, `build_files`, `build_logs`, `records` (identities, tokens, credentials,
+approvals), `activity`, `cache`. Records are `json` (not `jsonb`, which would reorder their keys).
+
 **Before 1.0.0 there are no store migrations.** The store records its format version; a platform
 release with another pre-1.0 format refuses to open it, naming both versions, and data moves with the
 export / import API (`GET /export`, `POST /import`: a zip of servers, versions, library and builds'
 records). From 1.0.0 the format is migrated forward automatically on start, with a backup first.
+
+### 7.2 Health
+
+`GET /healthz` (public, outside `/api/v1`): `200 {"status":"up"}` when the store can be reached,
+`503 {"status":"down"}` when it can't. Nothing else; for container health checks, load balancers
+and monitoring.
 
 ## 8. Security considerations
 

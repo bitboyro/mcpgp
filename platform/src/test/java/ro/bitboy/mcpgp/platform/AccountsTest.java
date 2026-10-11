@@ -66,7 +66,7 @@ class AccountsTest {
         try (ServerSocket socket = new ServerSocket(0)) {
             port = socket.getLocalPort();
         }
-        PlatformConfig config = new PlatformConfig(store, "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT, "local", true, guardrails);
+        PlatformConfig config = TestStores.of(new PlatformConfig(store, "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT, "local", true, guardrails));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PlatformServer.init(config, new String[] {"init", "--admin", "ana"}, new PrintStream(out, true, StandardCharsets.UTF_8));
         String admin = out.toString(StandardCharsets.UTF_8).lines().filter(l -> l.strip().startsWith("mcpgp_")).findFirst().orElseThrow().strip();
@@ -126,7 +126,9 @@ class AccountsTest {
         assertThat(platform.call("POST", "/sessions", null, JSON.writeValueAsBytes(Map.of("name", "bob", "password", "correct horse battery")),
                 "application/json").statusCode()).isEqualTo(401);
         assertThat(platform.json("GET", "/activity?action=signin", platform.admin(), null).path("items").findValuesAsText("outcome")).contains("denied", "ok");
-        assertThat(Files.readString(dir.resolve("store/identities/credentials.json"))).doesNotContain("correct horse");
+        if (TestStores.URL == null) {   // what the file store writes; the same records go to PostgreSQL as JSON
+            assertThat(Files.readString(dir.resolve("store/identities/credentials.json"))).doesNotContain("correct horse");
+        }
     }
 
     @Test

@@ -1,0 +1,5 @@
+# The image's default config: the file store in /var/lib/mcpgp (the volume).
+# Mount your own platform.yaml over /etc/mcpgp/platform.yaml, or set MCPGP_PLATFORM_* variables.
+storage:
+  type: files
+  root: /var/lib/mcpgp

@@ -1,0 +1,10 @@
+# Company sign-in (OpenID Connect): mounts secrets/oidc_client_secret for auth.oidc in platform.yaml
+# (docs/guides/self-hosting.md). A public client (PKCE only, no secret) doesn't need this file.
+services:
+  platform:
+    secrets:
+      - oidc_client_secret
+
+secrets:
+  oidc_client_secret:
+    file: ./secrets/oidc_client_secret

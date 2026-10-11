@@ -18,6 +18,8 @@
 | [spec/cli.md](spec/cli.md) | You script the CLI or run it in CI. |
 | [spec/platform-api.md](spec/platform-api.md) | You work on the platform: store, builds, identities, the REST API. |
 | [guides/ci-pipeline.md](guides/ci-pipeline.md) | You want reliable builds from a git repo in CI. |
+| [deployment.md](deployment.md) | You plan a platform installation: container, store, network, sign-in, backups, upgrades. |
+| [guides/self-hosting.md](guides/self-hosting.md) | You install the platform with Docker Compose, step by step. |
 | [guides/platform.md](guides/platform.md) | You run the platform: sign-in, the web UI, the API. |
 | [guides/agents.md](guides/agents.md) | An agent should build MCP servers on the platform. |
 | [guides/extensions.md](guides/extensions.md) | A server needs a bit of custom code. |

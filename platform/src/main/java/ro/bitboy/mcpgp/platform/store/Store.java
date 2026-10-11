@@ -5,13 +5,21 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
- * The platform's data (spec/platform-api.md §7.1). One interface, two planned implementations: the
- * file store now, PostgreSQL later. Blobs and versions are immutable and content-addressed.
+ * The platform's data (spec/platform-api.md §7.1). One interface, two implementations: the file store
+ * ({@link FileStore}) and PostgreSQL ({@link PostgresStore}); {@code storage.type} picks one. Blobs and
+ * versions are immutable and content-addressed.
  */
 public interface Store {
 
     /** The store format this release reads and writes. Before 1.0.0 other formats are refused, not migrated. */
     String FORMAT = "0.1";
+
+    /** Throws when the store can't be reached (the health check). */
+    default void check() {
+    }
+
+    /** Which store this is, for the log and the health check: {@code files (/var/lib/mcpgp)}. */
+    String describe();
 
     // servers
     List<Model.Server> servers();

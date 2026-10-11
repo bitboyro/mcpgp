@@ -18,9 +18,11 @@ http: { host: 127.0.0.1, port: 8443 }
 storage: { type: files, root: /var/lib/mcpgp }
 ```
 
-Environment variables `MCPGP_PLATFORM_STORAGE__ROOT`, `MCPGP_PLATFORM_HTTP__HOST` and
-`MCPGP_PLATFORM_HTTP__PORT` override the file. Back up by copying the storage root while the
-platform is stopped. TLS: put the platform behind your reverse proxy for now.
+Environment variables `MCPGP_PLATFORM_…` override the file (the list:
+[spec/platform-api.md §7](../spec/platform-api.md#7-platform-configuration-and-storage)). Back up by
+copying the storage root while the platform is stopped. TLS: put the platform behind your reverse
+proxy. For a shared installation (a container image, Docker Compose, PostgreSQL, company sign-in,
+backups) follow [self-hosting.md](self-hosting.md).
 
 ## The web UI
 

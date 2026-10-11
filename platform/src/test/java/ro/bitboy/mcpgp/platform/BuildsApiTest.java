@@ -54,8 +54,8 @@ class BuildsApiTest {
         keys = Minisign.generate();
         Path key = dir.resolve("signing.key");
         Files.writeString(key, Minisign.secretKeyFile(keys));
-        PlatformConfig config = new PlatformConfig(dir.resolve("store"), "127.0.0.1", port, "${file:" + key + "}",
-                PlatformConfig.Retention.DEFAULT);
+        PlatformConfig config = TestStores.of(new PlatformConfig(dir.resolve("store"), "127.0.0.1", port, "${file:" + key + "}",
+                PlatformConfig.Retention.DEFAULT));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         assertThat(PlatformServer.init(config, new String[] {"init", "--admin", "ana"}, new PrintStream(out, true, StandardCharsets.UTF_8))).isZero();
         admin = out.toString(StandardCharsets.UTF_8).lines().filter(l -> l.strip().startsWith("mcpgp_")).findFirst().orElseThrow().strip();
