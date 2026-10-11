@@ -127,6 +127,27 @@ class OrdersToolsTest {
         assertThat(TextOps.render("{{summary}} (x)", java.util.Map.of("summary", "Hi"))).isEqualTo("Hi (x)");
     }
 
+    @Test
+    void verbsFromHttpMethodsKeepPutAndPatchApart() {
+        java.util.function.BiFunction<Naming, ro.bitboy.mcpgp.core.openapi.ApiModel.Operation, String> name =
+                (n, op) -> n.base(op, new java.util.ArrayList<>());
+        Naming defaults = new Naming(Documents_yaml("{ source: methodPath }"));
+        assertThat(name.apply(defaults, op("PUT", "/customers/{id}"))).isEqualTo("customer_replace");
+        assertThat(name.apply(defaults, op("PATCH", "/customers/{id}"))).isEqualTo("customer_update");
+        assertThat(name.apply(defaults, op("GET", "/customers"))).isEqualTo("customer_list");
+        assertThat(name.apply(defaults, op("GET", "/customers/{id}"))).isEqualTo("customer_get");
+
+        Naming policy = new Naming(Documents_yaml("{ source: methodPath, methodVerbs: { PUT: upsert, LIST: search } }"));
+        assertThat(name.apply(policy, op("PUT", "/customers/{id}"))).isEqualTo("customer_upsert");   // a policy verb is shaped like a verb
+        assertThat(name.apply(policy, op("GET", "/customers"))).isEqualTo("customer_search");
+        assertThat(name.apply(policy, op("PATCH", "/customers/{id}"))).isEqualTo("customer_update");
+    }
+
+    private static ro.bitboy.mcpgp.core.openapi.ApiModel.Operation op(String method, String path) {
+        return new ro.bitboy.mcpgp.core.openapi.ApiModel.Operation("a:" + method + ":" + path, method, path, null, java.util.List.of(), null, null, false,
+                java.util.List.of(), null, java.util.List.of(), null, java.util.Map.of(), "");
+    }
+
     private static com.fasterxml.jackson.databind.JsonNode Documents_yaml(String text) {
         try {
             return ro.bitboy.mcpgp.core.resolve.Documents.YAML.readTree(text);

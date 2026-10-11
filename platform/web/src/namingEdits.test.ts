@@ -46,3 +46,15 @@ describe('editing naming', () => {
     ])
   })
 })
+
+describe('verbs from HTTP methods', () => {
+  it('reads defaults and the server\'s own, and writes one method', async () => {
+    const { methodVerbs } = await import('./naming')
+    const { methodVerb, validVerb } = await import('./namingEdits')
+    const verbs = methodVerbs({ extends: null, own: { methodVerbs: { PUT: 'upsert' } }, effective: { methodVerbs: { PUT: 'upsert' } }, lock: { present: false, entries: [] } })
+    expect(verbs.map((v) => [v.method, v.verb, v.own])).toEqual([['LIST', 'list', false], ['GET', 'get', false], ['POST', 'create', false],
+      ['PUT', 'upsert', true], ['PATCH', 'update', false], ['DELETE', 'delete', false]])
+    expect(methodVerb('PATCH', 'modify')).toEqual({ op: 'set', path: '/naming/methodVerbs/PATCH', value: 'modify' })
+    expect(validVerb('up_sert')).toBe(false)
+  })
+})

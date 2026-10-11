@@ -51,6 +51,9 @@ naming:
     order: object_verb       # object_verb (customer_get) | verb_object (get_customer)
     case: snake              # snake | camel | kebab
     number: singular         # singular | keep
+  methodVerbs:               # verbs from HTTP methods (when the name comes from method and path)
+    PUT: replace             # defaults: GET get, LIST list (GET on a collection), POST create,
+    PATCH: update            #           PUT replace, PATCH update, DELETE delete
   vocabulary:                # left side may be a regex alternation
     customer_account: customer
     "retrieve|fetch|read": get
@@ -76,7 +79,10 @@ no `dropWords`, `order: object_verb`, `case: snake`, `number: singular`, no voca
   restore, revoke, release, publish, assign, grant, edit, …); `object_verb` moves a leading verb to the end
   (`revokeToken` → `token_revoke`). Words outside the list are kept in place.
 - HTTP verb inference when the source has no verb (`methodPath`): GET on a collection → `list`,
-  GET on an item → `get`, POST → `create`, PUT/PATCH → `update`, DELETE → `delete`.
+  GET on an item → `get`, POST → `create`, PUT → `replace`, PATCH → `update`, DELETE → `delete`,
+  so PUT and PATCH on one path get different names. `methodVerbs` changes any of them (keys `GET`,
+  `LIST`, `POST`, `PUT`, `PATCH`, `DELETE`); a verb set there counts as a verb when shaping
+  (`upsert` → `customer_upsert`). Names that come from an operationId keep the operationId's verb.
 
 ## 4. Limits
 

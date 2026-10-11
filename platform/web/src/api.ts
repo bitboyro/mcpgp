@@ -282,6 +282,7 @@ export interface NamingPolicy {
   normalize?: { split?: string[]; dropWords?: string[] }
   shape?: { order?: string; case?: string; number?: string }
   vocabulary?: Record<string, string>
+  methodVerbs?: Record<string, string>
   namespace?: { server?: string; perApi?: boolean }
   limits?: { profile?: string; onTooLong?: string }
   collisions?: string

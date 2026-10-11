@@ -25,6 +25,12 @@
       },
       "additionalProperties": false
     },
+    "methodVerbs": {
+      "type": "object",
+      "description": "The verb per HTTP method when a name comes from method and path; LIST is GET on a collection. Defaults: GET get, LIST list, POST create, PUT replace, PATCH update, DELETE delete.",
+      "propertyNames": { "enum": ["GET", "LIST", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] },
+      "additionalProperties": { "type": "string", "pattern": "^[a-z][a-z0-9]{0,31}$" }
+    },
     "vocabulary": { "type": "object", "additionalProperties": { "type": ["string", "null"] }, "description": "words (a|b) → replacement; null removes an entry the extended policy has" },
     "namespace": {
       "type": "object",

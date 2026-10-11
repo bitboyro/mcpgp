@@ -45,6 +45,9 @@ final class Naming {
     private final String casing;
     private final boolean singular;
     private final Map<Pattern, String> vocabulary = new LinkedHashMap<>();
+    /** The verb for each HTTP method when the name comes from method and path; {@code LIST} is GET on a collection. */
+    private final Map<String, String> methodVerbs = new LinkedHashMap<>(Map.of(
+            "GET", "get", "LIST", "list", "POST", "create", "PUT", "replace", "PATCH", "update", "DELETE", "delete"));
     private final String serverPrefix;
     private final boolean perApi;
     final String profile;
@@ -66,6 +69,11 @@ final class Naming {
         policy.path("vocabulary").fields().forEachRemaining(f -> {
             if (!f.getValue().isNull()) {         // null switches off an inherited entry
                 vocabulary.put(Pattern.compile("(?<=^|_)(?:" + f.getKey() + ")(?=_|$)"), f.getValue().asText());
+            }
+        });
+        policy.path("methodVerbs").fields().forEachRemaining(f -> {
+            if (f.getValue().isTextual()) {
+                methodVerbs.put(f.getKey().toUpperCase(Locale.ROOT), f.getValue().asText().toLowerCase(Locale.ROOT));
             }
         });
         serverPrefix = policy.path("namespace").path("server").asText("");
@@ -200,13 +208,8 @@ final class Naming {
                 segments.addAll(words(segment));
             }
         }
-        String verb = switch (op.method()) {
-            case "GET" -> endsWithParameter ? "get" : "list";
-            case "POST" -> "create";
-            case "PUT", "PATCH" -> "update";
-            case "DELETE" -> "delete";
-            default -> op.method().toLowerCase(Locale.ROOT);
-        };
+        String method = op.method().equals("GET") && !endsWithParameter ? "LIST" : op.method();
+        String verb = methodVerbs.getOrDefault(method, op.method().toLowerCase(Locale.ROOT));
         List<String> words = new ArrayList<>();
         words.add(verb);
         words.addAll(segments);
@@ -215,7 +218,7 @@ final class Naming {
 
     private List<String> shape(List<String> words) {
         List<String> result = new ArrayList<>(words);
-        boolean hasVerb = !result.isEmpty() && VERBS.contains(result.get(0));
+        boolean hasVerb = !result.isEmpty() && (VERBS.contains(result.get(0)) || methodVerbs.containsValue(result.get(0)));
         if (singular) {
             for (int i = hasVerb ? 1 : 0; i < result.size(); i++) {
                 result.set(i, singularize(result.get(i)));

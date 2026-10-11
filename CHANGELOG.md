@@ -180,6 +180,11 @@ versions follow [SemVer](https://semver.org).
   names the file doesn't have yet).
 
 ### Changed
+- Naming: when a name comes from method and path (no operationId), PUT gives `replace` and PATCH
+  `update` (PUT was `update` too, so PUT and PATCH on one path collided). Tools in `mcp-names.lock`
+  keep their names; others named this way from a PUT change from `…_update` to `…_replace`.
+  `methodVerbs` in a naming policy sets the verb per method (`GET`, `LIST`, `POST`, `PUT`, `PATCH`,
+  `DELETE`), and Tools & rules → Naming edits it per server.
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 
 ### Fixed
