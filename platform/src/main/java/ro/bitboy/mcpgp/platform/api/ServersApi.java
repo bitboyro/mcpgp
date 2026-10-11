@@ -149,16 +149,27 @@ public class ServersApi {
     /** Every operation of the version's contracts: a tool, a resource, left out by {@code select} (and by what), or hidden by a rule. */
     @GetMapping("/{id}/versions/{version}/operations")
     public ResponseEntity<byte[]> operations(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
+        return derived(request, id, version, compilation::operations);
+    }
+
+    /** The version's naming: the policy it extends, its own settings, the effective policy and the lock file's entries. */
+    @GetMapping("/{id}/versions/{version}/naming")
+    public ResponseEntity<byte[]> naming(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
+        return derived(request, id, version, compilation::naming);
+    }
+
+    private ResponseEntity<byte[]> derived(HttpServletRequest request, String id, String version,
+                                           java.util.function.BiFunction<Model.Version, String, com.fasterxml.jackson.databind.node.ObjectNode> from) {
         who(request).require("servers:read");
         Model.VersionRef ref = servers.version(servers.get(id), version);
-        com.fasterxml.jackson.databind.node.ObjectNode operations = compilation.operations(servers.files(ref), ref.created());
-        if (operations == null) {
+        com.fasterxml.jackson.databind.node.ObjectNode value = from.apply(servers.files(ref), ref.created());
+        if (value == null) {
             Compiler.Result result = compilation.compile(servers.files(ref), new ManifestWriter.Build(Instant.parse(ref.created()), Compiler.VERSION, null, null, null));
             throw new ApiException(422, "VALIDATION", "version " + ref.number() + " does not compile",
                     Map.of("diagnostics", diagnostics(result.diagnostics())));
         }
-        operations.put("version", ref.number());
-        return Json.ok(operations);
+        value.put("version", ref.number());
+        return Json.ok(value);
     }
 
     /** {@code {id, title?}}: an independent copy of the latest version. */

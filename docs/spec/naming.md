@@ -123,7 +123,9 @@ tools:
 
 - Once released, a tool keeps its name even if the policy or the spec would now produce another.
   The build reports `name drift: would be X, kept Y`.
-- To rename on purpose: `mcpgp names accept <tool|--all>`.
+- To rename on purpose: `mcpgp names accept <tool|--all>`. It also locks tools the file doesn't list
+  yet (`since`: the server version); `--all` does both for every tool. Entries of tools that aren't in
+  the build any more stay, so a tool that comes back gets its old name.
 - Optional aliases (P2): the old name keeps working for N releases, with "deprecated, use X" in its
   description.
 

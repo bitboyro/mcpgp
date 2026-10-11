@@ -56,5 +56,5 @@ rules on the page. The platform MCP server comes with M7.
 - ~~Label every target-server list on platform pages as **example** data.~~ The customer-setup
   previews show the package's example config, marked **Example data**.
 - Tools page: "Try against the mock" instead of a real test call.
-- Add a **Naming** section to Tools & rules (policy, vocabulary, limits, old → new table); each tool's
-  naming steps are already shown under "Why it looks like this".
+- ~~Add a **Naming** section to Tools & rules (policy, vocabulary, limits, old → new table).~~ Done:
+  Tools & rules → Naming.

@@ -52,14 +52,40 @@ public final class NamesLock {
         Map<String, Entry> entries = new LinkedHashMap<>();
         node.get().path("tools").forEach(t -> entries.put(t.get("id").asText(),
                 new Entry(t.get("name").asText(), t.path("since").asText(null))));
-        return new NamesLock(Map.copyOf(entries));
+        return new NamesLock(java.util.Collections.unmodifiableMap(entries));
     }
 
     public Optional<Entry> get(String toolId) {
         return Optional.ofNullable(entries.get(toolId));
     }
 
+    /** The entries in file order. */
     public Map<String, Entry> entries() {
         return entries;
+    }
+
+    /** The lock file's text for these entries (in their order), as {@code mcpgp names accept} writes it. */
+    public static String render(Map<String, Entry> entries) {
+        StringBuilder text = new StringBuilder("""
+                # Written by `mcpgp names accept`. Commit it with the definition; don't edit it by hand.
+                # Tools keep these names even when the naming policy or the spec would now give others (naming.md §7).
+                version: 1
+                """);
+        if (entries.isEmpty()) {
+            return text.append("tools: []\n").toString();
+        }
+        text.append("tools:\n");
+        int idWidth = entries.keySet().stream().mapToInt(id -> id.length() + 3).max().orElse(0);
+        int nameWidth = entries.values().stream().mapToInt(e -> e.name().length() + 1).max().orElse(0);
+        entries.forEach((id, entry) -> {
+            String quotedId = "\"" + id.replace("\\", "\\\\").replace("\"", "\\\"") + "\",";
+            text.append("  - { id: ").append(String.format("%-" + idWidth + "s", quotedId)).append(" name: ");
+            if (entry.since() == null) {
+                text.append(entry.name()).append(" }\n");
+            } else {
+                text.append(String.format("%-" + nameWidth + "s", entry.name() + ",")).append(" since: \"").append(entry.since()).append("\" }\n");
+            }
+        });
+        return text.toString();
     }
 }

@@ -164,6 +164,12 @@ versions follow [SemVer](https://semver.org).
   take `operations: true`. Tools & rules → Operations: a switch per operation, with filters by text,
   state and tag, that writes `select` (one exclude entry per tool, or per tag; turning on what a
   broader clause leaves out asks first), previewed before saving as the next version.
+- Platform: `GET /servers/{id}/versions/{version}/naming` (the policy reference, the server's own
+  settings, the effective policy, the lock file's entries). Tools & rules → Naming: the policy in
+  words, the vocabulary, and each tool's name with how it came about (policy, rule, lock), names the
+  lock keeps although the policy would change them, and lock entries no tool uses.
+- CLI: `mcpgp names accept <def> <tool…|--all>` writes `mcp-names.lock` (renames on purpose, and
+  names the file doesn't have yet).
 
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).

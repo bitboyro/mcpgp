@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 /** {@code mcpgp}: the command line (spec/cli.md). Exit codes follow cli.md §4. */
 @Command(name = "mcpgp", mixinStandardHelpOptions = true, version = Compiler.VERSION,
         description = "Generate MCP servers from OpenAPI contracts.",
-        subcommands = {Main.Init.class, Main.Validate.class, Main.Build.class, Main.Explain.class, Main.Test.class, Main.PushCommand.class, Main.Keygen.class, Main.Verify.class})
+        subcommands = {Main.Init.class, Main.Validate.class, Main.Build.class, Main.Explain.class, Main.Names.class, Main.Test.class, Main.PushCommand.class, Main.Keygen.class, Main.Verify.class})
 public final class Main {
 
     static final int OK = 0;
@@ -414,6 +414,103 @@ public final class Main {
                 }
             }
             return OK;
+        }
+    }
+
+    @Command(name = "names", description = "Tool names and mcp-names.lock.", subcommands = Names.Accept.class)
+    static final class Names {
+
+        @Command(name = "accept", description = "Write the names the policy gives now into mcp-names.lock: renames on purpose, and new names to keep.")
+        static final class Accept implements Callable<Integer> {
+            @CommandLine.Mixin
+            Common common;
+
+            @Parameters(index = "0", paramLabel = "<definition>", description = "Root definition file (*.mcpgp.yaml).")
+            Path definition;
+
+            @Parameters(index = "1..*", arity = "0..*", paramLabel = "<tool>", description = "Tools, by current name, new name or operation id.")
+            List<String> tools = new ArrayList<>();
+
+            @Option(names = "--all", description = "Every tool: accept all renames and lock names the file doesn't have yet.")
+            boolean all;
+
+            @Override
+            public Integer call() throws IOException {
+                PrintWriter err = common.spec.commandLine().getErr();
+                if (!all && tools.isEmpty()) {
+                    err.println("error: name the tools to accept, or give --all");
+                    return USAGE;
+                }
+                Diagnostics workspaceDiagnostics = new Diagnostics();
+                Workspace workspace = common.workspace(workspaceDiagnostics);
+                Compiler.Result result = new Compiler(common.schemas).compile(definition, new Compiler.Options(workspace, false));
+                List<Diagnostic> found = new ArrayList<>(workspaceDiagnostics.all());
+                found.addAll(result.diagnostics());
+                if (result.manifest().isEmpty() || exitCode(found) != OK) {
+                    int code = common.report(definition, found.stream().filter(d -> d.level() == Diagnostic.Level.ERROR).toList());
+                    return code == OK ? ERRORS : code;
+                }
+                Path root = result.definition().get().root();
+                Diagnostics lockDiagnostics = new Diagnostics();
+                ro.bitboy.mcpgp.core.tools.NamesLock lock = ro.bitboy.mcpgp.core.tools.NamesLock.load(root, common.schemas, lockDiagnostics);
+                if (!lockDiagnostics.all().isEmpty()) {
+                    return common.report(definition, lockDiagnostics.all());
+                }
+                String since = result.manifest().get().at("/server/version").asText().replaceAll("\\+.*$", "");
+                java.util.Map<String, ro.bitboy.mcpgp.core.tools.NamesLock.Entry> entries = new java.util.LinkedHashMap<>(lock.entries());
+                java.util.Set<String> wanted = new java.util.LinkedHashSet<>(tools);
+                PrintWriter out = common.out();
+                int renamed = 0;
+                int added = 0;
+                for (ro.bitboy.mcpgp.core.tools.ToolPlan plan : result.tools()) {
+                    String computed = computedName(plan);
+                    boolean asked = wanted.remove(plan.name()) | wanted.remove(computed) | wanted.remove(plan.id());
+                    if (!all && !asked) {
+                        continue;
+                    }
+                    var locked = entries.get(plan.id());
+                    if (locked == null) {
+                        entries.put(plan.id(), new ro.bitboy.mcpgp.core.tools.NamesLock.Entry(computed, since));
+                        added++;
+                        if (!common.quiet) {
+                            out.println("locked " + computed + "  (" + plan.id() + ")");
+                        }
+                    } else if (!locked.name().equals(computed)) {
+                        entries.put(plan.id(), new ro.bitboy.mcpgp.core.tools.NamesLock.Entry(computed, since));
+                        renamed++;
+                        if (!common.quiet) {
+                            out.println("renamed " + locked.name() + " → " + computed + "  (clients that call " + locked.name() + " must change)");
+                        }
+                    }
+                }
+                if (!wanted.isEmpty()) {
+                    err.println("error: no tool named " + String.join(", ", wanted) + " in " + definition);
+                    return ERRORS;
+                }
+                if (renamed == 0 && added == 0) {
+                    if (!common.quiet) {
+                        out.println("nothing to accept: mcp-names.lock already has these names");
+                    }
+                    return OK;
+                }
+                Path file = root.resolve(ro.bitboy.mcpgp.core.tools.NamesLock.FILE_NAME);
+                Files.writeString(file, ro.bitboy.mcpgp.core.tools.NamesLock.render(entries));
+                if (!common.quiet) {
+                    out.println("wrote " + file + " (" + renamed + " renamed, " + added + " added); commit it with the definition");
+                }
+                return OK;
+            }
+
+            /** The name the policy and rules give now: the last name step before the lock. */
+            static String computedName(ro.bitboy.mcpgp.core.tools.ToolPlan plan) {
+                String name = plan.name();
+                for (ro.bitboy.mcpgp.core.tools.ToolPlan.Provenance step : plan.provenance().getOrDefault("name", List.of())) {
+                    if (!step.step().equals("lock") && step.value() != null) {
+                        name = step.value();
+                    }
+                }
+                return name;
+            }
         }
     }
 

@@ -48,7 +48,10 @@ tool off adds one `select.exclude` entry for that operation (or one `{ tag: [...
 tag); turning an operation on undoes what left it out, and when that reaches further (removing a broad
 exclude entry, changing `access`), the page says so and asks first. Unsaved switches are previewed by
 the platform, and saving makes the next version, as on Overview. Operations a rule hides change in the
-rule's file. Everything else is changed in the files (upload a new version on Sources).
+rule's file. **Naming** shows the naming policy in words (and which settings the server adds to a
+shared policy), the vocabulary, and every tool's name with how it came about: from the policy, set by
+a rule, or kept by `mcp-names.lock`, including names the lock keeps although the policy would now
+give another one (accept those with `mcpgp names accept`). Everything else is changed in the files (upload a new version on Sources).
 
 **Company sign-in.** Add `auth.oidc` (SSO) or `auth.ldap` (the directory) to `platform.yaml`; the
 sign-in page then offers them (the keys: [spec/platform-api.md §7](../spec/platform-api.md#7-platform-configuration-and-storage)).

@@ -48,6 +48,10 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   `kind` is `access`, `include`, `exclude` or `deprecated`; for `exclude`, the first matching entry and
   its index), or `hidden` (by a rule). The Tools & rules page turns operations on and off from it,
   writing `select` through the edits below. A version that doesn't compile gets `422`.
+- `GET /servers/{id}/versions/{version}/naming` returns the version's naming: `extends` (the shared
+  policy's reference, or null), `own` (what the definition sets in `naming` itself), `effective` (the
+  merged policy the compiler used) and `lock: { present, entries: [{ id, name, since }] }`. Each tool's
+  name steps are in the manifest's provenance; the Naming section of Tools & rules shows both.
 - `GET /servers/{id}/versions/{version}/example-config` returns the example configuration the
   version's package will ship (what the customer fills in), with secrets as references only.
 - **Edits:** `POST /servers/{id}/edits { base, changes: [{ op, path, value }], message?, dryRun? }`
