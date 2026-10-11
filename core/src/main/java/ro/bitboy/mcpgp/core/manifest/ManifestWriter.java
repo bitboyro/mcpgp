@@ -123,6 +123,7 @@ public final class ManifestWriter {
         // tools
         BuiltinNames names = new BuiltinNames(doc.path("naming"));
         List<ObjectNode> tools = new ArrayList<>();
+        List<ObjectNode> resourceNodes = new ArrayList<>();
         for (ToolPlan plan : plans) {
             JsonNode api = apis.stream().filter(a -> a.path("id").asText().equals(plan.api())).findFirst().orElseThrow();
             String apiTitle = api.path("title").asText(plan.api());
@@ -131,7 +132,12 @@ public final class ManifestWriter {
             ToolShaper.Shaped shaped = shaper.shape(plan, contractsByApi.get(plan.api()), defaultVersions.get(plan.api()));
             Contract primary = contractsByApi.get(plan.api()).getOrDefault(defaultVersions.get(plan.api()),
                     contractsByApi.get(plan.api()).values().iterator().next());
-            tools.add(apiTool(plan, shaped, primary.file()));
+            ObjectNode node = apiTool(plan, shaped, primary.file());
+            if (plan.expose().equals("resource")) {
+                resourceNodes.add(resource(node, defaultVersions.get(plan.api()), severalApis ? plan.api() : null));
+            } else {
+                tools.add(node);
+            }
         }
         List<Builtins.Spec> builtins = new ArrayList<>();
         if (multi) {
@@ -204,9 +210,14 @@ public final class ManifestWriter {
         }
         exposureNode.put("plainSearch", exposure.path("plainSearch").asBoolean(false));
         if (mode.equals("toolsets")) {
-            exposureNode.set("toolsets", toolsets(exposure.path("toolsets"), plans));
+            exposureNode.set("toolsets", toolsets(exposure.path("toolsets"), plans.stream().filter(p -> !p.expose().equals("resource")).toList()));
         }
         manifest.set("exposure", exposureNode);
+        if (!resourceNodes.isEmpty()) {
+            ObjectNode resources = manifest.putObject("resources").put("uriScheme", doc.at("/resources/uriScheme").asText("api"));
+            ArrayNode items = resources.putArray("items");
+            resourceNodes.stream().sorted(java.util.Comparator.comparing(r -> r.path("name").asText())).forEach(items::add);
+        }
         manifest.set("policies", policies(doc, fileForms));
         manifest.set("tools", toolNodes);
         manifest.set("packs", packs);
@@ -428,6 +439,41 @@ public final class ManifestWriter {
         });
         tool.set("provenance", provenance);
         return tool;
+    }
+
+    /**
+     * A {@code GET} operation exposed as an MCP resource (tools-contract §14.1): the tool's node with
+     * {@code kind: resource}, its URI template (the default contract's path, path parameters as
+     * {@code {name}}, declared query parameters as {@code {?a,b}}; prefixed with the API id in multi-API
+     * servers; the runtime adds the instance in multi-instance builds) and its media type.
+     */
+    private static ObjectNode resource(ObjectNode tool, String defaultVersion, String apiSegment) {
+        ObjectNode resource = tool.deepCopy();
+        resource.put("kind", "resource");
+        JsonNode variant = tool.path("variants").path(defaultVersion);
+        if (variant.isMissingNode()) {
+            variant = tool.path("variants").elements().next();
+        }
+        StringBuilder template = new StringBuilder(variant.path("path").asText().replaceAll("^/+", ""));
+        List<String> query = new ArrayList<>();
+        variant.path("parameters").forEach(p -> {
+            if (p.path("in").asText().equals("query")) {
+                query.add(p.path("name").asText());
+            }
+        });
+        if (!query.isEmpty()) {
+            template.append("{?").append(String.join(",", query)).append('}');
+        }
+        resource.put("uriTemplate", (apiSegment == null ? "" : apiSegment + "/") + template);
+        String mimeType = null;
+        for (JsonNode response : variant.path("responses")) {
+            if (response.path("status").asText().startsWith("2") && response.hasNonNull("contentType")) {
+                mimeType = response.path("contentType").asText();
+                break;
+            }
+        }
+        resource.put("mimeType", mimeType == null ? "application/json" : mimeType);
+        return resource;
     }
 
     private static ArrayNode diagnosticNodes(List<Diagnostic> earlier) {

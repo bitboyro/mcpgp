@@ -142,6 +142,12 @@ versions follow [SemVer](https://semver.org).
   `recording_sessions`): a session's upstream calls, redacted before storage (secrets, redaction
   fields, credential headers), capped, owner-only, with retention.
 
+- Resources: `expose: resource` on `GET` operations makes MCP resources and resource templates
+  (`api://customers/{id}{?expand}`; the instance first in multi-instance builds). The compiler writes
+  them to the manifest (`resources`) and refuses non-`GET` ones; the runtime serves
+  `resources/list`, `resources/templates/list` and `resources/read` through the same path as tool
+  calls, audited as `resource.read`.
+
 ### Changed
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 
