@@ -274,6 +274,34 @@ paths:
       responses:
         "200": { description: The item, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /library/{kind}/{name}/edits:
+    parameters:
+      - { $ref: "#/components/parameters/Kind" }
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: editLibraryItem
+      tags: [library]
+      summary: Edit naming policy
+      description: Changes the latest version of a naming policy (base) and saves it as the next version; with dryRun, returns the edited file, its problems and the servers that use it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base, changes]
+              properties:
+                base: { type: integer }
+                message: { type: string }
+                dryRun: { type: boolean, default: false }
+                changes:
+                  type: array
+                  maxItems: 50
+                  items: { type: object, required: [path], properties: { op: { enum: [set, remove], default: set }, path: { type: string }, value: {} } }
+      responses:
+        "200": { description: The dry run's result, content: { application/json: { schema: { type: object } } } }
+        "201": { description: The new version, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /library/{kind}/{name}/versions:
     parameters: [ { $ref: "#/components/parameters/Kind" }, { name: name, in: path, required: true, schema: { type: string } } ]
     post:

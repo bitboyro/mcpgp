@@ -284,3 +284,30 @@ describe('package & deliver', () => {
     expect(screen.getByText(/mcpgp build orders\.mcpgp\.yaml --frozen-lock/)).toBeTruthy()
   })
 })
+
+describe('shared naming policy', () => {
+  it('edits a policy in the library, with who uses it', async () => {
+    const item = { kind: 'naming', name: 'acme-standard', title: 'acme-standard', reference: 'mcpgp://acme/naming/acme-standard@2', updated: '',
+      versions: [{ number: 1 }, { number: 2 }] }
+    const { calls } = fakeApi({
+      'GET /me': ME,
+      'GET /settings': SETTINGS,
+      'GET /library': { workspace: 'acme', items: [item] },
+      'GET /library/naming/acme-standard': { ...item, root: 'acme-standard.yaml', policy: { vocabulary: { 'add|new': 'create' } },
+        usedBy: [{ server: 'orders-mcp', pinned: '1' }, { server: 'billing-mcp', pinned: null }] },
+      'GET /library/naming/acme-standard/versions/2/files/acme-standard.yaml': new Response('collisions: error\n'),
+      'POST /library/naming/acme-standard/edits': (c: { body: { dryRun?: boolean } }) => (c.body.dryRun
+        ? { base: 2, text: 'collisions: error\nmethodVerbs: { PUT: upsert }\n', problems: [], usedBy: [] } : { ...item, versions: [...item.versions, { number: 3 }] }),
+    })
+    renderAt('/library?naming=acme-standard')
+    expect(await screen.findByText(/pins an older version/)).toBeTruthy()
+    const put = screen.getByLabelText('PUT')
+    await userEvent.clear(put)
+    await userEvent.type(put, 'upsert{Enter}')
+    await waitFor(() => expect(screen.getByLabelText('Changes to the policy').textContent).toContain('+ methodVerbs: { PUT: upsert }'))
+    await userEvent.click(screen.getByRole('button', { name: 'Save as version 3' }))
+    await waitFor(() => expect(calls.filter((c) => c.method === 'POST' && !(c.body as { dryRun?: boolean }).dryRun)).toHaveLength(1))
+    expect(calls.filter((c) => c.method === 'POST').at(-1)!.body).toEqual({ base: 2, message: 'PUT → upsert',
+      changes: [{ op: 'set', path: '/methodVerbs/PUT', value: 'upsert' }] })
+  })
+})

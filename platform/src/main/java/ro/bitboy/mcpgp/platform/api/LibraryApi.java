@@ -59,7 +59,21 @@ public class LibraryApi {
     @GetMapping("/{kind}/{name}")
     public ResponseEntity<byte[]> get(HttpServletRequest request, @PathVariable String kind, @PathVariable String name) {
         ServersApi.who(request).require("servers:read");
-        return Json.ok(item(library.get(kind, name)));
+        Model.LibraryItem item = library.get(kind, name);
+        Map<String, Object> answer = item(item);
+        if (kind.equals("naming")) {
+            // the policy as data (the editor on the Library page works from it) and who uses it
+            Model.Version files = store.version(item.latest().digest()).orElseThrow();
+            answer.put("root", files.root());
+            try {
+                answer.put("policy", new com.fasterxml.jackson.databind.ObjectMapper(new com.fasterxml.jackson.dataformat.yaml.YAMLFactory())
+                        .readTree(store.blob(files.files().get(files.root()))));
+            } catch (java.io.IOException e) {
+                answer.put("policy", null);
+            }
+            answer.put("usedBy", library.usedBy(kind, name, config.workspace()));
+        }
+        return Json.ok(answer);
     }
 
     @PostMapping("/{kind}/{name}/versions")
@@ -72,6 +86,29 @@ public class LibraryApi {
         long before = library.get(kind, name).revision();
         Model.LibraryItem item = library.addVersion(kind, name, root, body == null ? new byte[0] : body, contentType, message, who);
         return Json.status(item.revision() == before ? 200 : 201, item(item));
+    }
+
+    /**
+     * Edits a naming policy: {@code {base, changes: [{op, path, value}], message?, dryRun?}}. A dry run
+     * answers the edited file, its problems and the servers that use the policy (with the version they
+     * pin); otherwise the edit becomes the policy's next version.
+     */
+    @PostMapping("/{kind}/{name}/edits")
+    public ResponseEntity<byte[]> edit(HttpServletRequest request, @PathVariable String kind, @PathVariable String name,
+                                       @RequestBody(required = false) byte[] body) {
+        Access.Principal who = ServersApi.who(request);
+        who.require("library:write");
+        com.fasterxml.jackson.databind.JsonNode json = Json.parse(body);
+        if (!json.path("base").canConvertToInt()) {
+            throw ApiException.validation("base: the version number the changes were made on");
+        }
+        int base = json.path("base").asInt();
+        List<ro.bitboy.mcpgp.platform.service.YamlEdit.Change> changes = ro.bitboy.mcpgp.platform.service.Edits.changes(json);
+        if (json.path("dryRun").asBoolean(false)) {
+            Library.Edit edit = library.preview(kind, name, base, changes);
+            return Json.ok(Map.of("base", base, "text", edit.text(), "problems", edit.problems(), "usedBy", library.usedBy(kind, name, config.workspace())));
+        }
+        return Json.status(201, item(library.saveEdit(kind, name, base, changes, json.path("message").asText(null), who)));
     }
 
     @GetMapping("/{kind}/{name}/versions/{version}/files/{*path}")

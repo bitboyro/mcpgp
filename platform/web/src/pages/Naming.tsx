@@ -323,6 +323,8 @@ function PrefixField({ label, current, disabled, required, onPick }: {
   )
 }
 
+export { WordField }
+
 /** One method's verb: a short input that reports a valid word when it leaves the field (or on Enter). */
 function WordField({ label, current, own, disabled, onPick }: {
   label: string

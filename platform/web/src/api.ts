@@ -168,7 +168,13 @@ export interface LibraryItem {
   reference: string
   versions: VersionRef[]
   updated: string
+  /** Naming policies: the policy as data, and the servers that extend it (`pinned`: the version they pin, null for the latest). */
+  policy?: NamingPolicy | null
+  root?: string
+  usedBy?: { server: string; pinned: string | null }[]
 }
+
+export interface LibraryEditPreview { base: number; text: string; problems: string[]; usedBy: { server: string; pinned: string | null }[] }
 
 export interface SignInOptions { local: boolean; ldap: boolean; oidc: boolean; oidcLabel?: string }
 
@@ -349,6 +355,13 @@ export const api = {
   deleteBuild: (id: string) => json<Build>('DELETE', `/builds/${enc(id)}`),
 
   library: () => json<{ workspace: string; items: LibraryItem[] }>('GET', '/library'),
+  libraryItem: (kind: string, name: string) => json<LibraryItem>('GET', `/library/${enc(kind)}/${enc(name)}`),
+  libraryFile: (kind: string, name: string, version: number | string, path: string) =>
+    text(`/library/${enc(kind)}/${enc(name)}/versions/${version}/files/${path.split('/').map(enc).join('/')}`),
+  previewLibraryEdit: (kind: string, name: string, base: number, changes: Change[]) =>
+    json<LibraryEditPreview>('POST', `/library/${enc(kind)}/${enc(name)}/edits`, { base, changes, dryRun: true }),
+  saveLibraryEdit: (kind: string, name: string, base: number, changes: Change[], message?: string) =>
+    json<LibraryItem>('POST', `/library/${enc(kind)}/${enc(name)}/edits`, { base, changes, message }),
 
   identities: () => json<Items<Identity>>('GET', '/identities'),
   createIdentity: (body: { kind: string; name: string; role?: string; scopes?: string[] }) => json<Identity>('POST', '/identities', body),

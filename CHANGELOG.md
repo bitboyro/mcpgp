@@ -176,6 +176,9 @@ versions follow [SemVer](https://semver.org).
   policy's) and prefixes (`apis[].toolPrefix`, `naming.namespace.server`) are edited on the page,
   previewed with the tool names that change and those the lock file keeps, and saved as the next
   version. Naming policies: a `null` vocabulary entry switches off one of the extended policy.
+- Shared naming policies are edited on the platform: `POST /library/naming/{name}/edits` (dry run
+  with the servers that use the policy and the versions they pin) and an editor on the Shared library
+  page for verbs from HTTP methods and vocabulary.
 - CLI: `mcpgp names accept <def> <tool…|--all>` writes `mcp-names.lock` (renames on purpose, and
   names the file doesn't have yet).
 
