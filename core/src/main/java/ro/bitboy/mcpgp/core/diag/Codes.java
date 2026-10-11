@@ -47,6 +47,7 @@ public final class Codes {
     public static final String DESCRIPTION_TRUNCATED = "DESCRIPTION_TRUNCATED";
     public static final String PINNED_TOOL_UNKNOWN = "PINNED_TOOL_UNKNOWN";
     public static final String PACK_UNKNOWN = "PACK_UNKNOWN";
+    public static final String EXTENSION_INVALID = "EXTENSION_INVALID";
     public static final String MANIFEST_INVALID = "MANIFEST_INVALID";
 
     private Codes() {

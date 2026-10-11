@@ -32,6 +32,8 @@ public final class ApiToolHandler implements ToolHandler {
     private final InputValidator validator = new InputValidator();
     private final RequestBuilder requests;
     private final Upstream upstream;
+    private final Redactor redactor;
+    private Enrichment enrichment = Enrichment.NONE;
     /** The recording pack, or null when the build doesn't have it. */
     private final Recordings recordings;
     private final ResponseMapper responses;
@@ -47,11 +49,21 @@ public final class ApiToolHandler implements ToolHandler {
                 apiKeys.put(id, placement);
             }
         });
-        Redactor redactor = new Redactor(config.secrets());
+        this.redactor = new Redactor(config.secrets());
         this.upstream = new Upstream(apiKeys, redactor);
         this.recordings = recordings(manifest, config, apiKeys);
         this.responses = new ResponseMapper(manifest.policies().path("responseLimitKb").asInt(256),
                 config.errorDetail(), redactor);
+    }
+
+    /** The request enrichers to run before each call is sent (extensions.md §3). */
+    public void enrichment(Enrichment enrichment) {
+        this.enrichment = enrichment;
+    }
+
+    /** Replaces the secrets this server knows in a text (for extension logs). */
+    public String redact(String text) {
+        return redactor.redact(text);
     }
 
     @Override
@@ -81,7 +93,7 @@ public final class ApiToolHandler implements ToolHandler {
             URI base = BaseUrl.resolve(instance.baseUrl(), api.contracts().get(contract).basePath());
             record.method = variant.path("method").asText();
             record.path = variant.path("path").asText();
-            RequestBuilder.UpstreamRequest request = requests.build(variant, args, base, record);
+            RequestBuilder.UpstreamRequest request = enrichment.apply(exchange, tool, record, requests.build(variant, args, base, record));
             LOG.debug("{} {} → {}", request.method(), variant.path("path").asText(), instance.id());
             // security: [] marks a public operation: no credentials (auth.md §2.2)
             boolean publicOperation = variant.path("security").isArray() && variant.path("security").isEmpty();

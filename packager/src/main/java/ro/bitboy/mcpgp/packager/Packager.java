@@ -139,7 +139,30 @@ public final class Packager {
         return false;
     }
 
+    /** The bytes of an extension artifact, by its path in the definition project (extensions.md §1). */
+    @FunctionalInterface
+    public interface Artifacts {
+        byte[] read(String path) throws IOException;
+
+        /** Artifacts read from the definition project's folder. */
+        static Artifacts in(Path root) {
+            return path -> Files.readAllBytes(root.resolve(path).normalize());
+        }
+
+        Artifacts NONE = path -> {
+            throw new IOException("extension artifact " + path + " is not available to this build");
+        };
+    }
+
+    /** Where the server jar carries extension artifacts (the runtime loads them from there). */
+    public static final String ARTIFACTS_FOLDER = "BOOT-INF/classes/mcpgp/artifacts/";
+
     public Result build(ObjectNode manifest, JsonNode definition, Instant time, Path out, Minisign.Keys signing) throws IOException {
+        return build(manifest, definition, Artifacts.NONE, time, out, signing);
+    }
+
+    /** @param artifacts the definition's extension artifacts (checked against the manifest's checksums) */
+    public Result build(ObjectNode manifest, JsonNode definition, Artifacts artifacts, Instant time, Path out, Minisign.Keys signing) throws IOException {
         String server = manifest.at("/server/name").asText();
         String version = manifest.at("/server/version").asText();
         String base = server + "-" + version;
@@ -160,7 +183,17 @@ public final class Packager {
                 Files.copy(in, runtimeJar);
             }
             Path jar = staging.resolve(server + ".jar");
-            Zips.copyWith(runtimeJar, Map.of(MANIFEST_ENTRY, manifestText.getBytes(StandardCharsets.UTF_8)), time, jar);
+            Map<String, byte[]> embedded = new LinkedHashMap<>();
+            embedded.put(MANIFEST_ENTRY, manifestText.getBytes(StandardCharsets.UTF_8));
+            for (JsonNode artifact : manifest.at("/extensions/artifacts")) {
+                String path = artifact.path("path").asText();
+                byte[] bytes = artifacts.read(path);
+                if (!("sha256:" + sha256(bytes)).equals(artifact.path("sha256").asText())) {
+                    throw new IOException("extension artifact " + path + " changed since it was compiled");
+                }
+                embedded.put(ARTIFACTS_FOLDER + path, bytes);
+            }
+            Zips.copyWith(runtimeJar, embedded, time, jar);
             Files.delete(runtimeJar);
             files.put(server + ".jar", jar);
 

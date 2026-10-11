@@ -33,6 +33,8 @@ public final class Manifest {
     }
 
     private final JsonNode root;
+    /** The folder of a manifest file (development and tests), where extension artifacts are looked up; null when embedded. */
+    private Path folder;
     private final Map<String, Api> apis = new LinkedHashMap<>();
     private final Map<String, JsonNode> tools = new LinkedHashMap<>();
 
@@ -73,7 +75,9 @@ public final class Manifest {
     /** A manifest file (development and tests; delivered servers use {@link #embedded()}). */
     public static Manifest file(Path path) {
         try {
-            return of(JSON.readTree(Files.readString(path)));
+            Manifest manifest = of(JSON.readTree(Files.readString(path)));
+            manifest.folder = path.toAbsolutePath().getParent();
+            return manifest;
         } catch (IOException e) {
             throw new ManifestException("Cannot read manifest " + path + ": " + e.getMessage());
         }
@@ -96,6 +100,11 @@ public final class Manifest {
 
     public JsonNode root() {
         return root;
+    }
+
+    /** The folder of the manifest file, when the server runs from one (not from the embedded manifest). */
+    public java.util.Optional<Path> folder() {
+        return java.util.Optional.ofNullable(folder);
     }
 
     public String serverName() {

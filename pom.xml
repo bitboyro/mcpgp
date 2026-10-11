@@ -22,6 +22,7 @@
   <modules>
     <module>schemas</module>
     <module>core</module>
+    <module>extension-api</module>
     <module>runtime</module>
     <module>packager</module>
     <module>cli</module>
