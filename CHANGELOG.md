@@ -168,6 +168,10 @@ versions follow [SemVer](https://semver.org).
   settings, the effective policy, the lock file's entries). Tools & rules → Naming: the policy in
   words, the vocabulary, and each tool's name with how it came about (policy, rule, lock), names the
   lock keeps although the policy would change them, and lock entries no tool uses.
+- Package & deliver: `GET /servers/{id}/versions/{version}/package` (formats, files, generated docs
+  and warnings of the next build, without building; `Packager.preview` shares the build's code) and a
+  page that shows the formats, how the server runs, the docs as they ship (rendered, links between
+  them open in place), the contents and the pipeline commands.
 - CLI: `mcpgp names accept <def> <tool…|--all>` writes `mcp-names.lock` (renames on purpose, and
   names the file doesn't have yet).
 

@@ -302,3 +302,15 @@ code, pre, .mono { font-family: var(--mono); }
 .table td { padding: 8px; border-bottom: 1px solid var(--line-soft); vertical-align: top; overflow-wrap: anywhere; }
 .table-stage th { color: var(--stage-dim); border-bottom-color: var(--stage-line); }
 .table-stage td { border-bottom-color: var(--stage-line); }
+
+/* rendered docs (Package & deliver) */
+.markdown { display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.55; min-width: 0; }
+.markdown h2 { font-size: 18px; }
+.markdown h3 { font-size: 15px; margin-top: 6px; }
+.markdown h4, .markdown h5 { font-size: 14px; margin-top: 4px; }
+.markdown code { font-family: var(--mono); font-size: 12.5px; padding: 1px 5px; border-radius: 6px; background: var(--stage-card); overflow-wrap: anywhere; }
+.markdown pre code { padding: 0; background: none; }
+.markdown .md-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.markdown .table { display: block; overflow-x: auto; }
+.stage { color-scheme: dark; }
+.link { background: none; border: 0; padding: 0; font: inherit; color: var(--stage-accent); text-decoration: underline; cursor: pointer; }

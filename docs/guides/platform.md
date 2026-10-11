@@ -36,7 +36,8 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json
 The pages: **All servers** (duplicate, variant, upload a new server), and per server **Overview**
 (what agents get, what the customer configures, the package, the checks), **Tools & rules** (each
 tool as the agent gets it, and why), **Connections**, **Sources** (versions, files, upload a new
-version), **Builds** (download, release, archive, delete) and **Activity**; plus the **Shared library**,
+version), **Package & deliver** (the formats the next build makes, how it runs, its docs as they ship,
+the package's files and the pipeline commands, all before building), **Builds** (download, release, archive, delete) and **Activity**; plus the **Shared library**,
 **All builds**, **Activity** and **API & agents** (identities, tokens, approvals). The UI uses the same
 API as everyone else; nothing it does is UI-only. On Overview, the server's settings (what agents
 see, what they may do, target servers, transports, confirmation, packs) can be changed on the page:

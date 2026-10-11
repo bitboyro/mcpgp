@@ -254,6 +254,17 @@ export interface Operation {
   exclusion?: { kind: 'access' | 'include' | 'exclude' | 'deprecated'; reason: string; index?: number; selector?: Selector }
 }
 
+/** What a build of a version will contain, before building it (packaging.md). */
+export interface PackagePreview {
+  version?: number
+  zip: string
+  formats: { id: 'jar' | 'mcpb' | 'docker'; file: string }[]
+  files: string[]
+  docs: Record<string, string>
+  warnings: string[]
+  signed: boolean
+}
+
 /** A version's naming (naming.md): the policy it extends, its own settings, the merged result, the lock. */
 export interface NamingInfo {
   version?: number
@@ -314,6 +325,7 @@ export const api = {
   manifest: (id: string, version: string | number = 'latest') => json<Manifest>('GET', `/servers/${enc(id)}/versions/${version}/manifest`),
   previewEdit: (id: string, base: number, changes: Change[], operations = false) =>
     json<EditPreview>('POST', `/servers/${enc(id)}/edits`, { base, changes, dryRun: true, operations: operations || undefined }),
+  packagePreview: (id: string, version: string | number = 'latest') => json<PackagePreview>('GET', `/servers/${enc(id)}/versions/${version}/package`),
   naming: (id: string, version: string | number = 'latest') => json<NamingInfo>('GET', `/servers/${enc(id)}/versions/${version}/naming`),
   operations: (id: string, version: string | number = 'latest') => json<OperationList>('GET', `/servers/${enc(id)}/versions/${version}/operations`),
   saveEdit: (id: string, base: number, changes: Change[], message?: string) =>

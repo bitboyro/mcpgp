@@ -158,6 +158,16 @@ public class ServersApi {
         return derived(request, id, version, compilation::naming);
     }
 
+    /** What a build of the version will contain: formats, files, the generated docs, warnings; signed as the platform signs. */
+    @GetMapping("/{id}/versions/{version}/package")
+    public ResponseEntity<byte[]> packagePreview(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
+        boolean signed = config.signingKey() != null;
+        return derived(request, id, version, (files, created) -> {
+            com.fasterxml.jackson.databind.node.ObjectNode preview = compilation.packagePreview(files, created, signed);
+            return preview == null ? null : preview.put("signed", signed);
+        });
+    }
+
     private ResponseEntity<byte[]> derived(HttpServletRequest request, String id, String version,
                                            java.util.function.BiFunction<Model.Version, String, com.fasterxml.jackson.databind.node.ObjectNode> from) {
         who(request).require("servers:read");
