@@ -5,7 +5,16 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+## 0.1.0 — 2026-10-11
+
+The first release: the compiler, the runtime and packaging, the CLI, and the self-hosted platform
+with its web UI, published as the Docker image `mcpgp-platform` (see
+[docs/guides/self-hosting.md](docs/guides/self-hosting.md)).
+
 ### Added
+- Publishing: the platform image for `linux/amd64` and `linux/arm64` on Docker Hub, with an SBOM and
+  build provenance: `:main` and `:sha-<commit>` from `main`, `:X.Y.Z`, `:X.Y` and `:latest` from
+  release tags, and branch images on request (Run workflow). Release tags also make the GitHub release.
 - Self-hosting: the platform image (`deploy/Dockerfile`, non-root, health check) and Docker Compose
   files for the file store, PostgreSQL, package signing and company sign-in; `deploy/smoke-test.py`
   checks an installation end to end. Docs: [docs/deployment.md](docs/deployment.md) and

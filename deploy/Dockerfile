@@ -2,8 +2,10 @@
 # The platform image (docs/guides/self-hosting.md). Build from the repository root:
 #   docker build -f deploy/Dockerfile -t mcpgp-platform .
 
-# ---- build: the platform jar, with the web UI and the runtime it packages servers with
-FROM maven:3.9-eclipse-temurin-21 AS build
+# ---- build: the platform jar, with the web UI and the runtime it packages servers with.
+# The jar is the same on every architecture, so this stage runs natively on the builder (no emulation
+# for multi-architecture images); only the run stage below is built per architecture.
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /src
 COPY . .
 RUN --mount=type=cache,target=/root/.m2 \

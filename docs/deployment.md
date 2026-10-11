@@ -46,7 +46,7 @@ the packages they make never contact the platform.
 
 | File | Purpose |
 |---|---|
-| `Dockerfile` | Builds the image from the repository: the web UI, the platform jar and the runtime it packages servers with. Runs as uid 10001, listens on 8443, has a health check, and keeps its data in the volume `/var/lib/mcpgp`. |
+| `Dockerfile` | The image `mcpgp-platform` (published on Docker Hub for `amd64` and `arm64`, or built here). It builds from the repository: the web UI, the platform jar and the runtime it packages servers with. Runs as uid 10001, listens on 8443, has a health check, and keeps its data in the volume `/var/lib/mcpgp`. |
 | `compose.yaml` | The platform with the file store on a named volume. |
 | `compose.postgres.yaml` | Adds PostgreSQL 17 (data on its own volume, no published port) and switches the store to it. |
 | `compose.signing.yaml` | Signs built packages with `secrets/signing_key`. |

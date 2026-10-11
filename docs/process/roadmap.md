@@ -14,7 +14,14 @@ Milestones, in order. Each ends with something demonstrable. Scope per item: see
 | **M6 · Web UI** ✓ | Final-direction UI | Pages from the design canvas on top of the API, editing a server's settings on its page, sign-in with local accounts, OIDC and LDAP / Active Directory. Follow-ups in [design/ui.md](../design/ui.md) |
 | **M7 · P1 wave** ✓ | Breadth | OTLP telemetry (moved from M3, 2026-10-10; ✓ with Prometheus /metrics), OAuth inbound (✓), OAuth CC + mTLS downstream (✓), discovery/hybrid/toolsets (✓), desktop bundle (✓), Docker (✓ files; image push/tar later), multi-API servers (✓ end to end), agent docs (✓), platform MCP server (✓, a package agents run with their own token), recording pack (✓) |
 | **M8 · P1 completion** (in progress) | The rest of P1 | Resources (✓), prompts with completion and progress (✓); CLI `push`, `test`, `init --from-spec` (✓); UI follow-ups (operations on and off on Tools & rules (✓), Naming section (✓), try against the mock (✓), formats on Package & deliver (✓)); codegen mode and the extension SPI (✓) |
-| **M9 · Self-hosting** (in progress) | Run it at work | Platform image and Docker Compose (✓), PostgreSQL store with `copy-store` (✓), deployment settings: first admin from config, `/healthz`, secure cookies behind TLS, start-up warnings (✓), company sign-in wired into compose (✓, OIDC and LDAP existed), [deployment.md](../deployment.md) and the [how-to](../guides/self-hosting.md) (✓); next: a password page in the web UI, image push to a registry |
+| **M9 · Self-hosting** (in progress) | Run it at work | Platform image and Docker Compose (✓), PostgreSQL store with `copy-store` (✓), deployment settings: first admin from config, `/healthz`, secure cookies behind TLS, start-up warnings (✓), company sign-in wired into compose (✓, OIDC and LDAP existed), [deployment.md](../deployment.md) and the [how-to](../guides/self-hosting.md) (✓); publishing the image to Docker Hub (✓, `publish` workflow); next: passwords in the web UI (0.2.0) |
+
+## Releases
+
+| Version | Contents |
+|---|---|
+| **0.1.0** (being prepared) | M1–M8 and M9 so far: compiler, runtime, packaging, CLI, the platform and its web UI, the Docker image, Docker Compose, the PostgreSQL store |
+| **0.2.0** (next) | Passwords in the web UI: **Change password** in the account menu (current password, the new one twice); **Set password** on a person in API & agents, for admins (a temporary password, optionally to be changed at the next sign-in); **Unlock** for accounts locked after wrong passwords. Company accounts show none of this. |
 
 Deferred: harness-lab comparison; per-user downstream identity; other languages.
 
