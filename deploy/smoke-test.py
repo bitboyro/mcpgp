@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Checks a running platform end to end (docs/guides/self-hosting.md): health, sign-in, a shared naming
-policy, the example server, a build, and a tool tried against the mock. It creates data, so run it
+policy and shared notices, the example server, a build, and a tool tried against the mock. It creates data, so run it
 against a test installation, not the one your team uses.
 
     python3 deploy/smoke-test.py http://localhost:8443 admin deploy/secrets/admin_password
@@ -47,6 +47,9 @@ naming = (examples / "workspace/naming/acme-standard.yaml").read_text()
 status, _ = call("POST", "/api/v1/library/naming?name=acme-standard", {"files": {"acme-standard.yaml": "source: operationId\n"}}, token)
 status2, _ = call("POST", "/api/v1/library/naming/acme-standard/versions", {"files": {"acme-standard.yaml": naming}}, token)
 check("naming policy acme-standard", status in (201, 409) and status2 == 201, f"{status}, {status2}")
+notices = (examples / "workspace/notices/acme-policy.yaml").read_text()
+status, _ = call("POST", "/api/v1/library/notices?name=acme-policy", {"files": {"acme-policy.yaml": notices}}, token)
+check("shared notices acme-policy", status in (201, 409), str(status))
 
 files = {p.relative_to(examples / "orders").as_posix(): p.read_text() for p in sorted((examples / "orders").rglob("*")) if p.is_file()}
 status, server = call("POST", "/api/v1/servers?id=smoke-orders-mcp", {"files": files}, token)
@@ -66,4 +69,7 @@ status, answer = call("POST", "/api/v1/servers/smoke-orders-mcp/versions/latest/
                       {"tool": "orders_customer_list", "arguments": {"instance": "mock", "query": {"accountId": "a-1"}}}, token)
 sent = [f'{r["method"]} {r["path"]} → {r["status"]}' for r in answer.get("requests", [])] if status == 200 else []
 check("try orders_customer_list against the mock", status == 200 and "error" not in answer and len(sent) == 1, ", ".join(sent) or json.dumps(answer))
+status, manifest = call("GET", "/api/v1/servers/smoke-orders-mcp/versions/latest/manifest", None, token)
+policy = [t["name"] for t in manifest.get("tools", []) if "Acme policy:" in t.get("description", "")] if status == 200 else []
+check("shared notices on the tools", len(policy) > 0, f"{len(policy)} tools carry the Acme policy")
 print("All checks passed. To clean up, archive smoke-orders-mcp (its page in the web UI, or POST /api/v1/servers/smoke-orders-mcp/archive).")
