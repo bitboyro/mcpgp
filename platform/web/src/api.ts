@@ -181,7 +181,7 @@ export interface Settings {
 }
 
 // The manifest (docs/spec/manifest.md): only the parts the UI shows are typed.
-export interface ProvenanceStep { step: string; value?: unknown; file?: string; pointer?: string; op?: string }
+export interface ProvenanceStep { step: string; value?: unknown; file?: string; pointer?: string; op?: string; since?: string }
 
 export interface Tool {
   name: string
@@ -254,6 +254,29 @@ export interface Operation {
   exclusion?: { kind: 'access' | 'include' | 'exclude' | 'deprecated'; reason: string; index?: number; selector?: Selector }
 }
 
+/** A version's naming (naming.md): the policy it extends, its own settings, the merged result, the lock. */
+export interface NamingInfo {
+  version?: number
+  extends: string | null
+  own: NamingPolicy
+  effective: NamingPolicy
+  lock: { present: boolean; entries: { id: string; name: string; since?: string }[] }
+  /** Each tool's lock id (the operation key, plus `#<suffix>` for content-type variants). */
+  tools?: { name: string; id: string }[]
+}
+
+export interface NamingPolicy {
+  source?: string
+  fallback?: string
+  normalize?: { split?: string[]; dropWords?: string[] }
+  shape?: { order?: string; case?: string; number?: string }
+  vocabulary?: Record<string, string>
+  namespace?: { server?: string; perApi?: boolean }
+  limits?: { profile?: string; onTooLong?: string }
+  collisions?: string
+  [key: string]: unknown
+}
+
 export interface OperationList {
   version?: number
   apis: { id: string; title: string; select: Select; operations: Operation[] }[]
@@ -291,6 +314,7 @@ export const api = {
   manifest: (id: string, version: string | number = 'latest') => json<Manifest>('GET', `/servers/${enc(id)}/versions/${version}/manifest`),
   previewEdit: (id: string, base: number, changes: Change[], operations = false) =>
     json<EditPreview>('POST', `/servers/${enc(id)}/edits`, { base, changes, dryRun: true, operations: operations || undefined }),
+  naming: (id: string, version: string | number = 'latest') => json<NamingInfo>('GET', `/servers/${enc(id)}/versions/${version}/naming`),
   operations: (id: string, version: string | number = 'latest') => json<OperationList>('GET', `/servers/${enc(id)}/versions/${version}/operations`),
   saveEdit: (id: string, base: number, changes: Change[], message?: string) =>
     json<Server>('POST', `/servers/${enc(id)}/edits`, { base, changes, message }),

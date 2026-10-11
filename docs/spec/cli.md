@@ -40,7 +40,7 @@ sign:
 | `mcpgp preview <def> [--tools] [--customer] [--format md\|json]` | What the agent gets / what the customer configures |
 | `mcpgp explain <def> <tool>` | Provenance of a tool's name, title, description |
 | `mcpgp diff <def> [--against <tag\|manifest.json\|last-release>] [--format md\|json]` | Added, removed and changed tools, schemas and names (informational) |
-| `mcpgp names accept <def> <tool…\|--all>` | Accept renames into `mcp-names.lock` |
+| `mcpgp names accept <def> <tool…\|--all>` | Write the names the policy gives now into `mcp-names.lock`: accepts renames (a breaking change for clients) and locks names the file doesn't have yet; tools by current name, new name or operation id. Existing entries keep their order, and entries of tools not in the build stay |
 | `mcpgp build <def…\|--all> [--version <v>] [--build-number <n>] [--source <uri>] [--frozen-lock] [--manifest-only] [--out <dir>]` | Compile + package: `dist/<name>-<version>.zip` and `dist/<name>-<version>.manifest.json`; `--manifest-only` writes only the manifest |
 | `mcpgp test <def> [--suite tests/]` | Start the server against a mock made from the specs; run a smoke check and the test cases (§3.2) |
 | `mcpgp keygen [--out <dir>]` | Create a signing key pair (`mcpgp.key`, secret; `mcpgp.pub`, to publish) |

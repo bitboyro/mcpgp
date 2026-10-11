@@ -114,8 +114,17 @@ public final class Compilation {
 
     /** Every operation and what became of it ({@link Operations}), cached like the preview; null when the version doesn't compile. */
     public ObjectNode operations(Model.Version version, String createdAt) {
+        return derived("operations", version, createdAt, result -> Operations.of(result));
+    }
+
+    /** The version's naming ({@link NamingView}), cached like the preview; null when the version doesn't compile. */
+    public ObjectNode naming(Model.Version version, String createdAt) {
+        return derived("naming", version, createdAt, result -> NamingView.of(result, version, store));
+    }
+
+    private ObjectNode derived(String kind, Model.Version version, String createdAt, java.util.function.Function<Compiler.Result, ObjectNode> from) {
         String key = version.digest() + "-" + libraryState();
-        var cached = store.cached("operations", key);
+        var cached = store.cached(kind, key);
         if (cached.isPresent()) {
             try {
                 return (ObjectNode) new com.fasterxml.jackson.databind.ObjectMapper().readTree(cached.get());
@@ -127,9 +136,9 @@ public final class Compilation {
         if (!result.ok() || result.definition().isEmpty()) {
             return null;
         }
-        ObjectNode operations = Operations.of(result);
-        store.cache("operations", key, CanonicalJson.compact(operations).getBytes(StandardCharsets.UTF_8));
-        return operations;
+        ObjectNode value = from.apply(result);
+        store.cache(kind, key, CanonicalJson.compact(value).getBytes(StandardCharsets.UTF_8));
+        return value;
     }
 
     /** Changes whenever a library item or server gets a new version (a reference may then resolve differently). */

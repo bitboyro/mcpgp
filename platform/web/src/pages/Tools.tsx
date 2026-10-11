@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { ProvenanceStep, Tool } from '../api'
 import { listedTools, useManifest } from '../serverData'
 import { Chip, ErrorBox, Loading, PageHead, Segmented } from '../ui'
+import { NamingView } from './Naming'
 import { OperationsView } from './Operations'
 import { agentView } from './Overview'
 
@@ -32,11 +33,20 @@ export function ToolsPage() {
   const selected = manifest.data?.tools.find((t) => t.name === selectedName)
   const operations = manifest.data ? manifest.data.diagnostics.filter((d) => d.code === 'OPERATION_EXCLUDED').length : 0
   const apiCount = manifest.data?.tools.filter((t) => t.kind === 'api').length ?? 0
-  const view = params.get('view') === 'operations' ? 'operations' : 'tools'
+  const view = params.get('view') === 'operations' ? 'operations' : params.get('view') === 'naming' ? 'naming' : 'tools'
   const switcher = (
-    <Segmented role="tab" label="View" value={view} onChange={(v) => setParams(v === 'operations' ? { view: v } : {}, { replace: true })}
-      options={[['tools', 'Tools'], ['operations', 'Operations']]} />
+    <Segmented role="tab" label="View" value={view} onChange={(v) => setParams(v === 'tools' ? {} : { view: v }, { replace: true })}
+      options={[['tools', 'Tools'], ['operations', 'Operations'], ['naming', 'Naming']]} />
   )
+
+  if (view === 'naming') {
+    return (
+      <>
+        <PageHead title="Tools & rules" sub="How tools get their names: the policy, the vocabulary, and names the lock file keeps.">{switcher}</PageHead>
+        <NamingView id={id} />
+      </>
+    )
+  }
 
   if (view === 'operations') {
     return (

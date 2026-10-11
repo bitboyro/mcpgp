@@ -110,6 +110,31 @@ paths:
       responses:
         "200": { description: Operations per API, content: { application/json: { schema: { $ref: "#/components/schemas/OperationList" } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/versions/{version}/naming:
+    parameters: [ { $ref: "#/components/parameters/ServerId" }, { $ref: "#/components/parameters/Version" } ]
+    get:
+      operationId: getNaming
+      tags: [servers]
+      summary: Get naming
+      description: The naming policy the version extends, its own naming settings, the effective policy and the lock file's entries.
+      responses:
+        "200":
+          description: Naming
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: integer }
+                  extends: { type: [string, "null"] }
+                  own: { type: object }
+                  effective: { type: object }
+                  lock:
+                    type: object
+                    properties:
+                      present: { type: boolean }
+                      entries: { type: array, items: { type: object, properties: { id: { type: string }, name: { type: string }, since: { type: string } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/versions/{version}/example-config:
     get:
       operationId: getExampleConfig
