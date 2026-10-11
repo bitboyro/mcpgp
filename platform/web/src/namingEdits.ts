@@ -6,7 +6,7 @@
 import type { Change, Manifest } from './api'
 import { nameRows } from './naming'
 
-const escape = (key: string) => key.replace(/~/g, '~0').replace(/\//g, '~1')
+export const escape = (key: string) => key.replace(/~/g, '~0').replace(/\//g, '~1')
 
 export const vocabularyPath = (words: string) => `/naming/vocabulary/${escape(words)}`
 

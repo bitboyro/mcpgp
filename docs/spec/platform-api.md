@@ -103,6 +103,15 @@ when a referenced item or server gets a new version. Definitions reference items
 `mcpgp://<org>/<kind>/<name>@<version|latest>`; the platform resolves them from its library when it
 compiles (the CLI does the same with `--workspace`).
 
+Naming policies are edited on the platform too: `GET /library/naming/{name}` adds `policy` (the
+latest version as data), `root` and `usedBy: [{ server, pinned }]` (servers whose latest version
+extends the policy; `pinned` is the version they name, null for none or `latest`).
+`POST /library/naming/{name}/edits { base, changes, message?, dryRun? }` edits the policy file like
+server edits (comments and layout kept; `base` must be the latest version, else `409`); a dry run
+answers `{ text, problems, usedBy }`, a save makes the next version (`422` when the result isn't a
+valid naming policy). A new version reaches servers that don't pin one; pinned servers keep theirs
+until their definition moves. Other kinds are versioned by upload.
+
 ## 3. Identities, sign-in and scopes
 
 | Kind | Signs in with | Typical scopes |

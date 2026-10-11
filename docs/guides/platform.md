@@ -57,7 +57,10 @@ there: add or change an entry, remove the server's own, override or switch off o
 policy (written as `null` in the server's `naming`), and set each API's `toolPrefix` and the server
 prefix (`naming.namespace.server`). Before saving, the page shows which tool names change and which
 the lock file keeps; renaming a tool breaks clients that call it. A prefix or suffix for chosen tools
-only is a rule (`name: { prepend | append }`) in the definition's files. Everything else is changed in the files (upload a new version on Sources).
+only is a rule (`name: { prepend | append }`) in the definition's files. Shared naming policies
+are edited on the **Shared library** page (open a policy): verbs from HTTP methods and vocabulary,
+previewed as a diff of the policy file and saved as its next version. The page lists the servers that
+use the policy; those that pin an older version keep it until their definition moves. Everything else is changed in the files (upload a new version on Sources).
 
 **Company sign-in.** Add `auth.oidc` (SSO) or `auth.ldap` (the directory) to `platform.yaml`; the
 sign-in page then offers them (the keys: [spec/platform-api.md §7](../spec/platform-api.md#7-platform-configuration-and-storage)).

@@ -314,3 +314,4 @@ code, pre, .mono { font-family: var(--mono); }
 .markdown .table { display: block; overflow-x: auto; }
 .stage { color-scheme: dark; }
 .link { background: none; border: 0; padding: 0; font: inherit; color: var(--stage-accent); text-decoration: underline; cursor: pointer; }
+.stage .input { background: var(--stage-card); border-color: var(--stage-control); color: var(--stage-bright); }
