@@ -11,8 +11,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -50,10 +48,14 @@ class StdioServerTest {
         Files.writeString(file, config);
         Startup startup = Startup.load(new String[] {"--manifest", manifest.toString(), "--config", file.toString(),
                 "--storage.root", dir.resolve("data").toString()}, Map.of("P", "secret-pass"), dir);
-        PipedInputStream serverIn = new PipedInputStream(1 << 16);
-        toServer = new PipedOutputStream(serverIn);
-        PipedOutputStream serverOut = new PipedOutputStream();
-        fromServer = new BufferedReader(new InputStreamReader(new PipedInputStream(serverOut, 1 << 20), StandardCharsets.UTF_8));
+        // nio pipes: PipedInputStream fails ("Read end dead") once a thread that read from it has ended,
+        // and the reads below run on pool threads
+        java.nio.channels.Pipe in = java.nio.channels.Pipe.open();
+        java.nio.channels.Pipe out = java.nio.channels.Pipe.open();
+        java.io.InputStream serverIn = java.nio.channels.Channels.newInputStream(in.source());
+        toServer = java.nio.channels.Channels.newOutputStream(in.sink());
+        OutputStream serverOut = java.nio.channels.Channels.newOutputStream(out.sink());
+        fromServer = new BufferedReader(new InputStreamReader(java.nio.channels.Channels.newInputStream(out.source()), StandardCharsets.UTF_8));
         context = McpgpServer.start(startup, new McpgpServer.Stdio(serverIn, serverOut, () -> { }));
     }
 

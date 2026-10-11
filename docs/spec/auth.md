@@ -24,20 +24,36 @@ auth, requests with an `Origin` header not in `server.allowedOrigins` are refuse
 
 ### 1.1 `oauth` mode
 
-- **Protected resource metadata (RFC 9728)** at `/.well-known/oauth-protected-resource`:
-  `resource` (= `server.publicUrl` + base path), `authorization_servers` (= `server.auth.issuer`),
-  `scopes_supported`, `bearer_methods_supported: ["header"]`.
+Needs `server.auth.issuer` and `server.publicUrl` (the server refuses to start without them). The
+**resource** is `publicUrl` + `basePath`, e.g. `https://orders-mcp.acme.internal/mcp`.
+
+- **Protected resource metadata (RFC 9728)** at `/.well-known/oauth-protected-resource` with the
+  resource's path appended (`/.well-known/oauth-protected-resource/mcp`; the bare path answers too):
+  `resource`, `authorization_servers` (= `server.auth.issuer`), `scopes_supported` (the keys of
+  `server.auth.scopes`), `bearer_methods_supported: ["header"]`.
 - **Unauthenticated request** → `401` with
-  `WWW-Authenticate: Bearer resource_metadata="<publicUrl>/.well-known/oauth-protected-resource"`,
-  which starts the client's sign-in.
+  `WWW-Authenticate: Bearer resource_metadata="<that URL>"`, which starts the client's sign-in. An
+  invalid token → `401` with `error="invalid_token"` as well; an authorization server that can't be
+  reached to check it → `503`.
 - **Token validation:**
-  - JWT access tokens: signature via the issuer's JWKS (from its RFC 8414 metadata), `iss`, `exp`,
-    `nbf`, and **`aud` must equal the resource** (RFC 8707). Clock skew tolerance 60 s.
-  - Opaque tokens: token introspection (RFC 7662) when `server.auth.introspection` is configured.
-- **Scopes:** `server.auth.scopes` maps scopes to tool selections, e.g.
-  `{ "orders.read": { access: read-only }, "orders.write": { access: read-write } }`. A call to a tool
-  the token's scopes don't allow → `403` with `WWW-Authenticate: Bearer error="insufficient_scope",
-  scope="<needed>"` (RFC 6750 §3.1). `tools/list` shows only allowed tools.
+  - JWT access tokens (`typ` `JWT`, `at+jwt` or none): the signature with the issuer's JWKS, from its
+    RFC 8414 metadata (`/.well-known/oauth-authorization-server`, path appended) or else its OpenID
+    metadata, or `server.auth.jwksUri`; cached, and fetched again for an unknown key. Only asymmetric
+    algorithms (RS, PS, ES, EdDSA); `none` and shared-secret (`HS*`) tokens are refused. `iss` must
+    be the issuer, `exp` / `nbf` hold with 60 s skew, and **`aud` must name the resource** (RFC 8707).
+    Scopes from `scope` (space-separated) or `scp`.
+  - Opaque tokens: token introspection (RFC 7662) when `server.auth.introspection` is configured
+    (`clientId` / `clientSecret` as HTTP Basic); `active` must be true, `aud` (when present) must name
+    the resource; answers are cached for 60 s (never past `exp`), by the token's hash.
+  - `issuer`, `jwksUri` and the introspection URL are `https://`, or `http://` only on loopback.
+- **Scopes:** `server.auth.scopes` maps scopes to tool selections: `access` (`read-only`: tools that
+  only read; `read-write`: all but destructive ones; `all`) and optionally `tools` (names, `*` as a
+  wildcard), e.g. `{ "orders.read": { access: read-only }, "orders.write": { access: read-write } }`.
+  A call to a tool the token's scopes don't allow, directly or through `call_tool`, → `403` with
+  `WWW-Authenticate: Bearer error="insufficient_scope", scope="<scopes that would allow it>"`
+  (RFC 6750 §3.1). `tools/list` shows only allowed tools. Built-in tools (instances, discovery) are
+  open to any valid token; without a mapping, a valid token allows every tool.
+- The token's `sub` (or `client_id`) is the `actor` in audit events; tokens are never logged.
 - The server never forwards the client's token downstream and never accepts tokens issued for another
   audience.
 

@@ -268,7 +268,13 @@ public final class ConfigLoader {
         String basePath = server.path("basePath").asText("/mcp");
         // inbound auth applies to HTTP only (auth.md §1)
         if (transport.equals("http") && authMode.equals("oauth")) {
-            problems.add("/server/auth/mode: oauth is not available in this runtime version yet; use static keys or a gateway");
+            // tokens must name this server as their audience (RFC 8707), so it needs its public address
+            if (server.path("auth").path("issuer").asText("").isEmpty()) {
+                problems.add("/server/auth/issuer: oauth mode needs the authorization server (issuer)");
+            }
+            if (server.path("publicUrl").asText("").isEmpty()) {
+                problems.add("/server/publicUrl: oauth mode needs the address clients use for this server (tokens are issued for it)");
+            }
         }
         if (transport.equals("http") && authMode.equals("static") && server.path("auth").path("keys").isEmpty()) {
             problems.add("/server/auth/keys: static mode needs at least one key ({ name, value })");
