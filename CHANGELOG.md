@@ -5,6 +5,11 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+## 0.2.0 — 2026-10-12
+
+Shared notices (company policy text once, on every server), and running the platform image without
+the repository: `setup` writes the Docker Compose folder, `check` says what would fail.
+
 ### Added
 - Platform image: `setup` writes everything to run it with Docker Compose into a folder (compose
   files pointing at the image, `platform.yaml`, `.env`, generated secrets and a signing key), asking
