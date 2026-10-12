@@ -95,6 +95,9 @@ public interface Store {
 
     void cache(String kind, String key, byte[] content);
 
+    /** Removes the derived data whose key {@code keep} refuses; returns how many entries went. */
+    int pruneCache(java.util.function.Predicate<String> keep);
+
     /** A stale or duplicate write. */
     final class ConflictException extends RuntimeException {
         public ConflictException(String message) {

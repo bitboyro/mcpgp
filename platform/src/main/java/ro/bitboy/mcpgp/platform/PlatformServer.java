@@ -182,6 +182,10 @@ public class PlatformServer {
                 "spring.servlet.multipart.enabled", "false",
                 "server.tomcat.max-swallow-size", "-1",
                 "logging.level.com.zaxxer.hikari", "warn"));
+        // manifests of big servers are MBs of JSON: gzip for browsers on another machine (zips stay as they are)
+        properties.put("server.compression.enabled", "true");
+        properties.put("server.compression.mime-types", "application/json,application/problem+json,text/html,text/css,text/plain,application/javascript,text/javascript,application/yaml");
+        properties.put("server.compression.min-response-size", "2KB");
         properties.putAll(tlsProperties(config));
         app.setDefaultProperties(properties);
         app.addInitializers(ctx -> ctx.getBeanFactory().registerSingleton("platformConfig", config));
@@ -250,7 +254,18 @@ public class PlatformServer {
 
     @Bean
     Compilation compilation(Store store, PlatformConfig config) {
-        return new Compilation(store, config.workspace());
+        Compilation compilation = new Compilation(store, config.workspace());
+        // results of older versions and unsaved previews kept by earlier releases: cleared in the background
+        Thread prune = new Thread(() -> {
+            try {
+                compilation.pruneCache();
+            } catch (RuntimeException e) {
+                org.slf4j.LoggerFactory.getLogger(PlatformServer.class).warn("clearing cached results failed: {}", e.getMessage());
+            }
+        }, "mcpgp-prune-cache");
+        prune.setDaemon(true);
+        prune.start();
+        return compilation;
     }
 
     @Bean(destroyMethod = "close")

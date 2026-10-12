@@ -131,6 +131,11 @@ abstract class StoreContract {
         store.cache("manifest", "abc", new byte[] {2});
         assertThat(store.cached("manifest", "abc")).hasValueSatisfying(b -> assertThat(b).containsExactly(2));
         assertThatThrownBy(() -> store.cache("Manifest", "abc", new byte[0])).isInstanceOf(IllegalArgumentException.class);
+        store.cache("naming", "old-1", new byte[] {3});
+        store.cache("manifest", "old-2", new byte[] {4});
+        assertThat(store.pruneCache(key -> !key.startsWith("old-"))).isEqualTo(2);
+        assertThat(store.cached("naming", "old-1")).isEmpty();
+        assertThat(store.cached("manifest", "abc")).isPresent();
         store.check();
         assertThat(store.describe()).isNotBlank();
     }

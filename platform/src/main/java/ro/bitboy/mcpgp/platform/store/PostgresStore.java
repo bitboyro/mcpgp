@@ -392,6 +392,17 @@ public final class PostgresStore implements Store, AutoCloseable {
                 ps -> { ps.setString(1, kind); ps.setString(2, key); ps.setBytes(3, content); });
     }
 
+    @Override
+    public int pruneCache(java.util.function.Predicate<String> keep) {
+        List<String[]> gone = new ArrayList<>();
+        query("SELECT kind, key FROM cache", ps -> { }, rs -> new String[] {rs.getString(1), rs.getString(2)})
+                .forEach(e -> { if (!keep.test(e[1])) gone.add(e); });
+        for (String[] e : gone) {
+            update("DELETE FROM cache WHERE kind = ? AND key = ?", ps -> { ps.setString(1, e[0]); ps.setString(2, e[1]); });
+        }
+        return gone.size();
+    }
+
     // ---------------------------------------------------------------------- JDBC
 
     @FunctionalInterface

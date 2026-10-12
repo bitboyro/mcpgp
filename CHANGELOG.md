@@ -5,6 +5,15 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+### Fixed
+- The store's cache of compiled results grew without limit: every preview of an unsaved change kept its
+  manifest (several MB for a big server), and nothing was ever removed, which made the store, and with
+  it every page, slower over time. Previews of unsaved changes are now kept in memory only, and the
+  cache keeps each server's last 3 versions (older ones compile again when opened; archived servers'
+  results go). Existing caches are cleared at start.
+- Responses are compressed (gzip) for JSON and the web app: a big server's manifest goes from MBs
+  to tens of KB over the network.
+
 ## 0.2.4 — 2026-10-12
 
 ### Added
