@@ -5,6 +5,11 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+### Fixed
+- Specs whose schemas are recursive across files (a criteria tree whose children are criteria, a
+  certificate whose parent is a certificate) failed with `REFERENCE_CYCLE`. Such a schema now becomes
+  a shared schema and the tools reach it through `$defs`, as when it's written in the spec itself.
+
 ## 0.2.1 — 2026-10-12
 
 Start from your API's spec in the web UI, and HTTPS without a proxy.
