@@ -5,6 +5,10 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+## 0.2.1 — 2026-10-12
+
+Start from your API's spec in the web UI, and HTTPS without a proxy.
+
 ### Added
 - HTTPS served by the platform itself, off unless configured: `http.tls` with a certificate and key
   (PEM) or a PKCS12 keystore, reloaded when the files change. `setup` asks who does HTTPS for an
