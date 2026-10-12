@@ -151,7 +151,9 @@ public class ServersApi {
             answer.put("replaces", change.replaces());
             answer.put("moved", upload.moves().stream().map(m -> Map.of("from", m.from(), "to", m.to())).toList());
             answer.put("compiles", result.compiles());
-            answer.put("diagnostics", diagnostics(result.preview().result().diagnostics()));
+            // a preview from the cache has no compiler result; its manifest lists the diagnostics
+            answer.put("diagnostics", result.preview().result() != null ? diagnostics(result.preview().result().diagnostics())
+                    : Json.parse(result.preview().manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8)).path("diagnostics"));
             return Json.ok(answer);
         }
         guardrails.quota(who, "versions");
