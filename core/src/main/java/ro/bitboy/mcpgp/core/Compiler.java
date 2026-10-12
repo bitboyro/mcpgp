@@ -29,7 +29,7 @@ import java.util.Optional;
 public final class Compiler {
 
     /** The compiler's own version, recorded in manifests. */
-    public static final String VERSION = "0.2.1";
+    public static final String VERSION = "0.2.2";
 
     /**
      * @param frozenLock fail instead of warning when a tool name would differ from the lock file
