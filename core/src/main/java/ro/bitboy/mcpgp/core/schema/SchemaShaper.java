@@ -30,6 +30,8 @@ public final class SchemaShaper {
     public enum Direction { INPUT, OUTPUT, BOTH }
 
     static final int INLINE_DEPTH = 5;
+    /** Shared schemas bigger than this (in JSON nodes, with what they refer to inlined) go to {@code $defs}, below the top level. */
+    static final int INLINE_SIZE = 300;
     private static final String COMPONENTS = "#/components/schemas/";
     private static final Set<String> DROPPED = Set.of(
             "discriminator", "xml", "externalDocs", "nullable", "x-nullable", "example");
@@ -39,6 +41,9 @@ public final class SchemaShaper {
     private final Format format;
     /** When set, shared references are rewritten to {@code <refPrefix><Name>} instead of inlined. */
     private final String refPrefix;
+    /** Shared schemas' sizes with their references inlined, capped just above {@link #INLINE_SIZE}. */
+    private final Map<String, Integer> sizes = new java.util.HashMap<>();
+    private final Set<String> measuring = new java.util.HashSet<>();
 
     public SchemaShaper(Map<String, ObjectNode> shared, Format format) {
         this(shared, format, null);
@@ -109,7 +114,7 @@ public final class SchemaShaper {
                 return NODES.objectNode().put("description", "Unknown schema " + name);
             }
             ObjectNode resolved;
-            if (stack.contains(name) || depth >= INLINE_DEPTH) {
+            if (stack.contains(name) || depth >= INLINE_DEPTH || depth > 0 && expandedSize(name) > INLINE_SIZE) {
                 if (!defs.containsKey(name)) {
                     defs.put(name, NODES.objectNode()); // placeholder against recursion
                     Deque<String> own = new ArrayDeque<>();
@@ -133,6 +138,43 @@ public final class SchemaShaper {
             return resolved;
         }
         return normalize((ObjectNode) schema.deepCopy(), direction, depth, stack, defs);
+    }
+
+    /**
+     * How big a shared schema gets with every reference in it inlined: a wide schema five levels deep is
+     * thousands of copies, so past {@link #INLINE_SIZE} it's referenced instead. A reference back to a
+     * schema being measured counts as one node: it's a {@code $defs} reference once inlined.
+     */
+    private int expandedSize(String name) {
+        Integer known = sizes.get(name);
+        if (known != null) {
+            return known;
+        }
+        if (!measuring.add(name)) {
+            return 1;
+        }
+        int size = size(shared.get(name));
+        measuring.remove(name);
+        sizes.put(name, Math.min(size, INLINE_SIZE + 1));
+        return sizes.get(name);
+    }
+
+    private int size(JsonNode node) {
+        if (node == null) {
+            return 0;
+        }
+        JsonNode ref = node.get("$ref");
+        if (ref != null && ref.isTextual() && ref.asText().startsWith(COMPONENTS)) {
+            return expandedSize(ref.asText().substring(COMPONENTS.length()));
+        }
+        int size = 1;
+        for (JsonNode child : node) {
+            size += size(child);
+            if (size > INLINE_SIZE) {
+                return size;
+            }
+        }
+        return size;
     }
 
     private ObjectNode normalize(ObjectNode schema, Direction direction, int depth, Deque<String> stack, Map<String, JsonNode> defs) {

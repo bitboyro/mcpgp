@@ -40,8 +40,8 @@ import java.util.Set;
  * Loads one contract (an OpenAPI document plus its overlays) into {@link Contract}.
  *
  * <p>Swagger 2.0, OpenAPI 3.0 and 3.1 are supported; 3.2 is reported as not yet supported. External
- * {@code $ref}s are inlined after checking they stay inside the project root (recursive ones become shared
- * schemas); internal references to shared schemas stay as {@code #/components/schemas/<Name>}. Nothing is fetched from the network.
+ * {@code $ref}s are checked to stay inside the project root; schemas in other files become shared schemas,
+ * everything else is inlined. Internal references to shared schemas stay as {@code #/components/schemas/<Name>}. Nothing is fetched from the network.
  */
 public final class ContractLoader {
 
@@ -119,10 +119,11 @@ public final class ContractLoader {
     // -------------------------------------------------------------------- external references
 
     /**
-     * Inlines every {@code $ref} that points to another file, checking each path. A schema that refers
-     * back to itself through other files (a tree, a chain) can't be inlined: it becomes a shared schema,
-     * named after the entry that already points to it or after its file, and the references to it point
-     * there, as they would had it been written in the spec itself.
+     * Inlines the {@code $ref}s that point to another file, checking each path. A schema in another file
+     * becomes a shared schema instead, named after the entry that already points to it or after its file,
+     * and the references to it point there, as they would had it been written in the spec itself: each
+     * file is read once however many places use it (inlining every use grows exponentially with depth),
+     * and a schema that refers back to itself (a tree, a chain) needs no special case.
      */
     private final class ExternalRefs {
         private final Diagnostics diagnostics;
@@ -133,8 +134,8 @@ public final class ContractLoader {
         private final Map<Path, JsonNode> cache = new HashMap<>();
         /** Shared schemas that point to another file, by what they point to. */
         private final Map<String, String> named = new HashMap<>();
-        /** What became shared schemas: names by what they are, and their content. */
-        private final Map<String, String> recursive = new HashMap<>();
+        /** The schemas from other files: names by what they are, and their content. */
+        private final Map<String, String> shared = new HashMap<>();
         private final Map<String, JsonNode> hoisted = new LinkedHashMap<>();
 
         ExternalRefs(Diagnostics diagnostics, Path main, ObjectNode document, Format format) {
@@ -142,7 +143,7 @@ public final class ContractLoader {
             this.main = main;
             this.document = document;
             this.format = format;
-            shared().fields().forEachRemaining(f -> {
+            sharedSection().fields().forEachRemaining(f -> {
                 String ref = f.getValue().path("$ref").asText("");
                 if (f.getValue().size() == 1 && !ref.isEmpty() && !ref.startsWith("#") && !ProjectPaths.isRemote(ref)) {
                     int hash = ref.indexOf('#');
@@ -157,10 +158,10 @@ public final class ContractLoader {
         }
 
         void inline() {
-            inline(document, main, "");
+            inline(document, main, "", false);
             if (!hoisted.isEmpty()) {
-                ObjectNode shared = swagger() ? document.with("definitions") : document.with("components").with("schemas");
-                hoisted.forEach(shared::set);
+                ObjectNode section = swagger() ? document.with("definitions") : document.with("components").with("schemas");
+                hoisted.forEach(section::set);
             }
         }
 
@@ -168,33 +169,36 @@ public final class ContractLoader {
             return format == Format.SWAGGER_2_0;
         }
 
-        private JsonNode shared() {
+        private JsonNode sharedSection() {
             return swagger() ? document.path("definitions") : document.path("components").path("schemas");
         }
 
-        private JsonNode inline(JsonNode node, Path file, String pointer) {
+        /** {@code schema}: inside a schema, where a reference to another file becomes a shared schema. */
+        private JsonNode inline(JsonNode node, Path file, String pointer, boolean schema) {
             if (node.isObject()) {
                 ObjectNode object = (ObjectNode) node;
                 JsonNode ref = object.get("$ref");
                 // inside another file, its own "#/..." references are to that file
                 if (ref != null && ref.isTextual() && (!ref.asText().startsWith("#") || !file.equals(main))) {
-                    return resolve(ref.asText(), file, location(file).withPointer(pointer + "/$ref")).orElse(object);
+                    return resolve(ref.asText(), file, location(file).withPointer(pointer + "/$ref"), schema).orElse(object);
                 }
+                boolean sharedSchemas = file.equals(main) && (swagger() ? pointer.equals("/definitions") : pointer.equals("/components/schemas"));
                 List<String> names = new ArrayList<>();
                 object.fieldNames().forEachRemaining(names::add);
                 for (String name : names) {
-                    object.set(name, inline(object.get(name), file, pointer + "/" + escape(name)));
+                    boolean inside = schema || sharedSchemas || name.equals("schema");
+                    object.set(name, inline(object.get(name), file, pointer + "/" + escape(name), inside));
                 }
             } else if (node.isArray()) {
                 ArrayNode array = (ArrayNode) node;
                 for (int i = 0; i < array.size(); i++) {
-                    array.set(i, inline(array.get(i), file, pointer + "/" + i));
+                    array.set(i, inline(array.get(i), file, pointer + "/" + i, schema));
                 }
             }
             return node;
         }
 
-        private Optional<JsonNode> resolve(String ref, Path from, Location location) {
+        private Optional<JsonNode> resolve(String ref, Path from, Location location, boolean schema) {
             int hash = ref.indexOf('#');
             String filePart = hash < 0 ? ref : ref.substring(0, hash);
             String fragment = hash < 0 ? "" : ref.substring(hash + 1);
@@ -204,12 +208,13 @@ public final class ContractLoader {
                 return Optional.empty();
             }
             String id = target.get() + "#" + fragment;
-            if (recursive.containsKey(id)) {
-                return Optional.of(sharedRef(recursive.get(id)));
+            if (shared.containsKey(id)) {
+                return Optional.of(sharedRef(shared.get(id)));
             }
             if (stack.contains(id)) {
-                recursive.put(id, name(id, target.get(), fragment));
-                return Optional.of(sharedRef(recursive.get(id)));
+                // not a schema (a path item, a parameter) that includes itself
+                diagnostics.error(Codes.REFERENCE_CYCLE, "Reference cycle through '" + ref + "'", location);
+                return Optional.empty();
             }
             JsonNode file = cache.computeIfAbsent(target.get(),
                     p -> Documents.read(p, diagnostics, location(p)).orElse(NODES.missingNode()));
@@ -221,19 +226,18 @@ public final class ContractLoader {
                 diagnostics.error(Codes.REF_UNRESOLVED, "'" + ref + "' does not exist", location);
                 return Optional.empty();
             }
+            if (schema) {
+                String name = name(id, target.get(), fragment);
+                shared.put(id, name);
+                hoisted.put(name, inline(node.deepCopy(), target.get(), fragment, true));
+                return Optional.of(sharedRef(name));
+            }
             stack.push(id);
-            JsonNode inlined;
             try {
-                inlined = inline(node.deepCopy(), target.get(), fragment);
+                return Optional.of(inline(node.deepCopy(), target.get(), fragment, false));
             } finally {
                 stack.pop();
             }
-            String name = recursive.get(id);
-            if (name == null) {
-                return Optional.of(inlined);
-            }
-            hoisted.put(name, inlined);
-            return Optional.of(sharedRef(name));
         }
 
         private ObjectNode sharedRef(String name) {
@@ -254,7 +258,7 @@ public final class ContractLoader {
                 }
             }
             String name = base.isEmpty() ? "Schema" : base.toString();
-            for (int i = 2; shared().has(name) || recursive.containsValue(name); i++) {
+            for (int i = 2; sharedSection().has(name) || shared.containsValue(name); i++) {
                 name = base + String.valueOf(i);
             }
             return name;

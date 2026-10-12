@@ -270,7 +270,7 @@ build: { targets: [mcpb] }
 | Lists of objects with a key | **Merged item by item**, matched on the key: `apis` and `instances` by `id`, `contracts` by `version`. An item present only in the later file is added; `$remove: true` removes the inherited item (e.g. `- { version: "1.0", $remove: true }`). |
 | Other lists | `overrides.rules` and `include`d rule files **append**; every other list **replaces**. Override with `$merge: append \| replace`. |
 | OpenAPI `$ref`s | Resolved relative to the spec file, under the same root restriction. |
-| Recursive OpenAPI schemas | A schema in another file that refers back to itself (a tree, a chain) isn't a cycle error: it becomes a shared schema (`components/schemas`), named after the entry that points to its file or after the file (`complete-tls-certificate.json` → `CompleteTlsCertificate`), and tools reach it through `$defs`. |
+| OpenAPI schemas in other files | Become shared schemas (`components/schemas`), named after the entry that points to their file or after the file (`complete-tls-certificate.json` → `CompleteTlsCertificate`): each file is read once however many places use it, and a schema that refers back to itself (a tree, a chain) isn't a cycle error. Other `$ref`s to files (path items, parameters, responses) are inlined. |
 
 ## 8. Lock file
 
