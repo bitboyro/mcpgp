@@ -45,7 +45,7 @@ final class Deployment {
         LOG.info("created administrator {} (a local account) in {}", admin.name(), store.describe());
     }
 
-    /** What to fix before people rely on this installation; empty when nothing stands out. */
+    /** What to fix before people rely on this installation; empty when nothing stands out. Without a store, the administrator isn't checked. */
     static List<String> warnings(PlatformConfig config, Store store) {
         List<String> warnings = new ArrayList<>();
         boolean local = PlatformConfig.loopback(config.host());
@@ -63,7 +63,7 @@ final class Deployment {
         if (config.postgres() == null && config.storageRoot().toAbsolutePath().normalize().startsWith("/tmp")) {
             warnings.add("the file store is under /tmp (" + config.storageRoot() + "): it may not survive a restart");
         }
-        if (store.identities().isEmpty()) {
+        if (store != null && store.identities().isEmpty()) {
             warnings.add("there is no administrator yet: set admin.name and admin.password, or run `init --admin <name>`");
         }
         if (config.localAccounts() && (config.oidc() != null || config.ldap() != null)) {

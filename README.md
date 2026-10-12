@@ -54,13 +54,14 @@ mcpgp build my-api-mcp.mcpgp.yaml            # dist/<server>-<version>.zip, read
 The examples work as they are: `cd examples/pipeline && mcpgp validate --all && mcpgp test --all`.
 Building in CI: [docs/guides/ci-pipeline.md](docs/guides/ci-pipeline.md).
 
-**The platform** (web UI, REST API, builds for a team), with Docker Compose:
+**The platform** (web UI, REST API, builds for a team), with Docker Compose; the image writes its own
+setup (compose files, config, generated secrets) into a folder, so nothing else is needed on the host:
 
 ```bash
-cd deploy
-chmod 700 secrets && openssl rand -base64 24 > secrets/admin_password && chmod 644 secrets/admin_password
-cp .env.example .env
-docker compose up -d --build --wait          # then open http://localhost:8443, user admin
+mkdir mcpgp && cd mcpgp
+docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/setup docker.io/<account>/mcpgp-platform:<version> setup
+docker compose run --rm platform check       # what would go wrong, before starting
+docker compose up -d --wait                  # then open the address you gave, user admin
 ```
 
 PostgreSQL, TLS, company sign-in and backups: [docs/guides/self-hosting.md](docs/guides/self-hosting.md).

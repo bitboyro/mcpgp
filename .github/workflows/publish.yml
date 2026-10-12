@@ -91,6 +91,9 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           provenance: mode=max
           sbom: true
+          # the platform image knows its own name, for `setup` (the CLI image ignores it)
+          build-args: |
+            MCPGP_IMAGE=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:${{ steps.meta.outputs.version }}
 
       - name: Pushed
         run: echo "${{ steps.meta.outputs.tags }}" | sed 's/^/pushed /'

@@ -14,6 +14,8 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 # ---- run
 FROM eclipse-temurin:21-jre-noble
+# the image's own name, which `setup` writes into .env (the publish workflow passes the pushed name)
+ARG MCPGP_IMAGE=mcpgp-platform:local
 LABEL org.opencontainers.image.title="mcpgp platform" \
       org.opencontainers.image.source="https://github.com/bitboyro/mcpgp"
 RUN groupadd --system --gid 10001 mcpgp \
@@ -23,7 +25,9 @@ RUN groupadd --system --gid 10001 mcpgp \
 COPY --from=build /mcpgp-platform.jar /opt/mcpgp/mcpgp-platform.jar
 COPY deploy/platform.default.yaml /etc/mcpgp/platform.yaml
 # listen on every interface inside the container; the data directory is the volume
-ENV MCPGP_PLATFORM_HTTP__HOST=0.0.0.0 \
+ENV MCPGP_PLATFORM_IMAGE=$MCPGP_IMAGE \
+    MCPGP_PLATFORM_CONFIG=/etc/mcpgp/platform.yaml \
+    MCPGP_PLATFORM_HTTP__HOST=0.0.0.0 \
     MCPGP_PLATFORM_HTTP__PORT=8443 \
     MCPGP_PLATFORM_STORAGE__ROOT=/var/lib/mcpgp
 USER 10001:10001
@@ -34,4 +38,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -fsS http://127.0.0.1:8443/healthz || exit 1
 # the platform's heap: half the container's memory; Try it servers run next to it with 256 MB each
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=50", "-jar", "/opt/mcpgp/mcpgp-platform.jar"]
-CMD ["--config", "/etc/mcpgp/platform.yaml"]
+# no command: run; `setup`, `check`, `init`, `copy-store` as commands (the config comes from MCPGP_PLATFORM_CONFIG)

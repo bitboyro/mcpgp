@@ -110,6 +110,16 @@
         <directory>mcp</directory>
         <targetPath>mcpgp/platform-mcp</targetPath>
       </resource>
+      <!-- the Docker Compose files, for the setup command (never the secrets or a local .env) -->
+      <resource>
+        <directory>../deploy</directory>
+        <targetPath>mcpgp/deploy</targetPath>
+        <includes>
+          <include>compose*.yaml</include>
+          <include>platform.yaml</include>
+          <include>.env.example</include>
+        </includes>
+      </resource>
     </resources>
     <plugins>
       <plugin>
