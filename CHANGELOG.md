@@ -5,6 +5,12 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+### Fixed
+- Specs with schemas in separate files that refer to each other compiled in exponential time: a
+  140-operation spec took minutes, and every page of its server with it. Schemas in other files are
+  now shared schemas, read once, and a tool's schema puts big shared schemas in `$defs` instead of
+  copying them five levels deep. The same spec compiles in about a second.
+
 ## 0.2.2 — 2026-10-12
 
 ### Fixed

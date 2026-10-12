@@ -66,7 +66,8 @@ Rules:
 - Auth headers, auth query parameters and auth cookies are **never** exposed; the runtime injects
   credentials.
 - `readOnly` schema properties are removed from inputs.
-- `$ref`s are inlined up to depth 5, then placed in `$defs`.
+- `$ref`s are inlined up to depth 5, then placed in `$defs`; so are shared schemas that would inline to more
+  than 300 JSON nodes (below the top level), so a wide schema graph doesn't repeat in every tool.
 - JSON Schema 2020-12; `additionalProperties: false` on the top level and on every group.
 - The runtime maps each group straight back to the request: no guessing, no renaming. Path values
   are percent-encoded (a `/` in a value stays inside its segment); empty, `.` and `..` path values

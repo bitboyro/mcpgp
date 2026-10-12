@@ -135,8 +135,11 @@ class ContractLoaderTest {
                               schema: { $ref: 'schemas/customer.yaml#/Customer' }
                 """);
         Contract c = load(root, "1", spec, List.of());
+        // a schema in another file becomes a shared schema, named after what it is in that file
         var schema = c.operations().get(0).responses().get(0).content().get(0).schema();
-        assertThat(schema.at("/properties/address/properties/city/type").asText()).isEqualTo("string");
+        assertThat(schema.path("$ref").asText()).isEqualTo("#/components/schemas/Customer");
+        assertThat(c.schemas().get("Customer").at("/properties/address/$ref").asText()).isEqualTo("#/components/schemas/Address");
+        assertThat(c.schemas().get("Address").at("/properties/city/type").asText()).isEqualTo("string");
 
         Files.writeString(temp.resolve("evil.yaml"), "X: { type: string }\n");
         Path escaping = Files.writeString(root.resolve("escape.yaml"), """
@@ -197,10 +200,11 @@ class ContractLoaderTest {
         Contract c = load(root, "1", spec, List.of());
         assertThat(diagnostics.errors()).isEmpty();
 
-        // the entry that points to the file keeps its name; the other gets its file's
-        assertThat(c.schemas().get("Criteria").at("/oneOf/1/properties/children/items/$ref").asText())
-                .isEqualTo("#/components/schemas/Criteria");
-        assertThat(c.schemas().get("Criteria").at("/oneOf/0/properties/key/type").asText()).isEqualTo("string");
+        // the entry that points to the file keeps its name; the others get their file's
+        assertThat(c.schemas().get("Criteria").at("/oneOf/0/$ref").asText()).isEqualTo("#/components/schemas/MetadataCondition");
+        assertThat(c.schemas().get("Criteria").at("/oneOf/1/$ref").asText()).isEqualTo("#/components/schemas/Conjunctor");
+        assertThat(c.schemas().get("Conjunctor").at("/properties/children/items/$ref").asText()).isEqualTo("#/components/schemas/Criteria");
+        assertThat(c.schemas().get("MetadataCondition").at("/properties/key/type").asText()).isEqualTo("string");
         var certificate = c.schemas().get("CompleteTlsCertificate");
         assertThat(certificate.at("/properties/parent/$ref").asText()).isEqualTo("#/components/schemas/CompleteTlsCertificate");
         assertThat(certificate.at("/properties/issuer/$ref").asText()).isEqualTo("#/components/schemas/CompleteTlsCertificate");
@@ -211,6 +215,35 @@ class ContractLoaderTest {
                 .selfContained(op(c, "orders:POST:/search").requestBody().content().get(0).schema(), ro.bitboy.mcpgp.core.schema.SchemaShaper.Direction.INPUT);
         assertThat(shaped.toString()).contains("#/$defs/Criteria").doesNotContain("components");
         assertThat(shaped.has("$defs")).isTrue();
+    }
+
+    @Test
+    void aSchemaFileUsedEverywhereIsReadOnce() throws IOException {
+        // each schema refers to the next three: inlining every use would be 4^30 copies
+        Path root = Files.createDirectories(temp.resolve("w"));
+        Files.createDirectories(root.resolve("schemas"));
+        for (int i = 0; i < 30; i++) {
+            StringBuilder props = new StringBuilder("\"name\": { \"type\": \"string\" }");
+            for (int j = 1; j <= 3 && i + j < 30; j++) {
+                props.append(", \"c").append(j).append("\": { \"$ref\": \"s").append(i + j).append(".json\" }");
+            }
+            Files.writeString(root.resolve("schemas/s" + i + ".json"), "{ \"type\": \"object\", \"properties\": { " + props + " } }");
+        }
+        Path spec = Files.writeString(root.resolve("spec.yaml"), """
+                openapi: 3.0.3
+                info: { title: t, version: "1" }
+                paths:
+                  /a:
+                    put:
+                      requestBody: { content: { application/json: { schema: { $ref: 'schemas/s0.json' } } } }
+                      responses: { "200": { description: ok } }
+                """);
+        Contract c = load(root, "1", spec, List.of());
+        assertThat(c.schemas()).hasSize(30);
+        var shaped = new ro.bitboy.mcpgp.core.schema.SchemaShaper(c.schemas(), c.format())
+                .selfContained(op(c, "orders:PUT:/a").requestBody().content().get(0).schema(), ro.bitboy.mcpgp.core.schema.SchemaShaper.Direction.INPUT);
+        assertThat(shaped.toString().length()).isLessThan(200_000);
+        assertThat(shaped.at("/properties/name/type").asText()).isEqualTo("string");
     }
 
     @Test
