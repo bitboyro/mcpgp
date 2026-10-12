@@ -321,7 +321,7 @@ public class ServersApi {
                 answer.put("manifest", manifest);
                 answer.put("exampleConfig", ExampleConfig.yaml(manifest));
                 if (json.path("operations").asBoolean(false)) {
-                    answer.put("operations", compilation.operations(result.version(), Instant.now().toString()));
+                    answer.put("operations", compilation.operations(result.version(), Instant.now().toString(), false));
                 }
             } else {
                 answer.put("diagnostics", diagnostics(result.preview().result().diagnostics()));

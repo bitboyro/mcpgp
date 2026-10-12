@@ -63,7 +63,7 @@ public final class Edits {
         contents.put(files.root(), edited.getBytes(StandardCharsets.UTF_8));
         // stored by content, like an upload; only a save makes it a version of the server
         Model.Version version = projects.store(contents);
-        return new Result(version, edited, compilation.preview(version, Instant.now().toString()));
+        return new Result(version, edited, compilation.preview(version, Instant.now().toString(), false));
     }
 
     /** Saves the edit as the server's next version; refused when it doesn't compile. */

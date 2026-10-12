@@ -412,6 +412,26 @@ public final class FileStore implements Store {
         write(cacheFile(kind, key), content);
     }
 
+    @Override
+    public int pruneCache(java.util.function.Predicate<String> keep) {
+        Path cache = root.resolve("cache");
+        if (!Files.isDirectory(cache)) {
+            return 0;
+        }
+        int removed = 0;
+        try (java.util.stream.Stream<Path> files = Files.walk(cache, 2)) {
+            for (Path file : files.filter(Files::isRegularFile).toList()) {
+                if (!keep.test(file.getFileName().toString())) {
+                    Files.deleteIfExists(file);
+                    removed++;
+                }
+            }
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        return removed;
+    }
+
     private Path cacheFile(String kind, String key) {
         StoreKeys.cacheKey(kind, key);
         return root.resolve("cache").resolve(kind).resolve(key);
