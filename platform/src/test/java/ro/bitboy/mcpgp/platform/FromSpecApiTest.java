@@ -87,6 +87,25 @@ class FromSpecApiTest extends PlatformTestBase {
 
         assertThat(send(post("/api/v1/servers/from-spec", Map.of("a.yaml", "openapi: 3.2.0\ninfo: { title: A, version: '1' }\n"))).statusCode())
                 .isEqualTo(422);
+
+        // the file is there, but not the part the reference points to: said before anything is created
+        var part = send(post("/api/v1/servers/from-spec", Map.of("api.json", SWAGGER, "paths/entries.json", ENTRIES,
+                "definitions/entry.json", "{ \"Other\": { \"type\": \"object\" } }")));
+        assertThat(part.statusCode()).isEqualTo(422);
+        assertThat(json(part).path("detail").asText()).contains("definitions/entry.json#/Entry").contains("isn't there");
+        assertThat(json(part).path("broken")).hasSize(2);     // both places that use it
+        // and so for a reference inside the spec itself
+        var inside = send(post("/api/v1/servers/from-spec", Map.of("openapi.yaml", """
+                openapi: 3.0.3
+                info: { title: Inside, version: '1' }
+                paths:
+                  /x:
+                    get:
+                      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: '#/components/schemas/Nope' } } } } }
+                """)));
+        assertThat(inside.statusCode()).isEqualTo(422);
+        assertThat(json(inside).path("detail").asText()).contains("openapi.yaml#/components/schemas/Nope").contains("isn't there");
+        assertThat(json(inside).at("/broken/0/pointer").asText()).isEqualTo("/paths/~1x/get/responses/200/content/application~1json/schema/$ref");
     }
 
     @Test

@@ -92,4 +92,25 @@ class SpecFilesTest {
         assertThat(placed.moves()).extracting(SpecFiles.Move::to).containsExactlyInAnyOrder("paths/customers.json", "definitions/customer.json");
         assertThat(SpecFiles.analyze(placed.files(), null).ok()).isTrue();
     }
+
+    @Test
+    void saysWhichPartsReferencesPointToArentThere() {
+        SpecFiles.Analysis a = SpecFiles.analyze(files(
+                "openapi.yaml", """
+                        openapi: 3.0.3
+                        info: { title: A, version: '1' }
+                        paths:
+                          /x:
+                            get:
+                              responses:
+                                "200": { description: ok, content: { application/json: { schema: { $ref: '#/components/schemas/Nope' } } } }
+                                "404": { description: no, content: { application/json: { schema: { $ref: 'errors.yaml#/Missing' } } } }
+                                "500": { description: oh, content: { application/json: { schema: { $ref: 'errors.yaml#/Error' } } } }
+                        components: { schemas: { Ok: { type: object } } }
+                        """,
+                "errors.yaml", "Error: { type: object }\n"), null);
+        assertThat(a.ok()).isFalse();
+        assertThat(a.broken()).extracting(SpecFiles.Ref::target).containsExactlyInAnyOrder("openapi.yaml#/components/schemas/Nope", "errors.yaml#/Missing");
+        assertThat(a.broken()).allSatisfy(r -> assertThat(r.from()).isEqualTo("openapi.yaml"));
+    }
 }

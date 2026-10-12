@@ -79,7 +79,8 @@ class SetupTest {
 
     @Test
     void asksForWhatIsntGivenAndAddsCompanySignIn() throws Exception {
-        String answers = String.join("\n", "https://mcpgp.acme.example", "acme", "files", "n", "https://login.acme.example/realms/acme", "mcpgp", "y") + "\n";
+        // 3: my own proxy does HTTPS
+        String answers = String.join("\n", "https://mcpgp.acme.example", "acme", "files", "n", "3", "https://login.acme.example/realms/acme", "mcpgp", "y") + "\n";
         assertThat(setup(answers)).as(output).isZero();
         assertThat(output).contains("Public address").contains("OIDC issuer").contains("todo    secrets/oidc_client_secret");
         assertThat(dir.resolve("compose.postgres.yaml")).doesNotExist();
@@ -144,5 +145,63 @@ class SetupTest {
                 .isEqualTo(Path.of("a.yaml"));
         assertThat(PlatformConfig.configFile(new String[] {"check"}, Map.of("MCPGP_PLATFORM_CONFIG", "/etc/mcpgp/platform.yaml")))
                 .isEqualTo(Path.of("/etc/mcpgp/platform.yaml"));
+    }
+
+    @Test
+    void httpsHereWithASelfSignedCertificate() throws Exception {
+        assertThat(setup(null, "--yes", "--public-url", "https://mcpgp.acme.example:9443", "--store", "files", "--no-sign", "--tls", "self-signed"))
+                .as(output).isZero();
+        String env = Files.readString(dir.resolve(".env"));
+        assertThat(env).contains("COMPOSE_FILE=compose.yaml:compose.tls.yaml").contains("MCPGP_BIND=0.0.0.0").contains("MCPGP_PORT=9443");
+        assertThat(dir.resolve("compose.tls.yaml")).exists();
+        assertThat(dir.resolve("secrets/tls_keystore.p12")).exists();
+        assertThat(dir.resolve("tls/certificate.pem")).content().startsWith("-----BEGIN CERTIFICATE-----");
+
+        // what check says about it, as the container sees the files
+        PlatformConfig config = new PlatformConfig(dir.resolve("store"), "0.0.0.0", 8443, null, PlatformConfig.Retention.DEFAULT, "acme", true,
+                PlatformConfig.Guardrails.DEFAULT, null, null, "https://mcpgp.acme.example:9443")
+                .withTls(new PlatformConfig.Tls(null, null, dir.resolve("secrets/tls_keystore.p12").toString(), "${file:" + dir.resolve("secrets/tls_keystore_password") + "}"));
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        assertThat(new Check(config, Map.of(), new PrintStream(bytes, true, StandardCharsets.UTF_8)).run()).as(bytes.toString(StandardCharsets.UTF_8)).isZero();
+        assertThat(bytes.toString(StandardCharsets.UTF_8)).contains("✓ HTTPS: a certificate for mcpgp.acme.example").contains("self-signed");
+
+        // switching an existing folder back to a proxy, and to the platform again
+        assertThat(setup(null, "--tls", "proxy")).as(output).isZero();
+        assertThat(Files.readString(dir.resolve(".env"))).contains("COMPOSE_FILE=compose.yaml\n").contains("MCPGP_BIND=127.0.0.1").contains("MCPGP_PORT=8443");
+        assertThat(setup(null, "--tls", "self-signed")).as(output).isZero();
+        assertThat(output).contains("kept    secrets/tls_keystore.p12");
+        assertThat(Files.readString(dir.resolve(".env"))).contains("compose.tls.yaml").contains("MCPGP_PORT=9443");
+    }
+
+    @Test
+    void httpsHereWithYourOwnCertificateFiles() throws Exception {
+        // a certificate and its PKCS#8 key, as a company CA would give them (made here with keytool)
+        Path keystore = dir.resolve("made.p12");
+        TlsFiles.selfSigned("mcpgp.acme.example", keystore, "changeit", dir.resolve("certificate.pem"));
+        java.security.KeyStore ks = java.security.KeyStore.getInstance("PKCS12");
+        try (var in = Files.newInputStream(keystore)) {
+            ks.load(in, "changeit".toCharArray());
+        }
+        java.security.Key key = ks.getKey("mcpgp", "changeit".toCharArray());
+        Files.writeString(dir.resolve("key.pem"), "-----BEGIN PRIVATE KEY-----\n"
+                + java.util.Base64.getMimeEncoder(64, "\n".getBytes()).encodeToString(key.getEncoded()) + "\n-----END PRIVATE KEY-----\n");
+
+        assertThat(setup(null, "--yes", "--public-url", "https://mcpgp.acme.example", "--store", "files", "--no-sign",
+                "--tls", "files", "--cert", "certificate.pem", "--key", "key.pem")).as(output).isZero();
+        assertThat(Files.readString(dir.resolve(".env"))).contains("compose.tls-files.yaml").contains("MCPGP_PORT=443");
+        PlatformConfig config = new PlatformConfig(dir.resolve("store"), "0.0.0.0", 8443, null, PlatformConfig.Retention.DEFAULT, "acme", true,
+                PlatformConfig.Guardrails.DEFAULT, null, null, "https://mcpgp.acme.example")
+                .withTls(new PlatformConfig.Tls(dir.resolve("tls/certificate.pem").toString(), dir.resolve("secrets/tls_key").toString(), null, null));
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        assertThat(new Check(config, Map.of(), new PrintStream(bytes, true, StandardCharsets.UTF_8)).run()).as(bytes.toString(StandardCharsets.UTF_8)).isZero();
+
+        // a certificate for another host: check refuses it
+        PlatformConfig other = new PlatformConfig(dir.resolve("store"), "0.0.0.0", 8443, null, PlatformConfig.Retention.DEFAULT, "acme", true,
+                PlatformConfig.Guardrails.DEFAULT, null, null, "https://other.acme.example").withTls(config.tls());
+        bytes.reset();
+        assertThat(new Check(other, Map.of(), new PrintStream(bytes, true, StandardCharsets.UTF_8)).run()).isEqualTo(1);
+        assertThat(bytes.toString(StandardCharsets.UTF_8)).contains("not other.acme.example");
+
+        assertThat(setup(null, "--yes", "--public-url", "http://localhost:8443", "--tls", "self-signed")).isEqualTo(2);  // HTTPS needs https://
     }
 }

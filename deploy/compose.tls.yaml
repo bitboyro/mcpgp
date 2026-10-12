@@ -1,0 +1,16 @@
+# HTTPS served by the platform itself, with a PKCS12 keystore (setup --tls self-signed writes one;
+# docs/guides/self-hosting.md). Publishes MCPGP_PORT on MCPGP_BIND, e.g. 0.0.0.0:9443, as HTTPS.
+services:
+  platform:
+    environment:
+      MCPGP_PLATFORM_HTTP__TLS__KEYSTORE: /run/secrets/tls_keystore
+      MCPGP_PLATFORM_HTTP__TLS__PASSWORD: "$${file:/run/secrets/tls_keystore_password}"
+    secrets:
+      - tls_keystore
+      - tls_keystore_password
+
+secrets:
+  tls_keystore:
+    file: ./secrets/tls_keystore.p12
+  tls_keystore_password:
+    file: ./secrets/tls_keystore_password

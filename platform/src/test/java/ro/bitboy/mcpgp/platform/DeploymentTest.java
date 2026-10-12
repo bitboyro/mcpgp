@@ -171,4 +171,63 @@ class DeploymentTest {
                 new PrintStream(again, true, StandardCharsets.UTF_8))).isEqualTo(1);
         assertThat(again.toString(StandardCharsets.UTF_8)).contains("not empty");
     }
+
+    @Test
+    void servesHttpsItselfWithACertificateAndRefusesSignInOverPlainHttp() throws Exception {
+        Path keystore = dir.resolve("tls.p12");
+        TlsFiles.selfSigned("localhost", keystore, "keystore password", dir.resolve("certificate.pem"));
+        Files.writeString(dir.resolve("tls_password"), "keystore password\n");
+        Path password = dir.resolve("admin_password");
+        Files.writeString(password, "a long first password");
+        int port;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            port = socket.getLocalPort();
+        }
+        PlatformConfig config = new PlatformConfig(dir.resolve("store"), "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT, "acme", true,
+                PlatformConfig.Guardrails.DEFAULT, null, null, "https://localhost:" + port)
+                .withAdmin(new PlatformConfig.Admin("ana", "${file:" + password + "}"))
+                .withTls(new PlatformConfig.Tls(null, null, keystore.toString(), "${file:" + dir.resolve("tls_password") + "}"));
+        // trust exactly this certificate, as a client given certificate.pem would
+        java.security.KeyStore trust = java.security.KeyStore.getInstance("PKCS12");
+        trust.load(null, null);
+        try (var in = Files.newInputStream(dir.resolve("certificate.pem"))) {
+            trust.setCertificateEntry("mcpgp", java.security.cert.CertificateFactory.getInstance("X.509").generateCertificate(in));
+        }
+        javax.net.ssl.TrustManagerFactory tmf = javax.net.ssl.TrustManagerFactory.getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());
+        tmf.init(trust);
+        javax.net.ssl.SSLContext ssl = javax.net.ssl.SSLContext.getInstance("TLS");
+        ssl.init(null, tmf.getTrustManagers(), null);
+        HttpClient https = HttpClient.newBuilder().sslContext(ssl).build();
+
+        try (ConfigurableApplicationContext context = PlatformServer.start(config)) {
+            String root = "https://localhost:" + port;
+            assertThat(https.send(HttpRequest.newBuilder(URI.create(root + "/healthz")).build(), HttpResponse.BodyHandlers.ofString()).statusCode())
+                    .isEqualTo(200);
+            String body = "{\"name\":\"ana\",\"password\":\"a long first password\"}";
+            HttpResponse<String> session = https.send(HttpRequest.newBuilder(URI.create(root + "/api/v1/sessions"))
+                    .header("Content-Type", "application/json").header("X-Mcpgp-Client", "web").header("Origin", root)
+                    .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+            assertThat(session.statusCode()).as(session.body()).isEqualTo(201);
+            assertThat(session.headers().firstValue("Set-Cookie").orElseThrow()).contains("Secure");
+
+            // a page on plain HTTP (another address of the same host): told where to go instead of a cookie it can't keep
+            HttpResponse<String> wrong = https.send(HttpRequest.newBuilder(URI.create(root + "/api/v1/sessions"))
+                    .header("Content-Type", "application/json").header("X-Mcpgp-Client", "web").header("Origin", "http://localhost:8443")
+                    .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+            assertThat(wrong.statusCode()).isEqualTo(409);
+            assertThat(JSON.readTree(wrong.body()).path("detail").asText()).contains("Open https://localhost:" + port + " instead");
+            assertThat(JSON.readTree(https.send(HttpRequest.newBuilder(URI.create(root + "/api/v1/platform")).build(),
+                    HttpResponse.BodyHandlers.ofString()).body()).path("publicUrl").asText()).isEqualTo(root);
+        }
+    }
+
+    @Test
+    void tlsSettingsAreChecked() throws Exception {
+        assertThatThrownBy(() -> PlatformConfig.load(config("http: { tls: { certificate: /etc/c.pem } }\n"), Map.of())).hasMessageContaining("privateKey");
+        assertThatThrownBy(() -> PlatformConfig.load(config("http: { tls: { keystore: /x.p12, password: secret } }\n"), Map.of())).hasMessageContaining("reference");
+        PlatformConfig env = PlatformConfig.load(null, Map.of("MCPGP_PLATFORM_HTTP__TLS__KEYSTORE", "/run/secrets/tls_keystore",
+                "MCPGP_PLATFORM_HTTP__TLS__PASSWORD", "${file:/run/secrets/tls_keystore_password}"));
+        assertThat(env.tls().pem()).isFalse();
+        assertThat(PlatformServer.tlsProperties(new PlatformConfig(dir, "127.0.0.1", 1))).isEmpty();     // no tls: plain HTTP, as before
+    }
 }

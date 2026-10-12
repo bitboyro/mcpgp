@@ -61,6 +61,9 @@ final class Check {
         if (config.ldap() != null && config.ldap().bindPassword() != null) {
             secrets.put("auth.ldap.bindPassword", config.ldap().bindPassword());
         }
+        if (config.tls() != null && !config.tls().pem()) {
+            secrets.put("http.tls.password", config.tls().password());
+        }
         Map<String, String> values = new LinkedHashMap<>();
         secrets.forEach((name, ref) -> {
             var value = Secrets.resolve(ref, env);
@@ -84,6 +87,7 @@ final class Check {
         }
 
         store(values.get("storage.password"));
+        tls(values.get("http.tls.password"));
 
         if (config.oidc() != null) {
             String discovery = config.oidc().issuer().replaceAll("/+$", "") + "/.well-known/openid-configuration";
@@ -106,6 +110,53 @@ final class Check {
         }
         out.println(failures == 0 ? "✓ ready to start" : "✗ " + failures + " problem" + (failures == 1 ? "" : "s") + "; fix them before starting");
         return failures == 0 ? 0 : 1;
+    }
+
+    /** The platform's own HTTPS: the certificate and key, the host they're for, how long they last. */
+    private void tls(String password) {
+        PlatformConfig.Tls tls = config.tls();
+        if (tls == null) {
+            if (config.publicUrl() != null && config.publicUrl().startsWith("https://")) {
+                out.println("· HTTPS: the platform serves plain HTTP; your proxy must serve " + config.publicUrl()
+                        + " (or let the platform do it: setup --tls self-signed)");
+            }
+            return;
+        }
+        for (String file : tls.pem() ? java.util.List.of(tls.certificate(), tls.privateKey()) : java.util.List.of(tls.keystore())) {
+            if (!Files.isReadable(Path.of(file))) {
+                fail("HTTPS: " + file + " can't be read");
+                return;
+            }
+        }
+        if (!tls.pem() && password == null) {
+            return;     // reported with the secrets
+        }
+        try {
+            TlsFiles.Loaded loaded = TlsFiles.load(tls, password);
+            if (!loaded.keyMatches()) {
+                fail("HTTPS: the private key doesn't belong to the certificate");
+                return;
+            }
+            var names = TlsFiles.names(loaded.certificate());
+            String host = config.publicUrl() == null ? null : TlsFiles.host(config.publicUrl());
+            if (host != null && !TlsFiles.covers(names, host)) {
+                fail("HTTPS: the certificate is for " + names + ", not " + host + " (browsers refuse it)");
+            }
+            Duration left = TlsFiles.remaining(loaded.certificate(), java.time.Instant.now());
+            if (left.isNegative()) {
+                fail("HTTPS: the certificate expired on " + loaded.certificate().getNotAfter().toInstant());
+                return;
+            }
+            ok("HTTPS: a certificate for " + String.join(", ", names) + ", valid " + left.toDays() + " more days"
+                    + (TlsFiles.selfSigned(loaded.certificate()) ? " (self-signed: browsers warn until it's trusted or replaced)" : ""));
+            if (left.toDays() < 30) {
+                out.println("! HTTPS: the certificate expires in " + left.toDays() + " days; renew it (the platform picks up new files)");
+            }
+        } catch (IllegalArgumentException e) {
+            fail("HTTPS: " + e.getMessage());
+        } catch (Exception e) {
+            fail("HTTPS: the certificate can't be read: " + e.getMessage());
+        }
     }
 
     /** The store can be reached and written, without opening it (a running platform holds it). */

@@ -312,6 +312,8 @@ export interface ContractPlan { api: string; version: string; spec: string; repl
 /** The extra fields of a SPEC_PROBLEMS answer: what the upload lacks. */
 export interface SpecProblems {
   missing?: { file: string; from: string; pointer: string }[]
+  /** References to a part of a file that isn't there: `file` is `api.json#/definitions/Entry`. */
+  broken?: { file: string; from: string; pointer: string }[]
   remote?: { file: string; from: string; pointer: string }[]
   candidates?: string[]
   problems?: string[]
@@ -374,7 +376,7 @@ export interface EditPreview {
 }
 
 export const api = {
-  signInOptions: () => json<{ auth: SignInOptions }>('GET', '/platform'),
+  signInOptions: () => json<{ auth: SignInOptions; publicUrl?: string | null }>('GET', '/platform'),
   signIn: (name: string, password: string) => json<Token>('POST', '/sessions', { name, password }),
   signOut: () => json<{ signedOut: boolean }>('DELETE', '/sessions/current'),
   me: () => json<Identity>('GET', '/me'),

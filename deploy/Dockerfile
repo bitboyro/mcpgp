@@ -34,8 +34,9 @@ USER 10001:10001
 WORKDIR /var/lib/mcpgp
 VOLUME /var/lib/mcpgp
 EXPOSE 8443
+# plain HTTP, or HTTPS when http.tls is set (the platform's own certificate, often self-signed)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:8443/healthz || exit 1
+  CMD curl -fsS http://127.0.0.1:8443/healthz || curl -fsSk https://127.0.0.1:8443/healthz || exit 1
 # the platform's heap: half the container's memory; Try it servers run next to it with 256 MB each
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=50", "-jar", "/opt/mcpgp/mcpgp-platform.jar"]
 # no command: run; `setup`, `check`, `init`, `copy-store` as commands (the config comes from MCPGP_PLATFORM_CONFIG)

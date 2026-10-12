@@ -111,8 +111,11 @@ server (up to 3) runs with a 256 MB heap next to it.
 
 ## 5. Network, TLS and the public URL
 
-- The platform listens on plain HTTP, port 8443 (`http.port`). Publish it only to the proxy:
-  `MCPGP_BIND=127.0.0.1` when the proxy runs on the same host.
+- Either the platform serves HTTPS itself (`http.tls`: a certificate and key as PEM files, or a
+  PKCS12 keystore; `setup` makes a self-signed one or takes yours, and renewed files are picked up
+  without a restart), or it listens on plain HTTP, port 8443 (`http.port`), for your proxy. With a
+  proxy, publish the port only to it: `MCPGP_BIND=127.0.0.1` when the proxy runs on the same host.
+  The platform without `http.tls` behaves exactly as before.
 - Set `http.publicUrl` to the address people use (`https://mcpgp.example.com`). It is the base of
   the OIDC redirect URI, and when it is `https://` session cookies are always `Secure`. The proxy
   should also send `X-Forwarded-Proto: https`.

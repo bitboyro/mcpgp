@@ -21,7 +21,29 @@ import java.util.Map;
  */
 public record PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
                              boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl, Postgres postgres,
-                             Admin admin) {
+                             Admin admin, Tls tls) {
+
+    public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
+                          boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl, Postgres postgres, Admin admin) {
+        this(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl, postgres, admin, null);
+    }
+
+    /**
+     * {@code http.tls}: the platform serves HTTPS itself, with a certificate and its private key as PEM
+     * files ({@code certificate}, {@code privateKey}: paths), or a PKCS12 {@code keystore} (a path) and
+     * its {@code password} (a reference). Without it the platform serves plain HTTP, for a proxy in front.
+     * Renewed files are picked up without a restart.
+     */
+    public record Tls(String certificate, String privateKey, String keystore, String password) {
+        public boolean pem() {
+            return keystore == null;
+        }
+    }
+
+    public PlatformConfig withTls(Tls tls) {
+        return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
+                postgres, admin, tls);
+    }
 
     public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
                           boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl) {
@@ -43,12 +65,12 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
 
     public PlatformConfig withPostgres(Postgres postgres) {
         return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
-                postgres, admin);
+                postgres, admin, tls);
     }
 
     public PlatformConfig withAdmin(Admin admin) {
         return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
-                postgres, admin);
+                postgres, admin, tls);
     }
 
     /**
@@ -150,7 +172,31 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
             admin = new Admin(adminName, password);
         }
         return new PlatformConfig(storage, host, port, signing, r, workspace, local, g, oidc(doc.at("/auth/oidc")), ldap(doc.at("/auth/ldap")),
-                publicUrl == null ? null : publicUrl.replaceAll("/+$", ""), postgres, admin);
+                publicUrl == null ? null : publicUrl.replaceAll("/+$", ""), postgres, admin, tls(doc.at("/http/tls"), env));
+    }
+
+    private static Tls tls(JsonNode node, Map<String, String> env) {
+        String certificate = env.getOrDefault("MCPGP_PLATFORM_HTTP__TLS__CERTIFICATE", node.path("certificate").asText(null));
+        String privateKey = env.getOrDefault("MCPGP_PLATFORM_HTTP__TLS__PRIVATE_KEY", node.path("privateKey").asText(null));
+        String keystore = env.getOrDefault("MCPGP_PLATFORM_HTTP__TLS__KEYSTORE", node.path("keystore").asText(null));
+        String password = env.getOrDefault("MCPGP_PLATFORM_HTTP__TLS__PASSWORD", node.path("password").asText(null));
+        if (certificate == null && privateKey == null && keystore == null) {
+            return null;
+        }
+        if (keystore != null) {
+            if (certificate != null || privateKey != null) {
+                throw new IllegalArgumentException("http.tls: a keystore, or certificate and privateKey, not both");
+            }
+            if (password == null || !Secrets.isReference(password)) {
+                throw new IllegalArgumentException("http.tls.password is required with a keystore and must be a reference (${env:…} or ${file:…})");
+            }
+        } else if (certificate == null || privateKey == null) {
+            throw new IllegalArgumentException("http.tls needs both certificate and privateKey (paths to PEM files), or a keystore");
+        }
+        if (Secrets.isReference(privateKey == null ? "" : privateKey)) {
+            throw new IllegalArgumentException("http.tls.privateKey is the path to the key file (e.g. /run/secrets/tls_key), not a reference");
+        }
+        return new Tls(certificate, privateKey, keystore, password);
     }
 
     private static Postgres postgres(JsonNode node, Map<String, String> env) {

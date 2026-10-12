@@ -70,6 +70,10 @@ public final class FromSpec {
             details.put("missing", a.missing().stream().map(FromSpec::ref).toList());
             a.missing().forEach(m -> lines.add(m.target() + " is missing (referenced from " + m.from() + " at " + m.pointer() + "); add it to the upload"));
         }
+        if (!a.broken().isEmpty()) {
+            details.put("broken", a.broken().stream().map(FromSpec::ref).toList());
+            a.broken().forEach(b -> lines.add(b.from() + " refers to " + b.target() + " (at " + b.pointer() + "), which isn't there"));
+        }
         if (!a.remote().isEmpty()) {
             details.put("remote", a.remote().stream().map(FromSpec::ref).toList());
             a.remote().forEach(r -> lines.add(r.from() + " refers to " + r.target() + " (at " + r.pointer()
