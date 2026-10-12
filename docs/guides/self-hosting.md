@@ -139,6 +139,9 @@ curl -X PUT https://mcpgp.example.com/api/v1/identities/<your id>/password \
      -d '{"password":"<at least 12 characters>","currentPassword":"<the one from the file>"}'
 ```
 
+Your first server: **New server** on All servers, then drop your API's OpenAPI or Swagger file (JSON
+or YAML), and the files it refers to if it has any.
+
 ## 6. Sign packages
 
 When you answered yes in `setup`, packages are signed already: give customers `signing_key.pub`

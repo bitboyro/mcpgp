@@ -5,6 +5,16 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+### Added
+- Start from your API's spec on the platform: All servers → **New server** takes an OpenAPI 3.0 / 3.1
+  or Swagger 2.0 file in JSON or YAML, several files that `$ref` each other, a folder or a zip. It
+  finds the main file, follows every `$ref`, says which referenced files are missing (and which
+  references are URLs) before anything is created, places files picked without their folders where
+  the spec expects them, and builds the project like `mcpgp init --from-spec`.
+  `POST /api/v1/servers/from-spec`.
+- Sources: **API specs** lists each API's spec versions; **Add a spec version** and **Replace** take an
+  uploaded spec the same way and make the server's next version. `POST /api/v1/servers/{id}/contracts`.
+
 ## 0.2.0 — 2026-10-12
 
 Shared notices (company policy text once, on every server), and running the platform image without

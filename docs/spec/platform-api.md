@@ -33,6 +33,23 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
 
 ### 2.1 Servers and versions
 
+- `POST /servers/from-spec` creates a server from an API's spec: an OpenAPI 3.0 / 3.1 or Swagger 2.0
+  document in JSON or YAML, as one file or several that `$ref` each other (JSON `{ files }` or a zip;
+  other files are left out). The platform finds the main file (the one with `openapi:` or `swagger:`
+  that no other file references; `main=<path>` picks it when several could be), follows every `$ref`
+  from it, and builds the project as `mcpgp init --from-spec` does: `<id>.mcpgp.yaml`, the spec under
+  `contracts/` (folders kept) and `tests/smoke.yaml`. `id`, `title` and `version` default to the
+  spec's (`info.title` → `orders-api-mcp`, `info.version`). Files picked without their folders are put
+  where the spec refers to them when exactly one uploaded file has that name (the answer lists them as
+  `moved`). Problems are answered before anything is created, as `422 SPEC_PROBLEMS` with `missing`
+  (`{ file, from, pointer }` for each referenced file that isn't in the upload), `remote` (references
+  to URLs, which the platform never fetches), `candidates` and `problems` (e.g. OpenAPI 3.2).
+  `dryRun=true` answers `{ id, title, api, version, main, format, files, moved, tools, exists }`.
+- `POST /servers/{id}/contracts` adds a contract version from an uploaded spec (same bodies and
+  checks): to the server's API (`api=<id>` when it has several), as `version` (default the spec's
+  `info.version`), with `default=true` to make it the default; the same version again replaces its
+  spec. The files go under `contracts/<version>/`, and the server gets its next version. `dryRun=true`
+  answers `{ api, version, spec, replaces, compiles, diagnostics, moved }`.
 - `POST /servers` creates a server from a first version: a zip of the project, or JSON
   `{ files: { "<path>": "<content>" } }`. The root definition is the single `*.mcpgp.yaml` at the
   top. Files are checked with the same rules as the CLI (root restriction, no remote references).

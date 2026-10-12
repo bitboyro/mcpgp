@@ -4,11 +4,14 @@
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
+  /** The whole problem document: extra fields like `missing` or `candidates` for SPEC_PROBLEMS. */
+  readonly body: Record<string, unknown>
 
-  constructor(status: number, code: string, detail: string) {
+  constructor(status: number, code: string, detail: string, body: Record<string, unknown> = {}) {
     super(detail)
     this.status = status
     this.code = code
+    this.body = body
   }
 }
 
@@ -30,15 +33,16 @@ async function send(method: string, path: string, body?: unknown, contentType?: 
   if (!response.ok) {
     let code = 'ERROR'
     let detail = response.statusText || String(response.status)
+    let problem: Record<string, unknown> = {}
     try {
-      const problem = await response.json() as { code?: string; detail?: string }
-      code = problem.code ?? code
-      detail = problem.detail ?? detail
+      problem = await response.json() as Record<string, unknown>
+      code = (problem.code as string | undefined) ?? code
+      detail = (problem.detail as string | undefined) ?? detail
     } catch {
       // not a problem document
     }
     if (response.status === 401 && path !== '/sessions') window.dispatchEvent(new Event(SIGNED_OUT))
-    throw new ApiError(response.status, code, detail)
+    throw new ApiError(response.status, code, detail, problem)
   }
   return response
 }
@@ -294,6 +298,25 @@ export interface DefinitionData {
   noticeSources?: Record<string, string>
 }
 
+/** What a new server from a spec would be (a dry run of POST /servers/from-spec). */
+export interface FromSpecPlan {
+  id: string; title: string; api: string; version: string; main: string; format: string
+  files: string[]; tools: number; exists: boolean; diagnostics: Diagnostic[]
+  /** Files picked without their folders, put where the spec refers to them. */
+  moved: { from: string; to: string }[]
+}
+
+/** What adding a contract version would do (a dry run of POST /servers/{id}/contracts). */
+export interface ContractPlan { api: string; version: string; spec: string; replaces: boolean; compiles: boolean; diagnostics: Diagnostic[]; moved: { from: string; to: string }[] }
+
+/** The extra fields of a SPEC_PROBLEMS answer: what the upload lacks. */
+export interface SpecProblems {
+  missing?: { file: string; from: string; pointer: string }[]
+  remote?: { file: string; from: string; pointer: string }[]
+  candidates?: string[]
+  problems?: string[]
+}
+
 /** A set of shared notices, the library kind `notices` (definition-format.md §5.1). */
 export interface NoticeSet { title?: string; notices: Notice[] }
 
@@ -361,6 +384,15 @@ export const api = {
   server: (id: string) => json<Server>('GET', `/servers/${enc(id)}`),
   createServer: (id: string, files: Record<string, string> | Blob, title?: string) =>
     json<Server>('POST', '/servers' + q({ id, title }), files instanceof Blob ? files : { files }),
+  /** A dry run says what would be created; problems with the upload are ApiError SPEC_PROBLEMS (see SpecProblems). */
+  fromSpecPlan: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string }) =>
+    json<FromSpecPlan>('POST', '/servers/from-spec' + q({ ...params, dryRun: true }), files instanceof Blob ? files : { files }),
+  createFromSpec: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string }) =>
+    json<Server>('POST', '/servers/from-spec' + q(params), files instanceof Blob ? files : { files }),
+  contractPlan: (id: string, files: Record<string, string> | Blob, params: { api?: string; version?: string; main?: string; default?: boolean }) =>
+    json<ContractPlan>('POST', `/servers/${enc(id)}/contracts` + q({ ...params, dryRun: true }), files instanceof Blob ? files : { files }),
+  addContract: (id: string, files: Record<string, string> | Blob, params: { api?: string; version?: string; main?: string; default?: boolean }) =>
+    json<Server>('POST', `/servers/${enc(id)}/contracts` + q(params), files instanceof Blob ? files : { files }),
   addVersion: (id: string, files: Record<string, string> | Blob, message?: string) =>
     json<Server>('POST', `/servers/${enc(id)}/versions` + q({ message }), files instanceof Blob ? files : { files }),
   version: (id: string, version: string | number) => json<VersionDetail>('GET', `/servers/${enc(id)}/versions/${version}`),

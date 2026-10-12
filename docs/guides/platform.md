@@ -35,7 +35,17 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json
      -d '{"password":"<at least 12 characters>"}' localhost:8443/api/v1/identities/<id>/password
 ```
 
-The pages: **All servers** (duplicate, variant, upload a new server), and per server **Overview**
+**Start from your API's spec:** All servers → **New server** → drop your OpenAPI or Swagger file
+(JSON or YAML; Swagger 2.0, OpenAPI 3.0 or 3.1). When it refers to other files (`$ref`), drop them
+too, or choose the spec's folder or a zip of it; the page says which files are still missing before
+anything is created, and puts files picked without their folders where the spec expects them. It
+shows what it found (title, version, how many operations become tools), you adjust the server id and
+title, and **Create server** makes the server, ready to shape on its Overview. A newer spec goes on
+the server's **Sources** page: **Add a spec version** (or **Replace** a version's spec), optionally as
+the default; each makes the server's next version. Teams that keep the definition in git upload the
+whole project instead (**A definition project**, or `mcpgp push`).
+
+The pages: **All servers** (new server from a spec or a project, duplicate, variant), and per server **Overview**
 (what agents get, what the customer configures, the package, the checks), **Tools & rules** (each
 tool as the agent gets it, and why), **Connections**, **Sources** (versions, files, upload a new
 version), **Package & deliver** (the formats the next build makes, how it runs, its docs as they ship,

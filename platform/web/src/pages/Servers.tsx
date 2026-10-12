@@ -3,6 +3,8 @@ import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, type Build, type LibraryItem, type ServerSummary } from '../api'
 import { readPicked, type PickedProject } from '../files'
+import { specProblems } from '../specUpload'
+import { SpecPicker, SpecProblemsView, type SpecUpload } from './SpecUpload'
 import { useSession } from '../session'
 import { BuildChip, Chip, ErrorBox, Icon, Loading, PageHead, Segmented, slug } from '../ui'
 
@@ -33,7 +35,8 @@ export function ServersPage() {
           {servers.isLoading && <Loading what="servers" />}
           <ErrorBox error={servers.error} />
           {servers.isSuccess && items.length === 0 && (
-            <div className="card"><h2>No servers yet</h2><p className="hint">Upload a definition project (a folder with a <code>*.mcpgp.yaml</code> at the top, or a zip of it) to start.</p></div>
+            <div className="card"><h2>No servers yet</h2><p className="hint">Start from your API's OpenAPI or Swagger file (JSON or YAML): <b>New server</b>.</p>
+              {can('servers:write') && <button type="button" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={() => setPanel({ mode: 'new' })}>New server from a spec</button>}</div>
           )}
           {items.map((server, i) => {
             const manifest = manifests[i]?.data
@@ -154,6 +157,88 @@ function CopyPanel({ mode, source, onClose, onMode }: { mode: 'copy' | 'variant'
 }
 
 function NewServer({ onClose }: { onClose: () => void }) {
+  const [source, setSource] = useState<'spec' | 'project'>('spec')
+  return (
+    <div className="list" style={{ gap: 16 }}>
+      <div className="card-head">
+        <div>
+          <div className="eyebrow">New server</div>
+          <h2>{source === 'spec' ? 'From your API\u2019s spec' : 'From a definition project'}</h2>
+        </div>
+        <button type="button" className="btn btn-stage btn-sm" aria-label="Close" onClick={onClose}><Icon name="close" size={14} /></button>
+      </div>
+      <Segmented label="Start from" value={source} onChange={setSource}
+        options={[['spec', 'An OpenAPI or Swagger file'], ['project', 'A definition project']]} />
+      {source === 'spec' ? <NewFromSpec /> : <NewFromProject />}
+    </div>
+  )
+}
+
+/** A server from an uploaded spec: checked by a dry run as files are picked, created as version 1. */
+function NewFromSpec() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [files, setFiles] = useState<SpecUpload | null>(null)
+  const [rev, setRev] = useState(0)
+  const [main, setMain] = useState('')
+  const [id, setId] = useState<string | null>(null)
+  const [title, setTitle] = useState<string | null>(null)
+  const [version, setVersion] = useState<string | null>(null)
+  const plan = useQuery({
+    queryKey: ['from-spec', rev, main],
+    queryFn: () => api.fromSpecPlan(files!, { main: main || undefined }),
+    enabled: files !== null,
+    retry: false,
+  })
+  const problems = specProblems(plan.error)
+  const create = useMutation({
+    mutationFn: () => api.createFromSpec(files!, { main: main || undefined, id: id ?? undefined, title: title ?? undefined, version: version ?? undefined }),
+    onSuccess: async (server) => {
+      await queryClient.invalidateQueries({ queryKey: ['servers'] })
+      navigate(`/servers/${server.id}`)
+    },
+  })
+  const shownId = id ?? plan.data?.id ?? ''
+  return (
+    <form className="list" style={{ gap: 14 }} onSubmit={(e) => { e.preventDefault(); if (plan.data && shownId) create.mutate() }}>
+      <p className="hint">The platform makes the server's definition from the spec: one tool per operation, named from the spec, ready to adjust
+        on its Overview. Nothing is created until you press Create.</p>
+      <SpecPicker files={files} onFiles={(f) => { setFiles(f); setRev((r) => r + 1); create.reset() }} />
+      {plan.isFetching && <p className="hint">Reading the spec…</p>}
+      {problems && <SpecProblemsView problems={problems} main={main} onMain={setMain} />}
+      {plan.error && !problems && <ErrorBox error={plan.error} />}
+      {plan.data && (
+        <>
+          <div className="stage-card">
+            <span className="eyebrow">Found</span>
+            <span><b>{plan.data.title}</b> · {FORMATS[plan.data.format] ?? plan.data.format} · version {plan.data.version}</span>
+            <span className="hint">{plan.data.tools === 1 ? '1 operation becomes a tool' : `${plan.data.tools} operations become tools`} · main file <span className="mono">{plan.data.main}</span>
+              {plan.data.files.filter((f) => f.startsWith('contracts/')).length > 1 && ` and ${plan.data.files.filter((f) => f.startsWith('contracts/')).length - 1} more`}</span>
+            {plan.data.moved.length > 0 && (
+              <span className="hint">Put where the spec refers to them: {plan.data.moved.map((m) => `${m.from} → ${m.to}`).join(', ')}</span>
+            )}
+          </div>
+          <label className="field">Server id (in addresses and references; lowercase, digits, -)
+            <input className="input input-stage" value={shownId} onChange={(e) => setId(slug(e.target.value))} required pattern="[a-z0-9][a-z0-9-]{1,62}" />
+          </label>
+          {plan.data.exists && id === null && <p className="hint">A server called {plan.data.id} exists already; choose another id.</p>}
+          <label className="field">Title
+            <input className="input input-stage" value={title ?? plan.data.title} onChange={(e) => setTitle(e.target.value)} />
+          </label>
+          <label className="field">Contract version (from the spec's info.version)
+            <input className="input input-stage" value={version ?? plan.data.version} onChange={(e) => setVersion(e.target.value)} />
+          </label>
+          <ErrorBox error={create.error} />
+          <button type="submit" className="btn btn-primary" disabled={!shownId || create.isPending}>{create.isPending ? 'Creating…' : 'Create server'}</button>
+        </>
+      )}
+    </form>
+  )
+}
+
+const FORMATS: Record<string, string> = { 'swagger-2.0': 'Swagger 2.0', 'openapi-3.0': 'OpenAPI 3.0', 'openapi-3.1': 'OpenAPI 3.1' }
+
+function NewFromProject() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const folder = useRef<HTMLInputElement>(null)
@@ -175,15 +260,8 @@ function NewServer({ onClose }: { onClose: () => void }) {
   }
   return (
     <form className="list" style={{ gap: 16 }} onSubmit={(e) => { e.preventDefault(); create.mutate() }}>
-      <div className="card-head">
-        <div>
-          <div className="eyebrow">Upload a definition</div>
-          <h2>New server</h2>
-        </div>
-        <button type="button" className="btn btn-stage btn-sm" aria-label="Close" onClick={onClose}><Icon name="close" size={14} /></button>
-      </div>
-      <p className="hint">A project folder with one <code>*.mcpgp.yaml</code> at the top, its contracts, overlays and rules. Files are checked
-        like the CLI checks them; hidden files are left out.</p>
+      <p className="hint">For a project kept in git: a folder with one <code>*.mcpgp.yaml</code> at the top, its contracts, overlays and rules.
+        Files are checked like the CLI checks them; hidden files are left out.</p>
       <div className="actions">
         <button type="button" className="btn btn-stage" onClick={() => folder.current?.click()}>Choose folder</button>
         <button type="button" className="btn btn-stage" onClick={() => zip.current?.click()}>Choose zip</button>

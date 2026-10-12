@@ -21,13 +21,22 @@ public final class Servers {
     }
 
     public Model.Server create(String id, String title, byte[] body, String contentType, String message, Access.Principal who) {
+        return create(id, title, () -> projects.store(body, contentType), message, who);
+    }
+
+    /** A new server from files made on the platform (e.g. from an uploaded spec). */
+    public Model.Server create(String id, String title, Map<String, byte[]> files, String message, Access.Principal who) {
+        return create(id, title, () -> projects.store(files), message, who);
+    }
+
+    private Model.Server create(String id, String title, java.util.function.Supplier<Model.Version> files, String message, Access.Principal who) {
         if (id == null || !id.matches("[a-z0-9][a-z0-9-]{1,62}")) {
             throw ApiException.validation("id: lowercase letters, digits and '-', 2–63 characters");
         }
         if (store.server(id).isPresent()) {
             throw new ApiException(409, "CONFLICT", "a server with id " + id + " exists");
         }
-        Model.Version version = projects.store(body, contentType);
+        Model.Version version = files.get();
         String now = Instant.now().toString();
         Model.Server server = new Model.Server(id, title == null || title.isBlank() ? id : title, null, false, now, now,
                 List.of(new Model.VersionRef(1, version.digest(), message, who.identity().name(), now)), 0);

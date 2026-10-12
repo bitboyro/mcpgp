@@ -3,6 +3,8 @@ import { useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../api'
 import { readPicked, type PickedProject } from '../files'
+import { specProblems } from '../specUpload'
+import { SpecPicker, SpecProblemsView, type SpecUpload } from './SpecUpload'
 import { useServer } from '../serverData'
 import { useSession } from '../session'
 import { ErrorBox, Loading, PageHead, ago, shortDigest } from '../ui'
@@ -21,13 +23,14 @@ export function SourcesPage() {
 
   return (
     <>
-      <PageHead title="Sources" sub="Where the definition and its files come from: a project you upload, one version at a time.">
+      <PageHead title="Sources" sub="The API specs the server is made from, and the versions of its files.">
         <button type="button" className="btn" disabled={versionNumber == null || checks.isPending} onClick={() => checks.mutate()}>Run checks</button>
       </PageHead>
       <div className="body">
         <section className="col" aria-label="Versions">
           <ErrorBox error={server.error} />
           {server.isLoading && <Loading />}
+          {server.data && <Contracts id={id} editable={can('servers:write')} onDone={(n) => { setChosen(n); setFile(null) }} />}
           {can('servers:write') && server.data && <Upload id={id} onDone={(n) => { setChosen(n); setFile(null) }} />}
           {server.data && (
             <div className="card">
@@ -99,6 +102,107 @@ export function SourcesPage() {
   )
 }
 
+interface ContractRef { version: string; spec?: string; default?: boolean }
+interface ApiRef { id: string; title?: string; contracts?: ContractRef[] }
+
+/** The API specs of the server, and adding or replacing one from an uploaded spec (each makes the next version). */
+function Contracts({ id, editable, onDone }: { id: string; editable: boolean; onDone: (version: number) => void }) {
+  const queryClient = useQueryClient()
+  const definition = useQuery({ queryKey: ['definition', id, 'latest'], queryFn: () => api.definition(id, 'latest') })
+  const [open, setOpen] = useState<string | null>(null)        // '' for a new version, else the version to replace
+  const [apiId, setApiId] = useState('')
+  const [files, setFiles] = useState<SpecUpload | null>(null)
+  const [rev, setRev] = useState(0)
+  const [main, setMain] = useState('')
+  const [version, setVersion] = useState<string | null>(null)
+  const [makeDefault, setMakeDefault] = useState(false)
+  const root = definition.data?.root as { api?: ApiRef; apis?: ApiRef[] } | undefined
+  const apis: ApiRef[] = root?.api ? [root.api] : root?.apis ?? []
+  const target = apiId || apis[0]?.id || ''
+  const params = { api: apis.length > 1 ? target : undefined, version: version ?? (open || undefined), main: main || undefined, default: makeDefault || undefined }
+  const plan = useQuery({
+    queryKey: ['contract-plan', id, rev, main, version, open, target, makeDefault],
+    queryFn: () => api.contractPlan(id, files!, params),
+    enabled: files !== null && open !== null,
+    retry: false,
+  })
+  const save = useMutation({
+    mutationFn: () => api.addContract(id, files!, params),
+    onSuccess: async (server) => {
+      for (const key of ['server', 'manifest', 'definition', 'servers', 'operations', 'naming']) await queryClient.invalidateQueries({ queryKey: [key] })
+      close()
+      if (server.latestVersion != null) onDone(server.latestVersion)
+    },
+  })
+  const close = () => { setOpen(null); setFiles(null); setMain(''); setVersion(null); setMakeDefault(false) }
+  const problems = specProblems(plan.error)
+  if (definition.isLoading) return <Loading what="the contracts" />
+  if (!definition.data) return <ErrorBox error={definition.error} />
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h2>API specs</h2>
+        {editable && open === null && apis.length > 0 && <button type="button" className="btn btn-sm" onClick={() => setOpen('')}>Add a spec version</button>}
+      </div>
+      {apis.length === 0 && <p className="hint">This server gets its APIs from the server it extends.</p>}
+      {apis.map((a) => (
+        <div key={a.id} className="list" style={{ gap: 4 }}>
+          {apis.length > 1 && <b>{a.title ?? a.id}</b>}
+          {(a.contracts ?? []).map((c) => (
+            <div key={c.version} className="row" style={{ background: 'none', padding: '6px 0' }}>
+              <span style={{ minWidth: 0 }}>
+                Version <b>{c.version}</b>{c.default && <> <span className="tag">default</span></>}<br />
+                <span className="meta mono" style={{ overflowWrap: 'anywhere' }}>{c.spec}</span>
+              </span>
+              {editable && open === null && (
+                <button type="button" className="btn btn-sm" onClick={() => { setApiId(a.id); setOpen(c.version) }}>Replace</button>
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
+      {open !== null && (
+        <form className="list" style={{ gap: 12 }} aria-label="Spec version" onSubmit={(e) => { e.preventDefault(); if (plan.data?.compiles) save.mutate() }}>
+          <h3>{open ? `Replace the spec of version ${open}` : 'Add a spec version'}</h3>
+          {apis.length > 1 && !open && (
+            <label className="field">API
+              <select className="input" value={target} onChange={(e) => setApiId(e.target.value)}>
+                {apis.map((a) => <option key={a.id} value={a.id}>{a.title ?? a.id}</option>)}
+              </select>
+            </label>
+          )}
+          <SpecPicker files={files} onFiles={(f) => { setFiles(f); setRev((r) => r + 1); save.reset() }} />
+          {plan.isFetching && <p className="hint">Reading the spec…</p>}
+          {problems && <SpecProblemsView problems={problems} main={main} onMain={setMain} />}
+          {plan.error && !problems && <ErrorBox error={plan.error} />}
+          {plan.data && (
+            <>
+              {!open && (
+                <label className="field">Version (from the spec's info.version)
+                  <input className="input" value={version ?? plan.data.version} onChange={(e) => setVersion(e.target.value)} />
+                </label>
+              )}
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}>
+                <input type="checkbox" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} /> Make it the default version
+              </label>
+              <p className="hint">{plan.data.replaces ? `Replaces the spec of version ${plan.data.version}` : `Adds version ${plan.data.version}`}
+                {' '}(files under <span className="mono">{plan.data.spec.replace(/[^/]+$/, '')}</span>).</p>
+              {!plan.data.compiles && (
+                <div className="note note-bad">With this spec the server doesn't compile: {plan.data.diagnostics.filter((d) => d.level === 'error').map((d) => d.message).join('; ')}</div>
+              )}
+            </>
+          )}
+          <ErrorBox error={save.error} />
+          <div className="actions">
+            <button type="submit" className="btn btn-primary" disabled={!plan.data?.compiles || save.isPending}>Save as the next version</button>
+            <button type="button" className="btn" onClick={close}>Cancel</button>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
+
 function Upload({ id, onDone }: { id: string; onDone: (version: number) => void }) {
   const queryClient = useQueryClient()
   const folder = useRef<HTMLInputElement>(null)
@@ -121,8 +225,9 @@ function Upload({ id, onDone }: { id: string; onDone: (version: number) => void 
   }
   return (
     <form className="card" onSubmit={(e) => { e.preventDefault(); upload.mutate() }}>
-      <h2>Upload a new version</h2>
-      <p className="hint">The whole project, as a folder or a zip. A version with the same content as the latest isn't created again.</p>
+      <h2>Upload the whole project</h2>
+      <p className="hint">For projects kept in git: the folder with the <code>*.mcpgp.yaml</code>, or a zip of it, as the next version.
+        A version with the same content as the latest isn't created again.</p>
       <div className="actions">
         <button type="button" className="btn" onClick={() => folder.current?.click()}>Choose folder</button>
         <button type="button" className="btn" onClick={() => zip.current?.click()}>Choose zip</button>

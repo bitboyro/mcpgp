@@ -210,6 +210,59 @@ paths:
       responses:
         "200": { description: The example configuration, content: { application/yaml: { schema: { type: string } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /servers/from-spec:
+    post:
+      operationId: createServerFromSpec
+      tags: [servers]
+      summary: Create server from spec
+      description: >
+        A new server around an API's OpenAPI or Swagger document (JSON or YAML; one file, or several that
+        $ref each other, as files or a zip). The definition, the spec under contracts/ and smoke tests are
+        made as `mcpgp init --from-spec` makes them. id, title and version default to the spec's; main picks
+        the main file when several could be. dryRun answers what would be created. Missing referenced files,
+        references to URLs and unreadable versions are 422 SPEC_PROBLEMS, before anything is created.
+      parameters:
+        - { name: id, in: query, schema: { type: string } }
+        - { name: title, in: query, schema: { type: string } }
+        - { name: version, in: query, description: The contract version; default the spec's info.version, schema: { type: string } }
+        - { name: main, in: query, description: The main file of the upload, schema: { type: string } }
+        - { name: message, in: query, schema: { type: string } }
+        - { name: dryRun, in: query, schema: { type: boolean, default: false } }
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/ProjectFiles" } }
+          application/zip: { schema: { type: string, format: binary } }
+      responses:
+        "200": { description: The dry run's answer (id, title, api, version, main, format, files, tools), content: { application/json: { schema: { type: object } } } }
+        "201": { description: The new server, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/contracts:
+    parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+    post:
+      operationId: addServerContract
+      tags: [servers]
+      summary: Add contract version
+      description: >
+        A contract version from an uploaded spec (like from-spec): added to the server's API (or api), or
+        replacing that version's spec when it exists. version defaults to the spec's info.version; default=true
+        makes it the default. The files go under contracts/<version>/ and the server gets its next version.
+      parameters:
+        - { name: api, in: query, schema: { type: string } }
+        - { name: version, in: query, schema: { type: string } }
+        - { name: main, in: query, schema: { type: string } }
+        - { name: default, in: query, schema: { type: boolean, default: false } }
+        - { name: message, in: query, schema: { type: string } }
+        - { name: dryRun, in: query, schema: { type: boolean, default: false } }
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/ProjectFiles" } }
+          application/zip: { schema: { type: string, format: binary } }
+      responses:
+        "200": { description: The dry run's answer (api, version, spec, replaces, compiles, diagnostics), content: { application/json: { schema: { type: object } } } }
+        "201": { description: The server, at its new version, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/edits:
     post:
       operationId: editServer
