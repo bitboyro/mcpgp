@@ -5,6 +5,8 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+## 0.2.5 — 2026-10-12
+
 ### Fixed
 - The store's cache of compiled results grew without limit: every preview of an unsaved change kept its
   manifest (several MB for a big server), and nothing was ever removed, which made the store, and with

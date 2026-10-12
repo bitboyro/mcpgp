@@ -13,7 +13,7 @@ and Jackson, at runtime):
 <dependency>
   <groupId>ro.bitboy.mcpgp</groupId>
   <artifactId>mcpgp-extension-api</artifactId>
-  <version>0.2.4</version>
+  <version>0.2.5</version>
   <scope>provided</scope>
 </dependency>
 ```
