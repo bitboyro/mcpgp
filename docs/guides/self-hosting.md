@@ -16,7 +16,7 @@ the image yourself instead, see [Building from the repository](#building-from-th
 
 ```bash
 mkdir mcpgp && cd mcpgp
-docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/setup docker.io/<account>/mcpgp-platform:0.2.4 setup
+docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/setup docker.io/<account>/mcpgp-platform:0.2.5 setup
 ```
 
 It asks for the public address (`https://mcpgp.example.com`, or `http://localhost:8443` to try it
