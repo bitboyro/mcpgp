@@ -52,6 +52,12 @@ final class Setup {
     String admin = "admin";
     String bind = "127.0.0.1";
     String port = "8443";
+    boolean bindGiven;
+    boolean portGiven;
+    /** HTTPS: self-signed or files (the platform serves it), proxy (yours does), or null (ask, when the address is https). */
+    String tls;
+    String cert;
+    String key;
     boolean yes;
     boolean upgrade;
 
@@ -65,10 +71,14 @@ final class Setup {
             Usage: setup [--out <dir>] [--public-url <https://…>] [--workspace <name>] [--store postgres|files]
                          [--sign | --no-sign] [--oidc-issuer <url> --oidc-client-id <id> [--oidc-public-client]]
                          [--admin <name>] [--bind <address>] [--port <port>] [--image <image>] [--yes] [--upgrade]
-              Writes compose.yaml (and compose.postgres/signing/oidc.yaml), platform.yaml, .env and secrets/
+                         [--tls self-signed|files|proxy [--cert <certificate.pem> --key <key.pem>]]
+              Writes compose.yaml (and compose.postgres/signing/oidc/tls.yaml), platform.yaml, .env and secrets/
               into <dir> (default /setup in the image, else the working directory). Asks for what isn't
               given, unless --yes. Existing files are kept; --upgrade rewrites the compose files and
-              MCPGP_IMAGE for this image.""";
+              MCPGP_IMAGE for this image. --tls in a folder that exists switches how HTTPS is done:
+              self-signed (the platform serves it with a certificate made here), files (your certificate
+              and key, paths inside the folder), proxy (yours does; the platform listens on 127.0.0.1).
+              With --yes and an https:// address, the default is proxy.""";
 
     int run(String[] args) {
         try {
@@ -86,7 +96,13 @@ final class Setup {
                 out.println("✗ " + dir + " is not a folder; mount one at /setup (docker run -v \"$PWD\":/setup …)");
                 return 1;
             }
-            return upgrade ? upgrade() : write();
+            if (tls != null && !List.of("self-signed", "files", "proxy").contains(tls)) {
+                throw new IllegalArgumentException("--tls: self-signed, files or proxy");
+            }
+            if (upgrade) {
+                return upgrade();
+            }
+            return tls != null && Files.exists(dir.resolve(".env")) ? switchTls() : write();
         } catch (IllegalArgumentException e) {
             out.println("✗ " + e.getMessage());
             return 2;
@@ -107,8 +123,11 @@ final class Setup {
                 case "--workspace" -> { workspace = need(a, value); i++; }
                 case "--store" -> { store = need(a, value); i++; }
                 case "--admin" -> { admin = need(a, value); i++; }
-                case "--bind" -> { bind = need(a, value); i++; }
-                case "--port" -> { port = need(a, value); i++; }
+                case "--bind" -> { bind = need(a, value); bindGiven = true; i++; }
+                case "--port" -> { port = need(a, value); portGiven = true; i++; }
+                case "--tls" -> { tls = need(a, value); i++; }
+                case "--cert" -> { cert = need(a, value); i++; }
+                case "--key" -> { key = need(a, value); i++; }
                 case "--oidc-issuer" -> { oidcIssuer = need(a, value); i++; }
                 case "--oidc-client-id" -> { oidcClientId = need(a, value); i++; }
                 case "--oidc-public-client" -> oidcSecret = false;
@@ -148,6 +167,15 @@ final class Setup {
         if (oidcIssuer != null && oidcSecret) {
             composeFiles.add("compose.oidc.yaml");
         }
+        if (tlsHere()) {
+            composeFiles.add(tls.equals("files") ? "compose.tls-files.yaml" : "compose.tls.yaml");
+            if (!bindGiven) {
+                bind = "0.0.0.0";
+            }
+            if (!portGiven) {
+                port = String.valueOf(TlsFiles.port(publicUrl));
+            }
+        }
         for (String file : composeFiles) {
             put(file, compose(file), "");
         }
@@ -175,6 +203,9 @@ final class Setup {
                 }
             }
         }
+        if (tlsHere()) {
+            tlsFiles();
+        }
         if (oidcIssuer != null && oidcSecret && !Files.exists(secrets.resolve("oidc_client_secret"))) {
             out.println("  todo    secrets/oidc_client_secret: put the client secret from your identity provider there (chmod 644)");
         }
@@ -183,7 +214,14 @@ final class Setup {
         out.println("Next:");
         out.println("  docker compose run --rm platform check     # what would go wrong, before starting");
         out.println("  docker compose up -d --wait");
-        out.println("  then put TLS in front of " + bind + ":" + port + " (Caddy: reverse_proxy " + bind + ":" + port + ")");
+        if (tlsHere()) {
+            out.println("  the platform serves HTTPS on port " + port + " itself" + (tls.equals("self-signed")
+                    ? "; browsers warn about the self-signed certificate until you trust tls/certificate.pem or replace it:"
+                    + "\n    setup --tls files --cert <certificate.pem> --key <key.pem>  (files you put in this folder)" : ""));
+        } else if (publicUrl.startsWith("https://")) {
+            out.println("  then put TLS in front of " + bind + ":" + port + " on " + TlsFiles.host(publicUrl) + ":" + TlsFiles.port(publicUrl)
+                    + " (Caddy: reverse_proxy " + bind + ":" + port + "), or let the platform do it: setup --tls self-signed");
+        }
         out.println("  and sign in at " + publicUrl + " as " + admin + " (the password is in secrets/admin_password)");
         if (oidcIssuer != null) {
             out.println("  company sign-in: register the redirect URI " + publicUrl + "/login/oauth2/code/oidc and map your groups");
@@ -206,6 +244,22 @@ final class Setup {
         }
         if (sign == null) {
             sign = !interactive || yesNo(prompt("Sign packages? [Y/n]", "y"));
+        }
+        if (tls == null && publicUrl.startsWith("https://")) {
+            if (interactive) {
+                out.println("HTTPS for " + publicUrl + ":");
+                out.println("  1) here, with a self-signed certificate for now (replace it with yours later)");
+                out.println("  2) here, with my certificate files (in this folder)");
+                out.println("  3) my own proxy or ingress does it (the platform stays plain HTTP behind it)");
+                String answer = prompt("Choose 1, 2 or 3", "1");
+                tls = answer.startsWith("2") ? "files" : answer.startsWith("3") ? "proxy" : "self-signed";
+                if (tls.equals("files")) {
+                    cert = cert != null ? cert : prompt("Certificate file (PEM, the full chain), in this folder", "certificate.pem");
+                    key = key != null ? key : prompt("Its private key (PEM), in this folder", "key.pem");
+                }
+            } else {
+                tls = "proxy";      // scripts: as before 0.2.1
+            }
         }
         if (oidcIssuer == null && interactive) {
             String issuer = prompt("Company sign-in: OIDC issuer (empty to skip)", "");
@@ -249,9 +303,116 @@ final class Setup {
         if (!port.matches("\\d{1,5}")) {
             throw new IllegalArgumentException("port: a number");
         }
+        validateTls();
         if (oidcIssuer != null && !oidcIssuer.startsWith("https://")) {
             throw new IllegalArgumentException("the OIDC issuer starts with https://");
         }
+    }
+
+    // ------------------------------------------------------------------ HTTPS
+
+    private void validateTls() {
+        if (tlsHere() && !publicUrl.startsWith("https://")) {
+            throw new IllegalArgumentException("--tls " + tls + " needs an https:// public address (MCPGP_PUBLIC_URL in .env)");
+        }
+        if ("files".equals(tls) && (cert == null || key == null)) {
+            throw new IllegalArgumentException("--tls files needs --cert <certificate.pem> and --key <key.pem>");
+        }
+    }
+
+    private boolean tlsHere() {
+        return "self-signed".equals(tls) || "files".equals(tls);
+    }
+
+    /** The certificate files: made here (self-signed), or the given ones copied in and checked. */
+    private void tlsFiles() throws IOException {
+        Path secrets = dir.resolve("secrets");
+        Path tlsDir = dir.resolve("tls");
+        Files.createDirectories(secrets);
+        Files.createDirectories(tlsDir);
+        if (tls.equals("self-signed")) {
+            if (Files.exists(secrets.resolve("tls_keystore.p12"))) {
+                out.println("  kept    secrets/tls_keystore.p12");
+                return;
+            }
+            String password = password().strip();
+            Path pem = tlsDir.resolve("certificate.pem");
+            Files.deleteIfExists(pem);
+            TlsFiles.selfSigned(TlsFiles.host(publicUrl), secrets.resolve("tls_keystore.p12"), password, pem);
+            permissions(secrets.resolve("tls_keystore.p12"), "rw-r--r--");
+            Files.writeString(secrets.resolve("tls_keystore_password"), password + "\n");
+            permissions(secrets.resolve("tls_keystore_password"), "rw-r--r--");
+            out.println("  wrote   secrets/tls_keystore.p12 and secrets/tls_keystore_password (a self-signed certificate for "
+                    + TlsFiles.host(publicUrl) + ", valid 1 year)");
+            out.println("  wrote   tls/certificate.pem (that certificate: import it where browsers and clients should trust it)");
+            return;
+        }
+        Path certFile = dir.resolve(cert).normalize();
+        Path keyFile = dir.resolve(key).normalize();
+        if (!certFile.startsWith(dir) || !keyFile.startsWith(dir) || !Files.isRegularFile(certFile) || !Files.isRegularFile(keyFile)) {
+            throw new IllegalArgumentException("--cert and --key are files in " + dir + " (put them there first)");
+        }
+        try {
+            java.security.cert.X509Certificate certificate;
+            try (InputStream inCert = Files.newInputStream(certFile)) {
+                certificate = (java.security.cert.X509Certificate) java.security.cert.CertificateFactory.getInstance("X.509").generateCertificate(inCert);
+            }
+            TlsFiles.privateKey(Files.readString(keyFile));
+            if (!TlsFiles.covers(TlsFiles.names(certificate), TlsFiles.host(publicUrl))) {
+                out.println("  warning the certificate is for " + TlsFiles.names(certificate) + ", not " + TlsFiles.host(publicUrl));
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("the certificate or key can't be read: " + e.getMessage());
+        }
+        Files.copy(certFile, tlsDir.resolve("certificate.pem"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(keyFile, secrets.resolve("tls_key"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        permissions(secrets.resolve("tls_key"), "rw-r--r--");
+        out.println("  wrote   tls/certificate.pem and secrets/tls_key (from " + cert + " and " + key + "; delete those copies when it works)");
+    }
+
+    /** {@code --tls} in a folder that exists: the TLS files, and COMPOSE_FILE, MCPGP_BIND and MCPGP_PORT in .env. */
+    private int switchTls() throws IOException {
+        Path envFile = dir.resolve(".env");
+        String text = Files.readString(envFile);
+        Map<String, String> current = new LinkedHashMap<>();
+        text.lines().filter(l -> l.matches("[A-Z_]+=.*")).forEach(l -> current.put(l.substring(0, l.indexOf('=')), l.substring(l.indexOf('=') + 1)));
+        boolean urlGiven = publicUrl != null;
+        if (!urlGiven) {
+            publicUrl = current.getOrDefault("MCPGP_PUBLIC_URL", "");
+        }
+        out.println("mcpgp platform setup --tls " + tls + ": HTTPS for " + publicUrl + ", in " + dir);
+        validateTls();
+        List<String> files = new ArrayList<>(List.of(current.getOrDefault("COMPOSE_FILE", "compose.yaml").split(":")));
+        files.removeIf(f -> f.startsWith("compose.tls"));
+        Map<String, String> values = new LinkedHashMap<>();
+        if (urlGiven) {
+            values.put("MCPGP_PUBLIC_URL", publicUrl.replaceAll("/+$", ""));
+        }
+        if (tlsHere()) {
+            String file = tls.equals("files") ? "compose.tls-files.yaml" : "compose.tls.yaml";
+            files.add(file);
+            if (!Files.exists(dir.resolve(file))) {
+                Files.writeString(dir.resolve(file), compose(file));
+                out.println("  wrote   " + file);
+            }
+            tlsFiles();
+            values.put("MCPGP_BIND", bindGiven ? bind : "0.0.0.0");
+            values.put("MCPGP_PORT", portGiven ? port : String.valueOf(TlsFiles.port(publicUrl)));
+        } else {
+            values.put("MCPGP_BIND", bindGiven ? bind : "127.0.0.1");
+            values.put("MCPGP_PORT", portGiven ? port : "8443");
+        }
+        values.put("COMPOSE_FILE", String.join(":", files));
+        Files.writeString(envFile, setKeys(text, values));
+        out.println("  updated .env (COMPOSE_FILE, MCPGP_BIND=" + values.get("MCPGP_BIND") + ", MCPGP_PORT=" + values.get("MCPGP_PORT") + ")");
+        out.println();
+        out.println("Next: docker compose run --rm platform check && docker compose up -d --force-recreate --wait");
+        if (tls.equals("proxy")) {
+            out.println("Your proxy serves " + publicUrl + " and forwards to 127.0.0.1:" + values.get("MCPGP_PORT") + ".");
+        }
+        return 0;
     }
 
     // ------------------------------------------------------------------ --upgrade

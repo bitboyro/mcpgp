@@ -73,6 +73,29 @@ public class PlatformServer {
         start(config);
     }
 
+    /** HTTPS from {@code http.tls}: an SSL bundle that is reloaded when its files change; nothing without it. */
+    static Map<String, Object> tlsProperties(PlatformConfig config) {
+        PlatformConfig.Tls tls = config.tls();
+        if (tls == null) {
+            return Map.of();
+        }
+        Map<String, Object> p = new java.util.LinkedHashMap<>();
+        p.put("server.ssl.bundle", "mcpgp");
+        if (tls.pem()) {
+            p.put("spring.ssl.bundle.pem.mcpgp.keystore.certificate", "file:" + tls.certificate());
+            p.put("spring.ssl.bundle.pem.mcpgp.keystore.private-key", "file:" + tls.privateKey());
+            p.put("spring.ssl.bundle.pem.mcpgp.reload-on-update", "true");
+        } else {
+            String password = Secrets.resolve(tls.password(), System.getenv())
+                    .orElseThrow(() -> new IllegalStateException("http.tls.password (" + tls.password() + ") can't be read"));
+            p.put("spring.ssl.bundle.jks.mcpgp.keystore.location", "file:" + tls.keystore());
+            p.put("spring.ssl.bundle.jks.mcpgp.keystore.password", password);
+            p.put("spring.ssl.bundle.jks.mcpgp.keystore.type", "PKCS12");
+            p.put("spring.ssl.bundle.jks.mcpgp.reload-on-update", "true");
+        }
+        return p;
+    }
+
     /** The configured store: the file store, or PostgreSQL. */
     public static Store openStore(PlatformConfig config) {
         PlatformConfig.Postgres pg = config.postgres();
@@ -151,7 +174,7 @@ public class PlatformServer {
     public static ConfigurableApplicationContext start(PlatformConfig config) {
         SpringApplication app = new SpringApplication(PlatformServer.class);
         app.setBannerMode(Banner.Mode.OFF);
-        app.setDefaultProperties(Map.of(
+        Map<String, Object> properties = new java.util.LinkedHashMap<>(Map.of(
                 "server.address", config.host(),
                 "server.port", String.valueOf(config.port()),
                 "spring.main.log-startup-info", "false",
@@ -159,6 +182,8 @@ public class PlatformServer {
                 "spring.servlet.multipart.enabled", "false",
                 "server.tomcat.max-swallow-size", "-1",
                 "logging.level.com.zaxxer.hikari", "warn"));
+        properties.putAll(tlsProperties(config));
+        app.setDefaultProperties(properties);
         app.addInitializers(ctx -> ctx.getBeanFactory().registerSingleton("platformConfig", config));
         return app.run();
     }

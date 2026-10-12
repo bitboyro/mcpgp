@@ -6,6 +6,17 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- HTTPS served by the platform itself, off unless configured: `http.tls` with a certificate and key
+  (PEM) or a PKCS12 keystore, reloaded when the files change. `setup` asks who does HTTPS for an
+  `https://` address: the platform with a self-signed certificate (made with the JRE's keytool), the
+  platform with your files, or your own proxy (the default with `--yes`, as before); `setup --tls
+  self-signed|files|proxy` switches an existing folder. `check` verifies the certificate: key, host,
+  expiry. The image's health check works over HTTP and HTTPS.
+- Sign-in: a plain `http://` page of a platform whose address is `https://` is told which address to
+  open, instead of a session cookie the browser drops (`409 WRONG_ADDRESS`); the sign-in page says so
+  too when it isn't on the platform's address.
+- The upload of a spec also reports references to parts that aren't there (`#/components/schemas/…`
+  inside the spec, or in a referenced file), not only missing files.
 - Start from your API's spec on the platform: All servers → **New server** takes an OpenAPI 3.0 / 3.1
   or Swagger 2.0 file in JSON or YAML, several files that `$ref` each other, a folder or a zip. It
   finds the main file, follows every `$ref`, says which referenced files are missing (and which

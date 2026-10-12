@@ -1,0 +1,16 @@
+# HTTPS served by the platform itself, with your certificate (tls/certificate.pem, the full chain) and
+# its key (secrets/tls_key, PKCS#8 PEM); setup --tls files --cert … --key … puts them there
+# (docs/guides/self-hosting.md). A renewed certificate is picked up without a restart.
+services:
+  platform:
+    environment:
+      MCPGP_PLATFORM_HTTP__TLS__CERTIFICATE: /etc/mcpgp/tls/certificate.pem
+      MCPGP_PLATFORM_HTTP__TLS__PRIVATE_KEY: /run/secrets/tls_key
+    volumes:
+      - ./tls:/etc/mcpgp/tls:ro
+    secrets:
+      - tls_key
+
+secrets:
+  tls_key:
+    file: ./secrets/tls_key

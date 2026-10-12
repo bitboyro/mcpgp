@@ -4,6 +4,7 @@ policy and shared notices, the example server, a build, and a tool tried against
 against a test installation, not the one your team uses.
 
     python3 deploy/smoke-test.py http://localhost:8443 admin deploy/secrets/admin_password
+    python3 deploy/smoke-test.py https://mcpgp.example.com:9443 admin secrets/admin_password --ca tls/certificate.pem
 """
 import json
 import pathlib
@@ -12,9 +13,17 @@ import time
 import urllib.error
 import urllib.request
 
-if len(sys.argv) != 4:
+import ssl
+
+args = [a for a in sys.argv[1:] if a != "--ca"]
+ca = sys.argv[sys.argv.index("--ca") + 1] if "--ca" in sys.argv else None
+if ca:
+    args.remove(ca)
+if len(args) != 3:
     sys.exit(__doc__)
-base, name, password_file = sys.argv[1].rstrip("/"), sys.argv[2], sys.argv[3]
+base, name, password_file = args[0].rstrip("/"), args[1], args[2]
+# --ca: trust this certificate (the platform's own, e.g. self-signed) as well as the system's
+context = ssl.create_default_context(cafile=ca) if ca else None
 examples = pathlib.Path(__file__).resolve().parent.parent / "examples" / "platform"
 
 
@@ -25,7 +34,7 @@ def call(method, path, body=None, token=None):
     request = urllib.request.Request(base + path, method=method, headers=headers,
                                      data=None if body is None else json.dumps(body).encode())
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with urllib.request.urlopen(request, timeout=60, context=context) as response:
             return response.status, json.loads(response.read() or b"null")
     except urllib.error.HTTPError as e:
         return e.code, json.loads(e.read() or b"null")

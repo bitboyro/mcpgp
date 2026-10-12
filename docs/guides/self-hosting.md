@@ -22,7 +22,8 @@ docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/setup docker.io/<accou
 It asks for the public address (`https://mcpgp.example.com`, or `http://localhost:8443` to try it
 locally), the workspace name (your organization's short name, as in `mcpgp://acme/…` references),
 the store (PostgreSQL or files; [../deployment.md §4](../deployment.md#4-storage) compares them),
-whether to sign packages, and optionally company sign-in. Then it writes:
+whether to sign packages, for an `https://` address who serves HTTPS (step 5), and optionally
+company sign-in. Then it writes:
 
 ```
 mcpgp/
@@ -30,6 +31,8 @@ mcpgp/
 ├─ compose.postgres.yaml      PostgreSQL, when you chose it
 ├─ compose.signing.yaml       package signing, when you chose it
 ├─ compose.oidc.yaml          the OIDC client secret, for company sign-in with a secret
+├─ compose.tls.yaml           HTTPS by the platform (or compose.tls-files.yaml, with your certificate)
+├─ tls/certificate.pem        the platform's certificate (self-signed: import it where it should be trusted)
 ├─ platform.yaml              sign-in, retention (and auth.oidc, when you gave an issuer)
 ├─ .env                       MCPGP_IMAGE, COMPOSE_FILE (the files above), public address, bind address
 ├─ .gitignore                 keeps .env and secrets/ out of git
@@ -96,10 +99,32 @@ It checks health, signs in, adds the example naming policy, shared notices and s
 tries a tool against the mock, and checks that the shared notices reach the tools. Without a signing
 key the build fails, because the example asks for signed packages.
 
-## 5. Put it behind TLS
+## 5. HTTPS
 
-Point your proxy at `127.0.0.1:8443`, set `MCPGP_PUBLIC_URL=https://…` in `.env`, and run
-`docker compose up -d` again. Caddy, which gets a certificate on its own:
+For an `https://` address, `setup` asks who does HTTPS:
+
+| Answer | What you get |
+|---|---|
+| **1. here, self-signed** (the default when asked) | The platform serves HTTPS itself on the port in your address (e.g. 9443), with a certificate made for your host, valid a year. Browsers warn until they trust it: import `tls/certificate.pem` (your browser's or OS's certificate settings), or replace it with yours (answer 2). |
+| **2. here, with my files** | The platform serves HTTPS with your certificate (the full chain, PEM) and its private key (PKCS#8 PEM, `BEGIN PRIVATE KEY`). Put both files in the folder first. A renewed certificate is picked up without a restart: copy it over `tls/certificate.pem` and the key over `secrets/tls_key`. |
+| **3. my own proxy** (the default with `--yes`) | The platform stays plain HTTP on `127.0.0.1:8443` for your proxy, ingress or load balancer (below). |
+
+Switch any time in the folder; it changes only the HTTPS pieces and `COMPOSE_FILE`, `MCPGP_BIND`,
+`MCPGP_PORT` in `.env`:
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/setup docker.io/<account>/mcpgp-platform:<version> setup --tls self-signed
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/setup docker.io/<account>/mcpgp-platform:<version> setup --tls files --cert certificate.pem --key key.pem
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/setup docker.io/<account>/mcpgp-platform:<version> setup --tls proxy
+docker compose run --rm platform check && docker compose up -d --force-recreate --wait
+```
+
+`check` says whether the certificate and key belong together, are for the host in your address, and
+how long they last (a warning 30 days before they expire). The public address must always be what
+people type, scheme, host and port: `https://mcpgp.example.com:9443`.
+
+**With your own proxy:** point it at `127.0.0.1:8443`, keep `MCPGP_PUBLIC_URL=https://…` in `.env`,
+and run `docker compose up -d` again. Caddy, which gets a certificate on its own:
 
 ```
 mcpgp.example.com {
@@ -238,7 +263,8 @@ installation; nothing reads it any more.
 | `Another platform process has the store in schema mcpgp open` | a second platform runs on the same database (or a crashed one's session hasn't ended yet) | stop the other one; wait a minute for the database to drop the old session |
 | `The store … has format 0.x` | an upgrade changed the store format | step 10 |
 | `the definition asks for a signed package, but the platform has no signing.key` | a build needs signing | step 6 |
-| sign-in works, then you're signed out at once | the cookie is `Secure` but you opened `http://` | open the `https://` address, or set `MCPGP_PUBLIC_URL` to `http://localhost:8443` for a local try |
+| "This platform's address is https://…; open it there" when signing in | you opened a plain `http://` address of a platform whose address is `https://`, where the browser can't keep the sign-in | open the address it names; or, for a quick try without HTTPS, set `MCPGP_PUBLIC_URL` to the `http://` address you use and `docker compose up -d --force-recreate platform` |
+| you can't connect from another machine | the platform listens on `127.0.0.1` only (`MCPGP_BIND`), and nothing serves the port in your address yet | let the platform serve HTTPS (`setup --tls self-signed`), or put your proxy on that port; check a network firewall or cloud security group too |
 | the company sign-in returns to `/sign-in?error=sso` | the redirect URI or issuer doesn't match | compare the redirect URI with `<publicUrl>/login/oauth2/code/oidc`; `docker compose logs platform` names the cause |
 | `/sign-in?error=no-access` | the person is in no group mapped in `roles` | map their group, or check `groupsClaim` |
 | `unhealthy` in `docker compose ps` | the platform can't reach its store | `docker compose logs platform db` |

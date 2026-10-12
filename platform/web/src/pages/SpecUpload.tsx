@@ -68,6 +68,16 @@ export function SpecProblemsView({ problems, main, onMain }: { problems: SpecPro
           </ul>
         </div>
       )}
+      {(problems.broken ?? []).length > 0 && (
+        <div>
+          <b>References to parts that aren't there: fix them in the spec, then pick the files again.</b>
+          <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+            {problems.broken!.map((b) => (
+              <li key={b.file + b.pointer}><span className="mono">{b.file}</span> <span className="hint">(from {b.from}, at <span className="mono">{b.pointer}</span>)</span></li>
+            ))}
+          </ul>
+        </div>
+      )}
       {(problems.remote ?? []).length > 0 && (
         <div>
           <b>References to URLs: the platform doesn't fetch them.</b> Download those files, add them, and change the references to their paths.
@@ -76,7 +86,7 @@ export function SpecProblemsView({ problems, main, onMain }: { problems: SpecPro
           </ul>
         </div>
       )}
-      {(problems.problems ?? []).filter((p) => !/is missing \(referenced|doesn't fetch URLs|several files could be/.test(p)).map((p) => <div key={p}>{p}</div>)}
+      {(problems.problems ?? []).filter((p) => !/is missing \(referenced|doesn't fetch URLs|several files could be|which isn't there$/.test(p)).map((p) => <div key={p}>{p}</div>)}
     </div>
   )
 }

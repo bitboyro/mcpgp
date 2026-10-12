@@ -59,6 +59,14 @@ public class AccountsApi {
         if (!config.localAccounts() && config.ldap() == null) {
             throw new ApiException(404, "NOT_FOUND", "sign-in with a name and password is turned off; sign in with your company account");
         }
+        String origin = request.getHeader("Origin");
+        if (AuthFilter.isWeb(request) && config.publicUrl() != null && config.publicUrl().startsWith("https://")
+                && origin != null && origin.startsWith("http://")) {
+            // the session cookie is Secure for an https:// platform: a browser on plain HTTP would drop it
+            throw new ApiException(409, "WRONG_ADDRESS", "This platform's address is " + config.publicUrl() + ", and this page is "
+                    + origin + ": over plain HTTP the browser can't keep you signed in. Open " + config.publicUrl() + " instead.",
+                    Map.of("publicUrl", config.publicUrl()));
+        }
         JsonNode json = Json.parse(body);
         Access.IssuedToken token = accounts.signIn(json.path("name").asText(null), json.path("password").asText(null));
         Map<String, Object> result = IdentitiesApi.token(token.record());
@@ -89,7 +97,10 @@ public class AccountsApi {
     /** How people can sign in; needed before signing in, so it has no token and tells nothing else. */
     @GetMapping("/platform")
     public ResponseEntity<byte[]> platform() {
-        return Json.ok(Map.of("auth", authOptions(config)));
+        Map<String, Object> answer = new LinkedHashMap<>();
+        answer.put("auth", authOptions(config));
+        answer.put("publicUrl", config.publicUrl());
+        return Json.ok(answer);
     }
 
     /** The installation's settings, as far as builders need them (spec/platform-api.md §7). */

@@ -268,7 +268,15 @@ with filters: `target`, `server` (the server's own entries and those of its buil
 
 ```yaml
 workspace: acme                    # the <workspace> of mcpgp:// references (default local)
-http: { host: 0.0.0.0, port: 8443, publicUrl: https://mcpgp.acme.internal }   # publicUrl: for the OIDC callback behind a proxy
+http:
+  host: 0.0.0.0
+  port: 8443
+  publicUrl: https://mcpgp.acme.internal   # what people type; the OIDC callback; Secure cookies when https://
+  tls:                                     # leave out: plain HTTP for a proxy in front (the default)
+    certificate: /etc/mcpgp/tls/certificate.pem   # PEM, the full chain (a path)
+    privateKey: /run/secrets/tls_key              # PKCS#8 PEM (a path to the file, not a reference)
+    # or: keystore: /run/secrets/tls_keystore (PKCS12), password: "${file:/run/secrets/tls_keystore_password}"
+    # renewed files are picked up without a restart
 storage:
   type: files                      # files (the default) | postgres
   root: /var/lib/mcpgp             # files: the directory
@@ -307,9 +315,12 @@ retention: { archiveAfterDays: 90, deleteArchivedAfterDays: 365, keepLast: 10 }
 Environment variables override the file: `MCPGP_PLATFORM_WORKSPACE`, `MCPGP_PLATFORM_HTTP__HOST`,
 `…HTTP__PORT`, `…HTTP__PUBLIC_URL`, `…STORAGE__TYPE`, `…STORAGE__ROOT`, `…STORAGE__URL`,
 `…STORAGE__USER`, `…STORAGE__PASSWORD`, `…STORAGE__SCHEMA`, `…STORAGE__POOL_SIZE`, `…SIGNING__KEY`,
-`…ADMIN__NAME`, `…ADMIN__PASSWORD` (all with the prefix `MCPGP_PLATFORM_`). Secrets (`password`,
-`clientSecret`, `bindPassword`, `signing.key`) are references, in the file and in the environment
-alike. `http.publicUrl` is `https://` (or `http://` for a local test); when it is `https://`, session
+`…ADMIN__NAME`, `…ADMIN__PASSWORD`, `…HTTP__TLS__CERTIFICATE`, `…HTTP__TLS__PRIVATE_KEY`,
+`…HTTP__TLS__KEYSTORE`, `…HTTP__TLS__PASSWORD` (all with the prefix `MCPGP_PLATFORM_`). Secrets (`password`,
+`clientSecret`, `bindPassword`, `signing.key`, `http.tls.password`) are references, in the file and
+in the environment alike. A web sign-in from a plain `http://` page to a platform whose `publicUrl`
+is `https://` is refused with `409 WRONG_ADDRESS` naming the address to open (the browser would drop
+its Secure cookie); `GET /platform` includes `publicUrl` for the sign-in page. `http.publicUrl` is `https://` (or `http://` for a local test); when it is `https://`, session
 cookies are always `Secure`. At start the platform logs `deployment:` warnings for settings unfit for
 a shared installation ([../deployment.md §10](../deployment.md#10-warnings-at-start)).
 

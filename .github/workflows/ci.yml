@@ -127,6 +127,33 @@ jobs:
         working-directory: /tmp/mcpgp
         run: docker compose logs --no-color | tail -200
 
+  setup-tls:
+    # setup with HTTPS served by the platform (a self-signed certificate), checked over HTTPS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -f deploy/Dockerfile --build-arg MCPGP_IMAGE=mcpgp-platform:ci -t mcpgp-platform:ci .
+      - name: setup --tls self-signed
+        run: |
+          mkdir /tmp/mcpgp
+          docker run --rm --user "$(id -u):$(id -g)" -v /tmp/mcpgp:/setup mcpgp-platform:ci \
+            setup --yes --public-url https://localhost:9443 --workspace acme --tls self-signed
+          grep -q "MCPGP_PORT=9443" /tmp/mcpgp/.env
+          grep -q "compose.tls.yaml" /tmp/mcpgp/.env
+      - name: check, then start
+        working-directory: /tmp/mcpgp
+        run: |
+          docker compose run --rm platform check
+          docker compose up -d --no-build --wait --wait-timeout 300
+          curl -fsS --cacert tls/certificate.pem https://localhost:9443/healthz
+      - name: Smoke test over HTTPS
+        run: python3 deploy/smoke-test.py https://localhost:9443 admin /tmp/mcpgp/secrets/admin_password --ca /tmp/mcpgp/tls/certificate.pem
+      - name: Logs
+        if: always()
+        working-directory: /tmp/mcpgp
+        run: docker compose logs --no-color | tail -200
+
   cli-image:
     # the CLI image as CI jobs use it: mcpgp on the PATH, the repository mounted
     runs-on: ubuntu-latest
