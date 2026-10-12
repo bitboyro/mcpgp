@@ -5,6 +5,16 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+### Added
+- Operations: filter by method (several at once) and by resource (the path's first named segment, e.g.
+  `/partners`); "Turn off these" acts on what the filters show.
+
+### Fixed
+- Turning operations on and off was slow: every switch waited for the server and each change compiled
+  the server two or three times. Switches now flip at once (the preview follows), a version is compiled
+  once for all its pages, and saving a server no longer throws away its own and other servers' cached
+  results (they're keyed on what a server actually references). Compiles over 2 s are logged.
+
 ## 0.2.3 — 2026-10-12
 
 ### Fixed
