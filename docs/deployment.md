@@ -59,6 +59,14 @@ the packages they make never contact the platform.
 The compose files combine: `-f compose.yaml -f compose.postgres.yaml -f compose.signing.yaml`, or
 the same list in `COMPOSE_FILE` in `.env` (separated by `:`).
 
+On a server you don't need the repository: the image carries these files. Its `setup` command writes
+them into a folder for the image's own version (`compose.yaml` without the `build:` section,
+`.env` with `MCPGP_IMAGE` and `COMPOSE_FILE`, `secrets/` with generated passwords and a signing key),
+never overwriting a file; `setup --upgrade` from a newer image rewrites only the compose files and
+`MCPGP_IMAGE`. Its `check` command reads the config and says what would fail at start (secrets it
+can't read, a database it can't reach, an identity provider that doesn't answer, the start-up
+warnings) without starting anything. Both: [guides/self-hosting.md](guides/self-hosting.md).
+
 ## 3. Configuration
 
 Three layers, later ones winning:

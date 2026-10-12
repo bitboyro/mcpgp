@@ -6,62 +6,59 @@ is and why: [../deployment.md](../deployment.md). Every setting:
 
 You'll need:
 - a host with Docker Engine 24+ and the Compose plugin, 2 CPUs, 4 GB of memory, 20 GB of disk;
-- a clone of this repository (the image is built from it);
 - for a shared installation, a hostname and a TLS certificate at your reverse proxy;
 - optionally, a client registration at your identity provider (step 7).
 
-All commands run in `deploy/` unless a step says otherwise.
+No clone of the repository: the image is on Docker Hub, and the image writes its own setup. (To build
+the image yourself instead, see [Building from the repository](#building-from-the-repository).)
 
-## 1. Create the secrets
-
-```bash
-cd deploy
-chmod 700 secrets
-openssl rand -base64 24 > secrets/admin_password     # the first administrator's password
-openssl rand -base64 24 > secrets/db_password        # only for PostgreSQL
-chmod 644 secrets/*_password
-```
-
-The containers run as their own users, so the files must be readable; the folder keeps other people
-on the host out. Never commit them (the folder's `.gitignore` already refuses everything but its
-README). To see the admin password when you first sign in: `cat secrets/admin_password`.
-
-## 2. Settings
+## 1. Write the folder with `setup`
 
 ```bash
-cp .env.example .env
+mkdir mcpgp && cd mcpgp
+docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/setup docker.io/<account>/mcpgp-platform:0.2.0 setup
 ```
 
-Edit `.env`:
+It asks for the public address (`https://mcpgp.example.com`, or `http://localhost:8443` to try it
+locally), the workspace name (your organization's short name, as in `mcpgp://acme/…` references),
+the store (PostgreSQL or files; [../deployment.md §4](../deployment.md#4-storage) compares them),
+whether to sign packages, and optionally company sign-in. Then it writes:
 
-| Setting | Set it to |
-|---|---|
-| `MCPGP_PUBLIC_URL` | the address people will use: `https://mcpgp.example.com` (or `http://localhost:8443` to try it locally) |
-| `MCPGP_WORKSPACE` | your organization's short name, as in `mcpgp://acme/naming/…` references (lowercase, digits, `-`) |
-| `MCPGP_ADMIN` | the first administrator's name |
-| `MCPGP_BIND` | `127.0.0.1` when the proxy runs on this host; `0.0.0.0` only behind a firewall |
-| `COMPOSE_FILE` | which files to combine (next step), e.g. `compose.yaml:compose.postgres.yaml` |
+```
+mcpgp/
+├─ compose.yaml               the platform, pointing at this image (no build section)
+├─ compose.postgres.yaml      PostgreSQL, when you chose it
+├─ compose.signing.yaml       package signing, when you chose it
+├─ compose.oidc.yaml          the OIDC client secret, for company sign-in with a secret
+├─ platform.yaml              sign-in, retention (and auth.oidc, when you gave an issuer)
+├─ .env                       MCPGP_IMAGE, COMPOSE_FILE (the files above), public address, bind address
+├─ .gitignore                 keeps .env and secrets/ out of git
+├─ signing_key.pub            the public key customers check packages with: publish it
+└─ secrets/                   700; the files 644, generated, never printed
+   ├─ admin_password
+   ├─ db_password
+   └─ signing_key
+```
 
-`platform.yaml` holds the rest (sign-in, retention). Its defaults are fine to start.
+Without questions, for scripts:
+`setup --yes --public-url https://mcpgp.example.com --workspace acme --store postgres --sign`
+(`setup --help` lists every option). It never overwrites a file: run it again and it keeps what is
+there. The `--user` flag makes the files yours rather than the container's.
 
-## 3. Start it
+The containers read the secrets as their own users, so the files are readable and the folder keeps
+other people on the host out. Back up `secrets/` and `.env` somewhere safe (a password manager, your
+secret store): the signing key can't be recreated. To see the admin password for the first sign-in:
+`cat secrets/admin_password`.
 
-**With the published image** (no build on the host): set `MCPGP_IMAGE` in `.env` to a release,
-e.g. `MCPGP_IMAGE=docker.io/<account>/mcpgp-platform:0.1.0`, then `docker compose pull platform`
-and leave `--build` out of the commands below. **Or build it here** from the repository, as below.
-
-Pick the store ([../deployment.md §4](../deployment.md#4-storage) compares them):
+## 2. Check, then start
 
 ```bash
-# file store, on the volume mcpgp_platform-data
-docker compose up -d --build --wait
-
-# or PostgreSQL (put COMPOSE_FILE=compose.yaml:compose.postgres.yaml in .env to make it the default)
-docker compose -f compose.yaml -f compose.postgres.yaml up -d --build --wait
+docker compose run --rm platform check      # what would go wrong: secrets, the database, the identity provider
+docker compose up -d --wait
 ```
 
-The first build of the image takes several minutes. `--wait` returns once the health check passes.
-Then:
+`check` changes nothing; it prints `✓ ready to start`, or what to fix. `--wait` returns once the
+health check passes. Then:
 
 ```bash
 curl -s http://127.0.0.1:8443/healthz          # {"status":"up"}
@@ -71,17 +68,33 @@ docker compose logs platform | grep -E "administrator|deployment:"
 The log says `created administrator <name>` once, and lists `deployment:` warnings for whatever
 still needs doing (they go away as you follow the next steps).
 
-## 4. Check it end to end
+## 3. Settings you may change later
 
-On a test installation (it creates a server named `smoke-orders-mcp`), from the repository root:
+`.env` holds what the compose files use:
+
+| Setting | Set it to |
+|---|---|
+| `MCPGP_IMAGE` | the image and version to run |
+| `COMPOSE_FILE` | which files to combine, e.g. `compose.yaml:compose.postgres.yaml:compose.signing.yaml` |
+| `MCPGP_PUBLIC_URL` | the address people use: `https://mcpgp.example.com` |
+| `MCPGP_WORKSPACE` | your organization's short name, as in `mcpgp://acme/naming/…` references |
+| `MCPGP_ADMIN` | the first administrator's name (used on the first start only) |
+| `MCPGP_BIND` | `127.0.0.1` when the proxy runs on this host; `0.0.0.0` only behind a firewall |
+
+`platform.yaml` holds the rest (sign-in, retention). After a change: `docker compose up -d`.
+
+## 4. Check it end to end (optional)
+
+On a test installation (it creates a server named `smoke-orders-mcp`), from a clone of the repository
+(the test uses its examples):
 
 ```bash
-python3 deploy/smoke-test.py http://127.0.0.1:8443 admin deploy/secrets/admin_password
+python3 deploy/smoke-test.py http://127.0.0.1:8443 admin ~/mcpgp/secrets/admin_password
 ```
 
 It checks health, signs in, adds the example naming policy, shared notices and server, builds it,
-tries a tool against the mock, and checks that the shared notices reach the tools. Without a signing key (step 6) the build fails, because the example asks for
-signed packages; that's expected until step 6.
+tries a tool against the mock, and checks that the shared notices reach the tools. Without a signing
+key the build fails, because the example asks for signed packages.
 
 ## 5. Put it behind TLS
 
@@ -128,18 +141,11 @@ curl -X PUT https://mcpgp.example.com/api/v1/identities/<your id>/password \
 
 ## 6. Sign packages
 
-With the CLI (`mcpgp-cli-<version>.zip` from the release, Java 21+), or its image without installing
-anything:
-
-```bash
-mcpgp keygen --out keys            # keys/mcpgp.key (secret), keys/mcpgp.pub (publish it)
-# or: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/keys":/work docker.io/<account>/mcpgp-cli:0.1.0 keygen
-cp keys/mcpgp.key secrets/signing_key && chmod 644 secrets/signing_key
-```
-
-Add `compose.signing.yaml` to `COMPOSE_FILE` (or `-f compose.signing.yaml`) and run
-`docker compose up -d`. Builds now sign their checksums; give customers `mcpgp.pub`. Keep
-`mcpgp.key` in your secret store as well: it can't be recreated.
+When you answered yes in `setup`, packages are signed already: give customers `signing_key.pub`
+(`mcpgp verify <package> --key signing_key.pub`). To turn it on later: run
+`setup --sign` again in the folder (it adds `compose.signing.yaml` and the key, and keeps everything
+else), add `compose.signing.yaml` to `COMPOSE_FILE` in `.env`, and `docker compose up -d`. A key of
+your own (`mcpgp keygen`) works too: put it in `secrets/signing_key` (`chmod 644`).
 
 ## 7. Company sign-in (optional)
 
@@ -148,10 +154,13 @@ OIDC (Entra ID, Okta, Keycloak, Google, …):
 1. Register a web application at your identity provider. Redirect URI:
    `https://mcpgp.example.com/login/oauth2/code/oidc`. Scopes `openid profile email`, and a claim
    with the person's groups (often `groups`).
-2. Put the client secret in `secrets/oidc_client_secret` (`chmod 644`), and add
-   `compose.oidc.yaml` to `COMPOSE_FILE`. A public client (PKCE, no secret) needs neither.
-3. Uncomment `auth.oidc` in `platform.yaml` and fill in `issuer`, `clientId`, `label` and `roles`:
-   which groups get `viewer`, `builder`, `releaser` or `admin`. People in none of them can't sign in.
+2. Put the client secret in `secrets/oidc_client_secret` (`chmod 644`). When you gave `setup` an
+   issuer it already added `compose.oidc.yaml` to `COMPOSE_FILE`; otherwise add it. A public client
+   (PKCE, no secret) needs neither.
+3. In `platform.yaml`, `auth.oidc` (written by `setup`, or uncomment it) has `issuer`, `clientId`,
+   `label` and `roles`: set which of your groups get `viewer`, `builder`, `releaser` or `admin` (the
+   groups `setup` writes are examples). People in none of them can't sign in. `docker compose run --rm
+   platform check` tells you whether the issuer answers.
 4. `docker compose up -d`, then sign in with the company button on the sign-in page.
 5. Once it works, and someone in your admin group has signed in, set
    `auth: { local: { enabled: false } }` to turn off passwords.
@@ -189,11 +198,10 @@ on the backups.
 ## 10. Upgrade
 
 ```bash
-# the published image: set MCPGP_IMAGE in .env to the new version, then
-docker compose pull platform && docker compose up -d --wait
-
-# or built here
-git pull && docker compose up -d --build --wait
+# the new image updates the compose files and MCPGP_IMAGE; secrets/, platform.yaml and the rest of .env stay
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/setup docker.io/<account>/mcpgp-platform:<new version> setup --upgrade
+docker compose run --rm platform check
+docker compose pull && docker compose up -d --wait
 ```
 
 Read the [CHANGELOG](../../CHANGELOG.md) first and back up. If the platform logs that the store
@@ -202,6 +210,9 @@ Read the [CHANGELOG](../../CHANGELOG.md) first and back up. If the platform logs
 the zip (`POST /api/v1/import`).
 
 ## 11. Move from the file store to PostgreSQL
+
+If `setup` wrote a file store, first run `setup --store postgres` again in the folder: it adds
+`compose.postgres.yaml` and `secrets/db_password` and keeps the rest.
 
 ```bash
 docker compose stop platform
@@ -228,3 +239,20 @@ installation; nothing reads it any more.
 | the company sign-in returns to `/sign-in?error=sso` | the redirect URI or issuer doesn't match | compare the redirect URI with `<publicUrl>/login/oauth2/code/oidc`; `docker compose logs platform` names the cause |
 | `/sign-in?error=no-access` | the person is in no group mapped in `roles` | map their group, or check `groupsClaim` |
 | `unhealthy` in `docker compose ps` | the platform can't reach its store | `docker compose logs platform db` |
+
+## Building from the repository
+
+Instead of the published image, build it on the host from a clone; the files are the ones in
+`deploy/` (with a `build:` section), and the secrets are made by hand:
+
+```bash
+git clone https://github.com/bitboyro/mcpgp && cd mcpgp/deploy
+chmod 700 secrets
+openssl rand -base64 24 > secrets/admin_password     # the first administrator's password
+openssl rand -base64 24 > secrets/db_password        # only for PostgreSQL
+chmod 644 secrets/*_password
+cp .env.example .env                                 # then set the values of step 3
+docker compose -f compose.yaml -f compose.postgres.yaml up -d --build --wait
+```
+
+The first build takes several minutes. Upgrading: `git pull && docker compose up -d --build --wait`.

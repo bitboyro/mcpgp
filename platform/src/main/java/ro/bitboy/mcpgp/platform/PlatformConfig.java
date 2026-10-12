@@ -242,11 +242,20 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
         return host != null && (host.equals("localhost") || host.equals("127.0.0.1") || host.equals("[::1]") || host.equals("::1"));
     }
 
+    /** {@code --config <file>}, else {@code MCPGP_PLATFORM_CONFIG} (the image sets it), else {@code platform.yaml} here if there is one. */
     static Path configFile(String[] args) {
+        return configFile(args, System.getenv());
+    }
+
+    static Path configFile(String[] args, Map<String, String> env) {
         for (int i = 0; i < args.length - 1; i++) {
             if (args[i].equals("--config")) {
                 return Path.of(args[i + 1]);
             }
+        }
+        String fromEnv = env.get("MCPGP_PLATFORM_CONFIG");
+        if (fromEnv != null && !fromEnv.isBlank()) {
+            return Path.of(fromEnv);
         }
         Path local = Path.of("platform.yaml");
         return Files.exists(local) ? local : null;

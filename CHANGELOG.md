@@ -6,6 +6,13 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- Platform image: `setup` writes everything to run it with Docker Compose into a folder (compose
+  files pointing at the image, `platform.yaml`, `.env`, generated secrets and a signing key), asking
+  or from flags, never overwriting; `setup --upgrade` moves the folder to a newer image. `check` says
+  what would fail at start (secrets, the database, the identity provider, start-up warnings) without
+  starting. No clone of the repository on the server any more.
+- The platform reads its config path from `MCPGP_PLATFORM_CONFIG` when `--config` isn't given; the
+  image sets it, so its commands (`check`, `init`, …) find the mounted `platform.yaml`.
 - Shared notices: company policy text written once and carried by many servers. A library item of
   kind `notices` (`mcpgp://<workspace>/notices/<name>@<version>`; for the CLI, `notices:` in
   `mcpgp-workspace.yaml`), included with `descriptions.include`; a server's own notice with the same

@@ -296,9 +296,15 @@ alike. `http.publicUrl` is `https://` (or `http://` for a local test); when it i
 cookies are always `Secure`. At start the platform logs `deployment:` warnings for settings unfit for
 a shared installation ([../deployment.md §10](../deployment.md#10-warnings-at-start)).
 
-Commands of the platform jar: `init --admin <name>` (the first administrator, once, printing a
-one-time admin token), `copy-store --from <directory>` (copies a file store into the configured,
-empty store, with build packages, build logs and the activity log), and no command: run.
+Commands of the platform jar (and image): `setup [--out <dir>] [options]` (writes the Docker
+Compose files, `platform.yaml`, `.env` and generated secrets for this image into a folder; never
+overwrites; `--upgrade` rewrites the compose files and `MCPGP_IMAGE`), `check` (what would fail at
+start with this config, changing nothing; exit code 1 when something would), `init --admin <name>`
+(the first administrator, once, printing a one-time admin token), `copy-store --from <directory>`
+(copies a file store into the configured, empty store, with build packages, build logs and the
+activity log), and no command: run. The config file is `--config <file>`, else
+`MCPGP_PLATFORM_CONFIG` (the image sets `/etc/mcpgp/platform.yaml`), else `platform.yaml` in the
+working directory.
 
 ### 7.1 Storage
 

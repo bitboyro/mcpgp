@@ -30,6 +30,8 @@ import java.util.Set;
 
 /**
  * The platform: {@code java -jar mcpgp-platform.jar [--config platform.yaml]};
+ * {@code setup} to write the Docker Compose files, config and secrets for this image into a folder;
+ * {@code check} to see what would go wrong with a config before starting;
  * {@code init --admin <name>} once to create the first administrator (or {@code admin} in the config);
  * {@code copy-store --from <directory>} to move a file store's data into the configured store.
  */
@@ -41,6 +43,24 @@ import java.util.Set;
 public class PlatformServer {
 
     public static void main(String[] args) {
+        if (args.length > 0 && args[0].equals("setup")) {
+            java.io.Console console = System.console();
+            java.io.BufferedReader in = console == null ? null : new java.io.BufferedReader(console.reader());
+            System.exit(new Setup(System.getenv(), in, System.out).run(args));
+            return;
+        }
+        if (args.length > 0 && args[0].equals("check")) {
+            PlatformConfig checked;
+            try {
+                checked = PlatformConfig.load(PlatformConfig.configFile(args), System.getenv());
+            } catch (RuntimeException e) {
+                System.out.println("✗ config: " + e.getMessage());
+                System.exit(1);
+                return;
+            }
+            System.exit(new Check(checked, System.getenv(), System.out).run());
+            return;
+        }
         PlatformConfig config = PlatformConfig.load(PlatformConfig.configFile(args), System.getenv());
         if (args.length > 0 && args[0].equals("init")) {
             System.exit(init(config, args, System.out));
