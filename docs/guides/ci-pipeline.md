@@ -27,7 +27,7 @@ mcp-servers/
 `.mcpgp/config.yaml` ([cli.md §2](../spec/cli.md#2-repository-config-mcpgpconfigyaml)):
 
 ```yaml
-cli: 0.1.0                         # the exact CLI version; another version refuses to run (exit 5)
+cli: 0.2.0                         # the exact CLI version; another version refuses to run (exit 5)
 workspace: workspace
 servers:                           # what --all works on
   - servers/orders/orders.mcpgp.yaml
@@ -61,7 +61,7 @@ change spec or rules ─► pull request ─► CI: validate · build · test �
    change without being accepted with `mcpgp names accept`.
 3. `mcpgp test --all`: starts each server against a mock made from its specs and runs `tools/list`
    plus the test cases in its `tests/` folder.
-4. **TODO (not in 0.1.0):** `mcpgp diff --all --against last-release --format md` as a PR comment
+4. **TODO (not yet):** `mcpgp diff --all --against last-release --format md` as a PR comment
    ("+3 tools, 1 removed, 12 descriptions changed"). Until then, reviewers read the definition
    changes and the build log.
 
@@ -134,7 +134,7 @@ The platform keeps the version, builds and signs it; `--verify-local` fails the 
 differs from what CI tested. Add `--release` to release it as well. Only the files the definition
 uses are sent ([cli.md §3.3](../spec/cli.md#33-push)).
 
-### 6.2 Git sources (TODO, not in 0.1.0)
+### 6.2 Git sources (TODO, not yet)
 
 Planned: link the repo on the platform as a **git source** (Sources page). Then the platform would
 show previews and builds for every branch and tag, and edits made in the web UI would become
