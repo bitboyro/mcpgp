@@ -45,7 +45,13 @@ API as everyone else; nothing it does is UI-only. On Overview, the server's sett
 see, what they may do, target servers, transports, confirmation, packs) can be changed on the page:
 the preview shows the result before anything is saved, Review shows the lines of the definition that
 change, and Save makes the next version. On Overview, **Notices on tool descriptions** adds company policy or disclaimers to every tool, a
-tag's tools, the tools that change data, or chosen tools; notices are never cut off. On Tools & rules,
+tag's tools, the tools that change data, or chosen tools; notices are never cut off. Text that every
+server should carry lives once in the **Shared library** under **Shared notices**: create a set there
+(**New shared notices**), add and change its notices (saved as the set's next version), and **Use
+version N on … servers** puts it on every server (or the ones you tick), or moves them to the new
+version; each changed server gets its next version. On a server's Overview the card lists the shared
+sets it uses (with **Use @N** when a newer version exists, and **Remove**), offers the others, and
+marks each shared notice with its set. On Tools & rules,
 **Try it** on a tool calls it against a mock of the API (made from the spec's examples; nothing
 reaches a real system) and shows what the agent gets back and the HTTP request the server sent;
 extensions are left out there (`mcpgp test` runs them). **Edit title and descriptions** on a tool changes its title, description and parameter descriptions

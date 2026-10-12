@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import ro.bitboy.mcpgp.core.Compiler;
 import ro.bitboy.mcpgp.core.diag.Diagnostic;
+import ro.bitboy.mcpgp.core.resolve.Workspace;
 import ro.bitboy.mcpgp.schemas.Schemas;
 
 import java.nio.file.Files;
@@ -110,5 +111,93 @@ class DescriptionsTest {
                 .allSatisfy(t -> assertThat(t.path("description").asText()).contains("Company policy"));
         assertThat(tools.get("notes_note_create").at("/provenance/description").findValuesAsText("step")).contains("notice");
         assertThat(result.diagnostics()).filteredOn(d -> d.code().equals("NOTICE_MATCHES_NOTHING")).hasSize(1);
+    }
+
+    @Test
+    void sharedNoticesComeFromTheLibraryAndAServerCanReplaceOne() throws Exception {
+        Path workspace = dir.resolve("workspace");
+        Files.createDirectories(workspace.resolve("notices"));
+        Files.writeString(workspace.resolve("mcpgp-workspace.yaml"), """
+                workspace: acme
+                notices: { company-policy: notices/company-policy.yaml }
+                """);
+        Files.writeString(workspace.resolve("notices/company-policy.yaml"), """
+                title: Acme policy
+                notices:
+                  - id: data-policy
+                    text: "Company policy: customer data stays in the EU."
+                  - id: writes
+                    text: "Changes need a ticket number."
+                    match: { method: [POST, PUT, PATCH, DELETE] }
+                """);
+        String own = """
+                descriptions:
+                  include: mcpgp://acme/notices/company-policy@1
+                  notices:
+                    - id: writes
+                      text: "Changes need an approved change request."
+                      match: { method: [POST] }
+                    - text: "Notes are kept for a year."
+                """;
+        Compiler.Result result = compileIn(workspace, own);
+        Map<String, JsonNode> tools = tools(result);
+        String create = tools.get("notes_note_create").path("description").asText();
+        assertThat(create).isEqualTo("Creates a note.\n\nCompany policy: customer data stays in the EU.\n\n"
+                + "Changes need an approved change request.\n\nNotes are kept for a year.");
+        assertThat(tools.get("notes_note_list").path("description").asText()).doesNotContain("change request")
+                .endsWith("Company policy: customer data stays in the EU.\n\nNotes are kept for a year.");
+        // where each one came from: the shared one names its item, the replaced one is the server's own
+        JsonNode steps = tools.get("notes_note_create").at("/provenance/description");
+        assertThat(steps.findValues("from")).extracting(JsonNode::asText).containsExactly("mcpgp://acme/notices/company-policy@1");
+        assertThat(result.manifest().get().toString()).doesNotContain("\"include\"");
+    }
+
+    @Test
+    void aSetCanBeAFileOfTheProjectAndMustBeValid() throws Exception {
+        Path project = dir.resolve("project");
+        Files.createDirectories(project.resolve("policy"));
+        Files.writeString(project.resolve("policy/notices.yaml"), "notices:\n  - id: eu\n    text: Data stays in the EU.\n");
+        Compiler.Result result = compileAt(project, Workspace.none(), "descriptions: { include: [policy/notices.yaml] }");
+        assertThat(tools(result).get("notes_note_list").path("description").asText()).endsWith("Data stays in the EU.");
+
+        Files.writeString(project.resolve("policy/notices.yaml"), "notices:\n  - text: no id\n");
+        Compiler.Result invalid = compileAt(project, Workspace.none(), "descriptions: { include: [policy/notices.yaml] }");
+        assertThat(invalid.diagnostics()).anyMatch(d -> d.code().equals(ro.bitboy.mcpgp.core.diag.Codes.NOTICES_INVALID));
+    }
+
+    Compiler.Result compileIn(Path workspace, String extra) throws Exception {
+        ro.bitboy.mcpgp.core.diag.Diagnostics diagnostics = new ro.bitboy.mcpgp.core.diag.Diagnostics();
+        Workspace ws = Workspace.load(workspace.resolve("mcpgp-workspace.yaml"), new Schemas(), diagnostics);
+        assertThat(diagnostics.all()).isEmpty();
+        Path project = dir.resolve("p" + System.nanoTime());
+        Files.createDirectories(project);
+        return compileAt(project, ws, extra);
+    }
+
+    Compiler.Result compileAt(Path project, Workspace workspace, String extra) throws Exception {
+        Files.writeString(project.resolve("notes.yaml"), """
+                openapi: 3.0.3
+                info: { title: Notes, version: "1.0" }
+                paths:
+                  /notes:
+                    get:
+                      operationId: listNotes
+                      summary: List notes
+                      description: Lists the notes.
+                      responses: { "200": { description: ok } }
+                    post:
+                      operationId: createNote
+                      summary: Create note
+                      description: Creates a note.
+                      responses: { "201": { description: ok } }
+                """);
+        Files.writeString(project.resolve("notes.mcpgp.yaml"), """
+                apiVersion: mcpgp/v1
+                kind: McpServer
+                metadata: { name: notes-mcp }
+                apis: [ { id: notes, contracts: [ { version: "1.0", spec: notes.yaml } ] } ]
+                %s
+                """.formatted(extra));
+        return new Compiler(new Schemas()).compile(project.resolve("notes.mcpgp.yaml"), new Compiler.Options(workspace, false));
     }
 }

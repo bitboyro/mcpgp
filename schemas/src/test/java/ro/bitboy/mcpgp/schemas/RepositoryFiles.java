@@ -52,6 +52,9 @@ final class RepositoryFiles {
         if (relative.contains("/workspace/naming/") && name.endsWith(".yaml")) {
             return Classification.validate(SchemaKind.NAMING_POLICY);
         }
+        if (relative.contains("/workspace/notices/") && name.endsWith(".yaml")) {
+            return Classification.validate(SchemaKind.NOTICES);
+        }
         if (relative.endsWith("/.mcpgp/config.yaml")) {
             return Classification.validate(SchemaKind.CLI_CONFIG);
         }

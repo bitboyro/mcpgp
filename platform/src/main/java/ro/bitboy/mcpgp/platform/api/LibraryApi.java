@@ -29,11 +29,13 @@ public class LibraryApi {
 
     private final Store store;
     private final Library library;
+    private final ro.bitboy.mcpgp.platform.service.SharedNotices sharedNotices;
     private final PlatformConfig config;
 
-    public LibraryApi(Store store, Library library, PlatformConfig config) {
+    public LibraryApi(Store store, Library library, ro.bitboy.mcpgp.platform.service.SharedNotices sharedNotices, PlatformConfig config) {
         this.store = store;
         this.library = library;
+        this.sharedNotices = sharedNotices;
         this.config = config;
     }
 
@@ -61,15 +63,16 @@ public class LibraryApi {
         ServersApi.who(request).require("servers:read");
         Model.LibraryItem item = library.get(kind, name);
         Map<String, Object> answer = item(item);
-        if (kind.equals("naming")) {
-            // the policy as data (the editor on the Library page works from it) and who uses it
+        if (kind.equals("naming") || kind.equals("notices")) {
+            // the policy or the notices as data (the editors on the Library page work from it) and who uses it
             Model.Version files = store.version(item.latest().digest()).orElseThrow();
             answer.put("root", files.root());
+            String field = kind.equals("naming") ? "policy" : "set";
             try {
-                answer.put("policy", new com.fasterxml.jackson.databind.ObjectMapper(new com.fasterxml.jackson.dataformat.yaml.YAMLFactory())
+                answer.put(field, new com.fasterxml.jackson.databind.ObjectMapper(new com.fasterxml.jackson.dataformat.yaml.YAMLFactory())
                         .readTree(store.blob(files.files().get(files.root()))));
             } catch (java.io.IOException e) {
-                answer.put("policy", null);
+                answer.put(field, null);
             }
             answer.put("usedBy", library.usedBy(kind, name, config.workspace()));
         }
@@ -109,6 +112,35 @@ public class LibraryApi {
             return Json.ok(Map.of("base", base, "text", edit.text(), "problems", edit.problems(), "usedBy", library.usedBy(kind, name, config.workspace())));
         }
         return Json.status(201, item(library.saveEdit(kind, name, base, changes, json.path("message").asText(null), who)));
+    }
+
+    /**
+     * Shared notices on servers: {@code {servers?: [id], version?: n, message?}}. Adds the item to each
+     * server's {@code descriptions.include} (every server that isn't archived when {@code servers} is
+     * left out), or moves the servers that include it to {@code version} (default: the latest). Each
+     * changed server gets its next version; the answer says what happened to each one.
+     */
+    @PostMapping("/{kind}/{name}/apply")
+    public ResponseEntity<byte[]> apply(HttpServletRequest request, @PathVariable String kind, @PathVariable String name,
+                                        @RequestBody(required = false) byte[] body) {
+        Access.Principal who = ServersApi.who(request);
+        who.require("servers:write");
+        if (!kind.equals("notices")) {
+            throw ApiException.validation("only shared notices are applied to servers; servers reference other kinds in their definition");
+        }
+        com.fasterxml.jackson.databind.JsonNode json = Json.parse(body);
+        List<String> servers = null;
+        if (json.has("servers")) {
+            if (!json.path("servers").isArray()) {
+                throw ApiException.validation("servers: a list of server ids");
+            }
+            servers = new ArrayList<>();
+            for (com.fasterxml.jackson.databind.JsonNode id : json.path("servers")) {
+                servers.add(id.asText());
+            }
+        }
+        Integer version = json.hasNonNull("version") ? Integer.valueOf(json.path("version").asInt()) : null;
+        return Json.ok(Map.of("results", sharedNotices.apply(name, servers, version, json.path("message").asText(null), who)));
     }
 
     @GetMapping("/{kind}/{name}/versions/{version}/files/{*path}")

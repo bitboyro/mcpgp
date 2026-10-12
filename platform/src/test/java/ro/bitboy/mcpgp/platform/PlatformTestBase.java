@@ -58,6 +58,9 @@ abstract class PlatformTestBase {
                 JSON.writeValueAsBytes(Map.of("files", Map.of("acme-standard.yaml", "source: operationId\n"))))).statusCode()).isEqualTo(201);
         assertThat(send(bearer("POST", "/api/v1/library/naming/acme-standard/versions", JSON.writeValueAsBytes(Map.of("files",
                 Map.of("acme-standard.yaml", Files.readString(EXAMPLES.resolve("workspace/naming/acme-standard.yaml"))))))).statusCode()).isEqualTo(201);
+        // the shared notices orders-mcp includes (mcpgp://acme/notices/acme-policy@1)
+        assertThat(send(bearer("POST", "/api/v1/library/notices?name=acme-policy&title=Acme%20policy", JSON.writeValueAsBytes(Map.of("files",
+                Map.of("acme-policy.yaml", Files.readString(EXAMPLES.resolve("workspace/notices/acme-policy.yaml"))))))).statusCode()).isEqualTo(201);
         assertThat(send(bearer("POST", "/api/v1/servers?id=orders-mcp", project(EXAMPLES.resolve("orders")))).statusCode()).isEqualTo(201);
     }
 

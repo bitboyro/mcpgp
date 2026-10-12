@@ -675,8 +675,12 @@ public final class ManifestWriter {
                 }
                 matched++;
                 (prepend ? before : after).computeIfAbsent(tool, t -> new ArrayList<>()).add(text);
-                provenanceSteps(tool, "description").addObject().put("step", "notice").put("value", text)
+                ObjectNode step = provenanceSteps(tool, "description").addObject().put("step", "notice").put("value", text)
                         .put("file", at.file()).put("pointer", at.pointer());
+                String from = notice.hasNonNull("id") ? definition.noticeSources().get(notice.get("id").asText()) : null;
+                if (from != null) {
+                    step.put("from", from);
+                }
             }
             if (matched == 0) {
                 diagnostics.warning(Codes.NOTICE_MATCHES_NOTHING, "Notice applies to no tool", at);

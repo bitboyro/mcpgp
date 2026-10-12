@@ -203,6 +203,41 @@ descriptions:
 - They show in a tool's provenance as `notice` steps; `NOTICE_MATCHES_NOTHING` warns about a notice
   that selects no tool. A variant inherits its parent's notices (merged by `id`).
 
+**Shared notices.** Text that many servers carry (a company policy) lives once, in a set of notices:
+a library item of kind `notices` on the platform, a file mapped under `notices:` in
+`mcpgp-workspace.yaml` for the CLI ([notices.schema.json](../../schemas/src/main/resources/schemas/notices.schema.json)):
+
+```yaml
+# mcpgp://acme/notices/company-policy@2
+title: Company policy
+notices:
+  - id: data-policy                     # required in a set
+    text: "Company policy: customer data stays in the EU."
+  - id: writes
+    text: "Changes need a ticket number in the reason."
+    match: { method: [POST, PUT, PATCH, DELETE] }
+```
+
+A definition includes sets with `descriptions.include` (one reference or a list; a file of the
+project works too):
+
+```yaml
+descriptions:
+  include: [mcpgp://acme/notices/company-policy@2]
+  notices:
+    - id: writes                        # replaces the set's notice with this id, in its place
+      text: "Changes need an approved change request."
+      match: { method: [POST, PUT, PATCH, DELETE] }
+```
+
+- The sets' notices come first, in the order of `include` (a later set's notice replaces an earlier
+  one with the same id), then the definition's own notices.
+- Pin a version (`@2`) to keep builds reproducible; a new version of the set reaches the server when
+  its definition moves to it (the platform does that for many servers at once, platform-api.md §2.3).
+- A shared notice's provenance step names its set (`from: mcpgp://acme/notices/company-policy@2`);
+  `mcpgp explain` shows it. A set that doesn't match its schema fails with `NOTICES_INVALID`.
+- A variant gets the notices of the definition it extends, shared ones included.
+
 ## 6. Variants
 
 ```yaml
@@ -230,7 +265,7 @@ build: { targets: [mcpb] }
 | Root restriction | No path may resolve outside the project root (`..` escapes, absolute paths and symlinks out are errors). |
 | Remote references | Off by default; allowed only for hosts in the workspace allowlist. |
 | Cycles | Detected; the error lists the full chain. |
-| Workspace references | `mcpgp://<workspace>/<kind>/<name>@<version>` (kinds: `servers`, `contracts`, `naming`, `rules`, `packs`, `templates`) resolve to the shared library. The CLI maps them to local files with `--workspace <dir>`, using `<dir>/mcpgp-workspace.yaml`. They are the only way to reuse files from outside the project. |
+| Workspace references | `mcpgp://<workspace>/<kind>/<name>@<version>` (kinds: `servers`, `contracts`, `naming`, `rules`, `notices`, `packs`, `templates`) resolve to the shared library. The CLI maps them to local files with `--workspace <dir>`, using `<dir>/mcpgp-workspace.yaml`. They are the only way to reuse files from outside the project. |
 | Maps | Deep-merged; later wins. `null` removes an inherited key (e.g. `packs: { jira: null }` in a variant). |
 | Lists of objects with a key | **Merged item by item**, matched on the key: `apis` and `instances` by `id`, `contracts` by `version`. An item present only in the later file is added; `$remove: true` removes the inherited item (e.g. `- { version: "1.0", $remove: true }`). |
 | Other lists | `overrides.rules` and `include`d rule files **append**; every other list **replaces**. Override with `$merge: append \| replace`. |
@@ -272,6 +307,7 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 | `OPERATION_EXCLUDED` | info | an operation becomes no tool, with the reason (access, include/exclude, deprecated, hidden) |
 | `RULE_MATCHES_NOTHING` | warning | a rule matches no tool |
 | `NOTICE_MATCHES_NOTHING` | warning | a notice (`descriptions.notices`) applies to no tool |
+| `NOTICES_INVALID` | error | a set of shared notices (`descriptions.include`) doesn't match its schema |
 | `CONTENT_TYPE_UNKNOWN` | error | a rule binds a content type the operation doesn't accept |
 | `RESOURCE_NOT_GET` | error | `expose: resource` on an operation that isn't a `GET` (tools-contract §14.1) |
 | `PROMPT_UNKNOWN_ARGUMENT` | error | a prompt message uses `{{name}}` for an argument the prompt doesn't declare (tools-contract §14.2) |

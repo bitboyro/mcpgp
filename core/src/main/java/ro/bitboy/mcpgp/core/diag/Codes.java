@@ -16,6 +16,7 @@ public final class Codes {
     public static final String DEFINITION_INVALID = "DEFINITION_INVALID";
     public static final String RULES_INVALID = "RULES_INVALID";
     public static final String NAMING_POLICY_INVALID = "NAMING_POLICY_INVALID";
+    public static final String NOTICES_INVALID = "NOTICES_INVALID";
     public static final String WORKSPACE_INVALID = "WORKSPACE_INVALID";
 
     // merging and structure

@@ -224,6 +224,11 @@ public class PlatformServer {
     }
 
     @Bean
+    ro.bitboy.mcpgp.platform.service.SharedNotices sharedNotices(Store store, Library library, Edits edits, PlatformConfig config) {
+        return new ro.bitboy.mcpgp.platform.service.SharedNotices(store, library, edits, config.workspace());
+    }
+
+    @Bean
     Accounts accounts(Store store, Access access, PlatformConfig config) {
         ro.bitboy.mcpgp.platform.service.Directory directory = config.ldap() == null ? null
                 : new ro.bitboy.mcpgp.platform.service.Directory(config.ldap(), System.getenv());

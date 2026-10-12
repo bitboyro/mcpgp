@@ -79,8 +79,8 @@ On a test installation (it creates a server named `smoke-orders-mcp`), from the 
 python3 deploy/smoke-test.py http://127.0.0.1:8443 admin deploy/secrets/admin_password
 ```
 
-It checks health, signs in, adds the example naming policy and server, builds it and tries a tool
-against the mock. Without a signing key (step 6) the build fails, because the example asks for
+It checks health, signs in, adds the example naming policy, shared notices and server, builds it,
+tries a tool against the mock, and checks that the shared notices reach the tools. Without a signing key (step 6) the build fails, because the example asks for
 signed packages; that's expected until step 6.
 
 ## 5. Put it behind TLS

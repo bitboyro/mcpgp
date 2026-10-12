@@ -46,6 +46,9 @@ naming:
 overrides:
   include: overrides/*.yaml                    # 00-global, 10-customers, 20-orders
 
+descriptions:
+  include: mcpgp://acme/notices/acme-policy@1    # company policy text on every tool (shared library)
+
 exposure:
   mode: hybrid
   pinned: [orders_customer_list, orders_customer_get, orders_order_search, orders_order_refund]

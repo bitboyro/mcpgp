@@ -54,7 +54,7 @@
     "cli": "0.1.0",
     "createdAt": "2026-10-09T10:40:00Z",
     "definition": {
-      "digest": "sha256:1ac717676b7c51e0ffa47ad10a874a680fc1b69782f98a5db0dc8bc329352ec6",
+      "digest": "sha256:35b397c1b55f4519b4589ffc10d75ac36dbfa32f1c4090764b0ed5daec23f94b",
       "name": "orders-mcp",
       "source": "git+https://git.example.com/integration/mcp-defs.git#9c41e7a"
     },
@@ -403,7 +403,7 @@
         "readOnlyHint": false
       },
       "confirm": false,
-      "description": "Calls a tool found with search_tools. The same validation, confirmation and auth apply as for a directly listed tool.",
+      "description": "Calls a tool found with search_tools. The same validation, confirmation and auth apply as for a directly listed tool.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "handler": "call_tool",
       "inputSchema": {
         "additionalProperties": false,
@@ -432,6 +432,17 @@
       },
       "kind": "builtin",
       "name": "call_tool",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "Call tool"
     },
@@ -443,7 +454,7 @@
         "readOnlyHint": true
       },
       "confirm": false,
-      "description": "Returns a tool's full definition: description, input schema and annotations.",
+      "description": "Returns a tool's full definition: description, input schema and annotations.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "handler": "describe_tool",
       "inputSchema": {
         "additionalProperties": false,
@@ -467,6 +478,17 @@
       },
       "kind": "builtin",
       "name": "describe_tool",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "Describe tool"
     },
@@ -478,7 +500,7 @@
         "readOnlyHint": true
       },
       "confirm": false,
-      "description": "Lists the configured Example Orders API servers (instances) with their contract version, access and status. Use an instance's name as the `instance` argument of the other tools.",
+      "description": "Lists the configured Example Orders API servers (instances) with their contract version, access and status. Use an instance's name as the `instance` argument of the other tools.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "handler": "instances_list",
       "inputSchema": {
         "additionalProperties": false,
@@ -487,6 +509,17 @@
       },
       "kind": "builtin",
       "name": "instances_list",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "List instances"
     },
@@ -499,7 +532,7 @@
       },
       "api": "orders",
       "confirm": false,
-      "description": "List accounts Results are paged; use limit and cursor.",
+      "description": "List accounts Results are paged; use limit and cursor.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -539,6 +572,13 @@
             "pointer": "/rules/1",
             "step": "rule",
             "value": "List accounts Results are paged; use limit and cursor."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
           }
         ],
         "name": [
@@ -652,7 +692,7 @@
         "readOnlyHint": true
       },
       "confirm": false,
-      "description": "Lists audit events of this server, newest first, optionally filtered by tool, instance, outcome and time. Paged.",
+      "description": "Lists audit events of this server, newest first, optionally filtered by tool, instance, outcome and time. Paged.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -696,6 +736,17 @@
       "kind": "pack",
       "name": "orders_audit_list",
       "pack": "audit",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "List audit events"
     },
@@ -707,7 +758,7 @@
         "readOnlyHint": true
       },
       "confirm": false,
-      "description": "Checks that the instance is reachable and that its sign-in works, and explains what failed.",
+      "description": "Checks that the instance is reachable and that its sign-in works, and explains what failed.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -726,6 +777,17 @@
       "kind": "pack",
       "name": "orders_connectivity_check",
       "pack": "diagnostics",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "Check connectivity"
     },
@@ -738,7 +800,7 @@
       },
       "api": "orders",
       "confirm": false,
-      "description": "Customer contacts Results are paged; use limit and cursor.",
+      "description": "Customer contacts Results are paged; use limit and cursor.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -792,6 +854,13 @@
             "pointer": "/rules/1",
             "step": "rule",
             "value": "Customer contacts Results are paged; use limit and cursor."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
           }
         ],
         "name": [
@@ -901,7 +970,7 @@
       },
       "api": "orders",
       "confirm": false,
-      "description": "[Orders] Creates a customer in the given account and returns it with its new id. The account must exist; call orders_account_list first.",
+      "description": "[Orders] Creates a customer in the given account and returns it with its new id. The account must exist; call orders_account_list first.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.\n\nChanges are audited. Give the ticket number in the reason when there is a field for it.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -969,6 +1038,20 @@
             "pointer": "/rules/1",
             "step": "rule",
             "value": "[Orders] Creates a customer in the given account and returns it with its new id. The account must exist; call orders_account_list first."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/1",
+            "step": "notice",
+            "value": "Changes are audited. Give the ticket number in the reason when there is a field for it."
           }
         ],
         "name": [
@@ -1121,7 +1204,7 @@
       },
       "api": "orders",
       "confirm": false,
-      "description": "[Orders] Creates a customer in the given account and returns it with its new id. The account must exist; call orders_account_list first.",
+      "description": "[Orders] Creates a customer in the given account and returns it with its new id. The account must exist; call orders_account_list first.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.\n\nChanges are audited. Give the ticket number in the reason when there is a field for it.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1238,6 +1321,20 @@
             "pointer": "/rules/1",
             "step": "rule",
             "value": "[Orders] Creates a customer in the given account and returns it with its new id. The account must exist; call orders_account_list first."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/1",
+            "step": "notice",
+            "value": "Changes are audited. Give the ticket number in the reason when there is a field for it."
           }
         ],
         "name": [
@@ -1384,7 +1481,7 @@
       },
       "api": "orders",
       "confirm": false,
-      "description": "[Orders] Gets one customer by id.",
+      "description": "[Orders] Gets one customer by id.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1457,6 +1554,13 @@
             "pointer": "/rules/0",
             "step": "rule",
             "value": "[Orders] Gets one customer by id."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
           }
         ],
         "name": [
@@ -1621,7 +1725,7 @@
       },
       "api": "orders",
       "confirm": false,
-      "description": "[Orders] Lists customers in an account, newest first. Results are paged; use limit and cursor.",
+      "description": "[Orders] Lists customers in an account, newest first. Results are paged; use limit and cursor.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1695,6 +1799,13 @@
             "pointer": "/rules/0",
             "step": "rule",
             "value": "[Orders] Lists customers in an account, newest first. Results are paged; use limit and cursor."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
           }
         ],
         "name": [
@@ -1891,7 +2002,7 @@
       },
       "api": "orders",
       "confirm": false,
-      "description": "[Orders] Update customer",
+      "description": "[Orders] Update customer\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.\n\nChanges are audited. Give the ticket number in the reason when there is a field for it.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1967,6 +2078,20 @@
             "pointer": "/rules/0",
             "step": "rule",
             "value": "[Orders] Update customer"
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/1",
+            "step": "notice",
+            "value": "Changes are audited. Give the ticket number in the reason when there is a field for it."
           }
         ],
         "name": [
@@ -2126,7 +2251,7 @@
         "readOnlyHint": true
       },
       "confirm": false,
-      "description": "Explains where a tool's name, title and description come from (contract, rules, lock file).",
+      "description": "Explains where a tool's name, title and description come from (contract, rules, lock file).\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -2143,6 +2268,17 @@
       "kind": "pack",
       "name": "orders_explain_tool",
       "pack": "introspection",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "Explain tool"
     },
@@ -2155,7 +2291,7 @@
       },
       "api": "orders",
       "confirm": false,
-      "description": "Download invoice PDF",
+      "description": "Download invoice PDF\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -2202,6 +2338,13 @@
             "pointer": "/paths/~1invoices~1{id}~1document/get/summary",
             "step": "spec",
             "value": "Download invoice PDF"
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
           }
         ],
         "name": [
@@ -2302,7 +2445,7 @@
         "readOnlyHint": true
       },
       "confirm": false,
-      "description": "Returns this server's build information: version, contracts, exposure and enabled packs.",
+      "description": "Returns this server's build information: version, contracts, exposure and enabled packs.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": { },
@@ -2311,6 +2454,17 @@
       "kind": "pack",
       "name": "orders_manifest_info",
       "pack": "introspection",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "Manifest info"
     },
@@ -2323,7 +2477,7 @@
       },
       "api": "orders",
       "confirm": false,
-      "description": "[Orders] Refunds a paid order. Only paid orders can be refunded.",
+      "description": "[Orders] Refunds a paid order. Only paid orders can be refunded.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.\n\nChanges are audited. Give the ticket number in the reason when there is a field for it.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -2420,6 +2574,20 @@
             "pointer": "/rules/1",
             "step": "rule",
             "value": "[Orders] Refunds a paid order. Only paid orders can be refunded."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/1",
+            "step": "notice",
+            "value": "Changes are audited. Give the ticket number in the reason when there is a field for it."
           }
         ],
         "name": [
@@ -2617,7 +2785,7 @@
       },
       "api": "orders",
       "confirm": false,
-      "description": "[Orders] Search orders by customer, status and time range. Newest first.",
+      "description": "[Orders] Search orders by customer, status and time range. Newest first.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -2688,6 +2856,13 @@
             "pointer": "/rules/0",
             "step": "rule",
             "value": "[Orders] Search orders by customer, status and time range. Newest first."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
           }
         ],
         "name": [
@@ -2858,7 +3033,7 @@
       },
       "api": "orders",
       "confirm": false,
-      "description": "List overdue invoices Results are paged; use limit and cursor.",
+      "description": "List overdue invoices Results are paged; use limit and cursor.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -2898,6 +3073,13 @@
             "pointer": "/rules/1",
             "step": "rule",
             "value": "List overdue invoices Results are paged; use limit and cursor."
+          },
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
           }
         ],
         "name": [
@@ -2989,7 +3171,7 @@
         "readOnlyHint": true
       },
       "confirm": false,
-      "description": "Lists the calls captured in a recording. Paged.",
+      "description": "Lists the calls captured in a recording. Paged.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -3007,6 +3189,17 @@
       "kind": "pack",
       "name": "orders_recording_list",
       "pack": "recording",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "List recorded calls"
     },
@@ -3018,7 +3211,7 @@
         "readOnlyHint": true
       },
       "confirm": false,
-      "description": "Lists recording sessions, newest first. Paged.",
+      "description": "Lists recording sessions, newest first. Paged.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -3032,6 +3225,17 @@
       "kind": "pack",
       "name": "orders_recording_sessions",
       "pack": "recording",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "List recordings"
     },
@@ -3043,7 +3247,7 @@
         "readOnlyHint": false
       },
       "confirm": false,
-      "description": "Starts a named recording of upstream requests and responses (redacted) for this session.",
+      "description": "Starts a named recording of upstream requests and responses (redacted) for this session.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -3060,6 +3264,17 @@
       "kind": "pack",
       "name": "orders_recording_start",
       "pack": "recording",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "Start recording"
     },
@@ -3071,7 +3286,7 @@
         "readOnlyHint": false
       },
       "confirm": false,
-      "description": "Stops the current recording and stores its findings.",
+      "description": "Stops the current recording and stores its findings.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -3085,6 +3300,17 @@
       "kind": "pack",
       "name": "orders_recording_stop",
       "pack": "recording",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "Stop recording"
     },
@@ -3096,7 +3322,7 @@
         "readOnlyHint": true
       },
       "confirm": false,
-      "description": "Connects to the instance's host and returns its TLS certificate chain (PEM, subject, issuer, validity, SHA-256) with a warning when the hostname doesn't match. Read-only.",
+      "description": "Connects to the instance's host and returns its TLS certificate chain (PEM, subject, issuer, validity, SHA-256) with a warning when the hostname doesn't match. Read-only.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -3115,6 +3341,17 @@
       "kind": "pack",
       "name": "orders_tls_certificate_fetch",
       "pack": "diagnostics",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "Fetch TLS certificate"
     },
@@ -3126,7 +3363,7 @@
         "readOnlyHint": true
       },
       "confirm": false,
-      "description": "Finds tools by what they do. Returns one line per tool (name, title, summary, read-only), best matches first.",
+      "description": "Finds tools by what they do. Returns one line per tool (name, title, summary, read-only), best matches first.\n\nAcme policy: customer data stays inside the EU; don't copy it into other tools.",
       "handler": "search_tools",
       "inputSchema": {
         "additionalProperties": false,
@@ -3157,6 +3394,17 @@
       },
       "kind": "builtin",
       "name": "search_tools",
+      "provenance": {
+        "description": [
+          {
+            "file": "orders.mcpgp.yaml",
+            "from": "mcpgp://acme/notices/acme-policy@1",
+            "pointer": "/descriptions/notices/0",
+            "step": "notice",
+            "value": "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+          }
+        ]
+      },
       "sensitive": false,
       "title": "Search tools"
     }

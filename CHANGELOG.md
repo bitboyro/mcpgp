@@ -5,6 +5,15 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+### Added
+- Shared notices: company policy text written once and carried by many servers. A library item of
+  kind `notices` (`mcpgp://<workspace>/notices/<name>@<version>`; for the CLI, `notices:` in
+  `mcpgp-workspace.yaml`), included with `descriptions.include`; a server's own notice with the same
+  id replaces a shared one. Provenance and `mcpgp explain` name the set a notice comes from.
+- Platform: shared notices in the Shared library (create, edit, used by), and
+  `POST /library/notices/{name}/apply` to add a set to every server, or chosen ones, or move them to a
+  new version in one step; on a server's Overview, the sets it uses, with **Use @N** and **Remove**.
+
 ## 0.1.0 — 2026-10-11
 
 The first release: the compiler, the runtime and packaging, the CLI, and the self-hosted platform
