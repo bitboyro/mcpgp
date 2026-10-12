@@ -4,7 +4,7 @@
 package, and ship it to your customers. They run it on their own infrastructure, connected
 only to their own systems. It never calls back to the platform or to you.
 
-> Status: **0.2.2.** The compiler, the runtime and packaging, the CLI and the self-hosted platform
+> Status: **0.2.3.** The compiler, the runtime and packaging, the CLI and the self-hosted platform
 > with its web UI work end to end; formats may still change before 1.0. What's
 > next: [docs/process/roadmap.md](docs/process/roadmap.md).
 
