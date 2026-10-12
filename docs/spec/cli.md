@@ -14,7 +14,7 @@ pipelines run. The web UI and the REST API use the same compiler and packager.
 | `mcpgp-cli-<version>.jar` from the release | `java -jar mcpgp-cli-<version>.jar …` |
 | **TODO:** a single native binary | Without Java |
 
-Pin the version in the repo: `.mcpgp/config.yaml` → `cli: 0.2.3`. The CLI refuses to run with a
+Pin the version in the repo: `.mcpgp/config.yaml` → `cli: 0.2.4`. The CLI refuses to run with a
 different version (exit code 5) unless `--ignore-version` is given. Help (`--help`, `-h`) and
 `--version` always work.
 
@@ -25,7 +25,7 @@ with `--config`. Paths in it are relative to the repository root (the folder hol
 is checked against `schemas/cli-config.schema.json`.
 
 ```yaml
-cli: 0.2.3                     # exact CLI version this repo is built with
+cli: 0.2.4                     # exact CLI version this repo is built with
 workspace: workspace           # local folder for mcpgp:// references (default for --workspace)
 servers:                       # definitions in this repo
   - servers/orders/orders.mcpgp.yaml

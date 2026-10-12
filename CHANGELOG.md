@@ -5,6 +5,8 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+## 0.2.4 — 2026-10-12
+
 ### Added
 - Operations: filter by method (several at once) and by resource (the path's first named segment, e.g.
   `/partners`); "Turn off these" acts on what the filters show.
