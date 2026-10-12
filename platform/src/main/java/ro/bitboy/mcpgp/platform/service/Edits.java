@@ -38,6 +38,11 @@ public final class Edits {
     }
 
     public Result preview(String id, int base, List<YamlEdit.Change> changes) {
+        return preview(id, base, changes, Map.of());
+    }
+
+    /** An edit that also adds or replaces files of the project (e.g. a new contract's spec). */
+    public Result preview(String id, int base, List<YamlEdit.Change> changes, Map<String, byte[]> added) {
         if (changes == null || changes.isEmpty()) {
             throw ApiException.validation("changes: at least one");
         }
@@ -54,6 +59,7 @@ public final class Edits {
         String edited = YamlEdit.apply(root, changes);
         Map<String, byte[]> contents = new TreeMap<>();
         files.files().forEach((path, blob) -> contents.put(path, store.blob(blob)));
+        contents.putAll(added);
         contents.put(files.root(), edited.getBytes(StandardCharsets.UTF_8));
         // stored by content, like an upload; only a save makes it a version of the server
         Model.Version version = projects.store(contents);
@@ -62,7 +68,11 @@ public final class Edits {
 
     /** Saves the edit as the server's next version; refused when it doesn't compile. */
     public Model.Server save(String id, int base, List<YamlEdit.Change> changes, String message, Access.Principal who) {
-        Result result = preview(id, base, changes);
+        return save(id, base, changes, Map.of(), message, who);
+    }
+
+    public Model.Server save(String id, int base, List<YamlEdit.Change> changes, Map<String, byte[]> added, String message, Access.Principal who) {
+        Result result = preview(id, base, changes, added);
         if (!result.compiles()) {
             throw new ApiException(422, "VALIDATION", "with these changes the definition doesn't compile",
                     Map.of("diagnostics", ro.bitboy.mcpgp.platform.api.ServersApi.diagnostics(result.preview().result().diagnostics())));

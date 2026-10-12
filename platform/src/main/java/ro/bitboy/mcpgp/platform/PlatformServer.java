@@ -239,6 +239,11 @@ public class PlatformServer {
     }
 
     @Bean
+    ro.bitboy.mcpgp.platform.service.FromSpec fromSpec(Store store, Servers servers, Edits edits) {
+        return new ro.bitboy.mcpgp.platform.service.FromSpec(store, servers, edits);
+    }
+
+    @Bean
     Library library(Store store) {
         return new Library(store);
     }

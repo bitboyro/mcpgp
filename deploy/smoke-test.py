@@ -55,6 +55,12 @@ files = {p.relative_to(examples / "orders").as_posix(): p.read_text() for p in s
 status, server = call("POST", "/api/v1/servers?id=smoke-orders-mcp", {"files": files}, token)
 check("server smoke-orders-mcp", status == 201, "" if status == 201 else json.dumps(server))
 
+spec = (examples / "orders/contracts/orders-1.0.json").read_text()
+status, plan = call("POST", "/api/v1/servers/from-spec?dryRun=true&id=smoke-from-spec", {"files": {"orders-1.0.json": spec}}, token)
+check("a server from a Swagger JSON (dry run)", status == 200 and plan.get("tools", 0) > 0, f'{plan.get("format")}, {plan.get("tools")} tools' if status == 200 else json.dumps(plan))
+status, created = call("POST", "/api/v1/servers/from-spec?id=smoke-from-spec", {"files": {"orders-1.0.json": spec}}, token)
+check("server smoke-from-spec from the spec", status in (201, 409), "" if status in (201, 409) else json.dumps(created))
+
 status, build = call("POST", "/api/v1/servers/smoke-orders-mcp/builds", {}, token)
 check("build started", status == 202, "" if status == 202 else json.dumps(build))
 for _ in range(90):
@@ -72,4 +78,4 @@ check("try orders_customer_list against the mock", status == 200 and "error" not
 status, manifest = call("GET", "/api/v1/servers/smoke-orders-mcp/versions/latest/manifest", None, token)
 policy = [t["name"] for t in manifest.get("tools", []) if "Acme policy:" in t.get("description", "")] if status == 200 else []
 check("shared notices on the tools", len(policy) > 0, f"{len(policy)} tools carry the Acme policy")
-print("All checks passed. To clean up, archive smoke-orders-mcp (its page in the web UI, or POST /api/v1/servers/smoke-orders-mcp/archive).")
+print("All checks passed. To clean up, archive smoke-orders-mcp and smoke-from-spec (their pages in the web UI, or POST /api/v1/servers/<id>/archive).")
