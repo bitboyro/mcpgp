@@ -5,6 +5,8 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+## 0.2.2 — 2026-10-12
+
 ### Fixed
 - Specs whose schemas are recursive across files (a criteria tree whose children are criteria, a
   certificate whose parent is a certificate) failed with `REFERENCE_CYCLE`. Such a schema now becomes
