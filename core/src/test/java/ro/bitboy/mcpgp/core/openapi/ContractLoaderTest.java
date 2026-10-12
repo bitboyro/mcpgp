@@ -155,6 +155,88 @@ class ContractLoaderTest {
     }
 
     @Test
+    void recursiveSchemasAcrossFilesBecomeSharedSchemas() throws IOException {
+        Path root = Files.createDirectories(temp.resolve("r"));
+        Files.createDirectories(root.resolve("schemas/criteria"));
+        Files.createDirectories(root.resolve("schemas/certificates"));
+        // a tree through two files, as a oneOf
+        Files.writeString(root.resolve("schemas/criteria/criteria-bean.json"), """
+                { "oneOf": [ { "$ref": "metadata-condition.json" }, { "$ref": "conjunctor.json" } ] }
+                """);
+        Files.writeString(root.resolve("schemas/criteria/metadata-condition.json"), """
+                { "type": "object", "properties": { "key": { "type": "string" } } }
+                """);
+        Files.writeString(root.resolve("schemas/criteria/conjunctor.json"), """
+                { "type": "object", "properties": { "children": { "type": "array", "items": { "$ref": "criteria-bean.json" } } } }
+                """);
+        // a chain: the file refers to itself, by name and by "#"
+        Files.writeString(root.resolve("schemas/certificates/complete-tls-certificate.json"), """
+                { "type": "object", "properties": { "parent": { "$ref": "complete-tls-certificate.json" },
+                  "issuer": { "$ref": "#" } } }
+                """);
+        Path spec = Files.writeString(root.resolve("spec.yaml"), """
+                openapi: 3.0.3
+                info: { title: t, version: "1" }
+                paths:
+                  /search:
+                    post:
+                      requestBody:
+                        content:
+                          application/json:
+                            schema: { $ref: '#/components/schemas/Criteria' }
+                      responses:
+                        "200":
+                          description: ok
+                          content:
+                            application/json:
+                              schema: { $ref: 'schemas/certificates/complete-tls-certificate.json' }
+                components:
+                  schemas:
+                    Criteria: { $ref: 'schemas/criteria/criteria-bean.json' }
+                """);
+        Contract c = load(root, "1", spec, List.of());
+        assertThat(diagnostics.errors()).isEmpty();
+
+        // the entry that points to the file keeps its name; the other gets its file's
+        assertThat(c.schemas().get("Criteria").at("/oneOf/1/properties/children/items/$ref").asText())
+                .isEqualTo("#/components/schemas/Criteria");
+        assertThat(c.schemas().get("Criteria").at("/oneOf/0/properties/key/type").asText()).isEqualTo("string");
+        var certificate = c.schemas().get("CompleteTlsCertificate");
+        assertThat(certificate.at("/properties/parent/$ref").asText()).isEqualTo("#/components/schemas/CompleteTlsCertificate");
+        assertThat(certificate.at("/properties/issuer/$ref").asText()).isEqualTo("#/components/schemas/CompleteTlsCertificate");
+        assertThat(op(c, "orders:POST:/search").responses().get(0).content().get(0).schema().path("$ref").asText())
+                .isEqualTo("#/components/schemas/CompleteTlsCertificate");
+        // and the tool's schema is self-contained, with the recursive part in $defs
+        var shaped = new ro.bitboy.mcpgp.core.schema.SchemaShaper(c.schemas(), c.format())
+                .selfContained(op(c, "orders:POST:/search").requestBody().content().get(0).schema(), ro.bitboy.mcpgp.core.schema.SchemaShaper.Direction.INPUT);
+        assertThat(shaped.toString()).contains("#/$defs/Criteria").doesNotContain("components");
+        assertThat(shaped.has("$defs")).isTrue();
+    }
+
+    @Test
+    void recursiveSchemasAcrossFilesInSwagger20() throws IOException {
+        Path root = Files.createDirectories(temp.resolve("s"));
+        Files.writeString(root.resolve("node.yaml"), """
+                type: object
+                properties:
+                  next: { $ref: 'node.yaml' }
+                """);
+        Path spec = Files.writeString(root.resolve("spec.yaml"), """
+                swagger: "2.0"
+                info: { title: t, version: "1" }
+                paths:
+                  /nodes:
+                    get:
+                      responses:
+                        "200": { description: ok, schema: { $ref: 'node.yaml' } }
+                """);
+        Contract c = load(root, "1", spec, List.of());
+        assertThat(c.schemas().get("Node").at("/properties/next/$ref").asText()).isEqualTo("#/components/schemas/Node");
+        assertThat(op(c, "orders:GET:/nodes").responses().get(0).content().get(0).schema().path("$ref").asText())
+                .isEqualTo("#/components/schemas/Node");
+    }
+
+    @Test
     void openApi32IsNotSupportedYet() throws IOException {
         Path spec = Files.writeString(temp.resolve("s.yaml"), "openapi: 3.2.0\ninfo: { title: t, version: '1' }\npaths: {}\n");
         var result = new ContractLoader(temp, temp).load(new ContractKey("a", "1"), new ContractFiles(spec, List.of()), diagnostics);
