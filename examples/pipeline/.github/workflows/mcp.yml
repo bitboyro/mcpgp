@@ -12,7 +12,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: docker.io/example/mcpgp-cli:0.2.2    # the CLI image; pin by digest in real use: @sha256:…
+      image: docker.io/example/mcpgp-cli:0.2.3    # the CLI image; pin by digest in real use: @sha256:…
     env:
       MCPGP_SIGNING_KEY: "${{ secrets.MCPGP_SIGNING_KEY }}"   # the definitions ask for signed packages
     steps:

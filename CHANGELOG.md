@@ -5,6 +5,8 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+## 0.2.3 — 2026-10-12
+
 ### Fixed
 - Specs with schemas in separate files that refer to each other compiled in exponential time: a
   140-operation spec took minutes, and every page of its server with it. Schemas in other files are

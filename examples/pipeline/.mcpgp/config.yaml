@@ -1,4 +1,4 @@
-cli: 0.2.2                    # the exact CLI version this repository is built with
+cli: 0.2.3                    # the exact CLI version this repository is built with
 workspace: ../platform/workspace
 servers:                      # what --all builds; here the example servers next to this folder
   - ../platform/orders/orders.mcpgp.yaml
