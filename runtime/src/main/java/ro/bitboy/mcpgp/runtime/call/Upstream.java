@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,15 +52,54 @@ final class Upstream {
         this.tokens = new OAuthTokens(redactor, Clock.systemUTC());
     }
 
+    /** The credential a call uses: an entry of the instance's {@code auth}, and for fromRequest the value the client sent. */
+    record Credential(JsonNode entry, String value) {
+        String type() {
+            return entry.path("type").asText("none");
+        }
+    }
+
+    private static final Credential NONE = new Credential(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("type", "none"), null);
+
     /**
+     * The first entry of the instance's {@code auth} that can be used: a fromRequest entry when the
+     * client sent its header with this request, any other entry always (auth.md §2.4).
+     *
+     * @param sent the request's credential headers, by lower-case name
+     */
+    static Credential credential(RuntimeConfig.Instance instance, Map<String, String> sent, boolean publicOperation) {
+        if (publicOperation) {
+            return NONE;
+        }
+        List<String> expected = new java.util.ArrayList<>();
+        for (JsonNode entry : instance.authEntries()) {
+            if (!entry.path("type").asText().equals("fromRequest")) {
+                return new Credential(entry, null);
+            }
+            String header = entry.path("header").asText();
+            String value = sent.get(header.toLowerCase(java.util.Locale.ROOT));
+            if (value != null && !value.isBlank()) {
+                if (value.length() > 16 * 1024 || value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0) {
+                    throw new ToolError("AUTH_DOWNSTREAM", "the " + header + " header isn't a usable credential", "Check the value your MCP client sends");
+                }
+                return new Credential(entry, value.strip());
+            }
+            expected.add(header);
+        }
+        throw new ToolError("AUTH_DOWNSTREAM", instance.id() + " needs your credential in the " + String.join(" or ", expected) + " header",
+                "Set that header in your MCP client's configuration for this server (its value comes from your environment, not from the agent)");
+    }
+
+    /**
+     * @param credential      from {@link #credential}
      * @param publicOperation the operation declares {@code security: []}: no credentials are sent
      */
-    HttpResponse<byte[]> send(RuntimeConfig.Instance instance, RequestBuilder.UpstreamRequest request, boolean publicOperation) {
+    HttpResponse<byte[]> send(RuntimeConfig.Instance instance, RequestBuilder.UpstreamRequest request, Credential credential, boolean publicOperation) {
         ro.bitboy.mcpgp.runtime.telemetry.Telemetry.Upstream traced = ro.bitboy.mcpgp.runtime.telemetry.Telemetry.current()
                 .upstream(instance.api(), instance.id(), request.method());
         Integer status = null;
         try {
-            HttpResponse<byte[]> response = sendUntraced(instance, request, publicOperation);
+            HttpResponse<byte[]> response = sendUntraced(instance, request, publicOperation ? NONE : credential);
             status = response.statusCode();
             return response;
         } finally {
@@ -67,12 +107,12 @@ final class Upstream {
         }
     }
 
-    private HttpResponse<byte[]> sendUntraced(RuntimeConfig.Instance instance, RequestBuilder.UpstreamRequest request, boolean publicOperation) {
+    private HttpResponse<byte[]> sendUntraced(RuntimeConfig.Instance instance, RequestBuilder.UpstreamRequest request, Credential credential) {
         String key = instance.api() + "/" + instance.id();
         Client client = clients.computeIfAbsent(key, k -> client(instance, instance.tlsContext()));
         HttpResponse<byte[]> response;
         try {
-            response = attempt(instance, request, client, publicOperation);
+            response = attempt(instance, request, client, credential);
         } catch (SSLException e) {
             if (client.tls() == null || !client.tls().filesChanged()) {
                 throw tlsError(instance, e);
@@ -82,15 +122,15 @@ final class Upstream {
             client = client(instance, reloaded);
             clients.put(key, client);
             try {
-                response = attempt(instance, request, client, publicOperation);
+                response = attempt(instance, request, client, credential);
             } catch (SSLException again) {
                 throw tlsError(instance, again);
             }
         }
-        if (response.statusCode() == 401 && !publicOperation && instance.authType().equals("oauth2ClientCredentials")) {
+        if (response.statusCode() == 401 && credential.type().equals("oauth2ClientCredentials")) {
             tokens.discard(instance);
             try {
-                response = attempt(instance, request, client, false);
+                response = attempt(instance, request, client, credential);
             } catch (SSLException e) {
                 throw tlsError(instance, e);
             }
@@ -99,7 +139,7 @@ final class Upstream {
     }
 
     private HttpResponse<byte[]> attempt(RuntimeConfig.Instance instance, RequestBuilder.UpstreamRequest request, Client client,
-                                         boolean publicOperation) throws SSLException {
+                                         Credential credential) throws SSLException {
         URI uri = request.uri();
         HttpRequest.Builder http = HttpRequest.newBuilder().timeout(Duration.ofSeconds(instance.timeoutSeconds()));
         String cookie = null;
@@ -112,8 +152,10 @@ final class Upstream {
             }
         }
 
-        JsonNode auth = instance.auth();
-        switch (publicOperation ? "none" : instance.authType()) {
+        JsonNode auth = credential.entry();
+        switch (credential.type()) {
+            // the client's own credential, as it sent it, to this instance's address only (redirects aren't followed)
+            case "fromRequest" -> http.header(auth.path("as").asText("Authorization"), credential.value());
             case "basic" -> http.header("Authorization", "Basic " + Base64.getEncoder().encodeToString(
                     (auth.path("username").asText() + ":" + auth.path("password").asText()).getBytes(StandardCharsets.UTF_8)));
             case "bearer" -> http.header("Authorization", "Bearer " + auth.path("token").asText());
@@ -134,7 +176,7 @@ final class Upstream {
             }
             case "none" -> {
             }
-            default -> throw new ToolError("AUTH_DOWNSTREAM", "sign-in type " + instance.authType() + " is not supported by this runtime");
+            default -> throw new ToolError("AUTH_DOWNSTREAM", "sign-in type " + credential.type() + " is not supported by this runtime");
         }
         if (cookie != null) {
             http.header("Cookie", cookie);

@@ -250,6 +250,11 @@
             "supported": { "type": "array", "items": { "type": "string" } },
             "identity": { "enum": ["service-account", "per-user"] },
             "unsatisfiedTools": { "enum": ["hide", "error"] },
+            "fromRequest": {
+              "type": "object",
+              "properties": { "header": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,63}$" } },
+              "additionalProperties": false
+            },
             "apiKey": {
               "type": "object",
               "properties": { "in": { "enum": ["header", "query", "cookie"] }, "name": { "type": "string" } },

@@ -1,6 +1,9 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import type { Manifest } from '../api'
-import { AUTH_LABELS, useManifest } from '../serverData'
+import { api, type Manifest } from '../api'
+import { AUTH_LABELS, useManifest, useServer } from '../serverData'
+import { useSession } from '../session'
 import { ErrorBox, Loading, PageHead } from '../ui'
 import { BuildButton, CustomerPreview } from './Overview'
 
@@ -22,7 +25,7 @@ export function ConnectionsPage() {
         <section className="col" aria-label="Settings">
           <ErrorBox error={manifest.error} />
           {manifest.isLoading && <Loading />}
-          {manifest.data && <Settings manifest={manifest.data} />}
+          {manifest.data && <Settings id={id} manifest={manifest.data} />}
         </section>
         <section className="stage" aria-label="Customer preview">
           {manifest.data && <CustomerPreview id={id} />}
@@ -33,7 +36,7 @@ export function ConnectionsPage() {
   )
 }
 
-function Settings({ manifest }: { manifest: Manifest }) {
+function Settings({ id, manifest }: { id: string; manifest: Manifest }) {
   const multi = manifest.instances.mode === 'multi'
   return (
     <>
@@ -63,6 +66,8 @@ function Settings({ manifest }: { manifest: Manifest }) {
                 <dt>A tool the sign-in can't use</dt><dd>{a.downstreamAuth.unsatisfiedTools === 'hide' ? 'Hidden' : 'Kept, with a clear error'}</dd>
                 {a.downstreamAuth.apiKey && <><dt>API key</dt><dd className="mono">{a.downstreamAuth.apiKey.in}: {a.downstreamAuth.apiKey.name}</dd></>}
               </dl>
+              <FromRequest id={id} api={a.id} server={manifest.server.name} several={manifest.apis.length > 1 || multi}
+                current={a.downstreamAuth.fromRequest} />
             </>
           )}
         </div>
@@ -77,6 +82,58 @@ function Settings({ manifest }: { manifest: Manifest }) {
         <p className="hint">These come from the definition's <span className="mono">instances</span> and <span className="mono">apis</span> sections.</p>
       </div>
     </>
+  )
+}
+
+/** The X-<Server>-Authorization default the runtime uses (auth.md §2.4). */
+export function defaultCredentialHeader(server: string): string {
+  return 'X-' + server.split(/[^A-Za-z0-9]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase()).join('-') + '-Authorization'
+}
+
+/** Whether customers' MCP clients may send their own credential for the API in a request header. */
+function FromRequest({ id, api: apiId, server, several, current }: {
+  id: string; api: string; server: string; several: boolean; current?: { header?: string }
+}) {
+  const { can } = useSession()
+  const queryClient = useQueryClient()
+  const serverData = useServer(id)
+  const [header, setHeader] = useState(current?.header ?? '')
+  const enabled = !!current
+  const editable = can('servers:write') && !serverData.data?.archived
+  const save = useMutation({
+    mutationFn: (on: boolean) => api.saveEdit(id, serverData.data?.latestVersion ?? 0, [on
+      ? { op: 'set', path: `/apis/[id=${apiId}]/downstreamAuth/fromRequest`, value: header.trim() ? { header: header.trim() } : {} }
+      : { op: 'remove', path: `/apis/[id=${apiId}]/downstreamAuth/fromRequest` }],
+      on ? 'Clients may send their own credential' + (header.trim() ? ' in ' + header.trim() : '') : 'Clients no longer send their own credential'),
+    onSuccess: async () => {
+      for (const key of ['server', 'manifest', 'servers', 'version', 'example-config']) await queryClient.invalidateQueries({ queryKey: [key] })
+    },
+  })
+  const valid = !header.trim() || /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/.test(header.trim())
+  const shown = header.trim() || defaultCredentialHeader(server) + (several ? ' (plus the API or server id)' : '')
+  return (
+    <div className="list" style={{ gap: 8, marginTop: 6 }}>
+      <h2>The user's own credential</h2>
+      <p className="hint">
+        The MCP client can send its user's credential for the API in a request header, set in the client's configuration: the agent never
+        sees it, and the server uses it for that call only, never storing or logging it. A credential configured for the target server is
+        used when the header is missing. Over HTTP only.
+      </p>
+      <dl className="kv">
+        <dt>Allowed</dt><dd>{enabled ? `Yes, in ${shown}` : 'No'}</dd>
+      </dl>
+      {editable && (
+        <form className="actions" onSubmit={(e) => { e.preventDefault(); save.mutate(true) }}>
+          <label className="field" style={{ flex: '1 1 240px' }}><span className="visually-hidden">Header</span>
+            <input className="input mono" value={header} placeholder={defaultCredentialHeader(server)} aria-invalid={!valid}
+              onChange={(e) => setHeader(e.target.value)} />
+          </label>
+          <button type="submit" className="btn btn-sm btn-primary" disabled={!valid || save.isPending}>{enabled ? 'Save header' : 'Allow'}</button>
+          {enabled && <button type="button" className="btn btn-sm" disabled={save.isPending} onClick={() => save.mutate(false)}>Turn off</button>}
+        </form>
+      )}
+      <ErrorBox error={save.error} />
+    </div>
   )
 }
 

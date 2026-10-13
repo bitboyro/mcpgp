@@ -166,7 +166,9 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `instances[].id` | — | `[a-z0-9-]{1,40}`; unique |
 | `instances[].baseUrl` | — | the complete address of the target server (§4.1); must match the build's base-URL allowlist if one is set |
 | `instances[].contract` | `auto` | `auto` or a shipped version |
-| `instances[].auth.type` | — | one of the build's supported types |
+| `instances[].auth.type` | — | one of the build's supported types, or `fromRequest` when the definition allows it (auth.md §2.4) |
+| `instances[].auth` (list) | — | several credentials tried in order: a `fromRequest` entry when its header is in the request, any other entry always |
+| `instances[].auth.header` / `.as` | `X-<Server>[-<Api>][-<Instance>]-Authorization` / `Authorization` | `fromRequest`: the request header the client sends, and the header sent to the API |
 | `instances[].tls` | system trust | trust anchors, client certificate, hostname check: see §5 |
 | `instances[].timeoutSeconds` | `30` | |
 | `instances[].readOnly` | `false` | hides write tools for this instance |

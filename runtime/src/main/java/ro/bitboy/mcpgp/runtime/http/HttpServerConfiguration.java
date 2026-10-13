@@ -41,7 +41,8 @@ import java.util.Map;
 public class HttpServerConfiguration {
 
     @Bean
-    HttpServletStreamableServerTransportProvider mcpServlet(RuntimeConfig config) {
+    HttpServletStreamableServerTransportProvider mcpServlet(RuntimeConfig config,
+                                                           org.springframework.beans.factory.ObjectProvider<ro.bitboy.mcpgp.runtime.Reloader> reloader) {
         return HttpServletStreamableServerTransportProvider.builder()
                 .jsonMapper(new JacksonMcpJsonMapper(new ObjectMapper()))
                 .mcpEndpoint(config.server().basePath())
@@ -52,9 +53,28 @@ public class HttpServerConfiguration {
                     if (client != null) {
                         context.put(McpServerFactory.CLIENT_KEY, client);
                     }
+                    // only the headers instances are configured to read, and only for this request (auth.md §2.4)
+                    Map<String, String> credentials = new HashMap<>();
+                    for (String header : credentialHeaders(reloader.getObject().current().config())) {
+                        String value = request.getHeader(header);
+                        if (value != null) {
+                            credentials.put(header, value);
+                        }
+                    }
+                    if (!credentials.isEmpty()) {
+                        context.put(McpServerFactory.CREDENTIALS_KEY, Map.copyOf(credentials));
+                    }
                     return McpTransportContext.create(context);
                 })
                 .build();
+    }
+
+    /** The headers the instances read their credential from, lower case; they follow config reloads. */
+    static java.util.Set<String> credentialHeaders(RuntimeConfig config) {
+        java.util.Set<String> headers = new java.util.HashSet<>();
+        config.allInstances().forEach(i -> i.authEntries().stream().filter(e -> e.path("type").asText().equals("fromRequest"))
+                .forEach(e -> headers.add(e.path("header").asText().toLowerCase(java.util.Locale.ROOT))));
+        return headers;
     }
 
     @Bean(destroyMethod = "closeGracefully")

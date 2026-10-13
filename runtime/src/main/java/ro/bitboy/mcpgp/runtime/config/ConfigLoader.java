@@ -125,6 +125,7 @@ public final class ConfigLoader {
         RuntimeConfig.Server server = server(manifest, resolved.path("server"), problems);
         Path storage = storageRoot(name, resolved);
         Map<String, List<RuntimeConfig.Instance>> instances = instances(manifest, resolved, baseDir, problems, warnings);
+        credentialHeaders(instances, server, problems, warnings);
         RuntimeConfig.Files files = files(manifest, resolved.path("files"), storage, baseDir, problems);
         if (resolved.path("telemetry").path("enabled").asBoolean(false) && resolved.at("/telemetry/exporter").asText("otlp").equals("prometheus")
                 && !server.transport().equals("http")) {
@@ -358,11 +359,35 @@ public final class ConfigLoader {
                     problems.add(where + "/contract: '" + contract + "' is not shipped with this server (shipped: "
                             + String.join(", ", api.contracts().keySet()) + ", or auto)");
                 }
-                JsonNode auth = node.has("auth") ? node.get("auth") : JsonNodeFactory.instance.objectNode().put("type", "none");
-                String authType = auth.path("type").asText("none");
-                if (!authType.equals("none") && !api.supportedAuth().contains(authType)) {
-                    problems.add(where + "/auth/type: '" + authType + "' is not supported by this server (supported: "
-                            + String.join(", ", api.supportedAuth()) + ")");
+                JsonNode auth = node.has("auth") ? node.get("auth").deepCopy() : JsonNodeFactory.instance.objectNode().put("type", "none");
+                List<JsonNode> entries = new ArrayList<>();
+                if (auth.isArray()) {
+                    auth.forEach(entries::add);
+                } else {
+                    entries.add(auth);
+                }
+                JsonNode fromRequest = api.node().path("downstreamAuth").path("fromRequest");
+                for (int e = 0; e < entries.size(); e++) {
+                    JsonNode entry = entries.get(e);
+                    String at2 = where + "/auth" + (auth.isArray() ? "/" + e : "");
+                    String authType = entry.path("type").asText("none");
+                    if (authType.equals("fromRequest")) {
+                        if (!fromRequest.isObject()) {
+                            problems.add(at2 + "/type: credentials from the request are not enabled in this server's definition"
+                                    + " (downstreamAuth.fromRequest)");
+                        } else if (!entry.has("header")) {
+                            ((ObjectNode) entry).put("header", fromRequest.has("header") && !multi && manifest.apis().size() == 1
+                                    ? fromRequest.get("header").asText()
+                                    : defaultHeader(manifest.serverName(), manifest.apis().size() > 1 ? api.id() : null, multi ? id : null));
+                        }
+                    } else if (!authType.equals("none") && !api.supportedAuth().contains(authType)) {
+                        problems.add(at2 + "/type: '" + authType + "' is not supported by this server (supported: "
+                                + String.join(", ", api.supportedAuth()) + ")");
+                    }
+                    if (e < entries.size() - 1 && !authType.equals("fromRequest")) {
+                        warnings.add("Instance " + id + ": the credentials listed after " + authType + " are never used (only a"
+                                + " fromRequest entry can be skipped, when its header is missing)");
+                    }
                 }
                 int timeout = node.path("timeoutSeconds").asInt(defaultTimeout);
                 if (timeout > maxTimeout) {
@@ -390,6 +415,72 @@ public final class ConfigLoader {
             result.put(api.id(), List.copyOf(list));
         }
         return result;
+    }
+
+    /** {@code X-<Server>[-<Api>][-<Instance>]-Authorization}, each part in title case: {@code X-Orders-Mcp-Prod-Authorization}. */
+    static String defaultHeader(String server, String api, String instance) {
+        StringBuilder name = new StringBuilder("X");
+        for (String part : new String[] {server, api, instance}) {
+            if (part == null) {
+                continue;
+            }
+            for (String word : part.split("[^A-Za-z0-9]+")) {
+                if (!word.isEmpty()) {
+                    name.append('-').append(Character.toUpperCase(word.charAt(0))).append(word.substring(1).toLowerCase(Locale.ROOT));
+                }
+            }
+        }
+        return name.append("-Authorization").toString();
+    }
+
+    /** Headers that carry something else: the MCP transport's, HTTP's own, and cookies. */
+    private static final Set<String> NOT_CREDENTIAL_HEADERS = Set.of("host", "content-type", "content-length", "connection", "cookie",
+            "transfer-encoding", "expect", "upgrade", "accept", "origin", "mcp-session-id", "mcp-protocol-version", "last-event-id",
+            "user-agent", "x-forwarded-for", "x-forwarded-proto", "x-forwarded-host", "traceparent", "tracestate");
+
+    /**
+     * Credentials from the request (auth.md §2.4): every instance reads its own header (a production
+     * credential never reaches test), none of them collides with what HTTP or MCP use, and the server's
+     * own sign-in keeps {@code Authorization} when it uses it.
+     */
+    private static void credentialHeaders(Map<String, List<RuntimeConfig.Instance>> instances, RuntimeConfig.Server server,
+                                          List<String> problems, List<String> warnings) {
+        Map<String, String> owners = new java.util.HashMap<>();
+        for (RuntimeConfig.Instance instance : instances.values().stream().flatMap(List::stream).toList()) {
+            boolean onlyFromRequest = true;
+            for (JsonNode entry : instance.authEntries()) {
+                if (!entry.path("type").asText().equals("fromRequest")) {
+                    onlyFromRequest = false;
+                    continue;
+                }
+                String header = entry.path("header").asText();
+                String lower = header.toLowerCase(Locale.ROOT);
+                String target = entry.path("as").asText("Authorization").toLowerCase(Locale.ROOT);
+                if (NOT_CREDENTIAL_HEADERS.contains(lower)) {
+                    problems.add("Instance " + instance.id() + ": " + header + " carries something else; choose another header for the credential");
+                } else if (lower.equals("authorization") && !server.authMode().equals("none")) {
+                    problems.add("Instance " + instance.id() + ": Authorization carries the client's sign-in to this server ("
+                            + server.authMode() + "); send the credential for the API in another header");
+                }
+                if (NOT_CREDENTIAL_HEADERS.contains(target)) {
+                    problems.add("Instance " + instance.id() + ": the credential can't be sent to the API as " + entry.path("as").asText());
+                }
+                String owner = owners.putIfAbsent(lower, instance.api() + "/" + instance.id());
+                if (owner != null) {
+                    problems.add("Instance " + instance.id() + ": " + header + " is also the credential header of " + owner
+                            + "; give each instance its own header");
+                }
+            }
+            if (!server.transport().equals("http") && instance.authEntries().stream()
+                    .anyMatch(e -> e.path("type").asText().equals("fromRequest"))) {
+                if (onlyFromRequest) {
+                    problems.add("Instance " + instance.id() + ": credentials from the request need the http transport; over stdio,"
+                            + " set the credential in the config or the environment");
+                } else {
+                    warnings.add("Instance " + instance.id() + ": over stdio there are no request headers; the other credential is used");
+                }
+            }
+        }
     }
 
     private static RuntimeConfig.Files files(Manifest manifest, JsonNode files, Path storage, Path baseDir, List<String> problems) {

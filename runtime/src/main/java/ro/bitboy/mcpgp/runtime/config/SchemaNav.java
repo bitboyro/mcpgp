@@ -55,6 +55,9 @@ final class SchemaNav {
                 if (!merged.has("type") && resolved.has("type")) {
                     merged.set("type", resolved.get("type"));
                 }
+                if (!merged.has("items") && resolved.has("items")) {
+                    merged.set("items", resolved.get("items")); // a value that is one thing or a list of them
+                }
             }
         }
         return merged;

@@ -35,6 +35,7 @@
         "method": { "type": "string" },
         "path": { "type": "string" },
         "status": { "type": ["integer", "null"] },
+        "auth": { "type": "string", "description": "The credential type the call used (fromRequest, bearer, …); never its value." },
         "body": { "type": "string", "description": "Redacted upstream error body (kept in full for troubleshooting)." }
       },
       "additionalProperties": false
