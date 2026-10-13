@@ -80,6 +80,12 @@ name adds `-mcp` (or `--name`), the contract version is `info.version`, and inst
 `single` mode. Existing files are never overwritten. Without `--from-spec`, the definition points at
 `contracts/openapi.yaml` for the developer to fill in.
 
+A local spec that refers to other files (`$ref: paths/entries.json`) brings them along: `init` follows
+the references from file to file, inside the spec's folder, and copies the files it reached under
+`contracts/` with the same layout (unreferenced files in the folder stay behind). A referenced file
+that is missing, a reference to a part that isn't there, or a reference to a URL is reported, and
+nothing is written. A spec from a URL is copied alone.
+
 ### 3.2 `test`
 
 1. Compiles the definition (errors stop here, exit code 1).

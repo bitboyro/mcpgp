@@ -68,6 +68,19 @@ class EditsApiTest extends PlatformTestBase {
     }
 
     @Test
+    void auditDefaultsShipWithThePackage() throws Exception {
+        int base = latest().path("latestVersion").asInt();
+        HttpResponseLike saved = save(Map.of("base", base, "changes", List.of(set("/runtimeDefaults/audit/file/retainDays", 90),
+                set("/runtimeDefaults/audit/arguments", "hashed"))));
+        assertThat(saved.status()).as(saved.body().toString()).isEqualTo(201);
+        JsonNode audit = json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null))).at("/policies/runtimeDefaults/audit");
+        assertThat(audit.at("/file/retainDays").asInt()).isEqualTo(90);
+        assertThat(audit.path("arguments").asText()).isEqualTo("hashed");
+        // a typo is refused, not ignored
+        assertThat(save(Map.of("base", base + 1, "changes", List.of(set("/runtimeDefaults/audit/file/retainDay", 90)))).status()).isEqualTo(422);
+    }
+
+    @Test
     void changesThatBreakTheDefinitionAreNotSaved() throws Exception {
         int base = latest().path("latestVersion").asInt();
         HttpResponseLike broken = save(Map.of("base", base, "changes", List.of(set("/exposure/mode", "everything"))));

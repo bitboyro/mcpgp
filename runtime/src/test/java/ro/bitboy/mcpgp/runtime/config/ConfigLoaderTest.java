@@ -37,6 +37,25 @@ class ConfigLoaderTest {
     }
 
     @Test
+    void theBuildsAuditSettingsAreTheDefaults(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
+        com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+        com.fasterxml.jackson.databind.node.ObjectNode root = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(
+                REPO.resolve("conformance/cases/content-types/multipart-split/expected/manifest.json").toFile());
+        ((com.fasterxml.jackson.databind.node.ObjectNode) root.path("policies")).putObject("runtimeDefaults").set("audit",
+                json.readTree("{\"file\": {\"retainDays\": 90}, \"arguments\": \"hashed\"}"));
+        Manifest manifest = Manifest.of(root);
+        Path config = java.nio.file.Files.writeString(dir.resolve("c.yaml"), "instance: { baseUrl: https://api.example.com }\n");
+        RuntimeConfig shipped = load(manifest, config, Map.of());
+        assertThat(shipped.audit().retainDays()).isEqualTo(90);
+        assertThat(shipped.audit().arguments()).isEqualTo("hashed");
+        // whoever runs the server can still choose
+        java.nio.file.Files.writeString(config, "instance: { baseUrl: https://api.example.com }\naudit: { file: { retainDays: 7 } }\n");
+        RuntimeConfig changed = load(manifest, config, Map.of());
+        assertThat(changed.audit().retainDays()).isEqualTo(7);
+        assertThat(changed.audit().arguments()).isEqualTo("hashed");
+    }
+
+    @Test
     void loadsTheMultiInstanceExample() {
         // the example's certificate files don't exist in the repo: real test material instead
         RuntimeConfig config = loader.load(ORDERS, new ConfigLoader.Options(Optional.of(REPO.resolve("examples/client/multi-instance/orders-mcp.yaml")),

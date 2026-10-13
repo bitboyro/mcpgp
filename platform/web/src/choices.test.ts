@@ -17,13 +17,15 @@ describe('settings on the page', () => {
   it('reads the current values from the manifest', () => {
     const m = manifest()
     const now = Object.fromEntries(choices(m).map((c) => [c.id, c.current(m)]))
-    expect(now).toEqual({ exposure: 'hybrid', 'access:orders': 'read-write', instances: 'multi', mixed: 'union', transports: 'both', safety: 'confirm' })
+    expect(now).toEqual({ exposure: 'hybrid', 'access:orders': 'read-write', instances: 'multi', mixed: 'union', transports: 'both', safety: 'confirm',
+      'audit-days': '30', 'audit-arguments': 'redacted' })
   })
 
   it('writes each option into the definition', () => {
     const byId = Object.fromEntries(choices(manifest()).map((c) => [c.id, c]))
     expect(byId['access:orders'].change('read-only')).toEqual({ op: 'set', path: '/apis/[id=orders]/select/access', value: 'read-only' })
     expect(byId.transports.change('http')).toEqual({ op: 'set', path: '/runtimeDefaults/transports', value: { allowed: ['http'], default: 'http' } })
+    expect(byId['audit-days'].change('90')).toEqual({ op: 'set', path: '/runtimeDefaults/audit/file/retainDays', value: 90 })
     expect(byId.safety.change('direct')).toEqual({ op: 'set', path: '/safety/confirmDestructive', value: false })
   })
 

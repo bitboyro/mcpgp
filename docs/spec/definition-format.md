@@ -82,6 +82,7 @@ build: { … }
 | `files.forms` | list | `[base64, path]` | file-input forms the build supports; the operator enables them at runtime |
 | `packs.<id>` | object \| `$ref` | — | presence enables the pack |
 | `runtimeDefaults` | object | see [runtime-config.md](runtime-config.md) | values become defaults in the generated config schema; `allowed` lists restrict the operator |
+| `runtimeDefaults.audit` | object | 30 days, `redacted` | the audit settings the package ships with: `file.retainDays`, `file.rotate`, `file.enabled`, `arguments` (`none` · `redacted` · `hashed`); the operator's config can still change them |
 | `resources.uriScheme` | string | `api` | scheme for operations exposed as resources (tools-contract §14.1) |
 | `prompts` | list | `[]` | prompt templates (tools-contract §14.2) |
 | `extensions` | object | none | custom tools, enrichers, call filters ([extensions.md](extensions.md)) |
