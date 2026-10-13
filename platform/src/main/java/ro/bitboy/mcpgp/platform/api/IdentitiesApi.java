@@ -44,6 +44,12 @@ public class IdentitiesApi {
         Access.Principal who = ServersApi.who(request);
         Map<String, Object> body = identity(who.identity());
         body.put("tokenScopes", who.scopes());
+        if (accounts.mustChange(who.identity().id())) {
+            body.put("mustChangePassword", true);
+        }
+        if (who.identity().kind().equals("person")) {
+            body.put("password", accounts.hasPassword(who.identity())); // a local password they can change
+        }
         return Json.ok(body);
     }
 
@@ -51,7 +57,17 @@ public class IdentitiesApi {
     public ResponseEntity<byte[]> identities(HttpServletRequest request) {
         ServersApi.who(request).require("admin");
         List<Map<String, Object>> items = new ArrayList<>();
-        store.identities().forEach(i -> items.add(identity(i)));
+        store.identities().forEach(i -> {
+            Map<String, Object> item = identity(i);
+            if (i.kind().equals("person")) {
+                item.put("password", accounts.hasPassword(i));
+                if (accounts.mustChange(i.id())) {
+                    item.put("mustChangePassword", true);
+                }
+                accounts.lockedUntil(i).ifPresent(until -> item.put("lockedUntil", until.toString()));
+            }
+            items.add(item);
+        });
         return Json.ok(Map.of("items", items));
     }
 

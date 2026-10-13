@@ -39,7 +39,7 @@ Releases happen when they're asked for; these land on `main` first.
 | Item | What | State |
 |---|---|---|
 | Tool-name clashes on spec upload | When two operations would get the same tool name, the upload shows them with suggested names (from method and path) to accept or edit, or sets a rule for the server (`naming.collisions`); both are saved in the definition | in progress |
-| 0.3.0 passwords | See the release table | planned |
+| 0.3.0 passwords | See the release table | on `main` |
 | UX and wording review | See Main priorities | planned |
 | Per-user identity by token exchange | OAuth on-behalf-of (RFC 8693) for a shared server whose API trusts the same identity provider; the header-based way (`fromRequest`, 0.2.6) covers clients that hold their own credential | deferred |
 | Store performance at scale | PostgreSQL: the cache cleanup deletes entries one by one, and the activity page reads the whole log; fine at today's sizes | when needed |

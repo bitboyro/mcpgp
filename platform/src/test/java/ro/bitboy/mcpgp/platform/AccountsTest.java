@@ -150,6 +150,44 @@ class AccountsTest {
     }
 
     @Test
+    void temporaryPasswordsAreReplacedFirstAndAdminsUnlock() throws Exception {
+        JsonNode dave = platform.json("POST", "/identities", platform.admin(), Map.of("kind", "person", "name", "dave", "role", "viewer",
+                "password", "dave original 1"));
+        String id = dave.path("id").asText();
+        // an admin sets a temporary password
+        JsonNode set = platform.json("PUT", "/identities/" + id + "/password", platform.admin(), Map.of("password", "temporary pass 1", "mustChange", true));
+        assertThat(set.path("mustChange").asBoolean()).isTrue();
+
+        JsonNode session = platform.json("POST", "/sessions", null, Map.of("name", "dave", "password", "temporary pass 1"));
+        assertThat(session.path("mustChangePassword").asBoolean()).isTrue();
+        String token = session.path("value").asText();
+        assertThat(platform.json("GET", "/me", token, null).path("mustChangePassword").asBoolean()).isTrue();
+        // nothing else until it's replaced, and not by the same one
+        HttpResponse<byte[]> blocked = platform.call("GET", "/servers", token, null, null);
+        assertThat(blocked.statusCode()).isEqualTo(403);
+        assertThat(JSON.readTree(blocked.body()).path("code").asText()).isEqualTo("PASSWORD_CHANGE_REQUIRED");
+        assertThat(platform.call("PUT", "/identities/" + id + "/password", token, JSON.writeValueAsBytes(Map.of("password", "temporary pass 1",
+                "currentPassword", "temporary pass 1")), "application/json").statusCode()).isEqualTo(422);
+        assertThat(platform.call("PUT", "/identities/" + id + "/password", token, JSON.writeValueAsBytes(Map.of("password", "dave chose this 2",
+                "currentPassword", "temporary pass 1")), "application/json").statusCode()).isEqualTo(200);
+        assertThat(platform.call("GET", "/servers", token, null, null).statusCode()).isEqualTo(200);
+
+        // five wrong passwords lock the account; the admin sees it and unlocks it
+        for (int i = 0; i < 5; i++) {
+            platform.call("POST", "/sessions", null, JSON.writeValueAsBytes(Map.of("name", "dave", "password", "wrong again")), "application/json");
+        }
+        JsonNode listed = platform.json("GET", "/identities", platform.admin(), null);
+        JsonNode entry = java.util.stream.StreamSupport.stream(listed.path("items").spliterator(), false)
+                .filter(i -> i.path("id").asText().equals(id)).findFirst().orElseThrow();
+        assertThat(entry.path("lockedUntil").asText()).isNotEmpty();
+        assertThat(entry.path("password").asBoolean()).isTrue();
+        assertThat(platform.call("POST", "/identities/" + id + "/unlock", token, null, null).statusCode()).isEqualTo(403);
+        assertThat(platform.json("POST", "/identities/" + id + "/unlock", platform.admin(), null).path("locked").asBoolean()).isFalse();
+        assertThat(platform.call("POST", "/sessions", null, JSON.writeValueAsBytes(Map.of("name", "dave", "password", "dave chose this 2")),
+                "application/json").statusCode()).isEqualTo(201);
+    }
+
+    @Test
     void agentReleasesNeedAPersonsApproval() throws Exception {
         String admin = platform.admin();
         platform.call("POST", "/servers?id=orders", admin, project(), "application/json");

@@ -39,7 +39,7 @@ public class WebUi {
         }
     }
 
-    @GetMapping({"/", "/sign-in", "/library", "/library/**", "/activity", "/builds", "/agents", "/servers/**"})
+    @GetMapping({"/", "/sign-in", "/library", "/library/**", "/activity", "/builds", "/agents", "/account", "/servers/**"})
     public ResponseEntity<byte[]> page() {
         return ResponseEntity.ok().cacheControl(CacheControl.noCache()).contentType(MediaType.TEXT_HTML).body(index);
     }

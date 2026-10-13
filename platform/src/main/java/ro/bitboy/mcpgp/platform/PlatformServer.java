@@ -317,8 +317,8 @@ public class PlatformServer {
     }
 
     @Bean
-    FilterRegistrationBean<AuthFilter> authFilter(Access access) {
-        FilterRegistrationBean<AuthFilter> registration = new FilterRegistrationBean<>(new AuthFilter(access));
+    FilterRegistrationBean<AuthFilter> authFilter(Access access, Accounts accounts) {
+        FilterRegistrationBean<AuthFilter> registration = new FilterRegistrationBean<>(new AuthFilter(access, accounts::mustChange));
         registration.addUrlPatterns("/api/v1/*");
         registration.setOrder(1);
         return registration;
