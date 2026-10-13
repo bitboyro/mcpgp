@@ -61,9 +61,11 @@ change spec or rules ─► pull request ─► CI: validate · build · test �
    change without being accepted with `mcpgp names accept`.
 3. `mcpgp test --all`: starts each server against a mock made from its specs and runs `tools/list`
    plus the test cases in its `tests/` folder.
-4. **TODO (not yet):** `mcpgp diff --all --against last-release --format md` as a PR comment
-   ("+3 tools, 1 removed, 12 descriptions changed"). Until then, reviewers read the definition
-   changes and the build log.
+4. `mcpgp diff --all --against last-release --format md`: what changed since the last release tag,
+   per server: tools added, removed and renamed, inputs and outputs, annotations, contract versions,
+   with the breaking changes first. Post it on the PR (or the run's summary) for reviewers;
+   `--fail-on-breaking` (exit code 6) stops a PR that breaks clients without a decision. The checkout
+   needs the tags and history (`fetch-depth: 0`).
 
 **On a release tag**
 1. The same steps. The server version follows the API (contract) version; `--version` overrides it.

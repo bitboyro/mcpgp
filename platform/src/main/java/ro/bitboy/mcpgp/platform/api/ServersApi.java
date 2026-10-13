@@ -227,6 +227,70 @@ public class ServersApi {
         return Json.ok(Map.of("ok", result.ok(), "diagnostics", diagnostics(result.diagnostics())));
     }
 
+    /**
+     * What changed between two versions of a server, as {@code mcpgp diff} reports it (cli.md §3.5):
+     * {@code from} and {@code to} are version numbers, {@code latest}, or {@code released} (the version
+     * of the server's last released build). Default: from the last release (or the version before the
+     * latest), to the latest.
+     */
+    @GetMapping("/{id}/diff")
+    public ResponseEntity<byte[]> diff(HttpServletRequest request, @PathVariable String id,
+                                       @RequestParam(required = false) String from, @RequestParam(required = false) String to) {
+        who(request).require("servers:read");
+        Model.Server server = servers.get(id);
+        if (server.latest() == null) {
+            throw ApiException.notFound("version");
+        }
+        Model.VersionRef released = store.builds().stream().filter(b -> b.server().equals(id) && b.released())
+                .max(java.util.Comparator.comparing(Model.Build::created))
+                .flatMap(b -> server.versions().stream().filter(v -> v.number() == b.version()).findFirst()).orElse(null);
+        Model.VersionRef after = to == null || to.isBlank() ? server.latest() : endpoint(server, to, released);
+        Model.VersionRef before;
+        if (from == null || from.isBlank()) {
+            before = released != null ? released : server.versions().stream().filter(v -> v.number() == after.number() - 1).findFirst().orElse(after);
+        } else {
+            before = endpoint(server, from, released);
+        }
+        JsonNode beforeManifest = manifestOf(server, before);
+        JsonNode afterManifest = manifestOf(server, after);
+        ro.bitboy.mcpgp.core.diff.ManifestDiff.Result result = ro.bitboy.mcpgp.core.diff.ManifestDiff.compare(beforeManifest, afterManifest);
+        Map<String, Object> answer = new java.util.LinkedHashMap<>();
+        answer.put("from", Map.of("version", before.number(), "serverVersion", result.from(), "released", released != null && released.number() == before.number()));
+        answer.put("to", Map.of("version", after.number(), "serverVersion", result.to()));
+        answer.put("released", released == null ? null : released.number());
+        answer.put("summary", ro.bitboy.mcpgp.core.diff.DiffReport.summary(result));
+        answer.put("breaking", result.breaking());
+        answer.put("changes", result.changes().stream().map(c -> {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("impact", c.impact().name().toLowerCase(java.util.Locale.ROOT));
+            m.put("tool", c.tool());
+            m.put("kind", c.kind());
+            m.put("text", c.text());
+            return m;
+        }).toList());
+        answer.put("markdown", ro.bitboy.mcpgp.core.diff.DiffReport.markdown(id, result));
+        return Json.ok(answer);
+    }
+
+    private Model.VersionRef endpoint(Model.Server server, String which, Model.VersionRef released) {
+        if (which.equals("released")) {
+            if (released == null) {
+                throw ApiException.notFound("a released build of " + server.id());
+            }
+            return released;
+        }
+        return servers.version(server, which);
+    }
+
+    private JsonNode manifestOf(Model.Server server, Model.VersionRef ref) {
+        Compilation.Preview preview = compilation.preview(servers.files(ref), ref.created());
+        if (preview.manifest() == null) {
+            throw new ApiException(422, "VALIDATION", "version " + ref.number() + " of " + server.id() + " doesn't compile",
+                    Map.of("diagnostics", diagnostics(preview.result().diagnostics())));
+        }
+        return Json.parse(preview.manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     @GetMapping("/{id}/versions/{version}/manifest")
     public ResponseEntity<byte[]> manifest(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
         who(request).require("servers:read");

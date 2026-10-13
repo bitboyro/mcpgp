@@ -81,6 +81,26 @@ class EditsApiTest extends PlatformTestBase {
     }
 
     @Test
+    void theChangesBetweenVersionsAreShown() throws Exception {
+        int base = latest().path("latestVersion").asInt();
+        HttpResponseLike saved = save(Map.of("base", base, "message", "read only", "changes", List.of(set("/apis/[id=orders]/select/access", "read-only"),
+                set("/exposure/pinned", List.of("orders_customer_get")))));
+        assertThat(saved.status()).as(saved.body().toString()).isEqualTo(201);
+        // default: the version before the latest (no release here), to the latest
+        JsonNode diff = json(send(bearer("GET", "/api/v1/servers/orders-mcp/diff", null)));
+        assertThat(diff.at("/from/version").asInt()).isEqualTo(base);
+        assertThat(diff.at("/to/version").asInt()).isEqualTo(base + 1);
+        assertThat(diff.path("breaking").asInt()).isPositive();
+        assertThat(diff.path("changes").findValuesAsText("kind")).contains("tool.removed");
+        assertThat(diff.path("changes").findValuesAsText("tool")).contains("orders_customer_create");
+        assertThat(diff.path("markdown").asText()).startsWith("### orders-mcp: ");
+        // the other way round, by number: the tools come back
+        JsonNode back = json(send(bearer("GET", "/api/v1/servers/orders-mcp/diff?from=" + (base + 1) + "&to=" + base, null)));
+        assertThat(back.path("changes").findValuesAsText("kind")).contains("tool.added").doesNotContain("tool.removed");
+        assertThat(send(bearer("GET", "/api/v1/servers/orders-mcp/diff?from=released", null)).statusCode()).isEqualTo(404);
+    }
+
+    @Test
     void changesThatBreakTheDefinitionAreNotSaved() throws Exception {
         int base = latest().path("latestVersion").asInt();
         HttpResponseLike broken = save(Map.of("base", base, "changes", List.of(set("/exposure/mode", "everything"))));

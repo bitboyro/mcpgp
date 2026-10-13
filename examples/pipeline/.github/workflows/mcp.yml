@@ -17,11 +17,15 @@ jobs:
       MCPGP_SIGNING_KEY: "${{ secrets.MCPGP_SIGNING_KEY }}"   # the definitions ask for signed packages
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }                   # tags and history, for diff against the last release
 
       - name: Validate
         run: mcpgp validate --all
 
-      # TODO (not yet): mcpgp diff --all --against last-release --format md, posted on the PR
+      - name: What changed since the last release
+        if: github.event_name == 'pull_request'
+        # on the run's summary page; post it as a PR comment with your comment action of choice
+        run: mcpgp diff --all --against last-release --format md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build
         run: mcpgp build --all --frozen-lock     # version follows the API (contract) version

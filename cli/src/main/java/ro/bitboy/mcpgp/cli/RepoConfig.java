@@ -19,7 +19,8 @@ import java.util.List;
  * @param file the config file
  * @param root the repository root
  */
-record RepoConfig(Path file, Path root, String cli, List<Path> servers, Path workspace, Path out, String signKey, List<String> notYet) {
+/** @param baseline what {@code diff} compares against when {@code --against} isn't given ({@code release.baseline}) */
+record RepoConfig(Path file, Path root, String cli, List<Path> servers, Path workspace, Path out, String signKey, String baseline, List<String> notYet) {
 
     static final String FILE = ".mcpgp/config.yaml";
 
@@ -68,6 +69,6 @@ record RepoConfig(Path file, Path root, String cli, List<Path> servers, Path wor
         return new RepoConfig(file, root, doc.path("cli").asText(), List.copyOf(servers),
                 doc.hasNonNull("workspace") ? root.resolve(doc.path("workspace").asText()).normalize() : null,
                 doc.hasNonNull("out") ? root.resolve(doc.path("out").asText()).normalize() : null,
-                doc.at("/sign/key").asText(null), List.copyOf(notYet));
+                doc.at("/sign/key").asText(null), doc.at("/release/baseline").asText("last-release"), List.copyOf(notYet));
     }
 }

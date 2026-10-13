@@ -5,6 +5,16 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+### Added
+- What changed between builds: `mcpgp diff` (against the last release tag, a tag or commit, a
+  manifest or a release folder; text, Markdown for PR comments, or JSON; `--fail-on-breaking`, exit
+  code 6) and the platform's **Changes** page (any two versions, by default since the last release;
+  linked from a build's Release). Tools are matched by operation, so renames show as renames; inputs
+  and outputs field by field; breaking changes first.
+- `mcpgp preview` (the tools the agent sees, and what the customer configures), `mcpgp try` (a tool
+  call against a real target, a runtime config with credentials, or a mock), `mcpgp migrate` (one
+  format so far: nothing to change), `--no-color`.
+
 ### Fixed
 - Activity searches read the whole log when few entries matched, and agent quotas read it on every
   save or build: searches now go to the store as a query (PostgreSQL filters in SQL, with indexes on

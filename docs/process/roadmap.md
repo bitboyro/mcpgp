@@ -30,7 +30,7 @@ Milestones, in order. Each ends with something demonstrable. Scope per item: see
 | **0.2.6** (released 2026-10-13) | Credentials from the MCP client (`fromRequest`): the client sends the user's credential for the API in a configured header, never stored; instances can list several credentials, tried in order (fallback); a switch on Connections |
 | **0.2.7** (released 2026-10-13) | Per-operation security enforced (tools no credential can call hidden or explained; each call uses the credential that fits); a suffix for every tool and renaming one tool from the UI; audit defaults on Overview; `init --from-spec` copies referenced files; broken schema references are errors; Try starts its server early |
 | **0.3.0** (planned) | Passwords in the web UI: **Change password** in the account menu (current password, the new one twice); **Set password** on a person in API & agents, for admins (a temporary password, optionally to be changed at the next sign-in); **Unlock** for accounts locked after wrong passwords. Company accounts show none of this. |
-| TODO, not yet scheduled | Marked TODO in the docs: CLI `diff` (PR comments against the last release), `preview`, `try`, `migrate` (with the first `apiVersion` v2), `--no-color`, `release.versionFrom` other than `contract`, `platform:` in the repository config; git and URL sources on the platform; a native CLI binary |
+| TODO, not yet scheduled | Marked TODO in the docs: `release.versionFrom` other than `contract`, `platform:` in the repository config; git and URL sources on the platform; a native CLI binary. (CLI `diff`, `preview`, `try`, `migrate` and `--no-color`, and the platform's Changes page: on `main`.) |
 
 ## Next (agreed 2026-10-13, not scheduled into a release)
 
@@ -38,7 +38,7 @@ Releases happen when they're asked for; these land on `main` first.
 
 | Item | What | State |
 |---|---|---|
-| Tool-name clashes on spec upload | When two operations would get the same tool name, the upload shows them with suggested names (from method and path) to accept or edit, or sets a rule for the server (`naming.collisions`); both are saved in the definition | in progress |
+| Tool-name clashes on spec upload | When two operations would get the same tool name, the upload shows them with suggested names (from method and path) to accept or edit, or sets a rule for the server (`naming.collisions`); both are saved in the definition | on `main` |
 | 0.3.0 passwords | See the release table | on `main` |
 | UX and wording review | See Main priorities | planned |
 | Per-user identity by token exchange | `tokenExchange`: RFC 8693 or Entra on-behalf-of, for a shared server whose users sign in with OAuth (auth.md §2.5) | on `main` |
@@ -71,7 +71,7 @@ new to mcpgp would meet it, from the first sign-in to a released build delivered
 Outcome: a list of findings with the fixes made, and a wording guide in [../design/ui.md](../design/ui.md)
 so new texts follow it.
 
-Deferred: harness-lab comparison; per-user downstream identity; other languages.
+Deferred: harness-lab comparison; other languages. (Per-user downstream identity: `fromRequest` and `tokenExchange`.)
 
 Last, and only after they are thought through (2026-10-11): the issue-tracker, skills and agent-feedback
 packs (whether they make sense at all), and paging normalization (APIs already page their own way;

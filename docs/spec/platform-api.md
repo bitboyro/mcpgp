@@ -51,6 +51,13 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   and path (`base` is that name without the API prefix). The user chooses, and the choice is saved in
   the definition: `renames=<JSON {operation key: name}>` writes a rule per operation (matched by
   method and path, `name: { set }`), or `collisions=method-path` sets `naming.collisions`.
+- `GET /servers/{id}/diff?from=&to=` (`servers:read`) says what changed between two versions, as
+  `mcpgp diff` does (cli.md §3.5): `from` and `to` are version numbers, `latest` or `released` (the
+  version of the server's last released build); by default from the last release (else the version
+  before the latest) to the latest. The answer: `from`, `to` (`{ version, serverVersion }`),
+  `released`, `summary`, `breaking`, `changes: [{ impact: breaking | notable | info, tool, kind,
+  text }]` and the same as `markdown`. The web UI: the server's Changes page, and "What changed since
+  the last release" next to Release on a build.
 - `POST /servers/{id}/contracts` adds a contract version from an uploaded spec (same bodies and
   checks): to the server's API (`api=<id>` when it has several), as `version` (default the spec's
   `info.version`), with `default=true` to make it the default; the same version again replaces its
