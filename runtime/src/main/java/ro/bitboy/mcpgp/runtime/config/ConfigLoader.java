@@ -367,6 +367,7 @@ public final class ConfigLoader {
                     entries.add(auth);
                 }
                 JsonNode fromRequest = api.node().path("downstreamAuth").path("fromRequest");
+                boolean exchange = api.node().path("downstreamAuth").path("tokenExchange").isObject();
                 for (int e = 0; e < entries.size(); e++) {
                     JsonNode entry = entries.get(e);
                     String at2 = where + "/auth" + (auth.isArray() ? "/" + e : "");
@@ -380,11 +381,16 @@ public final class ConfigLoader {
                                     ? fromRequest.get("header").asText()
                                     : defaultHeader(manifest.serverName(), manifest.apis().size() > 1 ? api.id() : null, multi ? id : null));
                         }
+                    } else if (authType.equals("tokenExchange")) {
+                        if (!exchange) {
+                            problems.add(at2 + "/type: calling the API as the signed-in user is not enabled in this server's definition"
+                                    + " (downstreamAuth.tokenExchange)");
+                        }
                     } else if (!authType.equals("none") && !api.supportedAuth().contains(authType)) {
                         problems.add(at2 + "/type: '" + authType + "' is not supported by this server (supported: "
                                 + String.join(", ", api.supportedAuth()) + ")");
                     }
-                    if (e < entries.size() - 1 && !authType.equals("fromRequest")) {
+                    if (e < entries.size() - 1 && !authType.equals("fromRequest") && !authType.equals("tokenExchange")) {
                         warnings.add("Instance " + id + ": the credentials listed after " + authType + " are never used (only a"
                                 + " fromRequest entry can be skipped, when its header is missing)");
                     }
@@ -469,6 +475,24 @@ public final class ConfigLoader {
                 if (owner != null) {
                     problems.add("Instance " + instance.id() + ": " + header + " is also the credential header of " + owner
                             + "; give each instance its own header");
+                }
+            }
+            boolean exchanges = instance.authEntries().stream().anyMatch(e -> e.path("type").asText().equals("tokenExchange"));
+            boolean signedIn = server.transport().equals("http") && server.authMode().equals("oauth");
+            if (exchanges && !signedIn) {
+                boolean only = instance.authEntries().stream().allMatch(e -> e.path("type").asText().equals("tokenExchange"));
+                String why = "Instance " + instance.id() + ": token exchange needs the user's OAuth sign-in to this server"
+                        + " (server.transport: http, server.auth.mode: oauth)";
+                if (only) {
+                    problems.add(why);
+                } else {
+                    warnings.add(why + "; the other credential is used");
+                }
+            }
+            for (JsonNode entry : instance.authEntries()) {
+                if (entry.path("type").asText().equals("tokenExchange") && entry.path("flavor").asText("").equals("entra-obo")
+                        && !entry.has("scopes")) {
+                    problems.add("Instance " + instance.id() + ": the on-behalf-of flow needs scopes (e.g. api://<app id>/.default)");
                 }
             }
             if (!server.transport().equals("http") && instance.authEntries().stream()

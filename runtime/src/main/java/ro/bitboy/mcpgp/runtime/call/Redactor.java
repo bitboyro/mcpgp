@@ -54,6 +54,17 @@ final class Redactor {
         };
     }
 
+    /** Adds a value learned during the call (an exchanged token) to what this thread's call masks. */
+    static void maskInCall(String value) {
+        List<String> call = CALL.get();
+        if (call != null && value != null && value.length() >= MIN_LENGTH && !call.contains(value)) {
+            List<String> more = new java.util.ArrayList<>(call);
+            more.add(value);
+            more.sort(Comparator.comparingInt(String::length).reversed());
+            CALL.set(more);
+        }
+    }
+
     String redact(String text) {
         String result = text;
         List<String> call = CALL.get();

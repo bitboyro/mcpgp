@@ -41,7 +41,7 @@ Releases happen when they're asked for; these land on `main` first.
 | Tool-name clashes on spec upload | When two operations would get the same tool name, the upload shows them with suggested names (from method and path) to accept or edit, or sets a rule for the server (`naming.collisions`); both are saved in the definition | in progress |
 | 0.3.0 passwords | See the release table | on `main` |
 | UX and wording review | See Main priorities | planned |
-| Per-user identity by token exchange | OAuth on-behalf-of (RFC 8693) for a shared server whose API trusts the same identity provider; the header-based way (`fromRequest`, 0.2.6) covers clients that hold their own credential | deferred |
+| Per-user identity by token exchange | `tokenExchange`: RFC 8693 or Entra on-behalf-of, for a shared server whose users sign in with OAuth (auth.md §2.5) | on `main` |
 | Store performance at scale | Activity searches filtered by the store (SQL and indexes on PostgreSQL) and bounded in time; the cache cleanup batched | on `main` |
 
 Done from this list: credentials from the MCP client (0.2.6); per-operation security enforced, tool-name suffix and per-tool rename, audit defaults on Overview, `init --from-spec` with referenced files, broken schema references as errors, Try warm-up (0.2.7).

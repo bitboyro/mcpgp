@@ -42,4 +42,14 @@ class CredentialsFromRequestTest {
         assertThat(offers(without, "fromRequest")).isFalse();
         assertThat(new Docs(orders(false), without, false).generate(true).get("docs/CONFIGURATION.md")).doesNotContain("Credentials from the MCP client");
     }
+
+    @Test
+    void tokenExchangeIsOfferedWhenTheDefinitionAllowsIt() throws Exception {
+        ObjectNode manifest = DeliveryTest.orders();
+        ((ObjectNode) manifest.at("/apis/0/downstreamAuth")).putObject("tokenExchange");
+        ObjectNode schema = ConfigSchema.generate(manifest);
+        assertThat(offers(schema, "tokenExchange")).isTrue();
+        assertThat(offers(ConfigSchema.generate(DeliveryTest.orders()), "tokenExchange")).isFalse();
+        assertThat(new Docs(manifest, schema, false).generate(true).get("docs/CONFIGURATION.md")).contains("## Calling the API as the signed-in user");
+    }
 }

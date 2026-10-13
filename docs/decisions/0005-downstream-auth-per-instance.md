@@ -24,6 +24,13 @@ the user in the client's configuration (not by the model), read per request for 
 never kept. An instance may list several credentials, tried in order, so a service account can take
 over when the header is missing.
 
+### Addendum (2026-10-13): per-user identity by token exchange
+
+The per-user identity left for later above: `tokenExchange` (auth.md §2.5) exchanges the signed-in
+user's OAuth token at the identity provider (RFC 8693, or Entra on-behalf-of) for a token issued for
+the API. The user's token goes only to the token endpoint, never to the API, so the client's token is
+still not passed through; the API gets an audience-bound token of its own.
+
 ## Consequences
 
 - The generated config schema offers only supported types.

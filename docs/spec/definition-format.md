@@ -64,7 +64,8 @@ build: { … }
 | `apis[].select.deprecated` | enum | `hide` | `hide` · `show` · `mark` |
 | `apis[].downstreamAuth.supported` | list | from spec | `basic` · `apiKey` · `bearer` · `oauth2ClientCredentials` · `mtls` · `custom:<id>` |
 | `apis[].downstreamAuth.fromRequest` | object | absent | Lets the MCP client send the credential for the API in a request header (`{ header: X-… }`, optional name); HTTP only, never stored. auth.md §2.4 |
-| `apis[].downstreamAuth.identity` | enum | `service-account` | `per-user` is P2. |
+| `apis[].downstreamAuth.tokenExchange` | object | absent | `{}` lets instances call the API as the signed-in user (token exchange; inbound oauth). auth.md §2.5 |
+| `apis[].downstreamAuth.identity` | enum | `service-account` | informational; per-user identity comes from `fromRequest` or `tokenExchange` |
 | `apis[].downstreamAuth.unsatisfiedTools` | enum | `hide` | `hide` · `error` |
 | `apis[].requestBody` | object | `{ multiple: split }` | operations with several request body types: `split` (one tool per type, suffixes from `suffixes`) or `prefer` (one tool, first match of `prefer`). Default suffixes: `multipart/form-data → multipart`, `application/x-www-form-urlencoded → form`, `application/octet-stream → binary`. See tools-contract §13 |
 | `apis[].pagination` | object | none | **optional**; normalizes paging (tools-contract §10). `{ style: offset \| page \| cursor \| link-header \| client, request: {…param names}, response: {items, total, next}, defaultLimit, maxLimit }` |

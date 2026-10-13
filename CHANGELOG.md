@@ -16,6 +16,12 @@ versions follow [SemVer](https://semver.org).
   (`mustChange`): the person replaces it at the next sign-in, and the platform answers
   `PASSWORD_CHANGE_REQUIRED` to anything else until then. `POST /identities/{id}/unlock` ends a lock
   after wrong passwords. Company accounts show none of this.
+- Calling the API as the signed-in user (`tokenExchange`, auth.md §2.5): on a shared server with
+  OAuth sign-in, each call exchanges the user's token at the identity provider (RFC 8693, or Entra
+  on-behalf-of) for a token issued for the API. Opt-in per server (`downstreamAuth.tokenExchange`, a
+  switch on Connections); exchanged tokens stay in memory per user until shortly before they expire;
+  the user's token goes only to the token endpoint. A `.default` scope (Entra) isn't judged against an
+  operation's scopes.
 - Clashing tool names, the user's choice: when two operations would get the same tool name (often the
   same operationId twice), the spec upload shows each one with a suggested name from its method and
   path, to accept or edit (saved as a rule per operation), or to make the server's rule

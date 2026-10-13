@@ -46,6 +46,7 @@ final class Upstream {
     /** apiKey placement per API, from the manifest ({@code in}, {@code name}). */
     private final Map<String, JsonNode> apiKeys;
     private final OAuthTokens tokens;
+    private final TokenExchange exchanges = new TokenExchange(Clock.systemUTC());
 
     Upstream(Map<String, JsonNode> apiKeys, Redactor redactor) {
         this.apiKeys = apiKeys;
@@ -59,6 +60,9 @@ final class Upstream {
         }
     }
 
+    /** Where {@code sent} carries the signed-in user's access token. */
+    static final String SUBJECT = "\u0000subject";
+
     private static final Credential NONE = new Credential(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("type", "none"), null);
 
     /**
@@ -66,7 +70,8 @@ final class Upstream {
      * security (auth.md §2.2): a fromRequest entry when the client sent its header with this request
      * (§2.4), any other entry always.
      *
-     * @param sent     the request's credential headers, by lower-case name
+     * @param sent     the request's credential headers, by lower-case name, and under {@link #SUBJECT} the
+     *                 signed-in user's access token (inbound oauth), for tokenExchange
      * @param security the operation's security requirements (variant {@code security})
      * @param kinds    the API's {@code downstreamAuth.schemes}
      */
@@ -76,11 +81,20 @@ final class Upstream {
             return NONE;
         }
         List<String> expected = new java.util.ArrayList<>();
+        boolean exchange = false;
         String unmet = null;
         for (JsonNode entry : instance.authEntries()) {
             String needs = Satisfaction.unmet(entry, instance, security, kinds);
             if (needs != null) {
                 unmet = unmet == null ? needs : unmet;
+                continue;
+            }
+            if (entry.path("type").asText().equals("tokenExchange")) {
+                String subject = sent.get(SUBJECT);
+                if (subject != null) {
+                    return new Credential(entry, subject);
+                }
+                exchange = true;
                 continue;
             }
             if (!entry.path("type").asText().equals("fromRequest")) {
@@ -96,11 +110,16 @@ final class Upstream {
             }
             expected.add(header);
         }
-        if (unmet != null && expected.isEmpty()) {
+        if (unmet != null && expected.isEmpty() && !exchange) {
             throw new ToolError("AUTH_DOWNSTREAM", instance.id() + "'s credentials can't call this operation: it needs " + unmet,
                     "Use another instance, or ask whoever runs this server for a credential that has it");
         }
-        throw new ToolError("AUTH_DOWNSTREAM", instance.id() + " needs your credential in the " + String.join(" or ", expected) + " header",
+        if (expected.isEmpty()) {
+            throw new ToolError("AUTH_DOWNSTREAM", instance.id() + " calls the API as you: sign in to this server (OAuth) to use it",
+                    "This server exchanges your sign-in for a token for the API; a request without it can't");
+        }
+        throw new ToolError("AUTH_DOWNSTREAM", instance.id() + " needs your credential in the " + String.join(" or ", expected) + " header"
+                + (exchange ? ", or your sign-in to this server" : ""),
                 "Set that header in your MCP client's configuration for this server (its value comes from your environment, not from the agent)");
     }
 
@@ -141,8 +160,12 @@ final class Upstream {
                 throw tlsError(instance, again);
             }
         }
-        if (response.statusCode() == 401 && credential.type().equals("oauth2ClientCredentials")) {
-            tokens.discard(instance);
+        if (response.statusCode() == 401 && (credential.type().equals("oauth2ClientCredentials") || credential.type().equals("tokenExchange"))) {
+            if (credential.type().equals("tokenExchange")) {
+                exchanges.discard(instance, credential.value());
+            } else {
+                tokens.discard(instance);
+            }
             try {
                 response = attempt(instance, request, client, credential);
             } catch (SSLException e) {
@@ -174,6 +197,8 @@ final class Upstream {
                     (auth.path("username").asText() + ":" + auth.path("password").asText()).getBytes(StandardCharsets.UTF_8)));
             case "bearer" -> http.header("Authorization", "Bearer " + auth.path("token").asText());
             case "oauth2ClientCredentials" -> http.header("Authorization", "Bearer " + tokens.token(instance, client.http()));
+            // the user's identity: their token exchanged for one for this API (the user's own token never goes to the API)
+            case "tokenExchange" -> http.header("Authorization", "Bearer " + exchanges.token(instance, auth, credential.value(), client.http()));
             case "apiKey" -> {
                 JsonNode placement = apiKeys.get(instance.api());
                 if (placement == null) {

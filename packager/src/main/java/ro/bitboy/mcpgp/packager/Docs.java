@@ -162,6 +162,7 @@ final class Docs {
         }
         md.append("\nExample: `").append(server).append(".example.yaml`.\n");
         fromRequest(md);
+        tokenExchange(md);
         return md.toString();
     }
 
@@ -403,6 +404,26 @@ final class Docs {
                 + "- [Configuration](docs/CONFIGURATION.md)\n- [Tools](docs/TOOLS.md)\n- [Operations](docs/OPERATIONS.md)\n";
     }
 
+    /** Calling the API as the signed-in user (auth.md §2.5), when the build allows it. */
+    private void tokenExchange(StringBuilder md) {
+        boolean enabled = false;
+        for (JsonNode api : manifest.path("apis")) {
+            enabled |= api.at("/downstreamAuth/tokenExchange").isObject();
+        }
+        if (!enabled) {
+            return;
+        }
+        md.append("\n## Calling the API as the signed-in user\n\n")
+                .append("With `auth: { type: tokenExchange }` the server calls the API with each user's own identity: the user signs in to the\n")
+                .append("server with OAuth (`server.auth.mode: oauth`, HTTP), and for every call the server exchanges that sign-in at your identity\n")
+                .append("provider for a token issued for the API (RFC 8693, or Microsoft Entra's on-behalf-of with `flavor: entra-obo`). The user's\n")
+                .append("own token goes only to the token endpoint; exchanged tokens stay in memory until shortly before they expire.\n\n")
+                .append("```yaml\nauth:\n  - type: tokenExchange\n    tokenUrl: https://login.example.com/oauth2/token\n")
+                .append("    clientId: ${env:EXCHANGE_CLIENT_ID}\n    clientSecret: ${env:EXCHANGE_CLIENT_SECRET}\n")
+                .append("    audience: https://api.example.com        # what the identity provider issues the token for\n")
+                .append("    scopes: [orders.read]\n  - { type: bearer, token: ${env:SERVICE_TOKEN} }   # optional, for requests without a user\n```\n");
+    }
+
     /** How a client sends its own credential for the API (auth.md §2.4), when the build allows it. */
     private void fromRequest(StringBuilder md) {
         boolean enabled = false;
@@ -441,6 +462,9 @@ final class Docs {
             a.at("/downstreamAuth/supported").forEach(t -> types.add(t.asText()));
             if (a.at("/downstreamAuth/fromRequest").isObject()) {
                 types.add("fromRequest");
+            }
+            if (a.at("/downstreamAuth/tokenExchange").isObject()) {
+                types.add("tokenExchange");
             }
         });
         return List.copyOf(types);

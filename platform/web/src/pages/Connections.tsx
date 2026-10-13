@@ -68,6 +68,7 @@ function Settings({ id, manifest }: { id: string; manifest: Manifest }) {
               </dl>
               <FromRequest id={id} api={a.id} server={manifest.server.name} several={manifest.apis.length > 1 || multi}
                 current={a.downstreamAuth.fromRequest} />
+              <TokenExchangeSwitch id={id} api={a.id} on={!!a.downstreamAuth.tokenExchange} />
             </>
           )}
         </div>
@@ -131,6 +132,41 @@ function FromRequest({ id, api: apiId, server, several, current }: {
           <button type="submit" className="btn btn-sm btn-primary" disabled={!valid || save.isPending}>{enabled ? 'Save header' : 'Allow'}</button>
           {enabled && <button type="button" className="btn btn-sm" disabled={save.isPending} onClick={() => save.mutate(false)}>Turn off</button>}
         </form>
+      )}
+      <ErrorBox error={save.error} />
+    </div>
+  )
+}
+
+/** Whether instances may call the API as the signed-in user, their OAuth sign-in exchanged at the identity provider. */
+function TokenExchangeSwitch({ id, api: apiId, on }: { id: string; api: string; on: boolean }) {
+  const { can } = useSession()
+  const queryClient = useQueryClient()
+  const serverData = useServer(id)
+  const editable = can('servers:write') && !serverData.data?.archived
+  const save = useMutation({
+    mutationFn: (enable: boolean) => api.saveEdit(id, serverData.data?.latestVersion ?? 0, [enable
+      ? { op: 'set', path: `/apis/[id=${apiId}]/downstreamAuth/tokenExchange`, value: {} }
+      : { op: 'remove', path: `/apis/[id=${apiId}]/downstreamAuth/tokenExchange` }],
+      enable ? 'Instances may call the API as the signed-in user' : 'Instances no longer call the API as the signed-in user'),
+    onSuccess: async () => {
+      for (const key of ['server', 'manifest', 'servers', 'version', 'example-config']) await queryClient.invalidateQueries({ queryKey: [key] })
+    },
+  })
+  return (
+    <div className="list" style={{ gap: 8, marginTop: 6 }}>
+      <h2>The signed-in user's identity</h2>
+      <p className="hint">
+        For a shared server whose users sign in with your identity provider (OAuth): every call exchanges the user's sign-in for a token
+        issued for the API (token exchange, or Microsoft Entra on-behalf-of), so the API sees who is calling. The user's own token goes
+        only to your identity provider. Whoever runs the server configures the exchange.
+      </p>
+      <dl className="kv"><dt>Allowed</dt><dd>{on ? 'Yes' : 'No'}</dd></dl>
+      {editable && (
+        <div className="actions">
+          <button type="button" className={'btn btn-sm' + (on ? '' : ' btn-primary')} disabled={save.isPending} onClick={() => save.mutate(!on)}>
+            {on ? 'Turn off' : 'Allow'}</button>
+        </div>
       )}
       <ErrorBox error={save.error} />
     </div>

@@ -143,6 +143,8 @@ public final class McpServerFactory {
     public static final String CLIENT_KEY = "mcpgp.client";
     /** The request's credential headers for the API (auth.md §2.4), by lower-case name: for this request only, never kept. */
     public static final String CREDENTIALS_KEY = "mcpgp.credentials";
+    /** The signed-in user's access token (inbound oauth, already checked), for tokenExchange (auth.md §2.5): this request only. */
+    public static final String SUBJECT_TOKEN_KEY = "mcpgp.subjectToken";
 
     /** stdio. */
     public McpSyncServer create(McpServerTransportProvider transport) {

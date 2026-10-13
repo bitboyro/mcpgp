@@ -67,7 +67,8 @@ final class ConfigSchema {
             for (JsonNode branch : auth.path("oneOf")) {
                 String type = branch.at("/properties/type/const").asText();
                 boolean fromRequest = type.equals("fromRequest") && api.at("/downstreamAuth/fromRequest").isObject();
-                if (type.equals("none") || supported.contains(type) || fromRequest) {
+                boolean exchange = type.equals("tokenExchange") && api.at("/downstreamAuth/tokenExchange").isObject();
+                if (type.equals("none") || supported.contains(type) || fromRequest || exchange) {
                     branches.add(branch);
                 }
             }

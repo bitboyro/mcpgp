@@ -83,6 +83,10 @@ public final class ExampleConfig {
                 lines.add(more + "# or the client's own credential, from a request header (HTTP only), then the one above when it's missing:");
                 lines.add(more + "# auth: [ { type: fromRequest }, { type: " + type + ", … } ]");
             }
+            if (api.at("/downstreamAuth/tokenExchange").isObject()) {
+                lines.add(more + "# or as the signed-in user (server.auth.mode: oauth): their sign-in exchanged for a token for the API:");
+                lines.add(more + "# auth: { type: tokenExchange, tokenUrl: https://login.example.com/oauth2/token, clientId: …, clientSecret: …, audience: … }");
+            }
             lines.add(more + "# tls: { ca: { path: ./certs/ca.pem } }   # for internal CAs; or `instance trust`");
         }
         lines.add("");
