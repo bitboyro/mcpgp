@@ -140,9 +140,13 @@
             "method": { "enum": ["GET", "HEAD", "POST"] },
             "path": { "type": "string", "pattern": "^/" },
             "pattern": { "type": "string" },
+            "field": { "description": "JSON pointer to the version in a JSON answer (/version); the pattern is matched against its value", "type": "string", "pattern": "^/" },
+            "header": { "description": "Read the version from this response header instead of the body", "type": "string", "minLength": 1 },
+            "underBasePath": { "description": "Ask under each contract's base path in turn (the preferred contract first, then the newest), not at the address as given", "type": "boolean" },
             "onFailure": { "enum": ["useDefault", "refuse"] }
           },
           "required": ["path", "pattern"],
+          "not": { "required": ["field", "header"] },
           "additionalProperties": false
         },
         "select": {

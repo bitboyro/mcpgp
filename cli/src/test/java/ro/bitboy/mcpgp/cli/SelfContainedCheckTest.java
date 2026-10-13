@@ -84,8 +84,10 @@ class SelfContainedCheckTest {
         // a target on loopback, by IP (so nothing needs a name lookup)
         AtomicInteger requests = new AtomicInteger();
         HttpServer target = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicInteger versionRequests = new AtomicInteger();
         target.createContext("/", exchange -> {
-            requests.incrementAndGet();
+            // the server first asks which version the target runs (runtime-config §4.4), at the same address
+            (exchange.getRequestURI().getPath().endsWith("/version") ? versionRequests : requests).incrementAndGet();
             byte[] body = "{\"id\":\"1\"}".getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, body.length);
@@ -114,6 +116,7 @@ class SelfContainedCheckTest {
             assertThat(server.waitFor(120, TimeUnit.SECONDS)).isTrue();
             assertThat(stdout.lines().count()).as(Files.readString(dir.resolve("err.txt"))).isEqualTo(3);
             assertThat(requests.get()).as("the tool call reached the target").isEqualTo(1);
+            assertThat(versionRequests.get()).as("the version requests, one per contract's base path").isEqualTo(2);
 
             List<String> outside = new ArrayList<>();
             for (String line : Files.readAllLines(trace)) {

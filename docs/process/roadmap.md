@@ -30,7 +30,7 @@ Milestones, in order. Each ends with something demonstrable. Scope per item: see
 | **0.2.6** (released 2026-10-13) | Credentials from the MCP client (`fromRequest`): the client sends the user's credential for the API in a configured header, never stored; instances can list several credentials, tried in order (fallback); a switch on Connections |
 | **0.2.7** (released 2026-10-13) | Per-operation security enforced (tools no credential can call hidden or explained; each call uses the credential that fits); a suffix for every tool and renaming one tool from the UI; audit defaults on Overview; `init --from-spec` copies referenced files; broken schema references are errors; Try starts its server early |
 | **0.3.0** (planned) | Passwords in the web UI: **Change password** in the account menu (current password, the new one twice); **Set password** on a person in API & agents, for admins (a temporary password, optionally to be changed at the next sign-in); **Unlock** for accounts locked after wrong passwords. Company accounts show none of this. |
-| TODO, not yet scheduled | Marked TODO in the docs: `release.versionFrom` other than `contract`, `platform:` in the repository config; git and URL sources on the platform; a native CLI binary. (CLI `diff`, `preview`, `try`, `migrate` and `--no-color`, and the platform's Changes page: on `main`.) |
+| TODO, not yet scheduled | Marked TODO in the docs: `release.versionFrom` other than `contract`, `platform:` in the repository config; git and URL sources on the platform; a native CLI binary. (CLI `diff`, `preview`, `try`, `migrate` and `--no-color`, the platform's Changes page, and contract detection for `auto` instances: on `main`.) |
 
 ## Next (agreed 2026-10-13, not scheduled into a release)
 

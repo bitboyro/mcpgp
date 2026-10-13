@@ -100,7 +100,9 @@ class ConfirmAndAuditTest {
         for (String line : Files.readAllLines(config.audit().file())) {
             JsonNode event = JSON.readTree(line);
             assertThat(SCHEMAS.problems(SchemaKind.AUDIT_EVENT, event)).as("audit event %s", line).isEmpty();
-            events.add(event);
+            if (!event.path("type").asText().equals("instance.contract")) { // written when detection finishes, in the background
+                events.add(event);
+            }
         }
         return events;
     }

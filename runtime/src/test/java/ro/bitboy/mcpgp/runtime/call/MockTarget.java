@@ -66,6 +66,12 @@ public final class MockTarget implements AutoCloseable {
     private final HttpServer server;
     public final List<Received> received = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final ConcurrentLinkedDeque<Response> queue = new ConcurrentLinkedDeque<>();
+    /**
+     * Version requests (contract detection, runtime-config §4.4), kept apart from {@link #received} and
+     * answered from their own queue (default 404), as a target routes them to their own endpoint.
+     */
+    public final List<Received> versionRequests = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final ConcurrentLinkedDeque<Response> versions = new ConcurrentLinkedDeque<>();
 
     public MockTarget() throws IOException {
         this(HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0));
@@ -112,9 +118,16 @@ public final class MockTarget implements AutoCloseable {
         this.server = server;
         server.createContext("/", exchange -> {
             byte[] body = exchange.getRequestBody().readAllBytes();
-            received.add(new Received(exchange.getRequestMethod(), exchange.getRequestURI().getRawPath(),
-                    exchange.getRequestURI().getRawQuery(), Map.copyOf(exchange.getRequestHeaders()), body));
-            Response response = queue.isEmpty() ? Response.json(200, "{}") : queue.poll();
+            Received request = new Received(exchange.getRequestMethod(), exchange.getRequestURI().getRawPath(),
+                    exchange.getRequestURI().getRawQuery(), Map.copyOf(exchange.getRequestHeaders()), body);
+            Response response;
+            if (request.path().endsWith("/version")) {
+                versionRequests.add(request);
+                response = versions.isEmpty() ? Response.json(404, "{}") : versions.poll();
+            } else {
+                received.add(request);
+                response = queue.isEmpty() ? Response.json(200, "{}") : queue.poll();
+            }
             if (response.delayMillis() > 0) {
                 try {
                     Thread.sleep(response.delayMillis());
@@ -135,6 +148,12 @@ public final class MockTarget implements AutoCloseable {
 
     public String address() {
         return (server instanceof com.sun.net.httpserver.HttpsServer ? "https" : "http") + "://127.0.0.1:" + server.getAddress().getPort();
+    }
+
+    /** The answer to the next version request. */
+    public MockTarget respondToVersion(Response response) {
+        versions.add(response);
+        return this;
     }
 
     public MockTarget respond(Response response) {

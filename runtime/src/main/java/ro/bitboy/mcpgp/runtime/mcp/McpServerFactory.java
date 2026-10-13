@@ -70,13 +70,16 @@ public final class McpServerFactory {
         this.clock = clock;
         this.confirmations = new Confirmations(clock);
         this.catalog = new ToolCatalog(manifest, config);
-        builtins.put("instances_list", new InstancesList(manifest, config));
-        builtins.putAll(new Discovery(manifest, config, catalog, this::call).handlers());
+        this.apiTools = new ApiToolHandler(manifest, config);
+        ro.bitboy.mcpgp.runtime.call.Contracts contracts = apiTools.contracts();
+        contracts.onResult(this::contractChosen);
+        contracts.start();
+        builtins.put("instances_list", new InstancesList(manifest, config, contracts));
+        builtins.putAll(new Discovery(manifest, config, catalog, contracts, this::call).handlers());
         this.toolsets = Toolsets.active(manifest) ? Toolsets.of(manifest) : null;
         if (toolsets != null) {
             builtins.putAll(toolsets.handlers());
         }
-        this.apiTools = new ApiToolHandler(manifest, config);
         this.extensions = Extensions.load(manifest);
         if (!extensions.enrichers().isEmpty()) {
             apiTools.enrichment(new ro.bitboy.mcpgp.runtime.call.Enrichment(extensions.enrichers(), (exchange, tool, record) -> context(exchange, tool, record, false)));
@@ -107,6 +110,28 @@ public final class McpServerFactory {
             LOG.warn("Not offered, because this runtime version doesn't implement them yet: {}", String.join(", ", unsupported));
             catalog.remove(unsupported);
         }
+    }
+
+    /** An auto instance's detected contract, or why there's none (runtime-config §4.4), in the audit. */
+    private void contractChosen(RuntimeConfig.Instance instance, ro.bitboy.mcpgp.runtime.call.Contracts.Choice choice) {
+        ObjectNode event = audit.event("instance.contract", choice.available() ? "ok" : "error", Ids.correlation());
+        event.putObject("actor").put("kind", "system");
+        event.put("api", instance.api());
+        event.put("instance", instance.id());
+        if (choice.available()) {
+            event.put("contract", choice.contract());
+        } else {
+            event.put("code", "INSTANCE_UNAVAILABLE");
+        }
+        ObjectNode detection = event.putObject("detection").put("selection", choice.selection());
+        putIfSet(detection, "reported", choice.reported());
+        putIfSet(detection, "reason", choice.reason());
+        audit.write(event);
+    }
+
+    /** Which contract each instance uses (runtime-config §4.4). */
+    public ro.bitboy.mcpgp.runtime.call.Contracts contracts() {
+        return apiTools.contracts();
     }
 
     public ToolCatalog catalog() {

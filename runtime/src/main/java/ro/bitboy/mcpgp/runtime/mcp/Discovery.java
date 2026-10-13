@@ -32,6 +32,7 @@ final class Discovery {
     private final Manifest manifest;
     private final RuntimeConfig config;
     private final ToolCatalog catalog;
+    private final ro.bitboy.mcpgp.runtime.call.Contracts contracts;
     /** Runs a tool call exactly like a direct one. */
     private final BiFunction<McpSyncServerExchange, McpSchema.CallToolRequest, McpSchema.CallToolResult> dispatch;
     private final List<Doc> docs = new ArrayList<>();
@@ -41,11 +42,12 @@ final class Discovery {
     private record Doc(JsonNode tool, Map<String, Integer> terms, int length) {
     }
 
-    Discovery(Manifest manifest, RuntimeConfig config, ToolCatalog catalog,
+    Discovery(Manifest manifest, RuntimeConfig config, ToolCatalog catalog, ro.bitboy.mcpgp.runtime.call.Contracts contracts,
               BiFunction<McpSyncServerExchange, McpSchema.CallToolRequest, McpSchema.CallToolResult> dispatch) {
         this.manifest = manifest;
         this.config = config;
         this.catalog = catalog;
+        this.contracts = contracts;
         this.dispatch = dispatch;
         for (JsonNode tool : catalog.all().values()) {
             if (!tool.path("kind").asText().equals("api")) {
@@ -202,7 +204,8 @@ final class Discovery {
         Map<String, String> contracts = new LinkedHashMap<>();
         for (RuntimeConfig.Instance i : config.allInstances()) {
             if (i.id().equals(instance)) {
-                contracts.put(i.api(), i.contract().equals("auto") ? manifest.apis().get(i.api()).defaultContract() : i.contract());
+                String contract = this.contracts.of(i).contract();
+                contracts.put(i.api(), contract != null ? contract : manifest.apis().get(i.api()).defaultContract());
             }
         }
         return contracts;

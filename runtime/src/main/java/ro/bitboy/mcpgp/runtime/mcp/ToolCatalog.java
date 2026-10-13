@@ -69,20 +69,23 @@ public final class ToolCatalog {
             List<String> reasons = new ArrayList<>();
             boolean usable = false;
             for (RuntimeConfig.Instance instance : config.instances().getOrDefault(api.id(), List.of())) {
-                String contract = instance.contract().equals("auto") ? api.defaultContract() : instance.contract();
-                JsonNode variant = tool.path("variants").get(contract);
-                JsonNode security = variant == null ? null : variant.get("security");
-                if (variant != null && security != null && security.isArray() && security.isEmpty()) {
-                    usable = true; // a public operation
-                    break;
-                }
-                String unmet = variant == null ? null : ro.bitboy.mcpgp.runtime.call.Satisfaction.unmet(instance, security, kinds);
-                if (variant != null && unmet == null) {
-                    usable = true;
-                    break;
-                }
-                if (unmet != null) {
+                // an auto instance may run any shipped contract (detection decides): a tool usable in one of them stays
+                for (String contract : instance.contract().equals("auto") ? api.contracts().keySet() : List.of(instance.contract())) {
+                    JsonNode variant = tool.path("variants").get(contract);
+                    if (variant == null) {
+                        continue;
+                    }
+                    JsonNode security = variant.get("security");
+                    String unmet = security != null && security.isArray() && security.isEmpty() ? null // a public operation
+                            : ro.bitboy.mcpgp.runtime.call.Satisfaction.unmet(instance, security, kinds);
+                    if (unmet == null) {
+                        usable = true;
+                        break;
+                    }
                     reasons.add(instance.id() + " (" + instance.authType() + "): needs " + unmet);
+                }
+                if (usable) {
+                    break;
                 }
             }
             if (!usable && !reasons.isEmpty()) {

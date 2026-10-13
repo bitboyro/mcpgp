@@ -18,9 +18,11 @@ apis:
         spec: contracts/orders-2.0.yaml          # OpenAPI 3.1
         overlays: [overlays/2.0-descriptions.yaml]
         default: true
-    detect:
+    detect:                                    # for instances with contract: auto (runtime-config §4.4)
       method: GET
       path: /version
+      underBasePath: true                      # each version answers under its own base path (/api/v2/version, /api/v1/version)
+      field: /version                          # the answer is { "version": "2.0.3" }
       pattern: '^(\d+\.\d+)'
     select:
       access: read-write                       # no DELETE tools

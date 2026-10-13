@@ -85,7 +85,7 @@ Full example: [examples/manifest/orders-mcp.manifest.json](../../examples/manife
     { "version": "1.0", "format": "swagger-2.0", "digest": "sha256:…", "basePath": "/api/v1", "default": false },
     { "version": "2.0", "format": "openapi-3.1", "digest": "sha256:…", "basePath": "/api/v2", "default": true }
   ],
-  "detect": { "method": "GET", "path": "/version", "pattern": "^(\\d+\\.\\d+)" },
+  "detect": { "method": "GET", "path": "/version", "underBasePath": true, "field": "/version", "pattern": "^(\\d+\\.\\d+)" },
   "downstreamAuth": {
     "supported": ["basic", "apiKey", "oauth2ClientCredentials", "mtls"],
     "identity": "service-account",

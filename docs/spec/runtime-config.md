@@ -166,6 +166,7 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `instances[].id` | — | `[a-z0-9-]{1,40}`; unique |
 | `instances[].baseUrl` | — | the complete address of the target server (§4.1); must match the build's base-URL allowlist if one is set |
 | `instances[].contract` | `auto` | `auto` or a shipped version |
+| `instances[].prefer` | the default contract | with `auto`: the contract detection asks about first (§4.4), for a target you expect to run it |
 | `instances[].auth.type` | — | one of the build's supported types, or `fromRequest` when the definition allows it (auth.md §2.4) |
 | `instances[].auth` (list) | — | several credentials tried in order: a `fromRequest` entry when its header is in the request, any other entry always |
 | `instances[].auth` (`tokenExchange`) | — | `tokenUrl`, `clientId`, `clientSecret`, `clientAuth`, `flavor` (`rfc8693` · `entra-obo`), `audience`, `resource`, `scopes`; needs `server.auth.mode: oauth` (auth.md §2.5) |
@@ -240,17 +241,38 @@ directory is created with owner-only permissions; config and `.env` usually live
 
 ### 4.4 Contract detection
 
-For instances with `contract: auto`, when the definition gives a detection rule (`apis[].detect`):
+For instances with `contract: auto`, when the definition gives a detection rule (`apis[].detect`),
+the server asks each target which version it runs, once per instance, at startup and on every reload;
+never per call. Starting waits up to 2 seconds for the answers; a slower target answers in the
+background, and calls to that instance wait for it.
 
-1. At startup (and on reload) the server calls the detection endpoint and matches the reported
-   version against the shipped contracts.
-2. Match → that contract is used.
-3. No rule, endpoint unreachable, or a version that matches no shipped contract → behaviour from the
-   definition's `apis[].detect.onFailure`:
-   - `useDefault` (default): use the default contract, log a warning, record it in the audit
-     `server.start` / `config.reload` event, and show it in `doctor` and `instances_list`;
-   - `refuse`: this instance is unavailable (others keep working) until detection succeeds.
-4. A pinned contract (`contract: "1.0"`) skips detection; if a rule exists, a mismatch is a warning.
+1. **Where it asks.** `detect.path` at the instance's address. With `underBasePath: true`, under each
+   contract's base path in turn: the instance's `prefer` contract (or the build's default) first,
+   then the others, newest first (`/api/v2/version`, then `/api/v1/version`). An address with its own
+   path is used as it is, for every contract.
+2. **What it reads.** `field` (a JSON pointer, `/version`) picks the value from a JSON answer;
+   `header` reads a response header instead; with neither, the whole body. `pattern` is matched
+   against that value, and its first group (or the whole match) names the version: the shipped
+   contract with the same version, or the longest one it starts with (`2.0.3` → `2.0`).
+3. **Which answer counts.** The first answer the pattern matches decides, even when it names a
+   version the build doesn't ship. A `4xx` means "not here": the next base path is asked. A `5xx`, a
+   timeout or an unreachable target ends detection.
+4. **Credentials.** The request carries the instance's own credential (basic, bearer, API key, client
+   credentials). Per-caller credentials (`fromRequest`, `tokenExchange`) only exist with a call, so the
+   request goes without them first; when the target answers `401`/`403`, the first call to that
+   instance asks again with that caller's credential, and the answer serves every caller. Until then
+   the instance behaves as for a failed detection.
+5. **No answer, or a version not shipped** → `apis[].detect.onFailure`:
+   - `useDefault` (default): the default contract, with a warning in the log, an `instance.contract`
+     audit event, and a note in `instances_list` and `doctor`;
+   - `refuse`: this instance is unavailable (others keep working). Its calls answer
+     `INSTANCE_UNAVAILABLE` with the reason, and while it is refused a call asks the target again,
+     at most once a minute, so it recovers without a restart.
+6. **Pinned instances** (`contract: "1.0"`) use that contract and are never asked. `doctor` asks
+   every target with a rule and warns when a pinned instance's target reports another version.
+
+Each result is logged and written as an `instance.contract` audit event (contract, how it was
+chosen, what the target reported).
 
 ### 4.5 Error detail
 
