@@ -29,7 +29,8 @@ Every test ends in a real MCP client call that travels through the **packaged** 
   suite: checksums, `minisign` signature, byte-identical rebuild, `--validate-config` on the example
   configs, compiler diagnostics cases.
 
-Pass: 0 failed steps, 0 mock violations, coverage complete (§6), no retries, no quarantine.
+Pass: 0 failed steps, 0 mock violations, coverage complete (§6), no retries, no quarantine, and
+performance within budget (§8). Every run produces the gate report (§9).
 
 ## 2. What exists today (code analysis)
 
@@ -59,7 +60,7 @@ Pass: 0 failed steps, 0 mock violations, coverage complete (§6), no retries, no
 | Packages are built in tests, never tested as customers run them | `.mcpb` launch (`java -jar ${__dirname}/server/<server>.jar`, env from `user_config`) and the Docker files are not exercised | Launchers per format |
 | 4 conformance cases (2 negative); 1 of 38 diagnostic codes has a case | Most behaviour is covered only by in-process unit tests | Suites S0–S7 |
 | `ci.yml` only; no release workflow | Nothing can block a release | `release.yml` with the gate in front of publishing |
-| No requirement IDs in `requirements.md`; no `AGENTS.md` | "Tests added" is a checkbox | Coverage rule (§8) |
+| No requirement IDs in `requirements.md`; no `AGENTS.md` | "Tests added" is a checkbox | Coverage rule (§10) |
 
 ### 2.3 Facts the plan depends on
 
@@ -95,7 +96,8 @@ Pass: 0 failed steps, 0 mock violations, coverage complete (§6), no retries, no
 | C2 | Structured `reason` next to `code` in `structuredContent` for `INPUT_VALIDATION` | Tests (and agents) shouldn't parse message prefixes |
 | C3 | A test clock for packaged servers, e.g. `MCPGP_TEST_CLOCK_OFFSET`, honoured only with `--test-mode` and refused otherwise | Token expiry and audit rotation can't be tested against a package without waiting |
 | C4 | `mcpgp build --docker-image` (or a documented script) producing the image the customer would build | Docker launcher; also closes "image push/tar later" in the roadmap |
-| C5 | Requirement IDs in `requirements.md`; changelog entries reference them | Coverage rule (§8) |
+| C5 | Requirement IDs in `requirements.md`; changelog entries reference them | Coverage rule (§10) |
+| C6 | Performance requirements (`R17.x`) in `requirements.md`: startup, call overhead, concurrency, memory, sizes | Budgets for S8 (§8) |
 
 ## 3. The validating mock
 
@@ -127,7 +129,7 @@ fixture: kitchen-sink-oas31          # shared fixture, or definition/ next to th
 profile: multi-3                     # runtime config profile
 client: { revision: all-claimed, elicitation: absent }   # accept | decline | absent
 tags: [smoke]                        # smoke: also on macOS and Windows
-covers: [R4.24, R5.3]                # requirement IDs (§8)
+covers: [R4.24, R5.3]                # requirement IDs (§10)
 mock: { seed: notes-basic }
 
 steps:
@@ -179,7 +181,8 @@ orchestrator
  │            docker: build the image as INSTALL says, run with the profile mounted (Linux)
  ├─ client    one session per case; capabilities and revision from the case
  ├─ assert    expect · upstream (journal + violations) · observe (audit tail, OTLP sink, stderr)
- └─ report    JUnit XML · coverage · failure bundles
+ ├─ measure   S8: timings from client and mock, process memory, sizes (§8)
+ └─ report    gate report HTML + JSON (§9) · JUnit XML · failure bundles
 ```
 
 - One server per (fixture, profile, matrix row); cases with `restart` or config changes get their own.
@@ -201,7 +204,8 @@ Run in this order; a failing suite stops the ones after it.
 | **S4 Behaviour** | By area: content types, files, results and truncation, paging, confirmation, exposure, instances, contract versions, downstream auth, inbound auth, TLS, extensions, packs, resources and prompts, progress, elicitation, completion | by hand | ~150–250 |
 | **S5 Operator** | Config sources (YAML, JSON, env only give the same results), reload, rotation, `init`/`doctor`/`instance`/`client add`, audit modes, telemetry, health | by hand | ~50 |
 | **S7 Negative** | §7 | by hand | ~120 |
-| **S6 Coverage** | Not tests: merges `covers:` with mock coverage; fails on any gap (§8) | computed | — |
+| **S8 Performance** | §8: startup, call overhead, concurrency, memory, sizes, against budgets and the previous release | scenarios | ~20 scenarios |
+| **S6 Coverage** | Not tests: merges `covers:` with mock coverage; fails on any gap (§10) | computed | — |
 
 S3 writes any failing generated step out as a traffic v2 file for `cases/regressions/`.
 
@@ -233,6 +237,7 @@ secrets, allowlist).
 | T1 | Linux | All suites × {jar, mcpb, docker} × {stdio, http} × 3 revisions; S3 in full on jar, sampled on the others | ≤ 20 min, sharded |
 | T2 | macOS, Windows | `smoke` cases of S0, S1, S4 × {jar, mcpb} × stdio × newest revision | ≤ 10 min |
 | PR | Linux | Java in-process runner + T1 for jar over stdio | ≤ 8 min |
+| Perf | Linux, one fixed runner size | S8, previous and new release interleaved on the same machine (§8.3) | ≤ 25 min |
 
 ## 7. Negative tests (S7)
 
@@ -252,7 +257,92 @@ OTLP); and the aftermath (the next call in the session works, the audit file has
 Compiler diagnostics never reach a server: each of the 38 codes in `core/.../diag/Codes.java` gets an
 `expected/diagnostics.json` case, run as a package precondition.
 
-## 8. Keeping it current
+## 8. Performance (S8)
+
+Nothing in the specs sets a performance target today; the runtime records `mcpgp.tool.duration`
+(`Telemetry`) and audit events carry `latencyMs`, but no budget exists. S8 measures the packaged
+server the same way the other suites test it: through MCP calls, against the mock. Budgets become
+requirements (`R17.x`, C6) so they are covered like any other.
+
+### 8.1 What is measured
+
+The mock answers instantly and stamps when each request arrives and its reply leaves, so a call's
+time splits into **mcpgp overhead** (client-side duration minus time spent in the mock) and upstream
+time. Overhead is what mcpgp controls and what budgets apply to.
+
+| Metric | Scenario | Per |
+|---|---|---|
+| **Startup** | Process start → `/health/ready` (http) or the first `initialize` reply (stdio), cold, 10 runs | format, transport, fixture size |
+| **Time to first tool call** | Start → `initialize` → `tools/list` → first `tools/call` answered | format, transport |
+| **Surface cost** | `tools/list` size in bytes and in tokens (one fixed tokenizer), and its latency | fixture, exposure mode |
+| **Call overhead** | p50 / p95 / p99 over 1,000 warmed calls: small GET, JSON POST, multipart 1 MB and 10 MB, binary download 10 MB, a response truncated at the limit, a discovery `invoke` | transport, revision |
+| **Concurrency** | 1, 8, 32, 128 concurrent sessions over Streamable HTTP for 60 s: throughput, p99 overhead, error count (must be 0) | profile |
+| **Token sharing** | 64 concurrent calls with OAuth client credentials on a cold cache: token requests (must be 1) and the wait added | — |
+| **Memory** | RSS and heap at idle, after warm-up, after the 128-session run; growth over 10,000 calls (leak check) | format |
+| **Reload** | Config change → first call using the new instance | file watch, `reload` command |
+| **Cost of options** | Overhead with audit `hashed` vs `none`, telemetry on vs off, an extension enricher on vs off | — |
+| **Sizes** | jar, `.mcpb`, zip, Docker image | format |
+| **Build** | `mcpgp build` time per fixture | fixture |
+
+Memory comes from the process (RSS read by the runner; `docker stats` for the image) and from JVM
+metrics on `/metrics` where the profile enables them.
+
+### 8.2 Budgets
+
+Two kinds, both recorded in `conformance/perf/budgets.yaml` with the requirement ID they cover:
+
+- **Absolute budgets**, generous, so a slow CI machine doesn't trip them (starting values to confirm
+  with the first measurements: startup ≤ 3 s for the jar, p95 overhead ≤ 15 ms for a small GET, 0
+  errors at 128 sessions, heap growth ≤ 5 % over 10,000 calls, one token request under concurrency).
+- **Regression budgets** against the previous release, measured on the same machine in the same job
+  (§8.3): fail when a metric is worse by more than its threshold (proposed: 10 % for overhead and
+  startup, 5 % for package sizes and surface tokens) **and** the 95 % interval of the difference
+  excludes zero. A difference inside the noise is reported as a tie and passes.
+
+### 8.3 Method
+
+- **A/B on one machine.** Hosted runners vary by more than the regressions worth catching, so the
+  perf job downloads the previous release's packages and runs both versions interleaved
+  (old, new, old, new …) on the same runner; only differences within that job count.
+- Fixed runner size; warm-up excluded; each scenario repeated (startup 10 runs, latency 1,000 calls
+  × 3 rounds); medians and percentiles with bootstrap intervals; the random seed and machine details
+  recorded.
+- Load comes from the same TypeScript client as the other suites (several SDK sessions), so it
+  measures what MCP clients actually see.
+- **Advisory first.** S8 reports from G5 on; absolute budgets block after the first release that
+  sets them; regression budgets block after three releases with stable numbers.
+
+## 9. Gate report
+
+Every gate run, on a PR or a release, produces one report.
+
+| Output | For | Where |
+|---|---|---|
+| `gate-report.html` | People: one self-contained page (inline CSS and SVG charts, no external requests), readable offline | CI workflow artifact on every run; release asset on every release |
+| `gate-report.json` | Machines: every result, measurement and environment detail; schema `gate-report.schema.json` in `schemas/` | Same places; the next release reads the previous one from here |
+| PR comment | Reviewers: verdict, failures, coverage gaps and perf deltas in a few lines, linking the full report | The PR |
+| JUnit XML | The GitHub checks UI | Workflow artifact |
+
+**Contents of the HTML report:**
+
+1. **Verdict**: pass or fail, and why: the blocking findings first.
+2. **Run**: version, commit, previous release compared against, matrix, runner, JVM, seeds, duration.
+3. **Correctness**: a suite × matrix-row grid (S0–S7); every failure with its repro command and a
+   link to its failure bundle.
+4. **Coverage** (S6): requirements covered, gaps, the new requirement IDs of this release and whether
+   their cases were red on the previous release (§10).
+5. **Surface**: tools added, removed and changed against the previous release (from S2), and the
+   surface cost per exposure mode.
+6. **Performance** (S8): a table of every metric against its budget and the previous release, with
+   the delta, its interval, and the verdict (better, tie, worse, over budget). Charts: startup per
+   format, overhead percentiles per call kind, throughput and p99 against concurrency, memory over the
+   10,000-call run.
+7. **Trend**: the main numbers across past releases, read from their `gate-report.json` assets.
+
+The release job attaches the report to the GitHub release, and the release notes link to it, so
+customers can see what a version was tested against.
+
+## 10. Keeping it current
 
 **Rule: no feature or fix ships unless Gate A has cases for it, at least one positive and one
 negative, that pass on this release and fail on the previous one.**
@@ -276,7 +366,7 @@ negative, that pass on this release and fail on the previous one.**
    requirement ID and proves them red on the previous release; a local hook runs
    `gate coverage --changed`; CI enforces it for people and agents alike.
 
-## 9. Work packages
+## 11. Work packages
 
 Estimates: engineer-days by hand / at the current agent-assisted pace. The second is bounded by
 review, not by writing.
@@ -294,22 +384,25 @@ review, not by writing.
 | W9 | Hand-written suites | S0, S1, S4, S5, S7 (~400 cases); C2, C3 | W3–W6 | 20–40 | 3–6 |
 | W10 | Coverage and rule | C5, `coverage.yaml`, S6, `gate-coverage`, red-on-previous, `AGENTS.md`, skill | W2 | 4–6 | 1 |
 | W11 | CI | `release.yml`, sharding, caching, T2 runners, publishing behind the gate | W3 | 4–6 | 1–2 |
-| | **Total** | | | **~70–110** | **~12–20 days** |
-| W12 | Fixing what it finds | Open-ended | | +30–50 % | +30–50 % |
+| W12 | Gate report | `gate-report.schema.json`; JSON writer; self-contained HTML (verdict, correctness, coverage, surface); PR comment; release asset; trend from past releases | W3 | 4–6 | 1 |
+| W13 | Performance | Mock timestamps; S8 scenarios; load sessions; process memory; A/B against the previous release; bootstrap intervals; `budgets.yaml`; C6; perf section and charts of the report | W3, W4, W12 | 6–10 | 1–2 |
+| | **Total** | | | **~80–125** | **~14–23 days** |
+| W14 | Fixing what it finds | Open-ended | | +30–50 % | +30–50 % |
 
 Not compressible: reviewing expected values and golden files, the spec questions S7 raises, CI
 round-trips on macOS, Windows and Docker, and flake hunting.
 
-## 10. Milestones
+## 12. Milestones
 
 | Milestone | Packages | Exit criterion |
 |---|---|---|
-| **G1 · Minimal gate** | W1, W2, W3, W11 (Linux, jar), S3 on `kitchen-sink-oas31` | The 4 existing cases pass through both runners; `release.yml` publishes only after the gate; the first RC is gated |
+| **G1 · Minimal gate** | W1, W2, W3, W11 (Linux, jar), W12 (verdict and correctness), S3 on `kitchen-sink-oas31` | The 4 existing cases pass through both runners; `release.yml` publishes only after the gate; the first RC is gated and its report is attached to the release |
 | **G2 · Breadth** | W4, W6, W7, W8 | All formats and fixtures; S2 golden files reviewed |
 | **G3 · Depth** | W5, W9 | S1, S4, S5, S7 green; P0 requirements covered |
 | **G4 · Discipline** | W10, T2 runners | S6 blocking; the PR and release coverage checks on |
+| **G5 · Performance** | W13, the rest of W12 | S8 in the report against the previous release; absolute budgets blocking after the first release that records them; regression budgets blocking after three stable releases |
 
-## 11. Decisions needed before G1
+## 13. Decisions needed before G1
 
 1. Client language for the runner: TypeScript (recommended, the SDK most clients use) or Python.
 2. Release candidates: gate on `v*-rc*` tags and publish the final tag only if its RC passed on the
@@ -318,8 +411,10 @@ round-trips on macOS, Windows and Docker, and flake hunting.
 4. S3 depth per tool and release (proposed: 5 valid sets + every one-constraint mutation).
 5. Whether `mcpgp test` keeps its simple `tool-tests` format for customers (proposed: yes, translated
    to traffic v2 internally).
+6. Before G5: the perf runner size (hosted or self-hosted), the tokenizer used for surface cost, the
+   starting budgets (§8.2), and whether the report is linked from customer-facing release notes.
 
-## 12. Out of scope
+## 14. Out of scope
 
 - The platform (web UI, REST API, platform MCP server, library, approvals): its own suite.
 - **Agent tests (Option B)** with [harness-lab](https://github.com/bitboyro/harness-lab), later. Changes it

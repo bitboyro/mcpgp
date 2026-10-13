@@ -14,7 +14,7 @@ Milestones, in order. Each ends with something demonstrable. Scope per item: see
 | **M6 · Web UI** ✓ | Final-direction UI | Pages from the design canvas on top of the API, editing a server's settings on its page, sign-in with local accounts, OIDC and LDAP / Active Directory. Follow-ups in [design/ui.md](../design/ui.md) |
 | **M7 · P1 wave** ✓ | Breadth | OTLP telemetry (moved from M3, 2026-10-10; ✓ with Prometheus /metrics), OAuth inbound (✓), OAuth CC + mTLS downstream (✓), discovery/hybrid/toolsets (✓), desktop bundle (✓), Docker (✓ files; image push/tar later), multi-API servers (✓ end to end), agent docs (✓), platform MCP server (✓, a package agents run with their own token), recording pack (✓) |
 | **M8 · P1 completion** (in progress) | The rest of P1 | Resources (✓), prompts with completion and progress (✓); CLI `push`, `test`, `init --from-spec` (✓); UI follow-ups (operations on and off on Tools & rules (✓), Naming section (✓), try against the mock (✓), formats on Package & deliver (✓)); codegen mode and the extension SPI (✓) |
-| **M9 · Release gate** (after 0.1.0) | Releases blocked by an integration suite | [release-gate.md](release-gate.md): packaged servers driven by an independent MCP client against a validating API mock; G1 minimal gate → G4 coverage rule enforced |
+| **M9 · Release gate** (after 0.1.0) | Releases blocked by an integration suite | [release-gate.md](release-gate.md): packaged servers driven by an independent MCP client against a validating API mock; performance measured against the previous release; a gate report attached to every release. G1 minimal gate → G5 performance budgets |
 
 Deferred: harness-lab comparison; per-user downstream identity; other languages.
 
