@@ -82,6 +82,20 @@ export interface Identity {
   lockedUntil?: string
 }
 
+/** One change between two builds: `impact` breaking (agents or clients of the earlier build need updating), notable or info. */
+export interface VersionChange { impact: 'breaking' | 'notable' | 'info'; tool: string | null; kind: string; text: string }
+
+export interface VersionDiff {
+  from: { version: number; serverVersion: string; released: boolean }
+  to: { version: number; serverVersion: string }
+  /** The version of the last released build, if there is one. */
+  released: number | null
+  summary: string
+  breaking: number
+  changes: VersionChange[]
+  markdown: string
+}
+
 export interface Token {
   id: string
   identity: string
@@ -455,6 +469,8 @@ export const api = {
   applyNotices: (name: string, body: { servers?: string[]; version?: number; message?: string }) =>
     json<{ results: ApplyResult[] }>('POST', `/library/notices/${enc(name)}/apply`, body),
 
+  /** What changed between two versions (`from`/`to`: a number, `latest` or `released`; defaults: the last release, the latest). */
+  diff: (id: string, from?: string, to?: string) => json<VersionDiff>('GET', `/servers/${enc(id)}/diff` + q({ from, to })),
   identities: () => json<Items<Identity>>('GET', '/identities'),
   setPassword: (id: string, body: { password: string; currentPassword?: string; mustChange?: boolean }) =>
     json<{ identity: string; mustChange: boolean }>('PUT', `/identities/${enc(id)}/password`, body),

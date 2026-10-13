@@ -37,7 +37,8 @@ import java.util.concurrent.TimeUnit;
 /** {@code mcpgp}: the command line (spec/cli.md). Exit codes follow cli.md §4. */
 @Command(name = "mcpgp", mixinStandardHelpOptions = true, scope = CommandLine.ScopeType.INHERIT, version = Compiler.VERSION,
         description = "Generate MCP servers from OpenAPI contracts.",
-        subcommands = {Main.Init.class, Main.Validate.class, Main.Build.class, Main.Explain.class, Main.Names.class, Main.Test.class, Main.PushCommand.class, Main.Keygen.class, Main.Sign.class, Main.Verify.class})
+        subcommands = {Main.Init.class, Main.Validate.class, Main.Build.class, Main.Explain.class, Main.Names.class, Main.Test.class, Main.PushCommand.class, Main.Keygen.class, Main.Sign.class, Main.Verify.class,
+                Inspect.Diff.class, Inspect.Preview.class, Inspect.Try.class, Inspect.Migrate.class})
 public final class Main {
 
     static final int OK = 0;
@@ -46,6 +47,8 @@ public final class Main {
     static final int NAME_DRIFT = 3;
     static final int TESTS_FAILED = 4;
     static final int VERSION_MISMATCH = 5;
+    /** {@code diff --fail-on-breaking}: a change breaks agents or clients of the earlier build. */
+    static final int BREAKING = 6;
     static final int INTERNAL = 10;
 
     /** Environment, replaceable in tests. */
@@ -60,6 +63,10 @@ public final class Main {
     @Option(names = "--config", paramLabel = "<file>", scope = CommandLine.ScopeType.INHERIT,
             description = "The repository config; default: the nearest .mcpgp/config.yaml.")
     Path config;
+
+    @Option(names = "--no-color", scope = CommandLine.ScopeType.INHERIT,
+            description = "No colour in the output (the output has none so far; NO_COLOR is honoured the same way).")
+    boolean noColor;
 
     @Option(names = "--ignore-version", scope = CommandLine.ScopeType.INHERIT,
             description = "Run although the CLI version differs from cli: in .mcpgp/config.yaml.")

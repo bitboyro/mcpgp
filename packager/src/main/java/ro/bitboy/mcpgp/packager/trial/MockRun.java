@@ -58,8 +58,21 @@ public final class MockRun implements AutoCloseable {
 
     /** @param root the definition's folder, where extension artifacts are copied from (next to the manifest the server runs) */
     public MockRun(JsonNode manifest, Collection<ApiModel.Contract> contracts, InputStream runtimeJar, Path dir, Path root) throws IOException {
+        this(manifest, new SpecMock(contracts), null, runtimeJar, dir, root);
+    }
+
+    /**
+     * The server against real target servers ({@code mcpgp try --target}): {@code config} is the runtime
+     * config to run with (its instances and credentials, secrets as references); there is no mock, so
+     * calls answer without {@code requests}.
+     */
+    public static MockRun against(JsonNode manifest, JsonNode config, InputStream runtimeJar, Path dir, Path root) throws IOException {
+        return new MockRun(manifest, null, config, runtimeJar, dir, root);
+    }
+
+    private MockRun(JsonNode manifest, SpecMock mock, JsonNode targetConfig, InputStream runtimeJar, Path dir, Path root) throws IOException {
         this.manifest = manifest;
-        this.mock = new SpecMock(contracts);
+        this.mock = mock;
         Path jar = dir.resolve("runtime.jar");
         try (runtimeJar) {
             Files.copy(runtimeJar, jar);
@@ -75,7 +88,7 @@ public final class MockRun implements AutoCloseable {
         Path manifestFile = dir.resolve("manifest.json");
         Files.writeString(manifestFile, CanonicalJson.pretty(manifest));
         Path config = dir.resolve("config.yaml");
-        Files.writeString(config, JSON.writeValueAsString(config(manifest, mock.address())));
+        Files.writeString(config, JSON.writeValueAsString(mock != null ? config(manifest, mock.address()) : targetConfig));
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         // a small, fixed heap: the platform keeps a few of these warm next to itself, and a container's
         // JAVA_TOOL_OPTIONS (sized for the platform) must not apply to them
@@ -91,6 +104,11 @@ public final class MockRun implements AutoCloseable {
         Thread errors = new Thread(() -> drain(process.getErrorStream()), "mcpgp-test-stderr");
         errors.setDaemon(true);
         errors.start();
+    }
+
+    /** Runtime config with every API's one instance at {@code baseUrl}, without credentials ({@code mcpgp try --target}). */
+    public static ObjectNode configAt(JsonNode manifest, String baseUrl) {
+        return config(manifest, baseUrl);
     }
 
     /** Runtime config with every API's instance at the mock: {@code instance}, {@code instances} or {@code apis}. */
@@ -277,7 +295,9 @@ public final class MockRun implements AutoCloseable {
             args.remove("instance");
         }
         String via = viaDiscovery(tool);
-        mock.drain();
+        if (mock != null) {
+            mock.drain();
+        }
         ObjectNode answer = JSON.createObjectNode();
         JsonNode response = via == null ? request("tools/call", Map.of("name", tool, "arguments", args))
                 : request("tools/call", Map.of("name", via, "arguments", Map.of("name", tool, "arguments", args)));
@@ -289,7 +309,9 @@ public final class MockRun implements AutoCloseable {
         } else {
             answer.set("result", response.path("result"));
         }
-        answer.set("requests", JSON.valueToTree(mock.drain()));
+        if (mock != null) {
+            answer.set("requests", JSON.valueToTree(mock.drain()));
+        }
         return answer;
     }
 
@@ -427,7 +449,9 @@ public final class MockRun implements AutoCloseable {
             Thread.currentThread().interrupt();
             process.destroyForcibly();
         }
-        mock.close();
+        if (mock != null) {
+            mock.close();
+        }
     }
 
     /** Results as JSON for {@code --json}. */

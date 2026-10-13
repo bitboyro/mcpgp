@@ -137,6 +137,8 @@ function BuildDetail({ id }: { id: string }) {
       <div className="actions">
         {b.status === 'succeeded' && !b.released && !b.deleted && can('builds:release') &&
           <button type="button" className="btn btn-primary" disabled={act.isPending} onClick={() => act.mutate('release')}>Release</button>}
+        {b.status === 'succeeded' && !b.released && !b.deleted &&
+          <Link className="btn" to={`/servers/${b.server}/changes?to=${b.version}`}>What changed since the last release</Link>}
         {!running(b) && !b.archived && can('builds:delete') &&
           <button type="button" className="btn btn-stage" disabled={act.isPending} onClick={() => act.mutate('archive')}>Archive</button>}
         {b.archived && !b.deleted && can('builds:delete') &&
