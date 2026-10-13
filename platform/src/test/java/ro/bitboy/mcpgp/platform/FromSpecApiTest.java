@@ -30,6 +30,48 @@ class FromSpecApiTest extends PlatformTestBase {
         return bearer("POST", path, JSON.writeValueAsBytes(Map.of("files", files)));
     }
 
+    static final String CLASHING = """
+            openapi: 3.0.3
+            info: { title: Trading Configuration, version: "1.0" }
+            paths:
+              /partners/{identifier}:
+                put:
+                  operationId: partnerIdentifierPut
+                  parameters: [ { name: identifier, in: path, required: true, schema: { type: string } } ]
+                  responses: { "200": { description: ok } }
+              /tests/{identifier}:
+                put:
+                  operationId: partnerIdentifierPut
+                  parameters: [ { name: identifier, in: path, required: true, schema: { type: string } } ]
+                  responses: { "200": { description: ok } }
+            """;
+
+    @Test
+    void clashingToolNamesAreShownWithSuggestionsAndResolvedAsTheUserChooses() throws Exception {
+        Map<String, String> files = Map.of("tc.yaml", CLASHING);
+        var clash = send(post("/api/v1/servers/from-spec?dryRun=true", files));
+        assertThat(clash.statusCode()).isEqualTo(422);
+        JsonNode problem = json(clash);
+        assertThat(problem.path("code").asText()).isEqualTo("NAME_COLLISIONS");
+        JsonNode first = problem.at("/collisions/0");
+        assertThat(first.path("operation").asText()).isEqualTo("trading_configuration:PUT:/tests/{identifier}");
+        assertThat(first.path("name").asText()).isEqualTo("trading_configuration_partner_identifier_put");
+        assertThat(first.path("suggested").asText()).isEqualTo("trading_configuration_test_replace");
+        assertThat(first.path("base").asText()).isEqualTo("test_replace");
+
+        // a rule for the server
+        assertThat(send(post("/api/v1/servers/from-spec?dryRun=true&collisions=method-path", files)).statusCode()).isEqualTo(200);
+
+        // or a name of their own, saved as a rule for that operation
+        String renames = java.net.URLEncoder.encode("{\"trading_configuration:PUT:/tests/{identifier}\": \"test_update\"}", StandardCharsets.UTF_8);
+        var created = send(post("/api/v1/servers/from-spec?id=tc-mcp&renames=" + renames, files));
+        assertThat(created.statusCode()).as(new String(created.body())).isEqualTo(201);
+        JsonNode manifest = json(send(bearer("GET", "/api/v1/servers/tc-mcp/versions/latest/manifest", null)));
+        assertThat(manifest.path("tools").findValuesAsText("name")).contains("trading_configuration_partner_identifier_put", "trading_configuration_test_update");
+        String definition = new String(send(bearer("GET", "/api/v1/servers/tc-mcp/versions/latest/files/tc-mcp.mcpgp.yaml", null)).body(), StandardCharsets.UTF_8);
+        assertThat(definition).contains("match: { method: PUT, path: \"/tests/{identifier}\" }").contains("name: { set: test_update }");
+    }
+
     @Test
     void aServerFromASwaggerJsonAndTheFilesItRefersTo() throws Exception {
         Map<String, String> files = Map.of("api.json", SWAGGER, "paths/entries.json", ENTRIES, "definitions/entry.json", ENTRY);

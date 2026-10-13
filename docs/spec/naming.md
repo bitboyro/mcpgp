@@ -65,7 +65,7 @@ naming:
   limits:
     profile: strict          # strict: [a-z0-9_], ≤ 64   ·   mcp: [A-Za-z0-9_.-], ≤ 128
     onTooLong: shorten-then-hash
-  collisions: error          # error | suffix-number | suffix-contract
+  collisions: error          # error | method-path | suffix-number | suffix-contract
 ```
 
 Defaults when a key is not set: `source: operationId`, `fallback: methodPath`, `split` as above,
@@ -110,7 +110,10 @@ trimmed to 1024 chars with a warning).
 ## 6. Collisions
 
 Two tools with the same final name:
-- `error` (default): build fails, listing both operations and the steps that produced the name.
+- `error` (default): build fails, listing both operations and the name the later one would get from
+  its method and path.
+- `method-path`: the later tool is named from its method and path (`PUT /tests/{id}` → `test_replace`,
+  with the prefixes and suffix), with `_2`, `_3` only if that clashes too; provenance step `collision`.
 - `suffix-number`: `_2`, `_3` in operation order. Discouraged; names then depend on order.
 - `suffix-contract`: `_v10` for the older contract's tool. Useful with `mixedContracts: namespaced`.
 

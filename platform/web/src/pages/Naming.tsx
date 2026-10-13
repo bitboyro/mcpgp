@@ -66,6 +66,10 @@ export function NamingView({ id }: { id: string }) {
     },
   })
 
+  // the clash rule as it will be saved: a pending change, else what the policy says
+  const pendingCollisions = pending['/naming/collisions']?.change
+  const collisionsNow = pendingCollisions ? (pendingCollisions.op === 'remove' ? 'error' : String(pendingCollisions.value))
+    : naming.data?.effective.collisions ?? 'error'
   const put = (label: string, change: Change, unchanged = false) => {
     setPending((now) => {
       const next = { ...now }
@@ -152,6 +156,17 @@ export function NamingView({ id }: { id: string }) {
                   onPick={(v) => put(v ? `server prefix ${v}` : 'no server prefix', serverPrefix(v), v === (naming.data!.effective.namespace?.server ?? ''))} />
                 <PrefixField key={'suffix' + (pending['/naming/namespace/suffix'] ? '*' : '')} label="Suffix for every tool" current={naming.data.effective.namespace?.suffix ?? ''} disabled={!editable}
                   onPick={(v) => put(v ? `suffix ${v}` : 'no suffix', serverSuffix(v), v === (naming.data!.effective.namespace?.suffix ?? ''))} />
+              </div>
+            )}
+            {manifest.data && (
+              <div className="card">
+                <h2>When two tools would get the same name</h2>
+                <p className="hint">Usually two operations with the same operationId. One tool's own name can always be set in its editor on Tools &amp; rules.</p>
+                <Segmented label="When two tools would get the same name" value={collisionsNow}
+                  options={[['error', 'Stop and show them'], ['method-path', 'Name from method and path'], ['suffix-number', 'Add a number']]}
+                  onChange={(v) => { if (editable) put(`name clashes: ${v}`, v === 'error' ? { op: 'remove', path: '/naming/collisions' } : { op: 'set', path: '/naming/collisions', value: v },
+                    v === (naming.data!.effective.collisions ?? 'error')) }} />
+                {collisionsNow === 'suffix-number' && <p className="hint">Numbers follow the order of the spec, so a new operation can change which tool gets _2.</p>}
               </div>
             )}
             <div className="card">

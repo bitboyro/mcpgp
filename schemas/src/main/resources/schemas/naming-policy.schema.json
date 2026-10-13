@@ -49,7 +49,7 @@
       },
       "additionalProperties": false
     },
-    "collisions": { "enum": ["error", "suffix-number", "suffix-contract"] }
+    "collisions": { "enum": ["error", "method-path", "suffix-number", "suffix-contract"] }
   },
   "additionalProperties": false
 }

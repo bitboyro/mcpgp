@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { SpecProblems } from '../api'
+import type { NameClash, SpecProblems } from '../api'
 import { readPicked } from '../files'
 import { mergeFiles, specOnly } from '../specUpload'
 
@@ -42,6 +42,42 @@ export function SpecPicker({ files, onFiles }: { files: SpecUpload | null; onFil
       {names.length > 0 && (
         <p className="hint" style={{ overflowWrap: 'anywhere' }}>Picked: <span className="mono">{names.slice(0, 8).join(', ')}{names.length > 8 ? ` and ${names.length - 8} more` : ''}</span></p>
       )}
+    </div>
+  )
+}
+
+/**
+ * Operations that would get the same tool name: rename them here (the suggested names come from their
+ * method and path, and can be changed), or make it the server's rule (naming.collisions). Either way
+ * it's saved in the definition, so it can change later.
+ */
+export function NameClashesView({ clashes, prefix, onRenames, onRule }: {
+  clashes: NameClash[]; prefix: string
+  onRenames: (renames: Record<string, string>) => void
+  onRule: () => void
+}) {
+  const [names, setNames] = useState<Record<string, string>>(() => Object.fromEntries(clashes.map((c) => [c.operation, c.base])))
+  const valid = (n: string) => /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(n)
+  const ok = clashes.every((c) => valid(names[c.operation] ?? ''))
+  return (
+    <div className="note note-warn list" style={{ gap: 10 }} role="alert">
+      <b>{clashes.length === 1 ? 'Two operations would get the same tool name.' : `${clashes.length} operations would get a tool name another one has.`}</b>
+      <span className="hint">Usually the spec gives them the same operationId. Choose a name for each, or let the server name clashing tools from
+        their method and path. Both are saved in the definition, where they can change later.</span>
+      {clashes.map((c) => (
+        <label key={c.operation} className="field">
+          <span><span className="mono">{c.method} {c.path}</span> <span className="hint">would be <span className="mono">{c.name}</span>, like another operation</span></span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="mono hint">{prefix}_</span>
+            <input className="input mono" value={names[c.operation] ?? ''} aria-invalid={!valid(names[c.operation] ?? '')}
+              onChange={(e) => setNames({ ...names, [c.operation]: e.target.value.trim() })} />
+          </span>
+        </label>
+      ))}
+      <div className="actions">
+        <button type="button" className="btn btn-primary btn-sm" disabled={!ok} onClick={() => onRenames(names)}>Use these names</button>
+        <button type="button" className="btn btn-sm" onClick={onRule}>Always name clashing tools from their method and path</button>
+      </div>
     </div>
   )
 }

@@ -93,6 +93,19 @@ public final class FromSpec {
 
     /** The project a new server would get: its definition, the spec under {@code contracts/}, smoke tests. */
     public Plan plan(Upload upload, String id, String title, String version) {
+        return plan(upload, id, title, version, null, Map.of());
+    }
+
+    /**
+     * @param collisions {@code method-path}: tools whose names clash are named from their method and path
+     *                   ({@code naming.collisions} in the definition); null: a clash is answered with suggestions
+     * @param renames    names chosen for clashing operations, by operation key ({@code api:PUT:/tests/{identifier}}):
+     *                   the name before the prefix, saved as a rule per operation
+     */
+    public Plan plan(Upload upload, String id, String title, String version, String collisions, Map<String, String> renames) {
+        if (collisions != null && !collisions.equals("method-path")) {
+            throw ApiException.validation("collisions: method-path, or leave it out");
+        }
         SpecFiles.Analysis a = upload.analysis();
         String specTitle = title != null && !title.isBlank() ? title.strip() : a.title() == null || a.title().isEmpty() ? "My API" : a.title();
         String api = Scaffold.apiId(specTitle);
@@ -104,9 +117,13 @@ public final class FromSpec {
                 : a.version() == null || a.version().isEmpty() ? "1.0" : a.version();
         Map<String, byte[]> project = new LinkedHashMap<>(SpecFiles.under("contracts/", upload.files(), a));
         String definitionFile = server + ".mcpgp.yaml";
-        project.put(definitionFile, Scaffold.definition(server, specTitle, api, contractVersion, "contracts/" + a.main())
-                .getBytes(StandardCharsets.UTF_8));
+        String text = Scaffold.definition(server, specTitle, api, contractVersion, "contracts/" + a.main()) + choices(collisions, renames);
+        project.put(definitionFile, text.getBytes(StandardCharsets.UTF_8));
         Compiler.Result result = compile(project, definitionFile);
+        if (result.manifest().isEmpty() && collisions == null && result.diagnostics().stream()
+                .filter(d -> d.level() == Diagnostic.Level.ERROR).allMatch(d -> d.code().equals(ro.bitboy.mcpgp.core.diag.Codes.NAME_COLLISION))) {
+            throw clashes(project, definitionFile, text, api, result);
+        }
         if (result.manifest().isEmpty()) {
             throw new ApiException(422, "VALIDATION", "the spec loads, but the server made from it doesn't compile: "
                     + String.join("; ", result.diagnostics().stream().filter(d -> d.level() == Diagnostic.Level.ERROR).map(Diagnostic::message).toList()),
@@ -116,6 +133,78 @@ public final class FromSpec {
         int tools = (int) java.util.stream.StreamSupport.stream(result.manifest().get().path("tools").spliterator(), false)
                 .filter(t -> t.path("kind").asText().equals("api")).count();
         return new Plan(server, specTitle, api, contractVersion, project, tools, result.diagnostics());
+    }
+
+    /** What the user chose for clashing names, as definition text: the collisions rule, or a rule per renamed operation. */
+    private static String choices(String collisions, Map<String, String> renames) {
+        StringBuilder yaml = new StringBuilder();
+        if (collisions != null) {
+            yaml.append("\n# tools whose names clash are named from their method and path (naming.md §6)\nnaming:\n  collisions: ").append(collisions).append('\n');
+        }
+        if (!renames.isEmpty()) {
+            yaml.append("\n# names chosen when two operations would have had the same tool name\noverrides:\n  rules:\n");
+            for (Map.Entry<String, String> r : new java.util.TreeMap<>(renames).entrySet()) {
+                String[] key = r.getKey().split(":", 3);
+                if (key.length != 3 || !key[1].matches("[A-Z]+") || !key[2].startsWith("/")) {
+                    throw ApiException.validation("renames: keys are operation keys, api:METHOD:/path");
+                }
+                if (!r.getValue().matches("[A-Za-z][A-Za-z0-9_]{0,63}")) {
+                    throw ApiException.validation("renames: " + r.getValue() + ": letters, digits and _, starting with a letter");
+                }
+                String ruleId = ("ui:" + key[1] + ":" + key[2]).replaceAll("[^A-Za-z0-9:._-]+", "_");
+                yaml.append("    - id: ").append(quoted(ruleId)).append('\n')
+                        .append("      match: { method: ").append(key[1]).append(", path: ").append(quoted(key[2])).append(" }\n")
+                        .append("      name: { set: ").append(r.getValue()).append(" }\n");
+            }
+        }
+        return yaml.toString();
+    }
+
+    private static String quoted(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
+    /**
+     * Operations that would get the same tool name: each later one with the name it would get from its
+     * method and path, for the user to accept, edit, or make the rule ({@code NAME_COLLISIONS}).
+     */
+    private static ApiException clashes(Map<String, byte[]> project, String definitionFile, String text, String api, Compiler.Result first) {
+        Map<String, byte[]> resolved = new LinkedHashMap<>(project);
+        resolved.put(definitionFile, (text + choices("method-path", Map.of())).getBytes(StandardCharsets.UTF_8));
+        Compiler.Result again = compile(resolved, definitionFile);
+        List<Map<String, Object>> list = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        if (again.manifest().isPresent()) {
+            for (JsonNode tool : again.manifest().get().path("tools")) {
+                List<JsonNode> steps = new ArrayList<>();
+                tool.at("/provenance/name").forEach(steps::add);
+                int at = -1;
+                for (int i = 0; i < steps.size(); i++) {
+                    if (steps.get(i).path("step").asText().equals("collision")) {
+                        at = i;
+                    }
+                }
+                String key = tool.at("/operation/key").asText();
+                boolean contentType = steps.stream().anyMatch(s -> s.path("step").asText().equals("contentTypeSuffix"));
+                if (at < 1 || contentType || !seen.add(key)) {
+                    continue; // a content type's tool follows its operation's name
+                }
+                String[] parts = key.split(":", 3);
+                String suggested = tool.path("name").asText();
+                Map<String, Object> clash = new LinkedHashMap<>();
+                clash.put("operation", key);
+                clash.put("method", parts.length == 3 ? parts[1] : "");
+                clash.put("path", parts.length == 3 ? parts[2] : "");
+                clash.put("operationId", tool.at("/operation/operationId").asText(null));
+                clash.put("name", steps.get(at - 1).path("value").asText());
+                clash.put("suggested", suggested);
+                clash.put("base", suggested.startsWith(api + "_") ? suggested.substring(api.length() + 1) : suggested);
+                list.add(clash);
+            }
+        }
+        List<String> lines = first.diagnostics().stream().filter(d -> d.level() == Diagnostic.Level.ERROR).map(Diagnostic::message).toList();
+        return new ApiException(422, "NAME_COLLISIONS", "operations would get the same tool name: " + String.join("; ", lines),
+                Map.of("collisions", list, "problems", lines));
     }
 
     public Model.Server create(Plan plan, String message, Access.Principal who) {
