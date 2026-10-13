@@ -395,6 +395,35 @@ public final class FileStore implements Store {
         return result;
     }
 
+    @Override
+    public synchronized List<Model.Activity> activity(ActivityQuery query, int limit) {
+        Path dir = root.resolve("activity");
+        if (!Files.isDirectory(dir)) {
+            return List.of();
+        }
+        List<Model.Activity> result = new ArrayList<>();
+        try (Stream<Path> files = Files.list(dir)) {
+            for (Path file : files.sorted(Collections.reverseOrder()).toList()) {
+                List<String> lines = Files.readAllLines(file);
+                for (int i = lines.size() - 1; i >= 0; i--) {
+                    Model.Activity entry = LINES.readValue(lines.get(i), Model.Activity.class);
+                    if (query.since() != null && !java.time.Instant.parse(entry.ts()).isAfter(query.since())) {
+                        return result; // newest first: the rest is older
+                    }
+                    if (query.matches(entry)) {
+                        result.add(entry);
+                        if (result.size() >= limit) {
+                            return result;
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return result;
+    }
+
     // ---------------------------------------------------------------------- cache
 
     @Override

@@ -124,6 +124,24 @@ abstract class StoreContract {
     }
 
     @Test
+    void activitySearchesFilterAndStopAtTheTimeBound() {
+        Store store = store();
+        store.append(new Model.Activity("2026-10-11T09:00:00Z", "bot", "agent", "build.start", "orders-mcp", "ok", Map.of()));
+        store.append(new Model.Activity("2026-10-11T10:00:01Z", "ana", "person", "server.create", "crm-mcp", "ok", Map.of()));
+        store.append(new Model.Activity("2026-10-11T10:00:02Z", "bot", "agent", "build.start", "b-1", "ok", Map.of("server", "orders-mcp")));
+        store.append(new Model.Activity("2026-10-11T10:00:03.5Z", "bot", "agent", "build_x", "orders-mcp", "ok", Map.of()));
+        // a server's own entries and its builds'
+        assertThat(store.activity(new Store.ActivityQuery(null, "orders-mcp", null, null), 10)).extracting(Model.Activity::ts)
+                .containsExactly("2026-10-11T10:00:03.5Z", "2026-10-11T10:00:02Z", "2026-10-11T09:00:00Z");
+        // an action prefix is a prefix, not a pattern
+        assertThat(store.activity(new Store.ActivityQuery(null, null, null, "build."), 10)).hasSize(2);
+        // since: what's older isn't read
+        assertThat(store.activity(new Store.ActivityQuery(null, null, "bot", null, java.util.Set.of("build.start"),
+                java.time.Instant.parse("2026-10-11T10:00:00Z")), 10)).extracting(Model.Activity::target).containsExactly("b-1");
+        assertThat(store.activity(new Store.ActivityQuery("crm-mcp", null, null, null), 10)).hasSize(1);
+    }
+
+    @Test
     void theCacheIsOverwritten() {
         Store store = store();
         assertThat(store.cached("manifest", "abc")).isEmpty();

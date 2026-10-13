@@ -48,7 +48,10 @@ public final class PostgresStore implements Store, AutoCloseable {
             "CREATE SEQUENCE IF NOT EXISTS records_seq",
             "CREATE TABLE IF NOT EXISTS records (kind text, id text, seq bigint NOT NULL, doc json NOT NULL, PRIMARY KEY (kind, id))",
             "CREATE TABLE IF NOT EXISTS activity (seq bigserial PRIMARY KEY, doc json NOT NULL)",
-            "CREATE TABLE IF NOT EXISTS cache (kind text, key text, content bytea NOT NULL, PRIMARY KEY (kind, key))");
+            "CREATE TABLE IF NOT EXISTS cache (kind text, key text, content bytea NOT NULL, PRIMARY KEY (kind, key))",
+            // activity searches by target (a server's page) and actor (agent quotas) without reading the whole log
+            "CREATE INDEX IF NOT EXISTS activity_target ON activity ((doc->>'target'))",
+            "CREATE INDEX IF NOT EXISTS activity_actor ON activity ((doc->>'actor'))");
 
     private final HikariDataSource pool;
     private final Connection lock;
@@ -376,6 +379,52 @@ public final class PostgresStore implements Store, AutoCloseable {
         });
     }
 
+    @Override
+    public List<Model.Activity> activity(ActivityQuery query, int limit) {
+        // the fields go to SQL (indexed for target and actor); the time bound stops the newest-first read
+        StringBuilder where = new StringBuilder();
+        List<String> values = new ArrayList<>();
+        if (query.target() != null) {
+            where.append(" AND doc->>'target' = ?");
+            values.add(query.target());
+        }
+        if (query.server() != null) {
+            where.append(" AND (doc->>'target' = ? OR doc->'details'->>'server' = ?)");
+            values.add(query.server());
+            values.add(query.server());
+        }
+        if (query.actor() != null) {
+            where.append(" AND doc->>'actor' = ?");
+            values.add(query.actor());
+        }
+        if (query.action() != null) {
+            where.append(" AND doc->>'action' LIKE ?");
+            values.add(query.action().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%");
+        }
+        String sql = "SELECT doc FROM activity" + (where.isEmpty() ? "" : " WHERE " + where.substring(5)) + " ORDER BY seq DESC";
+        return transaction(c -> {
+            List<Model.Activity> result = new ArrayList<>();
+            try (PreparedStatement ps = c.prepareStatement(sql)) {
+                for (int i = 0; i < values.size(); i++) {
+                    ps.setString(i + 1, values.get(i));
+                }
+                ps.setFetchSize(Math.min(500, limit + 1));
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (result.size() < limit && rs.next()) {
+                        Model.Activity entry = read(rs, Model.Activity.class);
+                        if (query.since() != null && !java.time.Instant.parse(entry.ts()).isAfter(query.since())) {
+                            break; // newest first: everything after is older
+                        }
+                        if (query.matches(entry)) {
+                            result.add(entry);
+                        }
+                    }
+                }
+            }
+            return result;
+        });
+    }
+
     // ---------------------------------------------------------------------- cache
 
     @Override
@@ -397,9 +446,20 @@ public final class PostgresStore implements Store, AutoCloseable {
         List<String[]> gone = new ArrayList<>();
         query("SELECT kind, key FROM cache", ps -> { }, rs -> new String[] {rs.getString(1), rs.getString(2)})
                 .forEach(e -> { if (!keep.test(e[1])) gone.add(e); });
-        for (String[] e : gone) {
-            update("DELETE FROM cache WHERE kind = ? AND key = ?", ps -> { ps.setString(1, e[0]); ps.setString(2, e[1]); });
+        if (gone.isEmpty()) {
+            return 0;
         }
+        transaction(c -> {
+            try (PreparedStatement ps = c.prepareStatement("DELETE FROM cache WHERE kind = ? AND key = ?")) {
+                for (String[] e : gone) {
+                    ps.setString(1, e[0]);
+                    ps.setString(2, e[1]);
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+            }
+            return null;
+        });
         return gone.size();
     }
 
