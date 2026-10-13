@@ -211,6 +211,9 @@ S3 writes any failing generated step out as a traffic v2 file for `cases/regress
 
 ### 6.1 Fixtures
 
+The fixtures and profiles exist to cover [feature-matrix.md](feature-matrix.md): every feature (`F…`),
+every value of its settings, and the interacting pairs listed there (§11).
+
 | Fixture | Turns on |
 |---|---|
 | `kitchen-sink-{swagger2,oas30,oas31}` | Every method, parameter style, body type (JSON, polymorphic, recursive, form, multipart, binary, text), response kind (201 + `Location`, 202, 204, binary, CSV, every error status), pagination style, auth type, hostile inputs |

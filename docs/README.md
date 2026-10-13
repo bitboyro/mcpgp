@@ -28,6 +28,7 @@
 | [process/development.md](process/development.md) | Before your first change. |
 | [process/roadmap.md](process/roadmap.md) | You want to know what comes next. |
 | [process/release-gate.md](process/release-gate.md) | You are working on the release gate (planned after 0.1.0). |
+| [process/feature-matrix.md](process/feature-matrix.md) | You need every feature, its settings and what tests it. |
 
 Examples that follow these specs live in [../examples](../examples).
 
