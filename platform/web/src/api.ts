@@ -357,7 +357,7 @@ export interface NamingPolicy {
   shape?: { order?: string; case?: string; number?: string }
   vocabulary?: Record<string, string>
   methodVerbs?: Record<string, string>
-  namespace?: { server?: string; perApi?: boolean }
+  namespace?: { server?: string; suffix?: string; perApi?: boolean }
   limits?: { profile?: string; onTooLong?: string }
   collisions?: string
   [key: string]: unknown
@@ -409,6 +409,7 @@ export const api = {
   manifest: (id: string, version: string | number = 'latest') => json<Manifest>('GET', `/servers/${enc(id)}/versions/${version}/manifest`),
   previewEdit: (id: string, base: number, changes: Change[], operations = false) =>
     json<EditPreview>('POST', `/servers/${enc(id)}/edits`, { base, changes, dryRun: true, operations: operations || undefined }),
+  warmTry: (id: string, version: string | number) => send('POST', `/servers/${enc(id)}/versions/${version}/try/warm`),
   tryTool: (id: string, version: string | number, tool: string, args: unknown) =>
     json<TryResult>('POST', `/servers/${enc(id)}/versions/${version}/try`, { tool, arguments: args }),
   definition: (id: string, version: string | number = 'latest') => json<DefinitionData>('GET', `/servers/${enc(id)}/versions/${version}/definition`),

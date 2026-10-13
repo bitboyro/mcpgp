@@ -69,6 +69,8 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   policy's reference, or null), `own` (what the definition sets in `naming` itself), `effective` (the
   merged policy the compiler used) and `lock: { present, entries: [{ id, name, since }] }`. Each tool's
   name steps are in the manifest's provenance; the Naming section of Tools & rules shows both.
+- `POST /servers/{id}/versions/{version}/try/warm` (`builds:run`) starts the version's trial server in
+  the background (`202`), so the first `try` doesn't wait for it; the web UI calls it when the Try panel opens.
 - `POST /servers/{id}/versions/{version}/try { tool, arguments }` (`builds:run`) calls a tool of the
   version as an agent would, against a **mock** of its API: the server mcpgp packages runs on the
   platform with the version's manifest, its instance (`mock`) is a loopback server that answers every

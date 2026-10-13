@@ -264,6 +264,15 @@ public class ServersApi {
         return Json.ok(trials.call(servers.files(ref), ref.created(), tool, arguments));
     }
 
+    /** Starts the version's trial server in the background, so the first {@code try} doesn't wait for it: {@code 202}. */
+    @PostMapping("/{id}/versions/{version}/try/warm")
+    public ResponseEntity<byte[]> warmTry(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
+        who(request).require("builds:run");
+        Model.VersionRef ref = servers.version(servers.get(id), version);
+        trials.warm(servers.files(ref), ref.created());
+        return Json.status(202, Map.of("warming", true));
+    }
+
     /** The definition as data: the root file as written, and the result with what it extends and includes merged in. */
     @GetMapping("/{id}/versions/{version}/definition")
     public ResponseEntity<byte[]> definition(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {

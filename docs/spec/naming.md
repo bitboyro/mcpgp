@@ -60,6 +60,7 @@ naming:
     remove: delete
   namespace:
     server: ""               # extra prefix for every tool, rarely needed
+    suffix: ""               # added to the end of every API tool's name (orders_customer_get_v2), before a content-type suffix
     perApi: true             # use apis[].toolPrefix (always true with several APIs)
   limits:
     profile: strict          # strict: [a-z0-9_], ≤ 64   ·   mcp: [A-Za-z0-9_.-], ≤ 128
