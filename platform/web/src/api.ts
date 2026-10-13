@@ -224,7 +224,7 @@ export interface ManifestApi {
   toolPrefix?: string
   contracts: Contract[]
   detect?: { method: string; path: string; pointer?: string; pattern?: string }
-  downstreamAuth?: { supported: string[]; identity?: string; unsatisfiedTools?: string; apiKey?: { in: string; name: string }; fromRequest?: { header?: string } }
+  downstreamAuth?: { supported: string[]; identity?: string; unsatisfiedTools?: string; apiKey?: { in: string; name: string }; fromRequest?: { header?: string }; tokenExchange?: Record<string, never> }
 }
 
 export interface Manifest {

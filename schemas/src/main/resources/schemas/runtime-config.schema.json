@@ -274,6 +274,21 @@
         },
         {
           "properties": {
+            "type": { "const": "tokenExchange" },
+            "tokenUrl": { "type": "string", "pattern": "^https?://" },
+            "clientId": { "type": "string" },
+            "clientSecret": { "$ref": "#/$defs/secret" },
+            "clientAuth": { "enum": ["basic", "post"] },
+            "flavor": { "enum": ["rfc8693", "entra-obo"], "description": "rfc8693 (default) or Microsoft Entra's on-behalf-of flow" },
+            "audience": { "type": ["string", "null"] },
+            "resource": { "type": ["string", "null"] },
+            "scopes": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["type", "tokenUrl", "clientId", "clientSecret"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
             "type": { "const": "fromRequest" },
             "header": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,63}$", "description": "the request header the MCP client sends the credential in; default X-<Server>[-<Api>][-<Instance>]-Authorization" },
             "as": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,63}$", "description": "the header it's sent to the API in; default Authorization" }

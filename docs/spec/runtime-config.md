@@ -168,6 +168,7 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `instances[].contract` | `auto` | `auto` or a shipped version |
 | `instances[].auth.type` | — | one of the build's supported types, or `fromRequest` when the definition allows it (auth.md §2.4) |
 | `instances[].auth` (list) | — | several credentials tried in order: a `fromRequest` entry when its header is in the request, any other entry always |
+| `instances[].auth` (`tokenExchange`) | — | `tokenUrl`, `clientId`, `clientSecret`, `clientAuth`, `flavor` (`rfc8693` · `entra-obo`), `audience`, `resource`, `scopes`; needs `server.auth.mode: oauth` (auth.md §2.5) |
 | `instances[].auth.header` / `.as` | `X-<Server>[-<Api>][-<Instance>]-Authorization` / `Authorization` | `fromRequest`: the request header the client sends, and the header sent to the API |
 | `instances[].tls` | system trust | trust anchors, client certificate, hostname check: see §5 |
 | `instances[].timeoutSeconds` | `30` | |

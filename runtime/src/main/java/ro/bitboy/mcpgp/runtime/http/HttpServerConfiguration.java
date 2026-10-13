@@ -64,6 +64,12 @@ public class HttpServerConfiguration {
                     if (!credentials.isEmpty()) {
                         context.put(McpServerFactory.CREDENTIALS_KEY, Map.copyOf(credentials));
                     }
+                    // the user's OAuth access token, which InboundFilter checked, for token exchange (auth.md §2.5)
+                    String authorization = request.getHeader("Authorization");
+                    if (client != null && config.server().authMode().equals("oauth") && authorization != null
+                            && authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
+                        context.put(McpServerFactory.SUBJECT_TOKEN_KEY, authorization.substring(7).strip());
+                    }
                     return McpTransportContext.create(context);
                 })
                 .build();

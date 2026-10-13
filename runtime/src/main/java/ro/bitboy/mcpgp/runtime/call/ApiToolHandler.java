@@ -71,7 +71,12 @@ public final class ApiToolHandler implements ToolHandler {
         Object sent = exchange == null || exchange.transportContext() == null ? null
                 : exchange.transportContext().get(ro.bitboy.mcpgp.runtime.mcp.McpServerFactory.CREDENTIALS_KEY);
         @SuppressWarnings("unchecked")
-        Map<String, String> credentials = sent instanceof Map<?, ?> m ? (Map<String, String>) m : Map.of();
+        Map<String, String> credentials = new java.util.HashMap<>(sent instanceof Map<?, ?> m ? (Map<String, String>) m : Map.of());
+        Object subject = exchange == null || exchange.transportContext() == null ? null
+                : exchange.transportContext().get(ro.bitboy.mcpgp.runtime.mcp.McpServerFactory.SUBJECT_TOKEN_KEY);
+        if (subject instanceof String token) {
+            credentials.put(Upstream.SUBJECT, token); // the signed-in user's token, for tokenExchange (auth.md §2.5)
+        }
         // whatever the client sent is masked in everything this call writes: results, errors, recordings
         try (AutoCloseable masked = Redactor.during(List.copyOf(credentials.values()))) {
             return call(exchange, tool, arguments, record, credentials);

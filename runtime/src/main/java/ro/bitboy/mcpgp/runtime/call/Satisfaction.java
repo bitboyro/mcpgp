@@ -78,12 +78,20 @@ public final class Satisfaction {
             case "basic" -> type.equals("basic");
             case "apiKey" -> type.equals("apiKey");
             // a static bearer token may be an OAuth access token: its scopes aren't known here
-            case "bearer" -> type.equals("bearer") || type.equals("oauth2ClientCredentials");
+            case "bearer" -> type.equals("bearer") || type.equals("oauth2ClientCredentials") || type.equals("tokenExchange");
             // scopes are checked when the config names them; without, the identity provider grants its defaults
             case "oauth2ClientCredentials", "oauth2" -> type.equals("bearer")
-                    || type.equals("oauth2ClientCredentials") && (!entry.has("scopes") || scopesOf(entry).containsAll(scopes));
+                    || (type.equals("oauth2ClientCredentials") || type.equals("tokenExchange")) && (!judgesScopes(entry) || scopesOf(entry).containsAll(scopes));
             default -> false;
         };
+    }
+
+    /**
+     * Scopes are judged when the config names them: not without, and not with Microsoft Entra's
+     * {@code <resource>/.default}, which stands for every permission the app was granted.
+     */
+    private static boolean judgesScopes(JsonNode entry) {
+        return entry.has("scopes") && scopesOf(entry).stream().noneMatch(s -> s.equals(".default") || s.endsWith("/.default"));
     }
 
     private static List<String> scopesOf(JsonNode entry) {

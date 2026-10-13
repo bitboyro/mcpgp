@@ -73,6 +73,7 @@ the build lists `mtls` among its supported types.
 | `oauth2ClientCredentials` | RFC 6749 §4.4 | token from `tokenUrl`, then `Authorization: Bearer <access_token>` |
 | `mtls` | RFC 8446 client certificates (+ RFC 8705 when the API binds tokens to certificates) | client certificate per instance (runtime-config §5) |
 | `fromRequest` | — | the client's own credential from a configured request header, as it was sent (§2.4) |
+| `tokenExchange` | RFC 8693 (or Microsoft Entra on-behalf-of) | the signed-in user's OAuth token exchanged for one issued for the API (§2.5) |
 
 ### 2.1 `oauth2ClientCredentials`
 
@@ -174,10 +175,49 @@ instances:
 - The value is sent as it came (e.g. `Bearer …`, `Basic …`), only to the instance's own address,
   with redirects not followed (§2.3). Values with line breaks or over 16 KB are refused.
 
+### 2.5 Calling the API as the signed-in user (`tokenExchange`)
+
+For a shared server whose users sign in with OAuth (§1.1): on each call the server exchanges the
+user's access token, which it already checked, at the identity provider for a token issued for the
+API, and sends that. The API sees who is calling and applies its own permissions. Allowed when the
+definition enables it (`apis[].downstreamAuth.tokenExchange: {}`); needs `server.transport: http`
+and `server.auth.mode: oauth`.
+
+```yaml
+auth:
+  - type: tokenExchange
+    tokenUrl: https://login.example.com/oauth2/token
+    clientId: ${env:EXCHANGE_CLIENT_ID}            # the server's own client at the identity provider
+    clientSecret: ${env:EXCHANGE_CLIENT_SECRET}
+    clientAuth: basic                              # basic (default) | post
+    flavor: rfc8693                                # rfc8693 (default) | entra-obo
+    audience: https://api.example.com              # rfc8693: what the token is for; resource: also sent when set
+    scopes: [orders.read]                          # entra-obo: required, e.g. api://<app id>/.default
+  - { type: bearer, token: ${env:SERVICE_TOKEN} }  # optional: used when a request has no user
+```
+
+- **RFC 8693**: `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`, `subject_token` (the
+  user's token), `subject_token_type` and `requested_token_type` `…:token-type:access_token`,
+  `audience` / `resource` / `scope` when set. **Entra on-behalf-of**: `grant_type=…:jwt-bearer`,
+  `assertion` (the user's token), `requested_token_use=on_behalf_of`, `scope`. The server
+  authenticates with its client id and secret (HTTP Basic or in the body).
+- The user's token goes **only to the token endpoint**, never to the API or anywhere else; the
+  client's sign-in itself is still never forwarded (§1).
+- Exchanged tokens are kept **in memory only**, per user (a hash of their token) and instance, until
+  `expires_in` minus 60 s, at most 1,000; a `401` from the API discards the user's token and the call
+  is tried once more with a new exchange. Both tokens are masked in everything the call produces; the
+  audit records `upstream.auth: tokenExchange` and the user as `actor`.
+- A refused exchange answers `AUTH_DOWNSTREAM` with the identity provider's `error` (e.g.
+  `invalid_grant`). A request without a signed-in user uses the next credential in the list, or
+  answers `AUTH_DOWNSTREAM`.
+- For §2.2 it covers bearer and OAuth schemes like `oauth2ClientCredentials`: scopes are judged when
+  the config lists them, except a `…/.default` scope (Entra), which stands for every granted one.
+
 ## 3. Security considerations
 
 - No token passthrough; audience-bound inbound tokens. Credentials from the request (§2.4) are a
-  separate header, for one instance, used once and never kept.
+  separate header, for one instance, used once and never kept. Token exchange (§2.5) sends the
+  user's token to the identity provider only, and the API gets a token issued for it.
 - Credentials only to the instance's own address; dropped on cross-host redirects.
 - Constant-time comparison of static keys; token endpoint errors never expose secrets.
 

@@ -168,6 +168,11 @@
               },
               "uniqueItems": true
             },
+            "tokenExchange": {
+              "description": "lets instances call the API as the signed-in user: their OAuth token exchanged at the identity provider for one for the API (RFC 8693 / on-behalf-of); needs inbound oauth",
+              "type": "object",
+              "additionalProperties": false
+            },
             "fromRequest": {
               "description": "lets the MCP client send the credential for the API in a request header (HTTP only); never stored or logged",
               "type": "object",

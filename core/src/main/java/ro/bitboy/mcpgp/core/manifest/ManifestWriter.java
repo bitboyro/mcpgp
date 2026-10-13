@@ -371,6 +371,9 @@ public final class ManifestWriter {
         if (declared.has("unsatisfiedTools")) {
             auth.put("unsatisfiedTools", declared.get("unsatisfiedTools").asText());
         }
+        if (declared.has("tokenExchange")) {
+            auth.set("tokenExchange", declared.get("tokenExchange").deepCopy()); // per-user identity (auth.md §2.5)
+        }
         if (declared.has("fromRequest")) {
             // the client may send the credential in a request header (auth.md §2.4); the runtime derives the
             // header's default name when the definition gives none
