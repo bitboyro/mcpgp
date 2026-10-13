@@ -70,6 +70,9 @@ public class AccountsApi {
         JsonNode json = Json.parse(body);
         Access.IssuedToken token = accounts.signIn(json.path("name").asText(null), json.path("password").asText(null));
         Map<String, Object> result = IdentitiesApi.token(token.record());
+        if (accounts.mustChange(token.record().identity())) {
+            result.put("mustChangePassword", true); // until then, only the password change is allowed (AuthFilter)
+        }
         if (AuthFilter.isWeb(request)) {
             return ResponseEntity.status(201).header(HttpHeaders.SET_COOKIE, sessionCookie(request, token.value(), Accounts.SESSION, config.publicUrl()).toString())
                     .contentType(MediaType.APPLICATION_JSON).body(Json.status(201, result).getBody());
@@ -135,7 +138,11 @@ public class AccountsApi {
         return ResponseCookie.from(AuthFilter.COOKIE, value).httpOnly(true).secure(https).sameSite("Strict").path("/").maxAge(maxAge).build();
     }
 
-    /** {@code {password, currentPassword?}}: admins set anyone's; people change their own with the current one. */
+    /**
+     * {@code {password, currentPassword?, mustChange?}}: admins set anyone's, as a temporary password with
+     * {@code mustChange} (the person chooses a new one at the next sign-in); people change their own with
+     * the current one, which also ends a temporary password.
+     */
     @PutMapping("/identities/{id}/password")
     public ResponseEntity<byte[]> password(HttpServletRequest request, @PathVariable String id, @RequestBody(required = false) byte[] body) {
         Access.Principal who = ServersApi.who(request);
@@ -150,10 +157,29 @@ public class AccountsApi {
                 throw new ApiException(403, "FORBIDDEN", "the current password is wrong");
             }
         }
-        accounts.setPassword(identity, json.path("password").asText(null));
+        boolean own = identity.id().equals(who.identity().id());
+        if (own && accounts.mustChange(identity.id()) && accounts.check(identity, json.path("password").asText(""))) {
+            throw ApiException.validation("choose a password other than the temporary one");
+        }
+        boolean mustChange = !own && json.path("mustChange").asBoolean(false);
+        accounts.setPassword(identity, json.path("password").asText(null), mustChange);
         store.append(new Model.Activity(Instant.now().toString(), who.identity().name(), who.identity().kind(), "password.set",
-                identity.name(), "ok", Map.of()));
-        return Json.ok(Map.of("identity", identity.id(), "password", "set"));
+                identity.name(), "ok", mustChange ? Map.of("temporary", true) : Map.of()));
+        return Json.ok(Map.of("identity", identity.id(), "password", "set", "mustChange", mustChange));
+    }
+
+    /** Ends a lock after wrong passwords (admins), for a local account or a directory sign-in. */
+    @PostMapping("/identities/{id}/unlock")
+    public ResponseEntity<byte[]> unlock(HttpServletRequest request, @PathVariable String id) {
+        Access.Principal who = ServersApi.who(request);
+        who.require("admin");
+        Model.Identity identity = store.identities().stream().filter(i -> i.id().equals(id)).findFirst()
+                .orElseThrow(() -> ApiException.notFound("identity"));
+        boolean wasLocked = accounts.lockedUntil(identity).isPresent();
+        accounts.unlock(identity);
+        store.append(new Model.Activity(Instant.now().toString(), who.identity().name(), who.identity().kind(), "identity.unlock",
+                identity.name(), "ok", Map.of("wasLocked", wasLocked)));
+        return Json.ok(Map.of("identity", identity.id(), "locked", false));
     }
 
     @GetMapping("/approvals")

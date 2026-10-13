@@ -6,6 +6,11 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- Passwords in the web UI: Change password on the Account page (the name in the sidebar); Set
+  password and Unlock on a person in API & agents, for admins. An admin's password can be temporary
+  (`mustChange`): the person replaces it at the next sign-in, and the platform answers
+  `PASSWORD_CHANGE_REQUIRED` to anything else until then. `POST /identities/{id}/unlock` ends a lock
+  after wrong passwords. Company accounts show none of this.
 - Clashing tool names, the user's choice: when two operations would get the same tool name (often the
   same operationId twice), the spec upload shows each one with a suggested name from its method and
   path, to accept or edit (saved as a rule per operation), or to make the server's rule

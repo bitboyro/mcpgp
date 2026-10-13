@@ -83,7 +83,11 @@ public final class Model {
      * @param failures    sign-in failures in a row
      * @param lockedUntil no sign-in before this time, or null
      */
-    public record Credential(String identity, String salt, int iterations, String hash, int failures, String lockedUntil) {
+    /** @param mustChange set by an admin's temporary password: the person chooses a new one before anything else */
+    public record Credential(String identity, String salt, int iterations, String hash, int failures, String lockedUntil, boolean mustChange) {
+        public Credential(String identity, String salt, int iterations, String hash, int failures, String lockedUntil) {
+            this(identity, salt, iterations, hash, failures, lockedUntil, false);
+        }
     }
 
     /** A request waiting for a person's decision (spec/platform-api.md §5), e.g. an agent's release. */

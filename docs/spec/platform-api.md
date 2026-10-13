@@ -213,9 +213,16 @@ of a chosen server is `inherited` (it gets the notices from its parent). The act
   by that cookie that changes something (anything but `GET`/`HEAD`/`OPTIONS`) must carry the header,
   and its `Origin`, when present, must name the host it was sent to; otherwise `403`. Other sites can
   send neither without a CORS preflight, which the platform never grants. Requests with an
-  `Authorization` header are unaffected. `PUT /identities/{id}/password` sets a password (admins:
-  anyone's; people: their own, with the current one). `auth.local.enabled: false` turns local accounts
-  off.
+  `Authorization` header are unaffected. `PUT /identities/{id}/password { password, currentPassword?,
+  mustChange? }` sets a password (admins: anyone's, with `mustChange: true` as a temporary one;
+  people: their own, with the current one). A person with a temporary password gets
+  `mustChangePassword: true` from sign-in and `GET /me`, and every other request answers
+  `403 PASSWORD_CHANGE_REQUIRED` until they set their own (not the temporary one again); `GET /me`,
+  `GET /settings` and signing out still work. Five wrong passwords lock an account for 15 minutes;
+  `POST /identities/{id}/unlock` (admins) ends it, for local and directory sign-ins. `GET /identities`
+  shows people's `password` (whether they have a local one), `mustChangePassword` and `lockedUntil`.
+  The web UI: Change password on the Account page (the name in the sidebar), Set password and Unlock
+  on a person in API & agents. `auth.local.enabled: false` turns local accounts off.
 
 Scopes:
 

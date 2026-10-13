@@ -33,9 +33,25 @@ public final class AuthFilter extends HttpFilter {
     private static final Set<String> SAFE = Set.of("GET", "HEAD", "OPTIONS");
 
     private final Access access;
+    /** Whether a person has to replace a temporary password first; null: never (tests). */
+    private final java.util.function.Predicate<String> mustChange;
 
     public AuthFilter(Access access) {
+        this(access, null);
+    }
+
+    public AuthFilter(Access access, java.util.function.Predicate<String> mustChange) {
         this.access = access;
+        this.mustChange = mustChange;
+    }
+
+    /** What a person with a temporary password may do: see who they are, choose a new password, sign out. */
+    private static boolean allowedBeforeChange(HttpServletRequest request, Access.Principal who) {
+        String uri = request.getRequestURI();
+        String method = request.getMethod();
+        return method.equals("GET") && (uri.equals("/api/v1/me") || uri.equals("/api/v1/settings"))
+                || method.equals("PUT") && uri.equals("/api/v1/identities/" + who.identity().id() + "/password")
+                || method.equals("DELETE") && uri.equals("/api/v1/sessions/current");
     }
 
     @Override
@@ -65,6 +81,11 @@ public final class AuthFilter extends HttpFilter {
                 response.setHeader("WWW-Authenticate", "Bearer realm=\"mcpgp\"");
             }
             fail(response, 401, "UNAUTHORIZED", "a valid bearer token is required");
+            return;
+        }
+        if (mustChange != null && principal.get().identity().kind().equals("person") && mustChange.test(principal.get().identity().id())
+                && !allowedBeforeChange(request, principal.get())) {
+            fail(response, 403, "PASSWORD_CHANGE_REQUIRED", "choose a new password first: this one was set as temporary");
             return;
         }
         request.setAttribute(PRINCIPAL, principal.get());

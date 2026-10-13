@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Link, NavLink, useNavigate, useParams } from 'react-router-dom'
 import { api } from './api'
 import { useSession } from './session'
+import { ChangePassword } from './pages/Passwords'
 import { Icon } from './ui'
 
 type IconName = Parameters<typeof Icon>[0]['name']
@@ -29,6 +30,18 @@ export function Shell({ children }: { children: ReactNode }) {
       queryClient.clear()
       navigate('/sign-in', { replace: true })
     }
+  }
+
+  // a temporary password an admin set: nothing else works until it's replaced (AuthFilter answers PASSWORD_CHANGE_REQUIRED)
+  if (me.mustChangePassword) {
+    return (
+      <div className="body" style={{ justifyContent: 'center', padding: 24 }}>
+        <section className="col" aria-label="Replace the temporary password">
+          <ChangePassword me={me} forced />
+          <button type="button" className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={signOut}>Sign out</button>
+        </section>
+      </div>
+    )
   }
 
   return (
@@ -62,7 +75,7 @@ export function Shell({ children }: { children: ReactNode }) {
         )}
         <div className="nav-foot">
           <Item to="/agents" icon="api">API &amp; agents</Item>
-          <div className="nav-who"><span>{me.name}</span><button type="button" onClick={signOut}>Sign out</button></div>
+          <div className="nav-who"><Link to="/account" title="Your account">{me.name}</Link><button type="button" onClick={signOut}>Sign out</button></div>
         </div>
       </nav>
       <div className="main">{children}</div>

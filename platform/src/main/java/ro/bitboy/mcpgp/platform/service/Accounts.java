@@ -60,6 +60,11 @@ public final class Accounts {
     }
 
     public void setPassword(Model.Identity identity, String password) {
+        setPassword(identity, password, false);
+    }
+
+    /** @param mustChange a temporary password: the person chooses a new one at the next sign-in */
+    public void setPassword(Model.Identity identity, String password, boolean mustChange) {
         if (!identity.kind().equals("person")) {
             throw ApiException.validation("only people have passwords; agents and pipelines use tokens");
         }
@@ -69,7 +74,34 @@ public final class Accounts {
         byte[] salt = new byte[16];
         RANDOM.nextBytes(salt);
         store.saveCredential(new Model.Credential(identity.id(), Base64.getEncoder().encodeToString(salt), ITERATIONS,
-                Base64.getEncoder().encodeToString(pbkdf2(password, salt, ITERATIONS)), 0, null));
+                Base64.getEncoder().encodeToString(pbkdf2(password, salt, ITERATIONS)), 0, null, mustChange));
+    }
+
+    private Optional<Model.Credential> credential(String identity) {
+        return store.credentials().stream().filter(c -> c.identity().equals(identity)).findFirst();
+    }
+
+    /** Whether the person has to choose a new password before doing anything else. */
+    public boolean mustChange(String identity) {
+        return credential(identity).map(Model.Credential::mustChange).orElse(false);
+    }
+
+    /** Whether wrong passwords locked the person's account (local or directory sign-in), and until when. */
+    public Optional<Instant> lockedUntil(Model.Identity identity) {
+        Instant now = clock.instant();
+        Optional<Instant> local = credential(identity.id()).map(Model.Credential::lockedUntil).map(Instant::parse).filter(t -> t.isAfter(now));
+        if (local.isPresent()) {
+            return local;
+        }
+        long[] failures = directoryFailures.get(identity.name().toLowerCase(java.util.Locale.ROOT));
+        return failures != null && failures[1] > now.toEpochMilli() ? Optional.of(Instant.ofEpochMilli(failures[1])) : Optional.empty();
+    }
+
+    /** Ends a lock after wrong passwords (an admin's Unlock); the count of wrong passwords starts again. */
+    public synchronized void unlock(Model.Identity identity) {
+        credential(identity.id()).ifPresent(c -> store.saveCredential(
+                new Model.Credential(c.identity(), c.salt(), c.iterations(), c.hash(), 0, null, c.mustChange())));
+        directoryFailures.remove(identity.name().toLowerCase(java.util.Locale.ROOT));
     }
 
     public boolean hasPassword(Model.Identity identity) {
@@ -123,10 +155,10 @@ public final class Accounts {
         if (!ok) {
             int failures = c.failures() + 1;
             String locked = failures >= MAX_FAILURES ? now.plus(LOCK).toString() : null;
-            store.saveCredential(new Model.Credential(c.identity(), c.salt(), c.iterations(), c.hash(), locked == null ? failures : 0, locked));
+            store.saveCredential(new Model.Credential(c.identity(), c.salt(), c.iterations(), c.hash(), locked == null ? failures : 0, locked, c.mustChange()));
             throw refused(name, locked == null ? "wrong password" : "wrong password; locked for 15 minutes");
         }
-        store.saveCredential(new Model.Credential(c.identity(), c.salt(), c.iterations(), c.hash(), 0, null));
+        store.saveCredential(new Model.Credential(c.identity(), c.salt(), c.iterations(), c.hash(), 0, null, c.mustChange()));
         Access.IssuedToken token = access.issue(identity.get(), identity.get().scopes(), "session", now.plus(SESSION));
         store.append(new Model.Activity(now.toString(), identity.get().name(), "person", "signin", identity.get().name(), "ok",
                 Map.of("token", token.record().id())));

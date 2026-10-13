@@ -4,6 +4,7 @@ import { api, type Identity, type Token } from '../api'
 import { useSession } from '../session'
 import { ErrorBox, Loading, PageHead, Segmented, ago } from '../ui'
 import { Approvals, describe } from './Activity'
+import { PersonPassword } from './Passwords'
 
 const ROLES: [string, string][] = [['viewer', 'Viewer'], ['builder', 'Builder'], ['releaser', 'Releaser'], ['admin', 'Admin']]
 
@@ -31,7 +32,7 @@ export function AgentsPage() {
             <div className="rows">
               {people.map((identity) => (
                 <IdentityRow key={identity.id} identity={identity} tokens={(tokens.data?.items ?? []).filter((t) => t.identity === identity.id)}
-                  onIssued={setIssued} canIssue={admin || identity.id === me.id} />
+                  onIssued={setIssued} canIssue={admin || identity.id === me.id} admin={admin} />
               ))}
             </div>
           </div>
@@ -86,7 +87,9 @@ claude mcp add mcpgp-platform -e MCPGP_TOKEN=<the agent's token> \\
   )
 }
 
-function IdentityRow({ identity, tokens, onIssued, canIssue }: { identity: Identity; tokens: Token[]; onIssued: (t: Token) => void; canIssue: boolean }) {
+function IdentityRow({ identity, tokens, onIssued, canIssue, admin }: {
+  identity: Identity; tokens: Token[]; onIssued: (t: Token) => void; canIssue: boolean; admin: boolean
+}) {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const active = tokens.filter((t) => !t.revoked && (!t.expires || new Date(t.expires) > new Date()))
@@ -111,6 +114,7 @@ function IdentityRow({ identity, tokens, onIssued, canIssue }: { identity: Ident
           {canIssue && <button type="button" className="btn btn-sm btn-soft" disabled={issue.isPending} onClick={() => issue.mutate()}>New token</button>}
         </span>
       </div>
+      {admin && <PersonPassword identity={identity} />}
       <ErrorBox error={issue.error ?? revoke.error} />
       {open && (
         <div className="list">
@@ -158,7 +162,7 @@ function NewIdentity({ onIssued }: { onIssued: (t: Token) => void }) {
           {ROLES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
         </select>
       </label>
-      {kind === 'person' && <p className="hint">People sign in with a password an admin sets through the API, or with company sign-in.</p>}
+      {kind === 'person' && <p className="hint">People sign in with company sign-in, or with a password: give them one with Give a password on their card.</p>}
       <ErrorBox error={create.error} />
       <div><button type="submit" className="btn btn-primary" disabled={!name || create.isPending}>Create {kind}</button></div>
     </form>

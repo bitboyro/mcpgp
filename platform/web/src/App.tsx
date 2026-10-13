@@ -7,6 +7,7 @@ import { ConnectionsPage } from './pages/Connections'
 import { LibraryPage } from './pages/Library'
 import { OverviewPage } from './pages/Overview'
 import { PackagePage } from './pages/Package'
+import { AccountPage } from './pages/Passwords'
 import { ServersPage } from './pages/Servers'
 import { SignInPage } from './pages/SignIn'
 import { SourcesPage } from './pages/Sources'
@@ -27,6 +28,7 @@ export function App() {
       <Route path="/builds" element={<Signed><AllBuildsPage /></Signed>} />
       <Route path="/activity" element={<Signed><ActivityPage /></Signed>} />
       <Route path="/agents" element={<Signed><AgentsPage /></Signed>} />
+      <Route path="/account" element={<Signed><AccountPage /></Signed>} />
       <Route path="/servers/:id" element={<Signed><OverviewPage /></Signed>} />
       <Route path="/servers/:id/tools" element={<Signed><ToolsPage /></Signed>} />
       <Route path="/servers/:id/connections" element={<Signed><ConnectionsPage /></Signed>} />

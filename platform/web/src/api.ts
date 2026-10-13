@@ -76,6 +76,10 @@ export interface Identity {
   tokenScopes?: string[]
   signsInWith?: 'oidc' | 'ldap'
   rolesFromGroups?: boolean
+  /** People: whether they have a local password; whether it's a temporary one to replace; until when wrong passwords locked them. */
+  password?: boolean
+  mustChangePassword?: boolean
+  lockedUntil?: string
 }
 
 export interface Token {
@@ -452,6 +456,9 @@ export const api = {
     json<{ results: ApplyResult[] }>('POST', `/library/notices/${enc(name)}/apply`, body),
 
   identities: () => json<Items<Identity>>('GET', '/identities'),
+  setPassword: (id: string, body: { password: string; currentPassword?: string; mustChange?: boolean }) =>
+    json<{ identity: string; mustChange: boolean }>('PUT', `/identities/${enc(id)}/password`, body),
+  unlock: (id: string) => json<{ identity: string; locked: boolean }>('POST', `/identities/${enc(id)}/unlock`),
   createIdentity: (body: { kind: string; name: string; role?: string; scopes?: string[] }) => json<Identity>('POST', '/identities', body),
   tokens: () => json<Items<Token>>('GET', '/tokens'),
   createToken: (body: { identity?: string; label?: string; scopes?: string[]; expiresInDays?: number }) => json<Token>('POST', '/tokens', body),
