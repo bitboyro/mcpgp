@@ -1,14 +1,15 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type Build, type LibraryItem, type ServerSummary } from '../api'
 import { readPicked, type PickedProject } from '../files'
 import { nameClashes, specProblems } from '../specUpload'
+import { ConnectAgent } from './ConnectAgent'
 import { NameClashesView, SpecPicker, SpecProblemsView, type SpecUpload } from './SpecUpload'
 import { useSession } from '../session'
 import { BuildChip, Chip, ErrorBox, Icon, Loading, PageHead, Segmented, slug } from '../ui'
 
-type Panel = { mode: 'copy' | 'variant'; source: ServerSummary } | { mode: 'new' } | null
+type Panel = { mode: 'copy' | 'variant'; source: ServerSummary } | { mode: 'new' } | { mode: 'connect' } | null
 
 const KIND_LABELS: Record<string, string> = {
   contracts: 'API contracts', naming: 'Naming policies', rules: 'Rule sets', packs: 'Pack configs', templates: 'Templates',
@@ -16,9 +17,15 @@ const KIND_LABELS: Record<string, string> = {
 
 export function ServersPage() {
   const { settings, can } = useSession()
-  const [panel, setPanel] = useState<Panel>(null)
+  const [search] = useSearchParams()
+  // undefined: nothing chosen yet; ?connect, or a platform with none of its own servers, starts at Connect an agent
+  const [chosen, setPanel] = useState<Panel | undefined>(search.has('connect') ? { mode: 'connect' } : undefined)
   const servers = useQuery({ queryKey: ['servers'], queryFn: () => api.servers() })
-  const items = servers.data?.items ?? []
+  // the platform's own server first
+  const items = [...(servers.data?.items ?? [])].sort((a, b) => Number(!!b.system) - Number(!!a.system))
+  const own = items.filter((s) => !s.system)
+  const firstRun = servers.isSuccess && own.length === 0 && items.length > 0
+  const panel = chosen === undefined ? (firstRun ? { mode: 'connect' as const } : null) : chosen
   const manifests = useQueries({
     queries: items.map((s) => ({ queryKey: ['manifest', s.id, 'latest'], queryFn: () => api.manifest(s.id), enabled: s.latestVersion != null, retry: false })),
   })
@@ -27,14 +34,14 @@ export function ServersPage() {
   return (
     <>
       <PageHead title="All servers"
-        sub={<>{items.length} MCP server{items.length === 1 ? '' : 's'} in {settings.workspace}. Duplicate one, or make a variant that stays in sync with it.</>}>
+        sub={<>{own.length} MCP server{own.length === 1 ? '' : 's'} in {settings.workspace}{items.length > own.length ? ', and the platform’s own' : ''}. Duplicate one, or make a variant that stays in sync with it.</>}>
         {can('servers:write') && <button type="button" className="btn btn-primary" onClick={() => setPanel({ mode: 'new' })}>New server</button>}
       </PageHead>
       <div className="body">
         <section aria-label="Servers" className="server-grid">
           {servers.isLoading && <Loading what="servers" />}
           <ErrorBox error={servers.error} />
-          {servers.isSuccess && items.length === 0 && (
+          {servers.isSuccess && own.length === 0 && (
             <div className="card"><h2>No servers yet</h2><p className="hint">Start from your API's OpenAPI or Swagger file (JSON or YAML): <b>New server</b>.</p>
               {can('servers:write') && <button type="button" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={() => setPanel({ mode: 'new' })}>New server from a spec</button>}</div>
           )}
@@ -44,16 +51,17 @@ export function ServersPage() {
             const last = serverBuilds[0]
             const lastGood = serverBuilds.find((b) => b.status === 'succeeded')
             const variants = items.filter((s) => s.parent === server.id).length
-            const selected = panel && panel.mode !== 'new' && panel.source.id === server.id
+            const selected = panel && 'source' in panel ? panel.source.id === server.id : !!(panel?.mode === 'connect' && server.system)
             return (
               <article key={server.id} className={'server-card' + (selected ? ' selected' : '')} aria-label={server.id}>
                 <div className="card-head">
                   <Link to={`/servers/${server.id}`} className="name">{server.id}</Link>
-                  {last ? <BuildChip build={last} /> : <Chip tone={server.latestVersion == null ? 'idle' : 'new'}>{server.latestVersion == null ? 'Draft' : 'Not built'}</Chip>}
+                  {server.system ? <Chip tone="new">Made by the platform</Chip> : last ? <BuildChip build={last} /> : <Chip tone={server.latestVersion == null ? 'idle' : 'new'}>{server.latestVersion == null ? 'Draft' : 'Not built'}</Chip>}
                 </div>
                 <div>
                   <div className="sub">{manifest?.server.title ?? server.title}</div>
                   {server.parent && <div className="lineage">↳ variant of {server.parent}</div>}
+                  {server.system && <div className="lineage">The platform as tools, for your agents. Updated with every platform release.</div>}
                   {manifests[i]?.error && <div className="lineage">doesn't compile yet; see Sources</div>}
                 </div>
                 <div className="stats">
@@ -63,8 +71,9 @@ export function ServersPage() {
                 </div>
                 <div className="card-actions">
                   <Link to={`/servers/${server.id}`} className="btn btn-dark btn-sm">Open</Link>
+                  {server.system && <button type="button" className="btn btn-sm btn-primary" onClick={() => setPanel({ mode: 'connect' })}>Connect an agent</button>}
                   {can('servers:write') && <>
-                    <button type="button" className="btn btn-sm" onClick={() => setPanel({ mode: 'copy', source: server })}>Duplicate</button>
+                    {!server.system && <button type="button" className="btn btn-sm" onClick={() => setPanel({ mode: 'copy', source: server })}>Duplicate</button>}
                     <button type="button" className="btn btn-sm btn-soft" onClick={() => setPanel({ mode: 'variant', source: server })}>New variant</button>
                   </>}
                 </div>
@@ -74,6 +83,7 @@ export function ServersPage() {
         </section>
         <aside aria-label="Side panel" className="stage stage-narrow">
           {panel?.mode === 'new' ? <NewServer onClose={() => setPanel(null)} />
+            : panel?.mode === 'connect' ? <ConnectAgent onClose={() => setPanel(null)} />
             : panel ? <CopyPanel key={panel.source.id + panel.mode} mode={panel.mode} source={panel.source} onClose={() => setPanel(null)}
               onMode={(mode) => setPanel({ mode, source: panel.source })} />
             : <SharedLibrary />}

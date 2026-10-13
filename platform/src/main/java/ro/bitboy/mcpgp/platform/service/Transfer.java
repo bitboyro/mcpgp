@@ -80,9 +80,13 @@ public final class Transfer {
         return bytes.toByteArray();
     }
 
-    /** Imports into a store without servers or library items; returns counts. */
+    /**
+     * Imports into a store without servers or library items (the platform's own server aside); returns
+     * counts. The export's copy of the platform's own server, with its history, replaces the fresh one;
+     * the next start brings it to this release.
+     */
     public Map<String, Integer> importAll(byte[] zip) {
-        if (!store.servers().isEmpty() || !store.library().isEmpty()) {
+        if (store.servers().stream().anyMatch(s -> !s.system()) || !store.library().isEmpty()) {
             throw new ApiException(409, "CONFLICT", "import fills a fresh store; this one has servers or library items already");
         }
         JsonNode data = null;
@@ -123,7 +127,9 @@ public final class Transfer {
             versions.forEach(store::saveVersion);
             List<Model.Server> servers = JSON.convertValue(data.path("servers"), new TypeReference<>() {
             });
-            servers.forEach(s -> store.saveServer(s, -1));
+            for (Model.Server server : servers) {
+                store.saveServer(server, store.server(server.id()).filter(Model.Server::system).map(Model.Server::revision).orElse(-1L));
+            }
             List<Model.LibraryItem> library = JSON.convertValue(data.path("library"), new TypeReference<>() {
             });
             library.forEach(i -> store.saveLibraryItem(i, -1));

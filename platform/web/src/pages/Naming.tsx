@@ -42,7 +42,7 @@ export function NamingView({ id }: { id: string }) {
   const [becomes, setBecomes] = useState('')
   const [message, setMessage] = useState('')
   const base = server.data?.latestVersion ?? 0
-  const editable = can('servers:write') && !!naming.data && !!manifest.data && !server.data?.archived
+  const editable = can('servers:write') && !!naming.data && !!manifest.data && !server.data?.archived && !server.data?.system
   const changes = Object.values(pending).map((p) => p.change)
   const summary = Object.values(pending).map((p) => p.label).join('; ')
   const preview = useQuery({

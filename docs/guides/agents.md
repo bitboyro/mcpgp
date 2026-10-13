@@ -6,6 +6,13 @@ easiest way in is the platform's own MCP server: mcpgp builds it from the platfo
 The platform applies the agent's scopes, quotas and approvals to every call
 ([spec/platform-api.md §3, §5](../spec/platform-api.md#3-identities-sign-in-and-scopes)).
 
+The platform's own server is also the first one on **All servers** (`mcpgp-platform`, made by the
+platform and updated with every release). **Connect an agent** there, or on **API & agents**, does
+steps 1 and 2 in one go: it creates the agent and its first token, shows what to paste into Claude
+Code, Claude Desktop, Cursor or VS Code, and says when the agent first calls. Only admins create
+agents; others are asked to have an admin do it. To change what agents get (hide tools, add notices),
+make a variant of `mcpgp-platform`.
+
 ## 1. An identity and a token
 
 An administrator creates the agent on **API & agents** (or `POST /api/v1/identities` with

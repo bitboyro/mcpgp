@@ -105,6 +105,7 @@ export interface Token {
   expires: string | null
   revoked: boolean
   value?: string
+  lastUsed?: string | null
 }
 
 export interface VersionRef {
@@ -122,6 +123,8 @@ export interface ServerSummary {
   archived: boolean
   latestVersion: number | null
   updated: string
+  /** The platform's own MCP server: made and updated by the platform; read it, make variants of it. */
+  system?: boolean
 }
 
 export interface Server extends ServerSummary {

@@ -14,6 +14,14 @@ versions follow [SemVer](https://semver.org).
 - `mcpgp preview` (the tools the agent sees, and what the customer configures), `mcpgp try` (a tool
   call against a real target, a runtime config with credentials, or a mock), `mcpgp migrate` (one
   format so far: nothing to change), `--no-color`.
+- The platform's own MCP server is the first server people see: `mcpgp-platform`, made by the
+  platform at its first start from the project in its release and given a new version by each upgrade
+  (`system: true`; read, try, build and make variants of it; changes are `409 SYSTEM_SERVER`).
+  `platformServer.enabled: false` archives it. **Connect an agent** (on its card, its Overview and API &
+  agents) creates an agent and its first token, shows the setup for Claude Code, Claude Desktop, Cursor
+  and VS Code, and says when the agent first called; people who aren't admins are asked to have an
+  admin create the agent. On a platform with no servers of its own, All servers opens there.
+- `GET /tokens` says when each token was `lastUsed`.
 
 ### Fixed
 - Activity searches read the whole log when few entries matched, and agent quotas read it on every

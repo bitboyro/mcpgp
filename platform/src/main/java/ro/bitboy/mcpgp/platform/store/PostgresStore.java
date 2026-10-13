@@ -170,7 +170,7 @@ public final class PostgresStore implements Store, AutoCloseable {
         StoreKeys.serverId(server.id());
         long revision = expectedRevision < 0 ? 1 : expectedRevision + 1;
         Model.Server saved = new Model.Server(server.id(), server.title(), server.parent(), server.archived(), server.created(),
-                server.updated(), List.copyOf(server.versions()), revision);
+                server.updated(), List.copyOf(server.versions()), revision, server.system());
         int changed = expectedRevision < 0
                 ? update("INSERT INTO servers (id, revision, doc) VALUES (?, ?, ?::json) ON CONFLICT DO NOTHING",
                         ps -> { ps.setString(1, server.id()); ps.setLong(2, revision); ps.setString(3, json(saved)); })
@@ -320,6 +320,16 @@ public final class PostgresStore implements Store, AutoCloseable {
     @Override
     public void saveToken(Model.Token token) {
         saveRecord("token", token.id(), token);
+    }
+
+    @Override
+    public List<Model.TokenUse> tokenUses() {
+        return records("token-use", Model.TokenUse.class);
+    }
+
+    @Override
+    public void saveTokenUse(Model.TokenUse use) {
+        saveRecord("token-use", use.token(), use);
     }
 
     @Override

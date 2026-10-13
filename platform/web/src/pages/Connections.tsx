@@ -100,7 +100,7 @@ function FromRequest({ id, api: apiId, server, several, current }: {
   const serverData = useServer(id)
   const [header, setHeader] = useState(current?.header ?? '')
   const enabled = !!current
-  const editable = can('servers:write') && !serverData.data?.archived
+  const editable = can('servers:write') && !serverData.data?.archived && !serverData.data?.system
   const save = useMutation({
     mutationFn: (on: boolean) => api.saveEdit(id, serverData.data?.latestVersion ?? 0, [on
       ? { op: 'set', path: `/apis/[id=${apiId}]/downstreamAuth/fromRequest`, value: header.trim() ? { header: header.trim() } : {} }

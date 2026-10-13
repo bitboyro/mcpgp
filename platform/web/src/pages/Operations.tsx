@@ -66,7 +66,7 @@ export function OperationsView({ id }: { id: string }) {
     if (!preview.isFetching || edits.length === 0) setFlips({})
   }, [preview.isFetching, edits.length])
   const onOf = (apiId: string, op: Operation) => flips[apiId + ' ' + op.key] ?? isOn(op)
-  const editable = can('servers:write') && !!current.data && !server.data?.archived
+  const editable = can('servers:write') && !!current.data && !server.data?.archived && !server.data?.system
 
   const before = useMemo(() => {
     const map = new Map<string, Operation>()

@@ -59,7 +59,7 @@ public final class Servers {
 
     /** Adds a stored version (an upload, or an edit of the latest one); the same content as the latest one adds nothing. */
     public Model.Server addVersion(String id, Model.Version version, String message, Access.Principal who) {
-        Model.Server server = get(id);
+        Model.Server server = writable(id);
         if (server.archived()) {
             throw new ApiException(409, "CONFLICT", "server " + id + " is archived; restore it first");
         }
@@ -71,7 +71,7 @@ public final class Servers {
         int number = versions.isEmpty() ? 1 : server.latest().number() + 1;
         versions.add(new Model.VersionRef(number, version.digest(), message, who.identity().name(), now));
         Model.Server saved = save(new Model.Server(server.id(), server.title(), server.parent(), false, server.created(), now, versions,
-                server.revision()), server.revision());
+                server.revision(), server.system()), server.revision());
         record(who, "version.create", id, Map.of("version", number, "digest", version.digest()));
         return saved;
     }
@@ -118,11 +118,25 @@ public final class Servers {
     }
 
     public Model.Server setArchived(String id, boolean archived, long expectedRevision, Access.Principal who) {
-        Model.Server server = get(id);
+        Model.Server server = writable(id);
         Model.Server saved = save(new Model.Server(server.id(), server.title(), server.parent(), archived, server.created(),
-                Instant.now().toString(), server.versions(), server.revision()), expectedRevision < 0 ? server.revision() : expectedRevision);
+                Instant.now().toString(), server.versions(), server.revision(), server.system()),
+                expectedRevision < 0 ? server.revision() : expectedRevision);
         record(who, archived ? "server.archive" : "server.restore", id, Map.of());
         return saved;
+    }
+
+    /**
+     * A server people and agents may change: not the platform's own (spec/platform-api.md §2.1), which
+     * the platform keeps up to date itself; a variant of it holds a company's changes.
+     */
+    public Model.Server writable(String id) {
+        Model.Server server = get(id);
+        if (server.system()) {
+            throw new ApiException(409, "SYSTEM_SERVER", "server " + id + " is made by the platform and changes with it; "
+                    + "make a variant of it to change what it does");
+        }
+        return server;
     }
 
     public Model.Server get(String id) {

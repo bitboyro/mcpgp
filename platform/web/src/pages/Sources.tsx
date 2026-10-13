@@ -30,8 +30,8 @@ export function SourcesPage() {
         <section className="col" aria-label="Versions">
           <ErrorBox error={server.error} />
           {server.isLoading && <Loading />}
-          {server.data && <Contracts id={id} editable={can('servers:write')} onDone={(n) => { setChosen(n); setFile(null) }} />}
-          {can('servers:write') && server.data && <Upload id={id} onDone={(n) => { setChosen(n); setFile(null) }} />}
+          {server.data && <Contracts id={id} editable={can('servers:write') && !server.data.system} onDone={(n) => { setChosen(n); setFile(null) }} />}
+          {can('servers:write') && server.data && !server.data.system && <Upload id={id} onDone={(n) => { setChosen(n); setFile(null) }} />}
           {server.data && (
             <div className="card">
               <h2>Versions</h2>

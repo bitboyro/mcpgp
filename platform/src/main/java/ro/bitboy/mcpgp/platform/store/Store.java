@@ -76,6 +76,11 @@ public interface Store {
 
     void saveToken(Model.Token token);
 
+    /** The last use of each token that was used. */
+    List<Model.TokenUse> tokenUses();
+
+    void saveTokenUse(Model.TokenUse use);
+
     // local accounts and approvals
     List<Model.Credential> credentials();
 

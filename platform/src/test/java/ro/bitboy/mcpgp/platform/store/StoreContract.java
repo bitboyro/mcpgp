@@ -106,6 +106,9 @@ abstract class StoreContract {
         store.saveCredential(new Model.Credential("i-1", "salt", 1000, "hash", 2, null));
         store.saveApproval(new Model.Approval("a-1", "release", "orders-mcp", "bot", "t", "pending", null, null, null));
         assertThat(store.tokens()).hasSize(1);
+        store.saveTokenUse(new Model.TokenUse("t-1", "2026-10-13T10:00:00Z"));
+        store.saveTokenUse(new Model.TokenUse("t-1", "2026-10-13T10:05:00Z"));
+        assertThat(store.tokenUses()).singleElement().extracting(Model.TokenUse::at).isEqualTo("2026-10-13T10:05:00Z");
         assertThat(store.credentials()).singleElement().extracting(Model.Credential::failures).isEqualTo(2);
         assertThat(store.approvals()).singleElement().extracting(Model.Approval::status).isEqualTo("pending");
     }

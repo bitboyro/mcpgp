@@ -18,10 +18,18 @@ import java.util.Map;
  *
  * @param postgres the PostgreSQL store, or null for the file store at {@code storageRoot}
  * @param admin    the first administrator, created at start when the store has no identities yet, or null
+ * @param platformServer {@code platformServer.enabled}: the platform's own MCP server is one of its servers
+ *                 (default); false archives it at the next start
  */
 public record PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
                              boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl, Postgres postgres,
-                             Admin admin, Tls tls) {
+                             Admin admin, Tls tls, boolean platformServer) {
+
+    public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
+                          boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl, Postgres postgres, Admin admin,
+                          Tls tls) {
+        this(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl, postgres, admin, tls, true);
+    }
 
     public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
                           boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl, Postgres postgres, Admin admin) {
@@ -42,7 +50,7 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
 
     public PlatformConfig withTls(Tls tls) {
         return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
-                postgres, admin, tls);
+                postgres, admin, tls, platformServer);
     }
 
     public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
@@ -65,12 +73,12 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
 
     public PlatformConfig withPostgres(Postgres postgres) {
         return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
-                postgres, admin, tls);
+                postgres, admin, tls, platformServer);
     }
 
     public PlatformConfig withAdmin(Admin admin) {
         return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
-                postgres, admin, tls);
+                postgres, admin, tls, platformServer);
     }
 
     /**
@@ -172,7 +180,9 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
             admin = new Admin(adminName, password);
         }
         return new PlatformConfig(storage, host, port, signing, r, workspace, local, g, oidc(doc.at("/auth/oidc")), ldap(doc.at("/auth/ldap")),
-                publicUrl == null ? null : publicUrl.replaceAll("/+$", ""), postgres, admin, tls(doc.at("/http/tls"), env));
+                publicUrl == null ? null : publicUrl.replaceAll("/+$", ""), postgres, admin, tls(doc.at("/http/tls"), env),
+                Boolean.parseBoolean(env.getOrDefault("MCPGP_PLATFORM_PLATFORM_SERVER__ENABLED",
+                        doc.at("/platformServer/enabled").asText("true"))));
     }
 
     private static Tls tls(JsonNode node, Map<String, String> env) {

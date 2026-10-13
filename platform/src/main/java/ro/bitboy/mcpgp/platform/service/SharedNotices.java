@@ -58,7 +58,8 @@ public final class SharedNotices {
 
         List<Model.Server> targets = new ArrayList<>();
         if (servers == null) {
-            store.servers().stream().filter(s -> !s.archived() && s.latest() != null).forEach(targets::add);
+            // the platform's own server changes only with the platform; its variants take notices
+            store.servers().stream().filter(s -> !s.archived() && !s.system() && s.latest() != null).forEach(targets::add);
         } else {
             for (String id : new LinkedHashSet<>(servers)) {
                 targets.add(store.server(id).filter(s -> s.latest() != null).orElseThrow(() -> ApiException.notFound("server " + id)));

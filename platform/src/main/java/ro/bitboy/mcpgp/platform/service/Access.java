@@ -51,6 +51,7 @@ public final class Access {
     }
 
     private final Store store;
+    private final Map<String, Instant> lastUse = new java.util.concurrent.ConcurrentHashMap<>();
 
     public Access(Store store) {
         this.store = store;
@@ -109,8 +110,21 @@ public final class Access {
         if (t.revoked() || t.expires() != null && Instant.parse(t.expires()).isBefore(Instant.now())) {
             return Optional.empty();
         }
-        return store.identities().stream().filter(i -> i.id().equals(t.identity()) && !i.disabled()).findFirst()
+        Optional<Principal> principal = store.identities().stream().filter(i -> i.id().equals(t.identity()) && !i.disabled()).findFirst()
                 .map(identity -> new Principal(identity, t.scopes(), t.id()));
+        principal.ifPresent(p -> used(t.id()));
+        return principal;
+    }
+
+    /** Records a token's use, at most once a minute per token (and per platform instance). */
+    private void used(String token) {
+        Instant now = Instant.now();
+        Instant last = lastUse.get(token);
+        if (last != null && last.isAfter(now.minusSeconds(60))) {
+            return;
+        }
+        lastUse.put(token, now);
+        store.saveTokenUse(new Model.TokenUse(token, now.truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString()));
     }
 
     static String hash(String secret) {
