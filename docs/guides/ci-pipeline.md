@@ -27,7 +27,7 @@ mcp-servers/
 `.mcpgp/config.yaml` ([cli.md §2](../spec/cli.md#2-repository-config-mcpgpconfigyaml)):
 
 ```yaml
-cli: 0.2.6                         # the exact CLI version; another version refuses to run (exit 5)
+cli: 0.2.7                         # the exact CLI version; another version refuses to run (exit 5)
 workspace: workspace
 servers:                           # what --all works on
   - servers/orders/orders.mcpgp.yaml
