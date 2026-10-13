@@ -270,6 +270,27 @@ class ContractLoaderTest {
     }
 
     @Test
+    void aReferenceToASchemaThatIsntThereIsAnError() throws IOException {
+        Path spec = Files.writeString(temp.resolve("broken.yaml"), """
+                swagger: "2.0"
+                info: { title: t, version: "1" }
+                definitions: { Entry: { type: object } }
+                paths:
+                  /entries:
+                    get:
+                      responses:
+                        "200": { description: ok, schema: { type: array, items: { $ref: '#/definitions/Entyr' } } }
+                """);
+        Diagnostics d = new Diagnostics();
+        new ContractLoader(temp, temp).load(new ContractKey("a", "1"), new ContractFiles(spec, List.of()), d);
+        assertThat(d.errors()).singleElement().satisfies(e -> {
+            assertThat(e.code()).isEqualTo("REF_UNRESOLVED");
+            assertThat(e.message()).contains("#/definitions/Entyr");
+            assertThat(e.location().pointer()).isEqualTo("/paths/~1entries/get/responses/200/schema/items/$ref");
+        });
+    }
+
+    @Test
     void openApi32IsNotSupportedYet() throws IOException {
         Path spec = Files.writeString(temp.resolve("s.yaml"), "openapi: 3.2.0\ninfo: { title: t, version: '1' }\npaths: {}\n");
         var result = new ContractLoader(temp, temp).load(new ContractKey("a", "1"), new ContractFiles(spec, List.of()), diagnostics);

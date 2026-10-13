@@ -244,13 +244,32 @@ public final class Main {
                 return ERRORS;
             }
             String contractFile = source == null ? "contracts/openapi.yaml" : "contracts/" + source.fileName();
-            Files.createDirectories(out.resolve("contracts"));
+            Map<String, byte[]> contracts = new java.util.LinkedHashMap<>();
             if (source != null) {
-                Files.write(out.resolve(contractFile), source.bytes());
+                // the spec and the files it refers to ($ref), as the platform takes them (SpecFiles)
+                Map<String, byte[]> files = source.files();
+                ro.bitboy.mcpgp.core.scaffold.SpecFiles.Analysis analysis = ro.bitboy.mcpgp.core.scaffold.SpecFiles.analyze(files, source.fileName());
+                if (!analysis.ok()) {
+                    analysis.missing().forEach(m -> err.println("error: " + m.target() + " is missing (referenced from " + m.from() + " at " + m.pointer() + ")"));
+                    analysis.broken().forEach(b -> err.println("error: " + b.from() + " refers to " + b.target() + " (at " + b.pointer() + "), which isn't there"));
+                    analysis.remote().forEach(r -> err.println("error: " + r.from() + " refers to " + r.target()
+                            + "; builds don't fetch URLs: download that file next to the spec and refer to it by its path"));
+                    analysis.problems().forEach(p -> err.println("error: " + p));
+                    return ERRORS;
+                }
+                contracts.putAll(ro.bitboy.mcpgp.core.scaffold.SpecFiles.under("contracts/", files, analysis));
+                contractFile = "contracts/" + analysis.main();
+            }
+            Files.createDirectories(out.resolve("contracts"));
+            for (Map.Entry<String, byte[]> file : contracts.entrySet()) {
+                Path target = out.resolve(file.getKey()).normalize();
+                Files.createDirectories(target.getParent());
+                Files.write(target, file.getValue());
             }
             Files.writeString(definition, Scaffold.definition(server, title, api, source == null ? "1.0" : source.version(), contractFile));
             PrintWriter writer = spec.commandLine().getOut();
-            writer.println("wrote " + definition + (source != null ? " and " + out.resolve(contractFile) : ""));
+            writer.println("wrote " + definition + (source != null ? " and " + out.resolve(contractFile)
+                    + (contracts.size() > 1 ? " with the " + (contracts.size() - 1) + " file" + (contracts.size() == 2 ? "" : "s") + " it refers to" : "") : ""));
             if (source == null) {
                 writer.println("next: put the API's OpenAPI document at " + out.resolve(contractFile) + ", then run mcpgp validate " + definition);
                 return OK;
@@ -271,8 +290,60 @@ public final class Main {
             return OK;
         }
 
-        /** The spec to start from: its bytes, as read, and what the definition takes from it. */
-        record Spec(byte[] bytes, String fileName, String title, String version) {
+        /**
+         * The spec to start from: its bytes, as read, and what the definition takes from it; for a local
+         * file, also the files it refers to ({@code $ref}s, followed from file to file), by path relative
+         * to the spec's folder.
+         */
+        record Spec(byte[] bytes, String fileName, String title, String version, Path file) {
+            Map<String, byte[]> files() throws IOException {
+                Map<String, byte[]> files = new java.util.TreeMap<>();
+                files.put(fileName, bytes);
+                if (file == null) {
+                    return files;
+                }
+                Path root = file.toAbsolutePath().getParent();
+                java.util.ArrayDeque<String> queue = new java.util.ArrayDeque<>(List.of(fileName));
+                com.fasterxml.jackson.dataformat.yaml.YAMLMapper yaml = new com.fasterxml.jackson.dataformat.yaml.YAMLMapper();
+                while (!queue.isEmpty() && files.size() < 5000) {
+                    String current = queue.poll();
+                    JsonNode document;
+                    try {
+                        document = yaml.readTree(files.get(current));
+                    } catch (IOException e) {
+                        continue; // reported by the analysis
+                    }
+                    List<String> refs = new java.util.ArrayList<>();
+                    refs(document, refs);
+                    for (String ref : refs) {
+                        String part = ref.contains("#") ? ref.substring(0, ref.indexOf('#')) : ref;
+                        if (part.isEmpty() || part.matches("(?i)^[a-z][a-z0-9+.-]*:.*")) {
+                            continue;
+                        }
+                        Path parent = Path.of(current).getParent();
+                        Path target = (parent == null ? Path.of(part) : parent.resolve(part)).normalize();
+                        String key = target.toString().replace('\\', '/');
+                        Path onDisk = root.resolve(target).normalize();
+                        if (key.startsWith("..") || files.containsKey(key) || !onDisk.startsWith(root) || !Files.isRegularFile(onDisk)) {
+                            continue; // missing or outside the spec's folder: the analysis says so
+                        }
+                        files.put(key, Files.readAllBytes(onDisk));
+                        queue.add(key);
+                    }
+                }
+                return files;
+            }
+
+            private static void refs(JsonNode node, List<String> into) {
+                if (node == null) {
+                    return;
+                }
+                if (node.isObject() && node.path("$ref").isTextual()) {
+                    into.add(node.get("$ref").asText());
+                }
+                node.forEach(child -> refs(child, into));
+            }
+
             static Spec load(String from) throws IOException {
                 byte[] bytes;
                 String fileName;
@@ -317,7 +388,8 @@ public final class Main {
                     }
                 }
                 String version = document.at("/info/version").asText("1.0");
-                return new Spec(bytes, fileName, document.at("/info/title").asText("My API"), version.isBlank() ? "1.0" : version);
+                return new Spec(bytes, fileName, document.at("/info/title").asText("My API"), version.isBlank() ? "1.0" : version,
+                        from.startsWith("https://") || from.startsWith("http://") ? null : Path.of(from));
             }
         }
     }

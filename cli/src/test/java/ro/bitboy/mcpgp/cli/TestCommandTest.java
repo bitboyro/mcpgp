@@ -78,6 +78,33 @@ class TestCommandTest {
     }
 
     @Test
+    void initCopiesTheFilesTheSpecRefersTo(@TempDir Path dir) throws Exception {
+        Path spec = Files.createDirectories(dir.resolve("spec"));
+        Files.createDirectories(spec.resolve("paths"));
+        Files.createDirectories(spec.resolve("schemas"));
+        Files.writeString(spec.resolve("api.json"), """
+                { "swagger": "2.0", "info": { "title": "Ledger", "version": "1.0" },
+                  "paths": { "/entries": { "$ref": "paths/entries.json" } } }""");
+        Files.writeString(spec.resolve("paths/entries.json"), """
+                { "get": { "operationId": "listEntries", "responses": { "200": { "description": "ok",
+                  "schema": { "type": "array", "items": { "$ref": "../schemas/entry.json" } } } } } }""");
+        Files.writeString(spec.resolve("schemas/entry.json"), "{ \"type\": \"object\", \"properties\": { \"id\": { \"type\": \"string\" } } }");
+        Files.writeString(spec.resolve("unrelated.json"), "{}");
+
+        assertThat(run("init", "--from-spec", spec.resolve("api.json").toString(), "--out", dir.resolve("p").toString())).as(err.toString()).isZero();
+        assertThat(out.toString()).contains("with the 2 files it refers to").contains("1 tools");
+        assertThat(dir.resolve("p/contracts/paths/entries.json")).exists();
+        assertThat(dir.resolve("p/contracts/schemas/entry.json")).exists();
+        assertThat(dir.resolve("p/contracts/unrelated.json")).doesNotExist();
+
+        // a referenced file that isn't there: said before anything is written
+        Files.delete(spec.resolve("schemas/entry.json"));
+        assertThat(run("init", "--from-spec", spec.resolve("api.json").toString(), "--out", dir.resolve("q").toString())).isEqualTo(1);
+        assertThat(err.toString()).contains("schemas/entry.json is missing");
+        assertThat(dir.resolve("q")).doesNotExist();
+    }
+
+    @Test
     void initRefusesWhatIsNotASpec(@TempDir Path dir) throws Exception {
         Path notes = Files.writeString(dir.resolve("notes.yaml"), "hello: world\n");
         assertThat(run("init", "--from-spec", notes.toString(), "--out", dir.resolve("p").toString())).isEqualTo(1);

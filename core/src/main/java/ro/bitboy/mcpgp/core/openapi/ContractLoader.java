@@ -91,6 +91,7 @@ public final class ContractLoader {
         if (format.get() == Format.SWAGGER_2_0) {
             rewriteRefs(document, "#/definitions/", "#/components/schemas/");
         }
+        checkInternalRefs(document, format.get() == Format.SWAGGER_2_0, document, "", diagnostics, location);
         return Optional.of(new Reader(key, format.get(), document, location, diagnostics).contract());
     }
 
@@ -262,6 +263,33 @@ public final class ContractLoader {
                 name = base + String.valueOf(i);
             }
             return name;
+        }
+    }
+
+    /**
+     * Every {@code #/…} reference must point at something: a schema that names a missing shared schema
+     * would otherwise end up in tools as an empty placeholder (request and response schemas alike).
+     */
+    private static void checkInternalRefs(JsonNode node, boolean swagger, JsonNode document, String pointer,
+                                          Diagnostics diagnostics, Location location) {
+        if (node.isObject()) {
+            JsonNode ref = node.get("$ref");
+            if (ref != null && ref.isTextual() && ref.asText().startsWith("#")) {
+                String target = ref.asText().substring(1);
+                if (swagger) {
+                    target = target.replaceFirst("^/components/schemas/", "/definitions/");
+                }
+                if (!target.isEmpty() && document.at(target).isMissingNode()) {
+                    String written = swagger ? ref.asText().replaceFirst("^#/components/schemas/", "#/definitions/") : ref.asText();
+                    diagnostics.error(Codes.REF_UNRESOLVED, "'" + written + "' does not exist", location.withPointer(pointer + "/$ref"));
+                }
+            }
+            node.fields().forEachRemaining(f -> checkInternalRefs(f.getValue(), swagger, document, pointer + "/" + escape(f.getKey()),
+                    diagnostics, location));
+        } else if (node.isArray()) {
+            for (int i = 0; i < node.size(); i++) {
+                checkInternalRefs(node.get(i), swagger, document, pointer + "/" + i, diagnostics, location);
+            }
         }
     }
 

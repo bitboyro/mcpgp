@@ -414,7 +414,23 @@
           "properties": { "fields": { "type": "array", "items": { "type": "string" } } },
           "additionalProperties": false
         },
-        "audit": { "type": "object" },
+        "audit": {
+          "description": "The audit settings the package ships with; the operator's runtime config can still change them (runtime-config.md §4)",
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "rotate": { "type": "string", "pattern": "^(daily|hourly|size:[1-9][0-9]*)$" },
+                "retainDays": { "type": "integer", "minimum": 1 }
+              },
+              "additionalProperties": false
+            },
+            "arguments": { "enum": ["none", "redacted", "hashed"] }
+          },
+          "additionalProperties": false
+        },
         "telemetry": { "type": "object" }
       },
       "additionalProperties": false

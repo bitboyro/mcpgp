@@ -232,7 +232,10 @@ export interface Manifest {
   exposure: { mode: string; discoveryStyle?: string; pinned?: string[] }
   instances: { mode: 'single' | 'multi'; mixedContracts?: string; max?: number | null }
   packs: { id: string; version: string; tools: string[] }[]
-  policies: { confirmDestructive?: boolean; responseLimitKb?: number; redaction?: { fields: string[] } }
+  policies: {
+    confirmDestructive?: boolean; responseLimitKb?: number; redaction?: { fields: string[] }
+    runtimeDefaults?: { audit?: { file?: { retainDays?: number; rotate?: string; enabled?: boolean }; arguments?: string } }
+  }
   runtime: { transports?: { allowed: string[]; default: string }; inboundAuth?: { allowed: string[]; default: string } }
   diagnostics: Diagnostic[]
 }

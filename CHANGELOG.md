@@ -5,6 +5,17 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+### Added
+- Audit defaults in the definition, checked: `runtimeDefaults.audit` (`file.retainDays`, `file.rotate`,
+  `file.enabled`, `arguments`) is typed, so a misspelt key is an error instead of being ignored; the
+  platform's Overview sets how long the audit log is kept and how arguments are recorded.
+- `mcpgp init --from-spec` copies the files a local spec refers to (followed from file to file), and
+  says which referenced files are missing before writing anything.
+
+### Fixed
+- A schema reference to a shared schema that isn't there (`#/definitions/Entyr`) was accepted and
+  became an empty placeholder in tools; it's now a `REF_UNRESOLVED` error, in requests and responses.
+
 ## 0.2.6 — 2026-10-13
 
 ### Added
