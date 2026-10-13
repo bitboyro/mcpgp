@@ -140,7 +140,8 @@ class InspectTest {
             assertThat(run("try", "--workspace", WORKSPACE, "--target", url, "--tool", "orders_customer_get", "--args",
                     "{\"path\": {\"id\": \"c-1\"}}", ORDERS.toString())).as(out + "\n" + err).isZero();
             assertThat(out.toString()).contains("Ada");
-            assertThat(seen).containsExactly("GET /api/v2/customers/c-1");
+            // as the server would, it first asks which version the target runs (runtime-config §4.4)
+            assertThat(seen).containsExactly("GET /api/v2/version", "GET /api/v1/version", "GET /api/v2/customers/c-1");
         } finally {
             target.stop(0);
         }

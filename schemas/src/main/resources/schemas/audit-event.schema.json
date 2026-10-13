@@ -9,7 +9,7 @@
     "v": { "const": 1 },
     "type": {
       "type": "string",
-      "pattern": "^(server\\.(start|stop)|session\\.(start|end)|auth\\.inbound|(tool\\.(call|confirm)|resource\\.read)|instance\\.health|config\\.reload|pack\\.[a-z][a-z0-9-]*\\.[a-z][a-z0-9_]*)$"
+      "pattern": "^(server\\.(start|stop)|session\\.(start|end)|auth\\.inbound|(tool\\.(call|confirm)|resource\\.read)|instance\\.(health|contract)|config\\.reload|pack\\.[a-z][a-z0-9-]*\\.[a-z][a-z0-9_]*)$"
     },
     "server": { "type": "string" },
     "build": { "type": "string" },
@@ -60,6 +60,16 @@
     "confirm": { "enum": ["asked", "given", "refused", "expired"] },
     "inlineSecrets": { "type": "boolean" },
     "configHash": { "type": "string" },
+    "detection": {
+      "description": "instance.contract: how an auto instance's contract was chosen (runtime-config §4.4)",
+      "type": "object",
+      "properties": {
+        "selection": { "enum": ["detected", "default"] },
+        "reported": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "cid": { "type": "string" }
   },
   "required": ["ts", "v", "type", "server", "outcome", "cid"],

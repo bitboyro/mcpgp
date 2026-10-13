@@ -68,6 +68,20 @@ class ServerCommandsTest {
     }
 
     @Test
+    void doctorSaysWhichVersionEachTargetRunsAndWarnsAboutAWrongPin() throws IOException {
+        target = new MockTarget();
+        target.respondToVersion(MockTarget.Response.json(200, "{\"version\":\"2.0.4\"}"))
+                .respondToVersion(MockTarget.Response.json(200, "{\"version\":\"2.0.4\"}"));
+        run("", """
+                instances:
+                  - { id: auto, baseUrl: "%1$s" }
+                  - { id: pinned, baseUrl: "%1$s", contract: "1.0" }
+                """.formatted(target.address()), "doctor");
+        assertThat(out()).contains("contract: 2.0, detected (the target reports 2.0.4)")
+                .contains("! instance pinned is pinned to contract 1.0, but its target runs 2.0");
+    }
+
+    @Test
     void doctorReportsConfigProblemsAndInlineSecrets() throws IOException {
         assertThat(run("", "instances: [ { id: a, baseUrl: \"ftp://x\" } ]\n", "doctor")).isEqualTo(1);
         assertThat(out()).contains("✗ config").contains("/instances/0/baseUrl: only http and https");

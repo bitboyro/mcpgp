@@ -37,6 +37,7 @@ public final class ApiToolHandler implements ToolHandler {
     /** The recording pack, or null when the build doesn't have it. */
     private final Recordings recordings;
     private final ResponseMapper responses;
+    private final Contracts contracts;
 
     public ApiToolHandler(Manifest manifest, RuntimeConfig config) {
         this.manifest = manifest;
@@ -51,9 +52,15 @@ public final class ApiToolHandler implements ToolHandler {
         });
         this.redactor = new Redactor(config.secrets());
         this.upstream = new Upstream(apiKeys, redactor);
+        this.contracts = new Contracts(manifest, config.allInstances(), upstream, java.time.Clock.systemUTC());
         this.recordings = recordings(manifest, config, apiKeys);
         this.responses = new ResponseMapper(manifest.policies().path("responseLimitKb").asInt(256),
                 config.errorDetail(), redactor);
+    }
+
+    /** Which contract each instance uses (runtime-config §4.4). */
+    public Contracts contracts() {
+        return contracts;
     }
 
     /** The request enrichers to run before each call is sent (extensions.md §3). */
@@ -92,8 +99,14 @@ public final class ApiToolHandler implements ToolHandler {
         Manifest.Api api = manifest.apis().get(tool.path("api").asText());
         record.api = api.id();
         RuntimeConfig.Instance instance = instance(api, arguments);
-        String contract = instance.contract().equals("auto") ? api.defaultContract() : instance.contract();
         record.instance = instance.id();
+        Contracts.Choice choice = contracts.forCall(instance, credentials);
+        if (!choice.available()) {
+            throw new ToolError("INSTANCE_UNAVAILABLE", instance.id() + " is unavailable: its contract version isn't known (" + choice.reason() + ")",
+                    "It's asked again within a minute; use another instance, or ask whoever runs this server to check it (doctor)")
+                    .withMeta(Map.<String, Object>of("mcpgp/instance", instance.id()));
+        }
+        String contract = choice.contract();
         record.contract = contract;
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("mcpgp/instance", instance.id());

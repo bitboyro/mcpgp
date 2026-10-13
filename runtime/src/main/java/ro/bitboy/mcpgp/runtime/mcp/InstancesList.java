@@ -18,10 +18,12 @@ final class InstancesList implements ToolHandler {
 
     private final Manifest manifest;
     private final RuntimeConfig config;
+    private final ro.bitboy.mcpgp.runtime.call.Contracts contracts;
 
-    InstancesList(Manifest manifest, RuntimeConfig config) {
+    InstancesList(Manifest manifest, RuntimeConfig config, ro.bitboy.mcpgp.runtime.call.Contracts contracts) {
         this.manifest = manifest;
         this.config = config;
+        this.contracts = contracts;
     }
 
     @Override
@@ -34,17 +36,26 @@ final class InstancesList implements ToolHandler {
                 continue;
             }
             for (RuntimeConfig.Instance instance : config.instances().getOrDefault(api.id(), List.of())) {
-                String contract = instance.contract().equals("auto") ? api.defaultContract() : instance.contract();
+                ro.bitboy.mcpgp.runtime.call.Contracts.Choice choice = contracts.of(instance);
+                String contract = choice.contract();
                 Map<String, Object> entry = new LinkedHashMap<>();
                 entry.put("name", instance.id());
                 if (several) {
                     entry.put("api", api.id());
                 }
-                entry.put("contract", contract);
+                if (contract != null) {
+                    entry.put("contract", contract);
+                }
                 entry.put("contractSelection", instance.contract().equals("auto") ? "auto" : "pinned");
+                if (instance.contract().equals("auto") && choice.selection().equals("detected")) {
+                    entry.put("detectedVersion", choice.reported());
+                }
+                if (choice.reason() != null) {
+                    entry.put("contractNote", choice.available() ? "default contract: " + choice.reason() : choice.reason());
+                }
                 entry.put("readOnly", instance.readOnly());
-                entry.put("status", "configured");
-                entry.put("tools", toolsOn(api.id(), contract, instance.readOnly()));
+                entry.put("status", choice.available() ? "configured" : "unavailable");
+                entry.put("tools", contract == null ? 0 : toolsOn(api.id(), contract, instance.readOnly()));
                 instances.add(entry);
             }
         }

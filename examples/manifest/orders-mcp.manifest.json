@@ -18,9 +18,11 @@
         }
       ],
       "detect": {
+        "field": "/version",
         "method": "GET",
         "path": "/version",
-        "pattern": "^(\\d+\\.\\d+)"
+        "pattern": "^(\\d+\\.\\d+)",
+        "underBasePath": true
       },
       "downstreamAuth": {
         "apiKey": {
@@ -59,7 +61,7 @@
     "cli": "0.1.0",
     "createdAt": "2026-10-09T10:40:00Z",
     "definition": {
-      "digest": "sha256:35b397c1b55f4519b4589ffc10d75ac36dbfa32f1c4090764b0ed5daec23f94b",
+      "digest": "sha256:332ad87ffd2e8a6d54d61617a3b931c963449f76584d90c08debbd1d990beffa",
       "name": "orders-mcp",
       "source": "git+https://git.example.com/integration/mcp-defs.git#9c41e7a"
     },

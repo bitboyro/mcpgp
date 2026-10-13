@@ -240,7 +240,7 @@ export interface ManifestApi {
   title?: string
   toolPrefix?: string
   contracts: Contract[]
-  detect?: { method: string; path: string; pointer?: string; pattern?: string }
+  detect?: { method: string; path: string; field?: string; header?: string; underBasePath?: boolean; pattern?: string }
   downstreamAuth?: { supported: string[]; identity?: string; unsatisfiedTools?: string; apiKey?: { in: string; name: string }; fromRequest?: { header?: string }; tokenExchange?: Record<string, never> }
 }
 

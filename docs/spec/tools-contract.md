@@ -130,7 +130,7 @@ request) are JSON-RPC errors.
 
 | Tool | When | Purpose |
 |---|---|---|
-| `instances_list` | multi-instance | `{ instances: [{ name, contract, readOnly, status, tools }] }`, never credentials |
+| `instances_list` | multi-instance | `{ instances: [{ name, contract, contractSelection, detectedVersion?, contractNote?, readOnly, status, tools }] }`; `status` is `configured`, or `unavailable` when detection refused the instance (runtime-config §4.4); never credentials |
 | discovery tools | `discovery` / `hybrid` | find, inspect and call tools not listed directly (§15) |
 | `toolsets_list`, `toolset_enable`, `toolset_disable` | `toolsets` | switch groups of tools on and off (§15.3) |
 | `search_tools`, `describe_tool` | plain + `plainSearch` | search alongside the full list |

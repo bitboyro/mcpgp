@@ -64,12 +64,15 @@ class UnsatisfiedToolsTest {
                 instances:
                   - id: prod
                     baseUrl: "%1$s"
+                    contract: "2.0"
                     auth: { type: oauth2ClientCredentials, tokenUrl: "%1$s/token", clientId: c, clientSecret: "${env:SECRET}", scopes: [orders.read] }
                   - id: partner
                     baseUrl: "%1$s"
+                    contract: "2.0"
                     auth: { type: basic, username: u, password: "${env:SECRET}" }
                   - id: both
                     baseUrl: "%1$s"
+                    contract: "2.0"
                     auth:
                       - { type: oauth2ClientCredentials, tokenUrl: "%1$s/token", clientId: c, clientSecret: "${env:SECRET}", scopes: [orders.read] }
                       - { type: basic, username: u, password: "${env:SECRET}" }

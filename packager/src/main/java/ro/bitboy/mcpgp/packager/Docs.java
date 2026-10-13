@@ -487,6 +487,7 @@ final class Docs {
             {"INPUT_VALIDATION", "arguments don't match the tool's schema or the instance's contract, or a file input was refused"},
             {"INSTANCE_REQUIRED / INSTANCE_UNKNOWN", "missing or unknown `instance`"},
             {"NOT_AVAILABLE_ON_INSTANCE", "the operation isn't in that instance's contract, or the instance is read-only"},
+            {"INSTANCE_UNAVAILABLE", "the instance's contract version isn't known yet; it's asked again within a minute"},
             {"TOOLSET_DISABLED", "toolsets mode: enable the tool's toolset with toolset_enable first"},
             {"CONFIRMATION_REQUIRED", "the tool needs the user's confirmation"},
             {"AUTH_INBOUND", "the client isn't allowed (HTTP 401/403)"},

@@ -359,6 +359,13 @@ public final class ConfigLoader {
                     problems.add(where + "/contract: '" + contract + "' is not shipped with this server (shipped: "
                             + String.join(", ", api.contracts().keySet()) + ", or auto)");
                 }
+                String prefer = node.hasNonNull("prefer") ? node.get("prefer").asText() : null;
+                if (prefer != null && !contract.equals("auto")) {
+                    problems.add(where + "/prefer: only for contract: auto (a pinned contract is used as it is)");
+                } else if (prefer != null && !api.contracts().containsKey(prefer)) {
+                    problems.add(where + "/prefer: '" + prefer + "' is not shipped with this server (shipped: "
+                            + String.join(", ", api.contracts().keySet()) + ")");
+                }
                 JsonNode auth = node.has("auth") ? node.get("auth").deepCopy() : JsonNodeFactory.instance.objectNode().put("type", "none");
                 List<JsonNode> entries = new ArrayList<>();
                 if (auth.isArray()) {
@@ -415,7 +422,7 @@ public final class ConfigLoader {
                         problems.add(e.getMessage());
                     }
                 }
-                list.add(new RuntimeConfig.Instance(api.id(), id, baseUrl, contract, node.path("readOnly").asBoolean(false),
+                list.add(new RuntimeConfig.Instance(api.id(), id, baseUrl, contract, prefer, node.path("readOnly").asBoolean(false),
                         timeout, auth, tls, context, baseDir));
             }
             result.put(api.id(), List.copyOf(list));

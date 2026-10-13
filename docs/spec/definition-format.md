@@ -58,7 +58,9 @@ build: { … }
 | `apis[].contracts[].spec` | path \| URL | — | Swagger 2.0, OAS 3.0 or 3.1. URLs only for allow-listed hosts. |
 | `apis[].contracts[].overlays` | list of paths | `[]` | Applied in order. |
 | `apis[].contracts[].default` | bool | last listed | Exactly one default per API. |
-| `apis[].detect` | object | none | optional: `{ method, path, pattern, onFailure: useDefault \| refuse }`; first capture group is matched against shipped versions (runtime-config §4.4) |
+| `apis[].detect` | object | none | optional: `{ method, path, pattern, field \| header, underBasePath, onFailure: useDefault \| refuse }`; the pattern's first group is matched against shipped versions (runtime-config §4.4) |
+| `apis[].detect.field` / `.header` | string | the body | where the version is: a JSON pointer into the answer (`/version`), or a response header; not both |
+| `apis[].detect.underBasePath` | bool | `false` | ask under each contract's base path in turn (the preferred contract first, then the newest), for APIs whose versions each answer under their own path |
 | `apis[].select.access` | enum | `read-write` | `read-only` · `read-write` (no DELETE) · `all` |
 | `apis[].select.include` / `exclude` | selector | all | See §5. |
 | `apis[].select.deprecated` | enum | `hide` | `hide` · `show` · `mark` |

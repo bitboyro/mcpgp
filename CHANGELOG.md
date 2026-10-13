@@ -22,6 +22,16 @@ versions follow [SemVer](https://semver.org).
   and VS Code, and says when the agent first called; people who aren't admins are asked to have an
   admin create the agent. On a platform with no servers of its own, All servers opens there.
 - `GET /tokens` says when each token was `lastUsed`.
+- Contract detection for `contract: auto` instances (runtime-config §4.4), which the spec described but
+  the runtime didn't do: an older system got the default contract's requests. The server now asks
+  each target which version it runs, at startup and on reload (starting waits up to 2 s; a slower
+  target answers in the background and its calls wait): under each contract's base path in
+  turn with `detect.underBasePath` (the instance's new `prefer` contract or the default first, then the
+  newest), reading `detect.field` (a JSON pointer) or `detect.header`. Per-caller credentials are used
+  when the target wants them. With `onFailure: refuse` an instance is unavailable
+  (`INSTANCE_UNAVAILABLE`, asked again at most once a minute). `instances_list` shows the detected
+  version, `doctor` warns when a pinned instance's target runs another version, and each result is an
+  `instance.contract` audit event. The orders example's rule reads `/version` under each base path.
 
 ### Fixed
 - Activity searches read the whole log when few entries matched, and agent quotas read it on every
