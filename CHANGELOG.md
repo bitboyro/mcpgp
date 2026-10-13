@@ -5,6 +5,8 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+## 0.2.6 — 2026-10-13
+
 ### Added
 - Credentials from the MCP client (`fromRequest`, auth.md §2.4): when the definition allows it
   (`downstreamAuth.fromRequest`), the client sends the credential for the API in a configured request
