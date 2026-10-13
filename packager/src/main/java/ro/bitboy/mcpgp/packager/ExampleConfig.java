@@ -79,6 +79,10 @@ public final class ExampleConfig {
                 default -> {
                 }
             }
+            if (api.at("/downstreamAuth/fromRequest").isObject()) {
+                lines.add(more + "# or the client's own credential, from a request header (HTTP only), then the one above when it's missing:");
+                lines.add(more + "# auth: [ { type: fromRequest }, { type: " + type + ", … } ]");
+            }
             lines.add(more + "# tls: { ca: { path: ./certs/ca.pem } }   # for internal CAs; or `instance trust`");
         }
         lines.add("");

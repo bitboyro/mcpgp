@@ -8,7 +8,9 @@ Two independent sides:
 MCP client ──(inbound)──► MCP server ──(downstream)──► target server
 ```
 
-Tokens never cross from one side to the other (no token passthrough).
+Tokens never cross from one side to the other (no token passthrough). A client may send its own
+credential *for the API* in a separate, configured header (§2.4); that is a downstream credential,
+never the client's sign-in to the MCP server.
 
 ## 1. Inbound (client → MCP server)
 
@@ -70,6 +72,7 @@ the build lists `mtls` among its supported types.
 | `apiKey` | OpenAPI `apiKey` scheme | in `header`, `query` or `cookie` with the name from the spec's security scheme |
 | `oauth2ClientCredentials` | RFC 6749 §4.4 | token from `tokenUrl`, then `Authorization: Bearer <access_token>` |
 | `mtls` | RFC 8446 client certificates (+ RFC 8705 when the API binds tokens to certificates) | client certificate per instance (runtime-config §5) |
+| `fromRequest` | — | the client's own credential from a configured request header, as it was sent (§2.4) |
 
 ### 2.1 `oauth2ClientCredentials`
 
@@ -113,9 +116,52 @@ manifest carries them per tool and contract (manifest §5). For each instance at
 - Credentials are sent only to the instance's own address; redirects to another host drop them.
 - `401`/`403` from the target → `AUTH_DOWNSTREAM` with status and a short reason.
 
+### 2.4 Credentials from the request (`fromRequest`)
+
+The MCP client sends the credential for the API in a request header of its own, set in the client's
+configuration from the user's environment or secret store: the model never sees it, and the MCP
+server never stores it. Allowed when the definition enables it (`apis[].downstreamAuth.fromRequest`);
+HTTP transport only.
+
+```yaml
+instances:
+  - id: prod
+    baseUrl: https://api.example.internal
+    auth:
+      - type: fromRequest
+        header: X-Orders-Authorization   # default X-<Server>[-<Api>][-<Instance>]-Authorization
+        as: Authorization                # the header sent to the API (default)
+      - type: oauth2ClientCredentials    # used when the request has no X-Orders-Authorization
+        tokenUrl: https://login.example.internal/oauth2/token
+        clientId: ${env:CLIENT_ID}
+        clientSecret: ${env:CLIENT_SECRET}
+```
+
+- **`auth` is one credential or a list**, tried in order for every call: a `fromRequest` entry is used
+  when the request carries its header, any other entry always. Entries after a non-`fromRequest`
+  one are never reached (a startup warning says so). With nothing usable the call fails with
+  `AUTH_DOWNSTREAM`, naming the header; there's no retry with another entry after the API refuses.
+- **Per request, never kept**: the value is read from the HTTP request that carries the call (not
+  from the MCP session), used for that call, and dropped. It is never written to disk, the cache,
+  logs, audit events or recordings; for the duration of the call it is masked (`***`) in everything
+  the call produces, upstream error bodies included. The audit records `upstream.auth: fromRequest`.
+- **Its own header per instance**: two instances (of any API in the server) can't read the same
+  header, so a production credential never reaches test; the default name includes the API id
+  when the server has several APIs and the instance id in multi-instance builds
+  (`X-Orders-Mcp-Prod-Authorization`). The definition's `fromRequest.header` sets the name for
+  single-API, single-instance servers.
+- **Not a header with another job**: `Host`, `Content-Type`, `Cookie`, `Origin`, `Accept`,
+  `Mcp-Session-Id`, `Mcp-Protocol-Version`, forwarding and tracing headers are refused, and so is
+  `Authorization` while the server's own sign-in (`static`, `oauth`) uses it. With inbound `none` the
+  server stays on loopback unless `allowInsecure` (§1), since anyone reaching it could relay to the
+  API with a credential of their own.
+- The value is sent as it came (e.g. `Bearer …`, `Basic …`), only to the instance's own address,
+  with redirects not followed (§2.3). Values with line breaks or over 16 KB are refused.
+
 ## 3. Security considerations
 
-- No token passthrough; audience-bound inbound tokens.
+- No token passthrough; audience-bound inbound tokens. Credentials from the request (§2.4) are a
+  separate header, for one instance, used once and never kept.
 - Credentials only to the instance's own address; dropped on cross-host redirects.
 - Constant-time comparison of static keys; token endpoint errors never expose secrets.
 

@@ -5,6 +5,16 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+### Added
+- Credentials from the MCP client (`fromRequest`, auth.md §2.4): when the definition allows it
+  (`downstreamAuth.fromRequest`), the client sends the credential for the API in a configured request
+  header, set in the client's configuration from the user's environment, so the agent never sees it.
+  The server reads it per request for one instance, sends it only to that instance's address, and
+  never stores or logs it (it's masked in results, errors and recordings; the audit records only
+  `upstream.auth: fromRequest`). Each instance reads its own header (default
+  `X-<Server>[-<Api>][-<Instance>]-Authorization`). An instance's `auth` can now be a list tried in
+  order, so a service account takes over when the header is missing. HTTP only.
+
 ## 0.2.5 — 2026-10-12
 
 ### Fixed

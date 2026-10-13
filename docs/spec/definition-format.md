@@ -63,6 +63,7 @@ build: { … }
 | `apis[].select.include` / `exclude` | selector | all | See §5. |
 | `apis[].select.deprecated` | enum | `hide` | `hide` · `show` · `mark` |
 | `apis[].downstreamAuth.supported` | list | from spec | `basic` · `apiKey` · `bearer` · `oauth2ClientCredentials` · `mtls` · `custom:<id>` |
+| `apis[].downstreamAuth.fromRequest` | object | absent | Lets the MCP client send the credential for the API in a request header (`{ header: X-… }`, optional name); HTTP only, never stored. auth.md §2.4 |
 | `apis[].downstreamAuth.identity` | enum | `service-account` | `per-user` is P2. |
 | `apis[].downstreamAuth.unsatisfiedTools` | enum | `hide` | `hide` · `error` |
 | `apis[].requestBody` | object | `{ multiple: split }` | operations with several request body types: `split` (one tool per type, suffixes from `suffixes`) or `prefer` (one tool, first match of `prefer`). Default suffixes: `multipart/form-data → multipart`, `application/x-www-form-urlencoded → form`, `application/octet-stream → binary`. See tools-contract §13 |

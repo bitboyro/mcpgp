@@ -367,6 +367,11 @@ public final class ManifestWriter {
         if (declared.has("unsatisfiedTools")) {
             auth.put("unsatisfiedTools", declared.get("unsatisfiedTools").asText());
         }
+        if (declared.has("fromRequest")) {
+            // the client may send the credential in a request header (auth.md §2.4); the runtime derives the
+            // header's default name when the definition gives none
+            auth.set("fromRequest", declared.get("fromRequest").deepCopy());
+        }
         if (supported.contains("apiKey") && apiKey != null && apiKey.in() != null && apiKey.parameterName() != null) {
             auth.set("apiKey", NODES.objectNode().put("in", apiKey.in()).put("name", apiKey.parameterName()));
         }

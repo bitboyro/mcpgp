@@ -91,6 +91,7 @@ Full example: [examples/manifest/orders-mcp.manifest.json](../../examples/manife
     "identity": "service-account",
     "unsatisfiedTools": "hide",
     "apiKey": { "in": "header", "name": "X-Api-Key" }
+    // "fromRequest": { "header": "X-Orders-Authorization" }: when the definition lets clients send the credential (auth.md §2.4)
   },
   "pagination": null
 }],

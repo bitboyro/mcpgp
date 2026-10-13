@@ -22,7 +22,7 @@ JSON Lines, one event per line, UTF-8. Written to `audit.file.path`. **Never to 
 | `tool`, `api`, `instance`, `contract` | for tool events | |
 | `outcome` | yes | `ok` · `error` · `denied` (`CONFIRMATION_REQUIRED`, `NOT_AVAILABLE_ON_INSTANCE`) |
 | `code` | when not ok | §3 |
-| `upstream` | for tool events | method, **templated** path, status |
+| `upstream` | for tool events | method, **templated** path, status, and `auth`: the credential type the call used (`fromRequest`, `bearer`, …), never its value |
 | `latencyMs` | for calls | |
 | `args` | for tool events | `"none"`; redacted (default): the arguments' keys with every value replaced by `"***"` (only `instance` is kept); or `{ "sha256": … }` of the canonical arguments |
 | `files` | for calls that send files | `[{ name, sizeBytes, sha256 }]`, never contents |

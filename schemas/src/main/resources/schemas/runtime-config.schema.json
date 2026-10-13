@@ -212,7 +212,13 @@
         "contract": { "type": "string", "minLength": 1 },
         "readOnly": { "type": "boolean" },
         "timeoutSeconds": { "type": "integer", "minimum": 1 },
-        "auth": { "$ref": "#/$defs/downstreamAuth" },
+        "auth": {
+          "description": "One credential, or a list tried in order: a fromRequest entry when its header is in the request, any other entry always",
+          "oneOf": [
+            { "$ref": "#/$defs/downstreamAuth" },
+            { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/downstreamAuth" } }
+          ]
+        },
         "tls": {
           "type": "object",
           "properties": {
@@ -264,6 +270,15 @@
             "audience": { "type": ["string", "null"] }
           },
           "required": ["type", "tokenUrl", "clientId", "clientSecret"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "fromRequest" },
+            "header": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,63}$", "description": "the request header the MCP client sends the credential in; default X-<Server>[-<Api>][-<Instance>]-Authorization" },
+            "as": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,63}$", "description": "the header it's sent to the API in; default Authorization" }
+          },
+          "required": ["type"],
           "additionalProperties": false
         },
         {

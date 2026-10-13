@@ -68,7 +68,8 @@ final class OAuthTokens {
     }
 
     private Token request(RuntimeConfig.Instance instance, HttpClient client) {
-        JsonNode auth = instance.auth();
+        JsonNode auth = instance.authEntries().stream().filter(e -> e.path("type").asText().equals("oauth2ClientCredentials"))
+                .findFirst().orElse(instance.auth());
         List<String> form = new ArrayList<>();
         form.add("grant_type=client_credentials");
         List<String> scopes = new ArrayList<>();

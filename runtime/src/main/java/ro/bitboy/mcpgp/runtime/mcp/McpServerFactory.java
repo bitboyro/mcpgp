@@ -141,6 +141,8 @@ public final class McpServerFactory {
 
     /** Transport-context key with the authenticated client's key name (HTTP, static mode). */
     public static final String CLIENT_KEY = "mcpgp.client";
+    /** The request's credential headers for the API (auth.md §2.4), by lower-case name: for this request only, never kept. */
+    public static final String CREDENTIALS_KEY = "mcpgp.credentials";
 
     /** stdio. */
     public McpSyncServer create(McpServerTransportProvider transport) {
@@ -416,6 +418,7 @@ public final class McpServerFactory {
             } else {
                 upstream.put("status", record.status);
             }
+            putIfSet(upstream, "auth", record.auth);
             putIfSet(upstream, "body", record.errorBody);
         }
         event.put("latencyMs", latencyMs);

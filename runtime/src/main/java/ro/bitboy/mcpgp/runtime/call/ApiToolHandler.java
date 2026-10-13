@@ -68,6 +68,22 @@ public final class ApiToolHandler implements ToolHandler {
 
     @Override
     public Object call(McpSyncServerExchange exchange, JsonNode tool, Map<String, Object> arguments, CallRecord record) {
+        Object sent = exchange == null || exchange.transportContext() == null ? null
+                : exchange.transportContext().get(ro.bitboy.mcpgp.runtime.mcp.McpServerFactory.CREDENTIALS_KEY);
+        @SuppressWarnings("unchecked")
+        Map<String, String> credentials = sent instanceof Map<?, ?> m ? (Map<String, String>) m : Map.of();
+        // whatever the client sent is masked in everything this call writes: results, errors, recordings
+        try (AutoCloseable masked = Redactor.during(List.copyOf(credentials.values()))) {
+            return call(exchange, tool, arguments, record, credentials);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private Object call(McpSyncServerExchange exchange, JsonNode tool, Map<String, Object> arguments, CallRecord record,
+                        Map<String, String> credentials) {
         Manifest.Api api = manifest.apis().get(tool.path("api").asText());
         record.api = api.id();
         RuntimeConfig.Instance instance = instance(api, arguments);
@@ -97,10 +113,12 @@ public final class ApiToolHandler implements ToolHandler {
             LOG.debug("{} {} → {}", request.method(), variant.path("path").asText(), instance.id());
             // security: [] marks a public operation: no credentials (auth.md §2.2)
             boolean publicOperation = variant.path("security").isArray() && variant.path("security").isEmpty();
+            Upstream.Credential credential = Upstream.credential(instance, credentials, publicOperation);
+            record.auth = credential.type().equals("none") ? null : credential.type();
             HttpResponse<byte[]> response;
             Recordings.RuntimeConfig_Instance recorded = new Recordings.RuntimeConfig_Instance(instance.api(), instance.id());
             try {
-                response = upstream.send(instance, request, publicOperation);
+                response = upstream.send(instance, request, credential, publicOperation);
             } catch (RuntimeException e) {
                 if (recordings != null) {
                     recordings.capture(tool.path("name").asText(), recorded, request, null, e.getMessage());
