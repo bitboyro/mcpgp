@@ -98,12 +98,22 @@ public class ServersApi {
                                                  @RequestParam(required = false) String title, @RequestParam(required = false) String version,
                                                  @RequestParam(required = false) String main, @RequestParam(required = false) String message,
                                                  @RequestParam(defaultValue = "false") boolean dryRun,
+                                                 @RequestParam(required = false) String collisions,
+                                                 @RequestParam(required = false) String renames,
                                                  @RequestHeader(value = "Content-Type", required = false) String contentType,
                                                  @RequestBody(required = false) byte[] body) {
         Access.Principal who = who(request);
         who.require("servers:write");
+        Map<String, String> chosen = new java.util.LinkedHashMap<>();
+        if (renames != null && !renames.isBlank()) {
+            JsonNode parsed = Json.parse(renames.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            if (!parsed.isObject()) {
+                throw ApiException.validation("renames: a JSON object of operation key → name");
+            }
+            parsed.fields().forEachRemaining(f -> chosen.put(f.getKey(), f.getValue().asText()));
+        }
         var upload = fromSpec.read(body == null ? new byte[0] : body, contentType, main);
-        var plan = fromSpec.plan(upload, id, title, version);
+        var plan = fromSpec.plan(upload, id, title, version, collisions == null || collisions.isBlank() ? null : collisions, chosen);
         if (dryRun) {
             Map<String, Object> answer = new java.util.LinkedHashMap<>();
             answer.put("id", plan.id());

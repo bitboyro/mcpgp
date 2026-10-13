@@ -1,7 +1,7 @@
 // Uploading an API's spec on the platform (spec/platform-api.md §2.1): the files the person picks, added
 // to as the platform asks for missing ones, and what to show for a SPEC_PROBLEMS answer.
 
-import { ApiError, type SpecProblems } from './api'
+import { ApiError, type NameClash, type SpecProblems } from './api'
 
 export const SPEC_FILE = /\.(json|ya?ml)$/i
 
@@ -17,6 +17,11 @@ export function specOnly(files: Record<string, string>): Record<string, string> 
 }
 
 /** The SPEC_PROBLEMS of an error, or null for other errors. */
+export function nameClashes(error: unknown): NameClash[] | null {
+  if (!(error instanceof ApiError) || error.code !== 'NAME_COLLISIONS') return null
+  return (error.body as { collisions?: NameClash[] }).collisions ?? []
+}
+
 export function specProblems(error: unknown): SpecProblems | null {
   if (!(error instanceof ApiError) || error.code !== 'SPEC_PROBLEMS') return null
   return error.body as SpecProblems

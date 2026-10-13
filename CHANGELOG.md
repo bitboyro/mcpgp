@@ -5,6 +5,13 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+### Added
+- Clashing tool names, the user's choice: when two operations would get the same tool name (often the
+  same operationId twice), the spec upload shows each one with a suggested name from its method and
+  path, to accept or edit (saved as a rule per operation), or to make the server's rule
+  (`naming.collisions: method-path`, new); the Naming page sets the rule too. The compiler's error
+  suggests the name.
+
 ## 0.2.7 — 2026-10-13
 
 ### Added

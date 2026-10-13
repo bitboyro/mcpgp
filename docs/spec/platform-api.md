@@ -45,6 +45,12 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   (`{ file, from, pointer }` for each referenced file that isn't in the upload), `remote` (references
   to URLs, which the platform never fetches), `candidates` and `problems` (e.g. OpenAPI 3.2).
   `dryRun=true` answers `{ id, title, api, version, main, format, files, moved, tools, exists }`.
+  Operations that would get the same tool name (often the same `operationId` twice) are answered as
+  `422 NAME_COLLISIONS` with `collisions: [{ operation, method, path, operationId, name, suggested,
+  base }]`: each later operation, the name it clashes on, and the name it would get from its method
+  and path (`base` is that name without the API prefix). The user chooses, and the choice is saved in
+  the definition: `renames=<JSON {operation key: name}>` writes a rule per operation (matched by
+  method and path, `name: { set }`), or `collisions=method-path` sets `naming.collisions`.
 - `POST /servers/{id}/contracts` adds a contract version from an uploaded spec (same bodies and
   checks): to the server's API (`api=<id>` when it has several), as `version` (default the spec's
   `info.version`), with `default=true` to make it the default; the same version again replaces its

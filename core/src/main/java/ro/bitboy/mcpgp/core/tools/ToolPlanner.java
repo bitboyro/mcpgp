@@ -324,6 +324,10 @@ public final class ToolPlanner {
                 id = base.key() + "#" + suffix;
                 provenance.add(Provenance.of("contentTypeSuffix", toolName));
             }
+            // the name it would get from its method and path, should its own clash (collisions: method-path)
+            String fromMethodPath = naming.namespace(naming.methodPathBase(base), prefix, severalApis)
+                    + (toolName.length() > namespaced.length() ? toolName.substring(namespaced.length()) : "");
+            methodPathNames.put(id, naming.cased(fromMethodPath));
             plans.add(new ToolPlan(naming.cased(toolName), id, apiId, base.key(), base.operationId(), base.tags(), type,
                     title, description, annotations, sensitive, needsConfirm, expose, accept,
                     Map.copyOf(params), Map.copyOf(parts), Map.copyOf(variants),
@@ -390,6 +394,9 @@ public final class ToolPlanner {
 
     // ---------------------------------------------------------------------- lock and collisions
 
+    /** Each tool's name from its method and path (by tool id), for {@code collisions: method-path}. */
+    private final Map<String, String> methodPathNames = new java.util.HashMap<>();
+
     private List<ToolPlan> applyLockAndCollisions(List<ToolPlan> plans, Naming naming, NamesLock lock, Location root) {
         List<ToolPlan> result = new ArrayList<>();
         for (ToolPlan plan : plans) {
@@ -431,6 +438,24 @@ public final class ToolPlanner {
                 unique.add(plan);
                 continue;
             }
+            if (naming.collisions.equals("method-path") && methodPathNames.containsKey(plan.id())) {
+                String candidate = naming.limit(methodPathNames.get(plan.id()));
+                for (int n = 2; candidate != null && byName.containsKey(candidate); n++) {
+                    candidate = naming.limit(methodPathNames.get(plan.id()) + "_" + n);
+                }
+                if (candidate != null) {
+                    List<Provenance> provenance = new ArrayList<>(plan.provenance().get("name"));
+                    provenance.add(Provenance.of("collision", candidate));
+                    Map<String, List<Provenance>> all = new LinkedHashMap<>(plan.provenance());
+                    all.put("name", List.copyOf(provenance));
+                    ToolPlan renamed = rename(plan, candidate, all);
+                    byName.put(renamed.name(), renamed);
+                    unique.add(renamed);
+                    diagnostics.info(Codes.NAME_COLLISION, plan.id() + " is named '" + candidate + "' from its method and path: '"
+                            + plan.name() + "' is " + existing.id() + "'s (naming.collisions: method-path)", root);
+                    continue;
+                }
+            }
             if (naming.collisions.equals("suffix-number")) {
                 int n = 2;
                 while (byName.containsKey(plan.name() + "_" + n)) {
@@ -441,7 +466,8 @@ public final class ToolPlanner {
                 unique.add(renamed);
             } else {
                 diagnostics.error(Codes.NAME_COLLISION, "Tools " + existing.id() + " and " + plan.id() + " are both named '"
-                        + plan.name() + "'; add a rule that renames one", root);
+                        + plan.name() + "'; add a rule that renames one" + (methodPathNames.containsKey(plan.id())
+                        ? " (e.g. " + methodPathNames.get(plan.id()) + ", from its method and path), or set naming.collisions: method-path" : ""), root);
             }
         }
         return unique;

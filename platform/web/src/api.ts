@@ -313,6 +313,9 @@ export interface FromSpecPlan {
 export interface ContractPlan { api: string; version: string; spec: string; replaces: boolean; compiles: boolean; diagnostics: Diagnostic[]; moved: { from: string; to: string }[] }
 
 /** The extra fields of a SPEC_PROBLEMS answer: what the upload lacks. */
+/** Operations that would get the same tool name (NAME_COLLISIONS): each later one, with the name it would get from its method and path. */
+export interface NameClash { operation: string; method: string; path: string; operationId?: string; name: string; suggested: string; base: string }
+
 export interface SpecProblems {
   missing?: { file: string; from: string; pointer: string }[]
   /** References to a part of a file that isn't there: `file` is `api.json#/definitions/Entry`. */
@@ -390,9 +393,9 @@ export const api = {
   createServer: (id: string, files: Record<string, string> | Blob, title?: string) =>
     json<Server>('POST', '/servers' + q({ id, title }), files instanceof Blob ? files : { files }),
   /** A dry run says what would be created; problems with the upload are ApiError SPEC_PROBLEMS (see SpecProblems). */
-  fromSpecPlan: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string }) =>
+  fromSpecPlan: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string; collisions?: string; renames?: string }) =>
     json<FromSpecPlan>('POST', '/servers/from-spec' + q({ ...params, dryRun: true }), files instanceof Blob ? files : { files }),
-  createFromSpec: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string }) =>
+  createFromSpec: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string; collisions?: string; renames?: string }) =>
     json<Server>('POST', '/servers/from-spec' + q(params), files instanceof Blob ? files : { files }),
   contractPlan: (id: string, files: Record<string, string> | Blob, params: { api?: string; version?: string; main?: string; default?: boolean }) =>
     json<ContractPlan>('POST', `/servers/${enc(id)}/contracts` + q({ ...params, dryRun: true }), files instanceof Blob ? files : { files }),

@@ -3,8 +3,8 @@ import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, type Build, type LibraryItem, type ServerSummary } from '../api'
 import { readPicked, type PickedProject } from '../files'
-import { specProblems } from '../specUpload'
-import { SpecPicker, SpecProblemsView, type SpecUpload } from './SpecUpload'
+import { nameClashes, specProblems } from '../specUpload'
+import { NameClashesView, SpecPicker, SpecProblemsView, type SpecUpload } from './SpecUpload'
 import { useSession } from '../session'
 import { BuildChip, Chip, ErrorBox, Icon, Loading, PageHead, Segmented, slug } from '../ui'
 
@@ -184,15 +184,20 @@ function NewFromSpec() {
   const [id, setId] = useState<string | null>(null)
   const [title, setTitle] = useState<string | null>(null)
   const [version, setVersion] = useState<string | null>(null)
+  // what the user chose for clashing tool names: names per operation, or the server's rule
+  const [renames, setRenames] = useState<Record<string, string> | null>(null)
+  const [rule, setRule] = useState(false)
+  const naming = { collisions: rule ? 'method-path' : undefined, renames: renames ? JSON.stringify(renames) : undefined }
   const plan = useQuery({
-    queryKey: ['from-spec', rev, main],
-    queryFn: () => api.fromSpecPlan(files!, { main: main || undefined }),
+    queryKey: ['from-spec', rev, main, naming.collisions, naming.renames],
+    queryFn: () => api.fromSpecPlan(files!, { main: main || undefined, ...naming }),
     enabled: files !== null,
     retry: false,
   })
   const problems = specProblems(plan.error)
+  const clashes = nameClashes(plan.error)
   const create = useMutation({
-    mutationFn: () => api.createFromSpec(files!, { main: main || undefined, id: id ?? undefined, title: title ?? undefined, version: version ?? undefined }),
+    mutationFn: () => api.createFromSpec(files!, { main: main || undefined, id: id ?? undefined, title: title ?? undefined, version: version ?? undefined, ...naming }),
     onSuccess: async (server) => {
       await queryClient.invalidateQueries({ queryKey: ['servers'] })
       navigate(`/servers/${server.id}`)
@@ -203,10 +208,14 @@ function NewFromSpec() {
     <form className="list" style={{ gap: 14 }} onSubmit={(e) => { e.preventDefault(); if (plan.data && shownId) create.mutate() }}>
       <p className="hint">The platform makes the server's definition from the spec: one tool per operation, named from the spec, ready to adjust
         on its Overview. Nothing is created until you press Create.</p>
-      <SpecPicker files={files} onFiles={(f) => { setFiles(f); setRev((r) => r + 1); create.reset() }} />
+      <SpecPicker files={files} onFiles={(f) => { setFiles(f); setRev((r) => r + 1); setRenames(null); setRule(false); create.reset() }} />
       {plan.isFetching && <p className="hint">Reading the spec…</p>}
       {problems && <SpecProblemsView problems={problems} main={main} onMain={setMain} />}
-      {plan.error && !problems && <ErrorBox error={plan.error} />}
+      {clashes && clashes.length > 0 && (
+        <NameClashesView clashes={clashes} prefix={clashes[0].suggested.slice(0, clashes[0].suggested.length - clashes[0].base.length - 1)}
+          onRenames={(r) => { setRenames({ ...(renames ?? {}), ...r }); setRule(false) }} onRule={() => { setRule(true); setRenames(null) }} />
+      )}
+      {plan.error && !problems && !(clashes && clashes.length > 0) && <ErrorBox error={plan.error} />}
       {plan.data && (
         <>
           <div className="stage-card">
@@ -228,6 +237,8 @@ function NewFromSpec() {
           <label className="field">Contract version (from the spec's info.version)
             <input className="input input-stage" value={version ?? plan.data.version} onChange={(e) => setVersion(e.target.value)} />
           </label>
+          {(rule || renames) && <p className="hint">{rule ? 'Clashing tools are named from their method and path (naming.collisions: method-path).'
+            : `Renamed: ${Object.values(renames!).join(', ')}.`} <button type="button" className="btn btn-sm" onClick={() => { setRule(false); setRenames(null) }}>Change</button></p>}
           <ErrorBox error={create.error} />
           <button type="submit" className="btn btn-primary" disabled={!shownId || create.isPending}>{create.isPending ? 'Creating…' : 'Create server'}</button>
         </>
