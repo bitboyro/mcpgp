@@ -103,11 +103,27 @@ auth:
 OpenAPI security requirements are alternatives (OR) of sets (AND) of schemes with scopes. The
 manifest carries them per tool and contract (manifest §5). For each instance at startup:
 
-- A tool is **usable** if one alternative is satisfied by the instance's auth (type matches the
-  scheme; for OAuth, configured `scopes` ⊇ required scopes).
-- Unusable tools follow `downstreamAuth.unsatisfiedTools`: `hide` (removed from that instance's
-  view; in multi-instance builds the tool stays listed and calls for that instance return
-  `AUTH_DOWNSTREAM` naming the missing scope) or `error`.
+- The manifest says what each scheme is (`apis[].downstreamAuth.schemes`: `basic`, `bearer`,
+  `apiKey`, `oauth2ClientCredentials`, `mtls`, `oauth2` for other OAuth flows and OpenID Connect,
+  `other`).
+- A credential **covers** a scheme of its kind: `basic`, `apiKey`; `bearer` covers bearer and OAuth
+  schemes (a static token may be an OAuth access token); `oauth2ClientCredentials` covers bearer and
+  OAuth schemes, with the configured `scopes` ⊇ the required ones when the config lists scopes
+  (without, the identity provider grants its defaults); a client certificate (`tls.clientCert`)
+  covers `mtls` next to any credential. `fromRequest` and `none` aren't judged: what the client
+  sends is known only per call, and an instance without credentials (a mock, a gateway that adds
+  them) sends nothing, so the API decides. A scheme the manifest doesn't describe isn't judged
+  either.
+- A tool is **usable** on an instance if one of its credentials covers every scheme of one
+  alternative.
+- A tool no instance can use follows `downstreamAuth.unsatisfiedTools`: `hide` (the default: not
+  listed, not callable; the startup log lists the hidden tools and what each instance lacks) or
+  `error` (listed). A tool some instance can use stays listed; calls for an instance that can't
+  return `AUTH_DOWNSTREAM` naming what's missing (`needs oauth with the scope orders.write`),
+  without calling the API.
+- **On each call** the first credential of the instance's list that can be used now (§2.4) and
+  covers the operation is used, so an instance can hold, say, an OAuth client and a basic login
+  and each operation gets the one it accepts.
 - Operations with `security: []` are public: no credentials are sent.
 
 ### 2.3 Rules for every type

@@ -15,6 +15,13 @@ versions follow [SemVer](https://semver.org).
 ### Fixed
 - A schema reference to a shared schema that isn't there (`#/definitions/Entyr`) was accepted and
   became an empty placeholder in tools; it's now a `REF_UNRESOLVED` error, in requests and responses.
+- Tools an instance's credentials can't call were listed, and the API refused the call
+  (auth.md §2.2 wasn't enforced). Now a tool no instance can call is hidden (with
+  `unsatisfiedTools: hide`, the default; the startup log says which and why) or kept with a clear
+  error (`error`); calls for an instance that can't call a tool answer `AUTH_DOWNSTREAM` naming what's
+  missing, without calling the API; and each call uses the first of the instance's credentials that
+  fits the operation. Instances without credentials, `fromRequest`, and OAuth clients whose config
+  names no scopes aren't judged. The manifest says what each security scheme is (`schemes`).
 
 ## 0.2.6 — 2026-10-13
 
