@@ -68,6 +68,22 @@ class EditsApiTest extends PlatformTestBase {
     }
 
     @Test
+    void versionDetectionIsSetAndTurnedOffFromConnections() throws Exception {
+        int base = latest().path("latestVersion").asInt();
+        HttpResponseLike on = save(Map.of("base", base, "changes", List.of(set("/apis/[id=orders]/detect", Map.of(
+                "method", "GET", "path", "/status", "pattern", "^v?(\\d+\\.\\d+)", "header", "X-Api-Version", "onFailure", "refuse")))));
+        assertThat(on.status()).as(on.body().toString()).isEqualTo(201);
+        JsonNode detect = json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null))).at("/apis/0/detect");
+        assertThat(detect.path("header").asText()).isEqualTo("X-Api-Version");
+        assertThat(detect.path("onFailure").asText()).isEqualTo("refuse");
+        assertThat(detect.has("underBasePath")).as("the whole rule is replaced").isFalse();
+
+        HttpResponseLike off = save(Map.of("base", base + 1, "changes", List.of(Map.of("op", "remove", "path", "/apis/[id=orders]/detect"))));
+        assertThat(off.status()).as(off.body().toString()).isEqualTo(201);
+        assertThat(json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null))).at("/apis/0").has("detect")).isFalse();
+    }
+
+    @Test
     void auditDefaultsShipWithThePackage() throws Exception {
         int base = latest().path("latestVersion").asInt();
         HttpResponseLike saved = save(Map.of("base", base, "changes", List.of(set("/runtimeDefaults/audit/file/retainDays", 90),
