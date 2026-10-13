@@ -339,6 +339,8 @@ public final class ManifestWriter {
         Set<String> supported = new LinkedHashSet<>();
         declared.path("supported").forEach(s -> supported.add(s.asText()));
         SecurityScheme apiKey = null;
+        // what each scheme the operations name is, so the runtime can tell which credential satisfies them (auth.md §2.2)
+        Map<String, String> schemes = new TreeMap<>();
         for (Contract contract : versions.values()) {
             for (SecurityScheme scheme : new TreeMap<>(contract.securitySchemes()).values()) {
                 String kind = switch (scheme.type() == null ? "" : scheme.type()) {
@@ -350,6 +352,8 @@ public final class ManifestWriter {
                     case "mutualTLS" -> "mtls";
                     default -> null;
                 };
+                schemes.putIfAbsent(scheme.name(), kind != null ? kind
+                        : "oauth2".equals(scheme.type()) || "openIdConnect".equals(scheme.type()) ? "oauth2" : "other");
                 if (kind != null && !declared.has("supported")) {
                     supported.add(kind);
                 }
@@ -371,6 +375,10 @@ public final class ManifestWriter {
             // the client may send the credential in a request header (auth.md §2.4); the runtime derives the
             // header's default name when the definition gives none
             auth.set("fromRequest", declared.get("fromRequest").deepCopy());
+        }
+        if (!schemes.isEmpty()) {
+            ObjectNode schemesNode = auth.putObject("schemes");
+            schemes.forEach(schemesNode::put);
         }
         if (supported.contains("apiKey") && apiKey != null && apiKey.in() != null && apiKey.parameterName() != null) {
             auth.set("apiKey", NODES.objectNode().put("in", apiKey.in()).put("name", apiKey.parameterName()));

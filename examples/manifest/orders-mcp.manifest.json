@@ -28,6 +28,11 @@
           "name": "X-Api-Key"
         },
         "identity": "service-account",
+        "schemes": {
+          "apiKey": "apiKey",
+          "basicAuth": "basic",
+          "oauth": "oauth2ClientCredentials"
+        },
         "supported": [
           "basic",
           "apiKey",

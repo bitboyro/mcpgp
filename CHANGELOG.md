@@ -31,6 +31,13 @@ versions follow [SemVer](https://semver.org).
 ## 0.2.5 — 2026-10-12
 
 ### Fixed
+- Tools an instance's credentials can't call were listed, and the API refused the call
+  (auth.md §2.2 wasn't enforced). Now a tool no instance can call is hidden (with
+  `unsatisfiedTools: hide`, the default; the startup log says which and why) or kept with a clear
+  error (`error`); calls for an instance that can't call a tool answer `AUTH_DOWNSTREAM` naming what's
+  missing, without calling the API; and each call uses the first of the instance's credentials that
+  fits the operation. Instances without credentials, `fromRequest`, and OAuth clients whose config
+  names no scopes aren't judged. The manifest says what each security scheme is (`schemes`).
 - The store's cache of compiled results grew without limit: every preview of an unsaved change kept its
   manifest (several MB for a big server), and nothing was ever removed, which made the store, and with
   it every page, slower over time. Previews of unsaved changes are now kept in memory only, and the

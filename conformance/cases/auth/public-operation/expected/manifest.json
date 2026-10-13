@@ -11,6 +11,9 @@
         }
       ],
       "downstreamAuth": {
+        "schemes": {
+          "basicAuth": "basic"
+        },
         "supported": [
           "basic"
         ]

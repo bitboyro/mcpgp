@@ -62,17 +62,27 @@ final class Upstream {
     private static final Credential NONE = new Credential(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("type", "none"), null);
 
     /**
-     * The first entry of the instance's {@code auth} that can be used: a fromRequest entry when the
-     * client sent its header with this request, any other entry always (auth.md §2.4).
+     * The first entry of the instance's {@code auth} that can be used and satisfies the operation's
+     * security (auth.md §2.2): a fromRequest entry when the client sent its header with this request
+     * (§2.4), any other entry always.
      *
-     * @param sent the request's credential headers, by lower-case name
+     * @param sent     the request's credential headers, by lower-case name
+     * @param security the operation's security requirements (variant {@code security})
+     * @param kinds    the API's {@code downstreamAuth.schemes}
      */
-    static Credential credential(RuntimeConfig.Instance instance, Map<String, String> sent, boolean publicOperation) {
+    static Credential credential(RuntimeConfig.Instance instance, Map<String, String> sent, boolean publicOperation,
+                                 JsonNode security, JsonNode kinds) {
         if (publicOperation) {
             return NONE;
         }
         List<String> expected = new java.util.ArrayList<>();
+        String unmet = null;
         for (JsonNode entry : instance.authEntries()) {
+            String needs = Satisfaction.unmet(entry, instance, security, kinds);
+            if (needs != null) {
+                unmet = unmet == null ? needs : unmet;
+                continue;
+            }
             if (!entry.path("type").asText().equals("fromRequest")) {
                 return new Credential(entry, null);
             }
@@ -85,6 +95,10 @@ final class Upstream {
                 return new Credential(entry, value.strip());
             }
             expected.add(header);
+        }
+        if (unmet != null && expected.isEmpty()) {
+            throw new ToolError("AUTH_DOWNSTREAM", instance.id() + "'s credentials can't call this operation: it needs " + unmet,
+                    "Use another instance, or ask whoever runs this server for a credential that has it");
         }
         throw new ToolError("AUTH_DOWNSTREAM", instance.id() + " needs your credential in the " + String.join(" or ", expected) + " header",
                 "Set that header in your MCP client's configuration for this server (its value comes from your environment, not from the agent)");

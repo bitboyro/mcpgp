@@ -11,6 +11,11 @@
         }
       ],
       "downstreamAuth": {
+        "schemes": {
+          "apiKey": "apiKey",
+          "basicAuth": "basic",
+          "oauth": "oauth2ClientCredentials"
+        },
         "supported": [
           "basic",
           "oauth2ClientCredentials"
@@ -39,6 +44,10 @@
         }
       ],
       "downstreamAuth": {
+        "schemes": {
+          "basicAuth": "basic",
+          "bearerAuth": "bearer"
+        },
         "supported": [
           "basic",
           "bearer"
@@ -68,6 +77,9 @@
         }
       ],
       "downstreamAuth": {
+        "schemes": {
+          "oauth": "oauth2ClientCredentials"
+        },
         "supported": [
           "oauth2ClientCredentials"
         ]

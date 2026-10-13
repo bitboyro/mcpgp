@@ -113,7 +113,8 @@ public final class ApiToolHandler implements ToolHandler {
             LOG.debug("{} {} → {}", request.method(), variant.path("path").asText(), instance.id());
             // security: [] marks a public operation: no credentials (auth.md §2.2)
             boolean publicOperation = variant.path("security").isArray() && variant.path("security").isEmpty();
-            Upstream.Credential credential = Upstream.credential(instance, credentials, publicOperation);
+            Upstream.Credential credential = Upstream.credential(instance, credentials, publicOperation, variant.get("security"),
+                    api.node().path("downstreamAuth").path("schemes"));
             record.auth = credential.type().equals("none") ? null : credential.type();
             HttpResponse<byte[]> response;
             Recordings.RuntimeConfig_Instance recorded = new Recordings.RuntimeConfig_Instance(instance.api(), instance.id());

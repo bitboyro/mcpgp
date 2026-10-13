@@ -92,6 +92,7 @@ Full example: [examples/manifest/orders-mcp.manifest.json](../../examples/manife
     "unsatisfiedTools": "hide",
     "apiKey": { "in": "header", "name": "X-Api-Key" }
     // "fromRequest": { "header": "X-Orders-Authorization" }: when the definition lets clients send the credential (auth.md §2.4)
+    // "schemes": { "apiKey": "apiKey", "basicAuth": "basic", "oauth": "oauth2ClientCredentials" }: what each scheme the tools' security names is (auth.md §2.2)
   },
   "pagination": null
 }],
