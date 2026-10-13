@@ -42,7 +42,7 @@ Releases happen when they're asked for; these land on `main` first.
 | 0.3.0 passwords | See the release table | on `main` |
 | UX and wording review | See Main priorities | planned |
 | Per-user identity by token exchange | OAuth on-behalf-of (RFC 8693) for a shared server whose API trusts the same identity provider; the header-based way (`fromRequest`, 0.2.6) covers clients that hold their own credential | deferred |
-| Store performance at scale | PostgreSQL: the cache cleanup deletes entries one by one, and the activity page reads the whole log; fine at today's sizes | when needed |
+| Store performance at scale | Activity searches filtered by the store (SQL and indexes on PostgreSQL) and bounded in time; the cache cleanup batched | on `main` |
 
 Done from this list: credentials from the MCP client (0.2.6); per-operation security enforced, tool-name suffix and per-tool rename, audit defaults on Overview, `init --from-spec` with referenced files, broken schema references as errors, Try warm-up (0.2.7).
 

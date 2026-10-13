@@ -5,6 +5,11 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
+### Fixed
+- Activity searches read the whole log when few entries matched, and agent quotas read it on every
+  save or build: searches now go to the store as a query (PostgreSQL filters in SQL, with indexes on
+  target and actor) and stop at their time bound. The cache cleanup deletes in one batch.
+
 ### Added
 - Passwords in the web UI: Change password on the Account page (the name in the sidebar); Set
   password and Unlock on a person in API & agents, for admins. An admin's password can be temporary

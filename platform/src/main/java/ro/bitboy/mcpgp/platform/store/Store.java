@@ -90,6 +90,41 @@ public interface Store {
 
     List<Model.Activity> activity(Predicate<Model.Activity> filter, int limit);
 
+    /**
+     * Activity entries, newest first: each field of {@code query} that is set must match ({@code action}
+     * as a prefix; {@code server}: the entry's target, or its details' {@code server}); reading stops at
+     * {@code since}. Stores that can filter themselves (PostgreSQL) don't read what doesn't match.
+     */
+    default List<Model.Activity> activity(ActivityQuery query, int limit) {
+        java.time.Instant since = query.since();
+        List<Model.Activity> result = new java.util.ArrayList<>();
+        boolean[] older = {false};
+        activity(a -> {
+            if (since != null && !java.time.Instant.parse(a.ts()).isAfter(since)) {
+                older[0] = true;
+                return false;
+            }
+            return !older[0] && query.matches(a);
+        }, limit).forEach(result::add);
+        return result;
+    }
+
+    /** What an activity search asks for; null fields match everything. */
+    record ActivityQuery(String target, String server, String actor, String action, java.util.Set<String> actions, java.time.Instant since) {
+        public ActivityQuery(String target, String server, String actor, String action) {
+            this(target, server, actor, action, null, null);
+        }
+
+        public boolean matches(Model.Activity a) {
+            return (target == null || target.equals(a.target()))
+                    && (server == null || server.equals(a.target()) || a.details() != null && server.equals(a.details().get("server")))
+                    && (actor == null || actor.equals(a.actor()))
+                    && (action == null || a.action().startsWith(action))
+                    && (actions == null || actions.contains(a.action()))
+                    && (since == null || java.time.Instant.parse(a.ts()).isAfter(since));
+        }
+    }
+
     // derived data, rebuildable at any time (e.g. compiled manifests by version digest)
     Optional<byte[]> cached(String kind, String key);
 
