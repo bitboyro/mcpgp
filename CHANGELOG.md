@@ -6,6 +6,13 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- Tool names from the UI: a suffix for every API tool's name (`naming.namespace.suffix`, e.g.
+  `orders_customer_get_v2`) next to the server prefix on Naming, and a Name field in a tool's editor
+  on Tools & rules that renames that one tool (saved in its rule, `name: { set: … }`).
+- Try starts its server when the panel opens (`POST …/try/warm`), so the first call doesn't wait
+  for it.
+
+### Added
 - Audit defaults in the definition, checked: `runtimeDefaults.audit` (`file.retainDays`, `file.rotate`,
   `file.enabled`, `arguments`) is typed, so a misspelt key is an error instead of being ignored; the
   platform's Overview sets how long the audit log is kept and how arguments are recorded.

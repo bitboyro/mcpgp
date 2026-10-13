@@ -56,6 +56,33 @@ public final class Trials implements AutoCloseable {
         reaper.scheduleAtFixedRate(this::closeIdle, 1, 1, TimeUnit.MINUTES);
     }
 
+    private final java.util.concurrent.ExecutorService warming = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "mcpgp-trial-warm");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    /**
+     * Starts the version's trial server in the background (opening the Try panel), so the first call
+     * doesn't wait for it; a call that comes first waits for the same start. Failures are left for
+     * the call to report.
+     */
+    public void warm(Model.Version version, String createdAt) {
+        synchronized (sessions) {
+            if (sessions.containsKey(version.digest())) {
+                sessions.get(version.digest()).lastUsed()[0] = System.currentTimeMillis();
+                return;
+            }
+        }
+        warming.submit(() -> {
+            try {
+                session(version, createdAt);
+            } catch (RuntimeException e) {
+                LOG.debug("Warming the trial server of {} failed: {}", version.digest().substring(0, 12), e.getMessage());
+            }
+        });
+    }
+
     /** One call of a tool of the version: {@code result} or {@code error}, the {@code requests} the mock got, and what was {@code leftOut}. */
     public ObjectNode call(Model.Version version, String createdAt, String tool, Map<String, Object> arguments) {
         Session session = session(version, createdAt);
@@ -146,6 +173,7 @@ public final class Trials implements AutoCloseable {
 
     @Override
     public void close() {
+        warming.shutdownNow();
         reaper.shutdownNow();
         synchronized (sessions) {
             new ArrayList<>(sessions.keySet()).forEach(this::stopLocked);

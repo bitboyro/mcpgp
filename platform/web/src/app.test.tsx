@@ -381,6 +381,8 @@ describe('trying a tool', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Call the tool' }))
     expect((await screen.findByLabelText('Result')).textContent).toContain('"status": "refunded"')
     expect(screen.getByLabelText('Request').textContent).toContain('POST /api/v2/orders/example/refund  → 200')
-    expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ tool: 'orders_order_refund', arguments: { instance: 'mock', path: { id: 'example' } } })
+    // opening the panel starts the trial server first
+    expect(calls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual(['/servers/orders-mcp/versions/3/try/warm', '/servers/orders-mcp/versions/3/try'])
+    expect(calls.find((c) => c.method === 'POST' && c.path.endsWith('/try'))!.body).toEqual({ tool: 'orders_order_refund', arguments: { instance: 'mock', path: { id: 'example' } } })
   })
 })

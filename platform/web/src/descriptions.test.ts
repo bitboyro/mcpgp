@@ -1,5 +1,5 @@
 import type { Tool } from './api'
-import { describeScope, noticeId, ownDescription, paramDescriptions, scopeMatch, scopeOf, setNotice, setOverride } from './descriptions'
+import { describeScope, noticeId, ownDescription, paramDescriptions, scopeMatch, scopeOf, setNotice, setOverride, baseName, sameTool, validBaseName } from './descriptions'
 
 const tool = {
   name: 'orders_account_list', kind: 'api', title: 'List accounts', description: 'Lists accounts.\n\nPolicy.',
@@ -43,5 +43,32 @@ describe('per-tool overrides', () => {
       .toEqual({ match: { operationId: 'listAccounts' }, title: { set: 'Accounts' }, description: { set: 'Every account.' } })
     const pack = { ...tool, name: 'orders_audit_search', kind: 'pack', operation: undefined } as unknown as Tool
     expect(setOverride(pack, now, { ...now, title: 'Audit' })?.value).toEqual({ match: { tool: 'orders_audit_search' }, title: { set: 'Audit' } })
+  })
+})
+
+describe('renaming one tool', () => {
+  const tool = {
+    name: 'orders_customer_create_multipart_v2', kind: 'api', operation: { key: 'orders:POST:/customers', operationId: 'createCustomer' },
+    provenance: { name: [
+      { step: 'source', value: 'createCustomer' }, { step: 'shape', value: 'customer_create' },
+      { step: 'namespace', value: 'orders_customer_create_v2' }, { step: 'contentTypeSuffix', value: 'orders_customer_create_v2_multipart' },
+    ] },
+  } as unknown as Tool
+
+  it('edits the name before the prefixes and suffix, in the tool rule', () => {
+    expect(baseName(tool)).toBe('customer_create')
+    const now = { title: '', description: '', params: {}, name: 'customer_create' }
+    expect(setOverride(tool, now, { ...now, name: 'customer_add' })).toEqual({
+      op: 'set', path: '/overrides/rules/[id=ui:createCustomer]', value: { match: { operationId: 'createCustomer' }, name: { set: 'customer_add' } },
+    })
+    expect(validBaseName('customer add')).toBe(false)
+  })
+
+  it('finds the renamed tool by its operation and content type', () => {
+    const renamed = { ...tool, name: 'orders_customer_add_v2_multipart', provenance: { name: [
+      { step: 'namespace', value: 'orders_customer_add_v2' }, { step: 'contentTypeSuffix', value: 'orders_customer_add_v2_multipart' }] } } as unknown as Tool
+    const json = { ...tool, name: 'orders_customer_add_v2', provenance: { name: [{ step: 'namespace', value: 'orders_customer_add_v2' }] } } as unknown as Tool
+    expect(sameTool(renamed, tool)).toBe(true)
+    expect(sameTool(json, tool)).toBe(false)
   })
 })

@@ -76,7 +76,35 @@ export function overrideMatch(tool: Tool): Selector {
   return { method: variant?.method, path: variant?.path }
 }
 
-export interface Override { title: string; description: string; params: Record<string, string> }
+export interface Override { title: string; description: string; params: Record<string, string>; name?: string }
+
+/**
+ * The part of an API tool's name a rule sets: the name before the prefixes and the suffix are added
+ * (the step before `namespace` in its provenance), e.g. `customer_get` of `orders_customer_get_v2`.
+ */
+export function baseName(tool: Tool): string | undefined {
+  if (tool.kind !== 'api') return undefined
+  const steps = tool.provenance?.name ?? []
+  const at = steps.findIndex((s) => s.step === 'namespace')
+  const value = at > 0 ? steps[at - 1].value : steps.at(-1)?.value
+  return typeof value === 'string' ? value : undefined
+}
+
+export const validBaseName = (name: string) => /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name)
+
+/** What a content type adds to an operation's tool name (`_multipart`), so its tools stay apart when renamed. */
+function contentTypePart(tool: Tool): string {
+  const steps = tool.provenance?.name ?? []
+  const namespaced = steps.find((s) => s.step === 'namespace')?.value
+  const suffixed = steps.find((s) => s.step === 'contentTypeSuffix')?.value
+  return typeof suffixed === 'string' && typeof namespaced === 'string' ? suffixed.slice(namespaced.length) : ''
+}
+
+/** The same tool in another manifest, by name or, when it was renamed, by its operation and content type. */
+export function sameTool(candidate: Tool, tool: Tool): boolean {
+  if (candidate.name === tool.name) return true
+  return !!tool.operation?.key && candidate.operation?.key === tool.operation.key && contentTypePart(candidate) === contentTypePart(tool)
+}
 
 /**
  * The rule that sets a tool's title, description and parameter descriptions: what the page's earlier
@@ -84,6 +112,8 @@ export interface Override { title: string; description: string; params: Record<s
  */
 export function setOverride(tool: Tool, now: Override, wanted: Override, existing?: Rule): Change | null {
   const rule: Rule = { match: overrideMatch(tool) }
+  if (existing?.name) rule.name = existing.name
+  if (wanted.name !== undefined && wanted.name !== now.name) rule.name = { set: wanted.name }
   if (existing?.title) rule.title = existing.title
   if (existing?.description) rule.description = existing.description
   if (wanted.title !== now.title) rule.title = { set: wanted.title }
@@ -96,7 +126,7 @@ export function setOverride(tool: Tool, now: Override, wanted: Override, existin
     if (value !== (now.params[name] ?? '')) params[name] = { description: { set: value } }
   }
   if (tool.kind === 'api' && Object.keys(params).length > 0) rule.params = params
-  if (!rule.title && !rule.description && !rule.params) return null
+  if (!rule.title && !rule.description && !rule.params && !rule.name) return null
   return { op: 'set', path: rulePath(overrideId(tool)), value: rule }
 }
 

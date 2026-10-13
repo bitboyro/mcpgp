@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, type Tool } from '../api'
 import { useServer } from '../serverData'
 import { startingArguments } from '../tryArgs'
@@ -22,6 +22,10 @@ export function TryTool({ id, tool }: { id: string; tool: Tool }) {
   } catch (e) {
     invalid = e instanceof Error ? e.message : 'not JSON'
   }
+  // the trial server takes a few seconds to start: begin when the panel opens, not on the first call
+  useEffect(() => {
+    if (base > 0) api.warmTry(id, base).catch(() => { /* the call reports what's wrong */ })
+  }, [id, base])
   const run = useMutation({ mutationFn: () => api.tryTool(id, base, tool.name, parsed) })
   const result = run.data?.result
   const structured = result?.structuredContent

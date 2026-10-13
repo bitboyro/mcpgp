@@ -16,6 +16,9 @@ class TryApiTest extends PlatformTestBase {
 
     @Test
     void aCallGoesToTheMockAndShowsWhatWouldBeSent() throws Exception {
+        // opening the panel starts the trial server in the background; the call then finds it (or waits for it)
+        var warm = send(bearer("POST", "/api/v1/servers/orders-mcp/versions/latest/try/warm", null));
+        assertThat(warm.statusCode()).isEqualTo(202);
         JsonNode answer = tryTool(Map.of("tool", "orders_customer_list",
                 "arguments", Map.of("instance", "mock", "query", Map.of("accountId", "a-1", "limit", 5))));
         assertThat(answer.at("/result/isError").asBoolean(false)).as(answer.toString()).isFalse();
