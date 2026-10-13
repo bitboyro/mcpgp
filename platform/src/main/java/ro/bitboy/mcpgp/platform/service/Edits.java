@@ -46,7 +46,7 @@ public final class Edits {
         if (changes == null || changes.isEmpty()) {
             throw ApiException.validation("changes: at least one");
         }
-        Model.Server server = servers.get(id);
+        Model.Server server = servers.writable(id);
         if (server.latest() == null) {
             throw new ApiException(409, "CONFLICT", "server " + id + " has no version to edit yet; upload one");
         }

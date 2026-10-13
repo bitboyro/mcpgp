@@ -115,6 +115,15 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   `dryRun` nothing is saved: the answer is the edited definition, its manifest (or diagnostics) and
   example configuration, which is how the UI previews unsaved changes; `operations: true` adds the
   operation list (as `GET …/operations` gives it) for the edited definition.
+- **The platform's own server:** `mcpgp-platform` (the platform's MCP server, §3) is one of the
+  servers, listed first, with `system: true`. The platform makes it at its first start from the project
+  bundled in its release, and adds a version (author `system`) at a start whose bundled project differs
+  from its latest version: an upgrade adds one, a restart none. It is read like any server (manifest,
+  operations, try, package) and can be built, duplicated and made a variant of; edits, uploads,
+  contracts and archiving are `409 SYSTEM_SERVER`. A variant holds a company's changes (hide tools,
+  add notices) and follows its new versions. `apply` of shared notices without `servers` leaves it
+  out. A server someone else already called `mcpgp-platform` is left alone (a warning at start).
+  `platformServer: { enabled: false }` in `platform.yaml` archives it at the next start.
 - **Duplicate:** `POST /servers/{id}/duplicate { id, title }`: an independent copy of the current
   version's files. **Variant:** `POST /servers/{id}/variants { id, title, pin? }`: a new server whose
   definition `extends` this one (`@latest`, or `@<version>` with `pin`) and stores only its overrides.
@@ -182,7 +191,9 @@ of a chosen server is `inherited` (it gets the notices from its parent). The act
 | **pipeline** | API token | `servers:write`, `builds:run`, `builds:release` |
 
 - **Tokens:** bearer tokens (RFC 6750), shown once, stored as hashes, with an expiry and scopes;
-  revocable. Every request names its identity in the activity log.
+  revocable. Every request names its identity in the activity log. `GET /tokens` says when each was
+  `lastUsed` (to the minute; recorded apart from the token, so it never undoes a revocation); the web
+  UI's Connect an agent waits for it.
 - **Local accounts:** passwords stored as PBKDF2-HMAC-SHA256 hashes (salted, 600 000 iterations),
   minimum length 12; repeated failures slow down and lock the account temporarily. Can be turned off
   when SSO is configured.
@@ -249,6 +260,10 @@ from the project in `platform/mcp` (this API's OpenAPI document and a definition
 compiler and packager as any build, and signed with the platform's key when there is one. Agents run it
 themselves, configured with the platform's address and **their own token** as a bearer credential; the
 platform never forwards tokens. Sign-in, passwords and export / import are left out of its tools.
+The same project is the platform's own server (§2.1), and **Connect an agent** in the web UI (on that
+server, and on API & agents) creates an agent with its first token and shows what to paste into each
+client (Claude Code, Claude Desktop, Cursor, VS Code); people who aren't admins are asked to have an
+admin create the agent.
 
 Roles bundle scopes: **viewer** (`servers:read`), **builder** (viewer + `servers:write`, `builds:run`,
 `library:write`), **releaser** (builder + `builds:release`, `builds:delete`, `approvals:decide`),
@@ -332,13 +347,14 @@ auth:
 signing: { key: "${env:MCPGP_SIGNING_KEY}" }
 specHosts: []                      # hosts definitions may fetch specs from (none by default)
 retention: { archiveAfterDays: 90, deleteArchivedAfterDays: 365, keepLast: 10 }
+platformServer: { enabled: true }  # the platform's own MCP server among the servers (§2.1); false archives it
 ```
 
 Environment variables override the file: `MCPGP_PLATFORM_WORKSPACE`, `MCPGP_PLATFORM_HTTP__HOST`,
 `…HTTP__PORT`, `…HTTP__PUBLIC_URL`, `…STORAGE__TYPE`, `…STORAGE__ROOT`, `…STORAGE__URL`,
 `…STORAGE__USER`, `…STORAGE__PASSWORD`, `…STORAGE__SCHEMA`, `…STORAGE__POOL_SIZE`, `…SIGNING__KEY`,
 `…ADMIN__NAME`, `…ADMIN__PASSWORD`, `…HTTP__TLS__CERTIFICATE`, `…HTTP__TLS__PRIVATE_KEY`,
-`…HTTP__TLS__KEYSTORE`, `…HTTP__TLS__PASSWORD` (all with the prefix `MCPGP_PLATFORM_`). Secrets (`password`,
+`…HTTP__TLS__KEYSTORE`, `…HTTP__TLS__PASSWORD`, `…PLATFORM_SERVER__ENABLED` (all with the prefix `MCPGP_PLATFORM_`). Secrets (`password`,
 `clientSecret`, `bindPassword`, `signing.key`, `http.tls.password`) are references, in the file and
 in the environment alike. A web sign-in from a plain `http://` page to a platform whose `publicUrl`
 is `https://` is refused with `409 WRONG_ADDRESS` naming the address to open (the browser would drop
@@ -383,7 +399,7 @@ File store layout:
 ```
 
 PostgreSQL tables (schema `mcpgp`): `store_info` (the format), `servers`, `library`, `versions`,
-`blobs`, `builds`, `build_files`, `build_logs`, `records` (identities, tokens, credentials,
+`blobs`, `builds`, `build_files`, `build_logs`, `records` (identities, tokens, token uses, credentials,
 approvals), `activity`, `cache`. Records are `json` (not `jsonb`, which would reorder their keys).
 
 **Before 1.0.0 there are no store migrations.** The store records its format version; a platform

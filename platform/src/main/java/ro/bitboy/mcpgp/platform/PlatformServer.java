@@ -238,6 +238,7 @@ public class PlatformServer {
     Store store(PlatformConfig config) {
         Store store = openStore(config);
         Deployment.bootstrap(config, store);
+        ro.bitboy.mcpgp.platform.service.SystemServers.ensure(store, config.platformServer());
         Deployment.warnings(config, store).forEach(w -> org.slf4j.LoggerFactory.getLogger(PlatformServer.class).warn("deployment: {}", w));
         return store;
     }

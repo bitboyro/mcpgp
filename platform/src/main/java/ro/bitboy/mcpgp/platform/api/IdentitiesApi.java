@@ -125,9 +125,13 @@ public class IdentitiesApi {
     public ResponseEntity<byte[]> tokens(HttpServletRequest request) {
         Access.Principal who = ServersApi.who(request);
         List<Map<String, Object>> items = new ArrayList<>();
+        Map<String, String> uses = new java.util.HashMap<>();
+        store.tokenUses().forEach(u -> uses.put(u.token(), u.at()));
         for (Model.Token t : store.tokens()) {
             if (who.has("admin") || t.identity().equals(who.identity().id())) {
-                items.add(token(t));
+                Map<String, Object> item = token(t);
+                item.put("lastUsed", uses.get(t.id()));
+                items.add(item);
             }
         }
         return Json.ok(Map.of("items", items));

@@ -63,7 +63,7 @@ export function OverviewPage() {
       for (const key of ['server', 'manifest', 'servers', 'example-config', 'version', 'definition']) await queryClient.invalidateQueries({ queryKey: [key] })
     },
   })
-  const editable = can('servers:write') && !!manifest.data && !server.data?.archived
+  const editable = can('servers:write') && !!manifest.data && !server.data?.archived && !server.data?.system
   const definition = useQuery({ queryKey: ['definition', id, base], queryFn: () => api.definition(id, base), enabled: base > 0 && !!manifest.data, retry: false })
 
   const pick = (key: string, label: string, original: boolean, change: Change) => {
@@ -89,7 +89,9 @@ export function OverviewPage() {
           </>
         ) : (
           <>
-            <Link to={`/servers/${id}/sources`} className="btn">Upload version</Link>
+            {server.data?.system
+              ? <Link to="/?connect" className="btn btn-primary">Connect an agent</Link>
+              : <Link to={`/servers/${id}/sources`} className="btn">Upload version</Link>}
             <BuildButton id={id} />
           </>
         )}
@@ -98,6 +100,15 @@ export function OverviewPage() {
         <section className="col" aria-label="Settings">
           <ErrorBox error={server.error} />
           {server.isLoading && <Loading />}
+          {server.data?.system && (
+            <div className="card" aria-label="Made by the platform">
+              <h2>Made by the platform</h2>
+              <p className="hint">The platform's API as tools, for your agents. The platform makes this server and adds a version with every
+                release, so it can't be changed here. To change what your agents get (hide tools, add notices), make a variant of it on
+                {' '}<Link to="/">All servers</Link>: it follows every new version.</p>
+              <div><Link to="/?connect" className="btn btn-primary btn-sm">Connect an agent</Link></div>
+            </div>
+          )}
           {saving && (
             <form className="card" style={{ borderColor: 'var(--accent)' }} onSubmit={(e) => { e.preventDefault(); save.mutate() }}>
               <h2>Save as version {base + 1}</h2>

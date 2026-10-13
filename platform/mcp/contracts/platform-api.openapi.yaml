@@ -819,6 +819,7 @@ components:
         title: { type: string }
         parent: { type: string }
         archived: { type: boolean }
+        system: { type: boolean, description: "The platform's own server: read it and make variants of it; changes are 409 SYSTEM_SERVER" }
         latestVersion: { type: integer }
         created: { type: string, format: date-time }
         updated: { type: string, format: date-time }
@@ -923,6 +924,7 @@ components:
         expires: { type: string, format: date-time }
         revoked: { type: boolean }
         value: { type: string, description: Only in the answer that creates the token }
+        lastUsed: { type: string, format: date-time, nullable: true, description: When the token was last used, to the minute }
     Activity:
       type: object
       properties:

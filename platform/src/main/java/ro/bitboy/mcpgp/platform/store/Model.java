@@ -15,9 +15,16 @@ public final class Model {
      *
      * @param parent   the server this one is a variant of, or null
      * @param revision increases with every change of this record (ETag, optimistic concurrency)
+     * @param system   made and kept up to date by the platform itself (the platform's own MCP server); people
+     *                 and agents read it and make variants of it, but don't change it
      */
     public record Server(String id, String title, String parent, boolean archived, String created, String updated,
-                         List<VersionRef> versions, long revision) {
+                         List<VersionRef> versions, long revision, boolean system) {
+        public Server(String id, String title, String parent, boolean archived, String created, String updated,
+                      List<VersionRef> versions, long revision) {
+            this(id, title, parent, archived, created, updated, versions, revision, false);
+        }
+
         public VersionRef latest() {
             return versions.isEmpty() ? null : versions.get(versions.size() - 1);
         }
@@ -70,6 +77,13 @@ public final class Model {
         public Identity(String id, String kind, String name, Set<String> scopes, String owner, String created, boolean disabled) {
             this(id, kind, name, scopes, owner, created, disabled, null);
         }
+    }
+
+    /**
+     * When a token was last used, at most a minute off: kept apart from the token, so recording a use
+     * never overwrites a revocation made meanwhile.
+     */
+    public record TokenUse(String token, String at) {
     }
 
     /** An API token: only the hash of its secret is stored. */

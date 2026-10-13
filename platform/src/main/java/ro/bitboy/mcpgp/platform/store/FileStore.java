@@ -118,7 +118,7 @@ public final class FileStore implements Store {
             throw new ConflictException("server " + server.id() + " was changed meanwhile");
         }
         Model.Server saved = new Model.Server(server.id(), server.title(), server.parent(), server.archived(), server.created(),
-                server.updated(), List.copyOf(server.versions()), current.map(Model.Server::revision).orElse(0L) + 1);
+                server.updated(), List.copyOf(server.versions()), current.map(Model.Server::revision).orElse(0L) + 1, server.system());
         writeJson(serverFile(server.id()), saved);
         return saved;
     }
@@ -322,6 +322,20 @@ public final class FileStore implements Store {
         all.removeIf(t -> t.id().equals(token.id()));
         all.add(token);
         writeJson(root.resolve("identities/tokens.json"), all);
+    }
+
+    @Override
+    public synchronized List<Model.TokenUse> tokenUses() {
+        return readList(root.resolve("identities/token-uses.json"), new TypeReference<>() {
+        });
+    }
+
+    @Override
+    public synchronized void saveTokenUse(Model.TokenUse use) {
+        List<Model.TokenUse> all = new ArrayList<>(tokenUses());
+        all.removeIf(u -> u.token().equals(use.token()));
+        all.add(use);
+        writeJson(root.resolve("identities/token-uses.json"), all);
     }
 
     // ---------------------------------------------------------------------- accounts and approvals

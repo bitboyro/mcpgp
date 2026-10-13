@@ -487,6 +487,9 @@ public class ServersApi {
             s.put("parent", server.parent());
         }
         s.put("archived", server.archived());
+        if (server.system()) {
+            s.put("system", true);
+        }
         s.put("latestVersion", server.latest() == null ? null : server.latest().number());
         s.put("updated", server.updated());
         return s;
