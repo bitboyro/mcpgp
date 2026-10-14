@@ -118,7 +118,9 @@ Built from `SpecMock` and `MockTarget`; one process per server under test; loopb
 - **TLS mode** with certificates from `fixtures/certs/` (server cert, wrong CA, expired, wrong host,
   client-cert required).
 - **Fakes beside it**: an identity provider (JWKS, introspection, token endpoint for client
-  credentials, RFC 9728 metadata) and an OTLP sink (HTTP and gRPC) that records spans and metrics.
+  credentials with `basic` and `post` client authentication, token exchange in both flavors
+  (RFC 8693 and Entra on-behalf-of), RFC 9728 metadata) and an OTLP sink (HTTP and gRPC) that records
+  spans and metrics.
 
 ## 4. Case format: traffic v2
 
@@ -199,10 +201,10 @@ Run in this order; a failing suite stops the ones after it.
 |---|---|---|---|
 | **S0 Package** | Each format starts, answers `initialize` and `tools/list`; stdout carries only JSON-RPC on stdio; `.mcpb` as Claude Desktop runs it; Docker as documented | by hand | ~10 per format |
 | **S1 Protocol** | Negotiation on each claimed revision and refusal with the list; per-revision fallbacks; HTTP sessions (`Mcp-Session-Id`, DELETE, an error reply keeps the session); ping; cancellation; concurrent calls; `tools/list` paging | by hand | ~40 |
-| **S2 Surface** | Each fixture's `tools/list`, `resources/list`, `prompts/list` equal `golden/surface.json`; every schema is valid JSON Schema; discovery finds every operation; toolsets switch and send `list_changed` | generated | 1 per fixture × exposure mode |
+| **S2 Surface** | Each fixture's `tools/list`, `resources/list`, `prompts/list` equal `golden/surface.json`; every schema is valid JSON Schema; discovery finds every operation; toolsets switch and send `list_changed`; the package's generated TOOLS and agent docs describe exactly the served surface | generated | 1 per fixture × exposure mode |
 | **S3 Operations** | Every tool of every fixture: valid arguments from `inputSchema` → 0 violations and correct mapping; one-constraint mutations → `INPUT_VALIDATION`, `upstream: none`; every documented status → its code; every fault → its code | generated, seeded | thousands |
-| **S4 Behaviour** | By area: content types, files, results and truncation, paging, confirmation, exposure, instances, contract versions, downstream auth, inbound auth, TLS, extensions, packs, resources and prompts, progress, elicitation, completion | by hand | ~150–250 |
-| **S5 Operator** | Config sources (YAML, JSON, env only give the same results), reload, rotation, `init`/`doctor`/`instance`/`client add`, audit modes, telemetry, health | by hand | ~50 |
+| **S4 Behaviour** | By area of the feature matrix (§6.3): content types, files, results and truncation, confirmation, exposure, instances, contract versions, unsatisfiable tools, downstream auth (static, client credentials, credentials from the request, token exchange, credential lists), inbound auth, TLS, extensions, packs, resources and prompts, progress, elicitation, completion | by hand | ~180–280 |
+| **S5 Operator** | Config sources (YAML, JSON, env only give the same results); reload by file watch, `SIGHUP` and `reload` separately; rotation; `init`/`doctor`/`instance`/`client add`; audit modes; telemetry (OTLP over HTTP and gRPC, Prometheus); logging to stderr and to a file; health and the management port; `basePath` and `publicUrl`; nothing written outside the storage root; every ignored setting (feature-matrix §10) warns or is refused, never silent | by hand | ~65 |
 | **S7 Negative** | §7 | by hand | ~120 |
 | **S8 Performance** | §8: startup, call overhead, concurrency, memory, sizes, against budgets and the previous release | scenarios | ~20 scenarios |
 | **S6 Coverage** | Not tests: merges `covers:` with mock coverage; fails on any gap (§10) | computed | — |
@@ -212,17 +214,25 @@ S3 writes any failing generated step out as a traffic v2 file for `cases/regress
 ### 6.1 Fixtures
 
 The fixtures and profiles exist to cover [feature-matrix.md](feature-matrix.md): every feature (`F…`),
-every value of its settings, and the interacting pairs listed there (§11).
+every value of its settings, and the interacting pairs listed there (§11); §6.3 maps each area to them.
 
 | Fixture | Turns on |
 |---|---|
 | `kitchen-sink-{swagger2,oas30,oas31}` | Every method, parameter style, body type (JSON, polymorphic, recursive, form, multipart, binary, text), response kind (201 + `Location`, 202, 204, binary, CSV, every error status), pagination style, auth type, hostile inputs |
 | `naming` | Vocabulary, method verbs, prefixes, limits, collisions, explicit names, aliases |
-| `rules` | `set`/`prepend`/`append`/`replace`/`template`, notices, per-tool edits; one rule that changes a parameter |
-| `selection` | Include/exclude by tag, path, method, operationId; hidden deprecated; the three access presets |
-| `exposure-{discovery-search,discovery-catalog,toolsets,hybrid}` | Each exposure mode |
+| `naming-{source,shape,namespace}` | One fixture per naming dimension: each `source`/`fallback`; each `shape.order`, `shape.case`, `shape.number`; `namespace.server`, `suffix`, `perApi` |
+| `names-drift` | A rename against `mcp-names.lock`: the build fails with `--frozen-lock` and passes after `names accept` (package precondition) |
+| `rules` | `set`/`prepend`/`append`/`replace`/`template`, notices in both positions and from the library, per-tool edits, `hidden`; one rule that changes a parameter; a broken overlay (diagnostic case) |
+| `selection` | Include/exclude by every selector key; the three access presets |
+| `deprecated-{hide,show,mark}` | Each value of `select.deprecated` |
+| `unsatisfied-{hide,error}` | Operations needing a credential type no instance has: hidden, or listed and explained |
+| `exposure-{plain,plain-search,discovery-search,discovery-catalog,toolsets,hybrid}` | Each exposure mode, `plainSearch` and pinned tools |
+| `exposure-{mode}-multi` | Each exposure mode with two APIs and multi-instance, for the pairs in feature-matrix §11 |
 | `multi-api`, `multi-version`, `variant` | Prefixes; versions with different operations, `auto` detection, union/namespaced/forbid; `extends` |
-| `shape` | Lean schemas, sensitive tools, multipart `parts`, `outputSchema` |
+| `shape` | Sensitive tools, multipart `parts`, `outputSchema`, `responseLimitKb`; lean schemas once implemented |
+| `body-prefer` | `requestBody.multiple: prefer` (the kitchen-sink uses `split`) |
+| `safety-off` | `confirmDestructive: false`; `files.forms` with only one form |
+| `limits` | `instances.max`, `timeouts.maxSeconds`, `baseUrlAllowlist`, `redaction.fields` |
 | `packs-all`, `extension`, `resources-prompts` | Every pack; a test extension jar (custom tool, enricher, filter); `expose: resource`, prompts with completion |
 | `orders`, `ops-assistant` | The shipped examples |
 
@@ -231,9 +241,34 @@ every value of its settings, and the interacting pairs listed there (§11).
 `single` · `multi-3` (`eu` plain; `us` TLS with a test CA and OAuth client credentials; `ro`
 read-only with a short timeout) · `env-only` and `json` (same as `multi-3`) · `inbound-oauth` ·
 `mtls` · `telemetry-on` · `audit-{none,redacted,hashed}` · `strict` (summary errors, no inline
-secrets, allowlist).
+secrets, allowlist, configured redaction fields) · `static-auth` (inbound `static` keys) ·
+`credentials` (client credentials with `clientAuth: post`; credentials from the request; token
+exchange in both flavors; a credential list tried in order) · `trust-{ca-only,ca-and-system,system}`
+(each with a matching and a wrong CA) · `files-off` (each file form disabled at runtime) ·
+`logging-file` · `http-paths` (`basePath`, `publicUrl`, management port).
 
-### 6.3 Matrix
+### 6.3 Coverage by area
+
+Each area of [feature-matrix.md](feature-matrix.md) and where the gate covers it. A feature row
+whose values aren't all reachable through these fixtures and profiles is a gap S6 reports.
+
+| Area | Features | Suites | Fixtures | Profiles |
+|---|---|---|---|---|
+| 1 · Contracts and instances | F1–F14 | S2, S3, S4, S7 | kitchen-sink ×3, `multi-version`, `multi-api`, `limits`, `orders` | `single`, `multi-3`, `strict` |
+| 2 · Which tools exist | F15–F19 | S2, S3 | `selection`, `deprecated-*`, `unsatisfied-*`, `rules` | `single` |
+| 3 · Names, descriptions, shapes | F20–F32 | S2, S3, S4 | `naming`, `naming-*`, `names-drift`, `rules`, `shape`, `body-prefer`, kitchen-sink | `single` |
+| 4 · How tools are offered | F33–F39 | S2, S4 | `exposure-*`, `exposure-*-multi`, `resources-prompts` | `single`, `multi-3` |
+| 5 · Calls: safety, files, errors | F40–F44 | S3, S4, S7 | kitchen-sink, `safety-off`, `limits` | `multi-3`, `strict`, `files-off` |
+| 6 · Credentials and TLS | F45–F52 | S4, S5, S7 | kitchen-sink (auth types), `unsatisfied-*` | `multi-3`, `mtls`, `credentials`, `trust-*` |
+| 7 · The server itself | F53–F68 | S0, S1, S5, S7 | all | `inbound-oauth`, `static-auth`, `telemetry-on`, `audit-*`, `env-only`, `json`, `logging-file`, `http-paths` |
+| 8 · Packs and extensions | F69–F71 | S2, S4 | `packs-all`, `extension` (others have packs off) | `single` |
+| 9 · Build and packages | F72–F80 | S0, S2, preconditions | every fixture, built in every format | — |
+
+The CLI commands of F80 other than `build`, `verify` and `test` stay in the Java tests: they don't end
+in a call to a package. The settings of feature-matrix §10 are covered by S5 (warned or refused)
+until they are implemented, then by the row's own cases.
+
+### 6.4 Matrix
 
 | Tier | Runs on | Scope | Budget |
 |---|---|---|---|
@@ -368,6 +403,10 @@ negative, that pass on this release and fail on the previous one.**
    written from the spec before the code; a `gate-cases` skill drafts positive and S7 cases for a
    requirement ID and proves them red on the previous release; a local hook runs
    `gate coverage --changed`; CI enforces it for people and agents alike.
+6. **The feature matrix leads.** A PR that adds a feature or a setting value adds its row to
+   [feature-matrix.md](feature-matrix.md) and the fixture or profile that reaches it (§6.3) in the
+   same PR. S6 reads the matrix: a feature or value without a case fails the gate, and so does a
+   setting in the schemas that has no row.
 
 ## 11. Work packages
 
@@ -380,8 +419,8 @@ review, not by writing.
 | W2 | Traffic v2 | Schema; matchers; ordered upstream; `do`/`observe`; code allow-list; migrate the 4 cases | — | 2–3 | 0.5 |
 | W3 | Runner core | Orchestrator, jar launcher (stdio, http), client sessions, assertions, JUnit, failure bundles, repro CLI | W1, W2 | 8–12 | 1–2 |
 | W4 | More launchers | `.mcpb` (from `Bundle`'s manifest), Docker (C4) | W3 | 3–5 | 0.5–1 |
-| W5 | Fakes | Identity provider, OTLP sink, certificate set | W1 | 4–6 | 0.5–1 |
-| W6 | Fixtures | Kitchen-sink ×3, ~15 definitions, ~9 profiles, seeds | W1 | 8–12 | 1–2 |
+| W5 | Fakes | Identity provider (client credentials, token exchange in both flavors, JWKS, introspection), OTLP sink, certificate set | W1 | 5–8 | 1–1.5 |
+| W6 | Fixtures | Kitchen-sink ×3, ~30 definitions, ~20 profiles, seeds (per §6.3) | W1 | 12–18 | 2–3 |
 | W7 | S2 Surface | Golden files with `-Dmcpgp.updateExpected`-style regeneration; discovery and toolsets checks | W3, W6 | 2–3 | 0.5 |
 | W8 | S3 Operations | Argument generator, one-constraint mutations, status and fault sweeps, regression write-out | W3, W6 | 6–10 | 1–2 |
 | W9 | Hand-written suites | S0, S1, S4, S5, S7 (~400 cases); C2, C3 | W3–W6 | 20–40 | 3–6 |
@@ -389,7 +428,7 @@ review, not by writing.
 | W11 | CI | `release.yml`, sharding, caching, T2 runners, publishing behind the gate | W3 | 4–6 | 1–2 |
 | W12 | Gate report | `gate-report.schema.json`; JSON writer; self-contained HTML (verdict, correctness, coverage, surface); PR comment; release asset; trend from past releases | W3 | 4–6 | 1 |
 | W13 | Performance | Mock timestamps; S8 scenarios; load sessions; process memory; A/B against the previous release; bootstrap intervals; `budgets.yaml`; C6; perf section and charts of the report | W3, W4, W12 | 6–10 | 1–2 |
-| | **Total** | | | **~80–125** | **~14–23 days** |
+| | **Total** | | | **~85–135** | **~16–26 days** |
 | W14 | Fixing what it finds | Open-ended | | +30–50 % | +30–50 % |
 
 Not compressible: reviewing expected values and golden files, the spec questions S7 raises, CI

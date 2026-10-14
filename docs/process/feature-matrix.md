@@ -3,7 +3,8 @@
 Status: **inventory** of the generated server, the compiler and the CLI as of `0a7a7e6`. Every
 feature, where it is configured, what each setting changes, whether the code does it, which tests
 cover it today (ContractVersionsTest is on the unmerged `test/contract-versions` branch), and what the [release gate](release-gate.md) has to verify. The IDs (`F…`) are what
-gate cases declare in `covers:`; S6 fails when a feature or a setting value has no case.
+gate cases declare in `covers:`; S6 fails when a feature or a setting value has no case. Which
+suites, fixtures and profiles cover each area: [release-gate.md](release-gate.md) §6.3.
 
 The platform (web UI, REST API, platform MCP server, library, approvals) is out of scope here; it
 needs its own matrix.
