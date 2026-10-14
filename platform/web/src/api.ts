@@ -64,6 +64,12 @@ const q = (params: Record<string, string | number | boolean | undefined>) => {
 
 const enc = encodeURIComponent
 
+/** How an auto instance learns which contract version its target runs (runtime-config §4.4). */
+export interface Detect {
+  method: string; path: string; pattern: string; field?: string; header?: string; underBasePath?: boolean
+  onFailure?: 'useDefault' | 'refuse'
+}
+
 export interface Items<T> { items: T[] }
 
 export interface Identity {
@@ -240,7 +246,7 @@ export interface ManifestApi {
   title?: string
   toolPrefix?: string
   contracts: Contract[]
-  detect?: { method: string; path: string; field?: string; header?: string; underBasePath?: boolean; pattern?: string }
+  detect?: Detect
   downstreamAuth?: { supported: string[]; identity?: string; unsatisfiedTools?: string; apiKey?: { in: string; name: string }; fromRequest?: { header?: string }; tokenExchange?: Record<string, never> }
 }
 

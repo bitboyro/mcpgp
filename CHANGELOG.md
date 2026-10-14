@@ -32,6 +32,11 @@ versions follow [SemVer](https://semver.org).
   (`INSTANCE_UNAVAILABLE`, asked again at most once a minute). `instances_list` shows the detected
   version, `doctor` warns when a pinned instance's target runs another version, and each result is an
   `instance.contract` audit event. The orders example's rule reads `/version` under each base path.
+- Connections: **Which version a customer's server runs**, for servers that ship two or more
+  versions of an API. It sets, changes or turns off the detection rule: the path, whether each
+  version answers under its own base path, where the version is (a JSON field, a header or the
+  whole answer), the pattern, and what happens when it can't be found. Before, the page only showed
+  a rule written in the definition by hand.
 
 ### Fixed
 - Activity searches read the whole log when few entries matched, and agent quotas read it on every
