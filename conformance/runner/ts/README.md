@@ -1,8 +1,7 @@
 # The release gate (G1)
 
 Packaged mcpgp servers, driven by an MCP client mcpgp didn't write, against an API mock that checks
-every request against the contract. A release is published only when this passes
-(`.github/workflows/publish.yml`); every PR runs it too (`ci.yml`). The plan is
+every request against the contract. A release is published only when this passes. The plan is
 `docs/process/release-gate.md` (milestone M9).
 
 Every test ends in a real MCP call through the package's server jar to the mock:
@@ -10,6 +9,17 @@ Every test ends in a real MCP call through the package's server jar to the mock:
 ```
  @modelcontextprotocol/sdk client ──stdio | Streamable HTTP──► java -jar <server>.jar ──HTTP──► mock (checks the contract)
 ```
+
+## When it runs
+
+| | |
+|---|---|
+| Version tag `vX.Y.Z` | `publish.yml` runs the gate (`gate.yml`: the Java tests and this suite) first; images and the GitHub release only if it passes, with the report attached |
+| Release candidate `vX.Y.Z-rcN` | The gate only; nothing is published |
+| By hand | Actions → gate → Run workflow, on any branch, tag or commit; fewer transports or revisions cost less |
+| Locally | `npm run gate` below, at no cost in CI minutes |
+
+Pull requests and pushes to `main` don't run it.
 
 ## Run it
 

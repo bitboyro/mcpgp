@@ -94,13 +94,22 @@ MCPGP_TEST_POSTGRES_URL=jdbc:postgresql://127.0.0.1:55432/mcpgp MCPGP_TEST_POSTG
   1. A release PR: the version in every `pom.xml` and in `Compiler.VERSION` set to `X.Y.Z` (no
      `-SNAPSHOT`), the CHANGELOG's Unreleased section renamed `## X.Y.Z — <date>`, breaking changes
      and migrations listed first. Merge it once CI is green.
-  2. Tag that commit `vX.Y.Z` and push the tag. The `publish` workflow checks the tag matches the
-     version, pushes the image (`:X.Y.Z`, `:X.Y`, `:latest`) and creates the GitHub release from the
-     CHANGELOG section.
-  3. A follow-up PR sets the next version, `X.Y+1.0-SNAPSHOT`.
+  2. Optional, and cheaper than a failed release: tag the commit `vX.Y.Z-rc1` and push the tag. The
+     `publish` workflow runs only the release gate (`gate.yml`: the Java tests and the integration
+     suite of `conformance/runner/ts`) and publishes nothing. `npm run gate` there does the same
+     locally, at no cost.
+  3. Tag that commit `vX.Y.Z` and push the tag. The `publish` workflow runs the release gate first;
+     only if it passes does it check the tag matches the version, push the image (`:X.Y.Z`, `:X.Y`,
+     `:latest`) and create the GitHub release from the CHANGELOG section, with the gate report
+     attached. If the gate fails, nothing is published: fix it on `main`, then move the tag (nothing
+     was released under it) or use the next version.
+  4. A follow-up PR sets the next version, `X.Y+1.0-SNAPSHOT`.
 - **Images:** every push to `main` publishes `:main` and `:sha-<commit>`. Images of other branches
   only on request: Actions → publish → Run workflow, on the branch (tag: the branch name, or one you
   type in). Pull requests never publish.
+- **Release gate:** it runs only for version tags and when started by hand (Actions → gate → Run
+  workflow, on any branch, tag or commit, optionally fewer transports or revisions), so pull requests
+  and pushes to `main` don't spend CI minutes on it.
 
 ## 8. Working with coding agents
 

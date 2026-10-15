@@ -3,7 +3,8 @@ name: publish
 # The images on Docker Hub, <user>/mcpgp-platform (docs/guides/self-hosting.md) and <user>/mcpgp-cli
 # (spec/cli.md §1), with the same tags:
 #   push to main          → :main, :sha-<commit>
-#   tag vX.Y.Z            → :X.Y.Z, :X.Y, :latest (and :X from 1.0.0), plus a GitHub release with the
+#   tag vX.Y.Z-rcN        → the release gate only (gate.yml); nothing is published
+#   tag vX.Y.Z            → the release gate (gate.yml), then :X.Y.Z, :X.Y, :latest (and :X from 1.0.0), plus a GitHub release with the
 #                           CLI (zip and jar) and SHA256SUMS
 #   Run workflow (manual) → the branch it runs on, as :<branch>, or the tag you type in
 # Needs the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker Hub access token, read &
@@ -29,37 +30,19 @@ concurrency:
 
 jobs:
   gate:
-    # the release gate (docs/process/release-gate.md): nothing below runs unless it passes
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: maven
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: conformance/runner/ts/package-lock.json
-      - name: The CLI that builds the packages under test
-        run: mvn -B -q -pl cli -am package -DskipTests
-      - name: Gate (packaged servers, an independent MCP client, a validating API mock)
-        working-directory: conformance/runner/ts
-        run: |
-          npm ci --no-audit --no-fund
-          npm run gate
-      - name: Gate report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gate-report
-          path: conformance/runner/ts/.gate/report/
-          if-no-files-found: warn
+    # the release gate (gate.yml): the Java tests and the integration suite, for every version tag
+    # (release candidates too) and every manual run; pushes to main publish :main without it
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/gate.yml
 
   image:
     needs: gate
+    # tags and manual runs only after the gate passed; a release candidate (vX.Y.Z-rcN) publishes nothing
+    if: >-
+      !cancelled()
+      && (needs.gate.result == 'success'
+          || (needs.gate.result == 'skipped' && github.event_name == 'push' && github.ref == 'refs/heads/main'))
+      && !(startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-'))
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -131,7 +114,7 @@ jobs:
 
   release:
     # the GitHub release for a version tag: its CHANGELOG section and how to pull the image
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
     needs: image
     runs-on: ubuntu-latest
     permissions:

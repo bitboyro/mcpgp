@@ -1,0 +1,106 @@
+name: gate
+
+# The release gate (docs/process/release-gate.md): the Java tests, and the integration suite of
+# conformance/runner/ts (packaged servers, an independent MCP client, a validating API mock). It runs
+# only when asked, to keep CI minutes for what needs them:
+#   - from publish.yml, for every version tag (vX.Y.Z and release candidates vX.Y.Z-rcN): nothing is
+#     published unless it passes;
+#   - by hand: Actions → gate → Run workflow, on a branch, tag or commit.
+# Locally, for free: `npm run gate` in conformance/runner/ts (its README).
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or commit to check (empty: the one chosen above)"
+        required: false
+        default: ""
+      transports:
+        description: "Transports: stdio,http"
+        required: false
+        default: "stdio,http"
+      revisions:
+        description: "MCP revisions, e.g. 2025-11-25 (empty: every revision the server claims)"
+        required: false
+        default: ""
+      java-tests:
+        description: "Also run the Java tests (mvn verify)"
+        type: boolean
+        required: false
+        default: true
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: false
+        default: ""
+      transports:
+        type: string
+        required: false
+        default: "stdio,http"
+      revisions:
+        type: string
+        required: false
+        default: ""
+      java-tests:
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  java:
+    # every module's tests, as ci.yml's build job runs them, including the package check
+    if: inputs.java-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Tools for the package check
+        run: sudo apt-get update -q && sudo apt-get install -y -q strace minisign
+      - name: Java tests
+        env:
+          MCPGP_PACKAGE_CHECK: "1"
+        run: mvn -B verify
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: conformance/runner/ts/package-lock.json
+      - name: The CLI that builds the packages under test
+        run: mvn -B -q -pl cli -am package -DskipTests
+      - name: Integration suite
+        working-directory: conformance/runner/ts
+        env:
+          GATE_TRANSPORTS: ${{ inputs.transports }}
+          GATE_REVISIONS: ${{ inputs.revisions }}
+        run: |
+          npm ci --no-audit --no-fund
+          npm run gate
+      - name: Gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-report
+          path: conformance/runner/ts/.gate/report/
+          if-no-files-found: warn

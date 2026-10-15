@@ -59,7 +59,7 @@ performance within budget (§8). Every run produces the gate report (§9).
 | `MockRun` is a hand-written JSON-RPC client with `protocolVersion` fixed to `2025-11-25` and empty capabilities | Same authors on both sides; older revisions and capability fallbacks untested | Independent client (official TypeScript SDK) |
 | Packages are built in tests, never tested as customers run them | `.mcpb` launch (`java -jar ${__dirname}/server/<server>.jar`, env from `user_config`) and the Docker files are not exercised | Launchers per format |
 | 4 conformance cases (2 negative); 1 of 38 diagnostic codes has a case | Most behaviour is covered only by in-process unit tests | Suites S0–S7 |
-| `ci.yml` only; no release workflow | Nothing can block a release | `release.yml` with the gate in front of publishing |
+| Publishing (`publish.yml`) ran no tests | Nothing could block a release | `gate.yml` (Java tests and the integration suite) in front of publishing, for version tags |
 | No requirement IDs in `requirements.md`; no `AGENTS.md` | "Tests added" is a checkbox | Coverage rule (§10) |
 
 ### 2.3 Facts the plan depends on
@@ -274,7 +274,7 @@ until they are implemented, then by the row's own cases.
 |---|---|---|---|
 | T1 | Linux | All suites × {jar, mcpb, docker} × {stdio, http} × 3 revisions; S3 in full on jar, sampled on the others | ≤ 20 min, sharded |
 | T2 | macOS, Windows | `smoke` cases of S0, S1, S4 × {jar, mcpb} × stdio × newest revision | ≤ 10 min |
-| PR | Linux | Java in-process runner + T1 for jar over stdio | ≤ 8 min |
+| On demand | Linux | Actions → gate → Run workflow, on any ref, optionally fewer transports or revisions; release candidate tags `vX.Y.Z-rcN`. Pull requests and pushes to `main` don't run it, to save CI minutes | as chosen |
 | Perf | Linux, one fixed runner size | S8, previous and new release interleaved on the same machine (§8.3) | ≤ 25 min |
 
 ## 7. Negative tests (S7)
@@ -392,7 +392,7 @@ negative, that pass on this release and fail on the previous one.**
    the changelog's Unreleased section needs a positive and a negative case for each ID in its
    changelog entry, or the `no-behaviour-change` label with a reason approved by a person. Golden
    files need a CODEOWNERS review; the S2 surface diff is posted on the PR.
-3. **Every release** (`release.yml`, before the gate): each ID in the release's changelog section is
+3. **Every release** (`publish.yml`, before the gate): each ID in the release's changelog section is
    covered on each transport; every case added since the last tag **fails on the previous release's
    packages** (or is tagged `existing-behaviour` with a reason); every S2 golden diff since the last
    tag is explained by a changelog entry; every requirement marked shipped has cases. The report goes
@@ -425,7 +425,7 @@ review, not by writing.
 | W8 | S3 Operations | Argument generator, one-constraint mutations, status and fault sweeps, regression write-out | W3, W6 | 6–10 | 1–2 |
 | W9 | Hand-written suites | S0, S1, S4, S5, S7 (~400 cases); C2, C3 | W3–W6 | 20–40 | 3–6 |
 | W10 | Coverage and rule | C5, `coverage.yaml`, S6, `gate-coverage`, red-on-previous, `AGENTS.md`, skill | W2 | 4–6 | 1 |
-| W11 | CI | `release.yml`, sharding, caching, T2 runners, publishing behind the gate | W3 | 4–6 | 1–2 |
+| W11 | CI | `gate.yml` called by `publish.yml` for version tags, manual runs, sharding, caching, T2 runners | W3 | 4–6 | 1–2 |
 | W12 | Gate report | `gate-report.schema.json`; JSON writer; self-contained HTML (verdict, correctness, coverage, surface); PR comment; release asset; trend from past releases | W3 | 4–6 | 1 |
 | W13 | Performance | Mock timestamps; S8 scenarios; load sessions; process memory; A/B against the previous release; bootstrap intervals; `budgets.yaml`; C6; perf section and charts of the report | W3, W4, W12 | 6–10 | 1–2 |
 | | **Total** | | | **~85–135** | **~16–26 days** |
