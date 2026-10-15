@@ -21,6 +21,7 @@ import ro.bitboy.mcpgp.platform.service.YamlEdit;
 import ro.bitboy.mcpgp.platform.service.Access;
 import ro.bitboy.mcpgp.platform.service.Compilation;
 import ro.bitboy.mcpgp.platform.service.Servers;
+import ro.bitboy.mcpgp.platform.service.SpecFetch;
 import ro.bitboy.mcpgp.platform.store.Model;
 import ro.bitboy.mcpgp.platform.store.Store;
 
@@ -42,9 +43,15 @@ public class ServersApi {
     private final ro.bitboy.mcpgp.platform.service.Guardrails guardrails;
     private final Edits edits;
     private final ro.bitboy.mcpgp.platform.service.Trials trials;
+    private final ro.bitboy.mcpgp.platform.service.FromSpec fromSpec;
+
+    private final SpecFetch specFetch;
 
     public ServersApi(Store store, Servers servers, Compilation compilation, ro.bitboy.mcpgp.platform.PlatformConfig config,
-                      ro.bitboy.mcpgp.platform.service.Guardrails guardrails, Edits edits, ro.bitboy.mcpgp.platform.service.Trials trials) {
+                      ro.bitboy.mcpgp.platform.service.Guardrails guardrails, Edits edits, ro.bitboy.mcpgp.platform.service.Trials trials,
+                      ro.bitboy.mcpgp.platform.service.FromSpec fromSpec) {
+        this.fromSpec = fromSpec;
+        this.specFetch = new SpecFetch(config.specHosts(), System.getenv());
         this.edits = edits;
         this.trials = trials;
         this.store = store;
@@ -79,6 +86,130 @@ public class ServersApi {
         who.require("servers:write");
         guardrails.quota(who, "versions");
         Model.Server server = servers.create(id, title, body == null ? new byte[0] : body, contentType, message, who);
+        return withEtag(Json.status(201, detail(server)), server);
+    }
+
+    /**
+     * A new server from an API's spec (one file, or several that {@code $ref} each other; JSON
+     * {@code {files}} or a zip): the definition, the spec under {@code contracts/} and smoke tests, as
+     * {@code mcpgp init --from-spec} makes them. {@code id}, {@code title} and {@code version} default to
+     * what the spec says; {@code main} picks the main file when several could be. A dry run answers what
+     * would be created; problems with the upload are {@code 422 SPEC_PROBLEMS} with {@code missing},
+     * {@code remote} and {@code candidates}.
+     */
+    @PostMapping("/from-spec")
+    public ResponseEntity<byte[]> createFromSpec(HttpServletRequest request, @RequestParam(required = false) String id,
+                                                 @RequestParam(required = false) String title, @RequestParam(required = false) String version,
+                                                 @RequestParam(required = false) String main, @RequestParam(required = false) String message,
+                                                 @RequestParam(defaultValue = "false") boolean dryRun,
+                                                 @RequestParam(required = false) String collisions,
+                                                 @RequestParam(required = false) String renames,
+                                                 @RequestHeader(value = "Content-Type", required = false) String contentType,
+                                                 @RequestBody(required = false) byte[] body) {
+        Access.Principal who = who(request);
+        who.require("servers:write");
+        Map<String, String> chosen = new java.util.LinkedHashMap<>();
+        if (renames != null && !renames.isBlank()) {
+            JsonNode parsed = Json.parse(renames.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            if (!parsed.isObject()) {
+                throw ApiException.validation("renames: a JSON object of operation key → name");
+            }
+            parsed.fields().forEachRemaining(f -> chosen.put(f.getKey(), f.getValue().asText()));
+        }
+        var upload = fromSpec.read(body == null ? new byte[0] : body, contentType, main);
+        var plan = fromSpec.plan(upload, id, title, version, collisions == null || collisions.isBlank() ? null : collisions, chosen);
+        if (dryRun) {
+            Map<String, Object> answer = new java.util.LinkedHashMap<>();
+            answer.put("id", plan.id());
+            answer.put("title", plan.title());
+            answer.put("api", plan.api());
+            answer.put("version", plan.version());
+            answer.put("main", upload.analysis().main());
+            answer.put("format", upload.analysis().format());
+            answer.put("files", List.copyOf(plan.project().keySet()));
+            answer.put("moved", upload.moves().stream().map(m -> Map.of("from", m.from(), "to", m.to())).toList());
+            answer.put("tools", plan.tools());
+            answer.put("exists", store.server(plan.id()).isPresent());
+            answer.put("diagnostics", diagnostics(plan.diagnostics()));
+            return Json.ok(answer);
+        }
+        guardrails.quota(who, "versions");
+        Model.Server server = fromSpec.create(plan, message, who);
+        return withEtag(Json.status(201, detail(server)), server);
+    }
+
+    /**
+     * A contract version from an uploaded spec, like {@code from-spec}: added to the server's API (or
+     * {@code api}), or replacing the spec of that version when it exists; {@code version} defaults to
+     * the spec's {@code info.version}, {@code default=true} makes it the default. The files go under
+     * {@code contracts/<version>/}; the server gets its next version. A dry run answers whether it
+     * compiles and what would change for agents. Instead of a body, {@code url} fetches the spec from
+     * an allowed host ({@code specHosts}) and records the address as the version's {@code source};
+     * {@code source=true} fetches it again from the address recorded for {@code version}. A spec that
+     * is the same as the saved one answers {@code unchanged} and makes no version.
+     */
+    @PostMapping("/{id}/contracts")
+    public ResponseEntity<byte[]> addContract(HttpServletRequest request, @PathVariable String id, @RequestParam(required = false) String api,
+                                              @RequestParam(required = false) String version, @RequestParam(required = false) String main,
+                                              @RequestParam(name = "default", defaultValue = "false") boolean makeDefault,
+                                              @RequestParam(required = false) String message, @RequestParam(defaultValue = "false") boolean dryRun,
+                                              @RequestParam(required = false) String url,
+                                              @RequestParam(name = "source", defaultValue = "false") boolean fromSource,
+                                              @RequestHeader(value = "Content-Type", required = false) String contentType,
+                                              @RequestBody(required = false) byte[] body) {
+        Access.Principal who = who(request);
+        who.require("servers:write");
+        if (fromSource) {
+            if (version == null || version.isBlank()) {
+                throw ApiException.validation("version: say which version's recorded address to fetch again");
+            }
+            url = fromSpec.source(id, api, version).orElseThrow(() -> ApiException.validation(
+                    "version " + version + " wasn't fetched from an address; upload its spec, or give url"));
+        }
+        boolean fetching = url != null && !url.isBlank();
+        if (fetching && body != null && body.length > 0) {
+            throw ApiException.validation("url: fetch the spec or upload it, not both");
+        }
+        SpecFetch.Fetched fetched = fetching ? specFetch.fetch(url) : null;
+        var upload = fetching ? fromSpec.read(fetched) : fromSpec.read(body == null ? new byte[0] : body, contentType, main);
+        var change = fromSpec.contract(id, upload, api, version, makeDefault, fetching ? url.strip() : null);
+        Model.Server current = servers.get(id);
+        int base = current.latest().number();
+        if (dryRun) {
+            Edits.Result result = edits.preview(id, base, change.changes(), change.files());
+            Map<String, Object> answer = new java.util.LinkedHashMap<>();
+            answer.put("api", change.api());
+            answer.put("version", change.version());
+            answer.put("spec", change.spec());
+            answer.put("replaces", change.replaces());
+            answer.put("moved", upload.moves().stream().map(m -> Map.of("from", m.from(), "to", m.to())).toList());
+            answer.put("compiles", result.compiles());
+            answer.put("unchanged", change.unchanged());
+            if (fetched != null) {
+                answer.put("source", change.source());
+                answer.put("fetched", Map.of("url", fetched.url(), "file", fetched.name(), "bytes", fetched.body().length));
+            }
+            if (result.compiles() && !change.unchanged()) {
+                // what agents would notice, as on the Changes page
+                var diff = ro.bitboy.mcpgp.core.diff.ManifestDiff.compare(manifestOf(current, current.latest()),
+                        Json.parse(result.preview().manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                answer.put("summary", ro.bitboy.mcpgp.core.diff.DiffReport.summary(diff));
+                answer.put("breaking", diff.breaking());
+                answer.put("changes", changeList(diff));
+            }
+            // a preview from the cache has no compiler result; its manifest lists the diagnostics
+            answer.put("diagnostics", result.preview().result() != null ? diagnostics(result.preview().result().diagnostics())
+                    : Json.parse(result.preview().manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8)).path("diagnostics"));
+            return Json.ok(answer);
+        }
+        if (change.unchanged()) {
+            return withEtag(Json.ok(detail(current)), current); // the same spec: no new version
+        }
+        guardrails.quota(who, "versions");
+        String text = message != null && !message.isBlank() ? message
+                : (change.replaces() ? "Replace the spec of " : "Add contract ") + change.api() + "@" + change.version()
+                + (fetching ? " from " + change.source() : "");
+        Model.Server server = edits.save(id, base, change.changes(), change.files(), text, who);
         return withEtag(Json.status(201, detail(server)), server);
     }
 
@@ -136,6 +267,74 @@ public class ServersApi {
         return Json.ok(Map.of("ok", result.ok(), "diagnostics", diagnostics(result.diagnostics())));
     }
 
+    /**
+     * What changed between two versions of a server, as {@code mcpgp diff} reports it (cli.md §3.5):
+     * {@code from} and {@code to} are version numbers, {@code latest}, or {@code released} (the version
+     * of the server's last released build). Default: from the last release (or the version before the
+     * latest), to the latest.
+     */
+    @GetMapping("/{id}/diff")
+    public ResponseEntity<byte[]> diff(HttpServletRequest request, @PathVariable String id,
+                                       @RequestParam(required = false) String from, @RequestParam(required = false) String to) {
+        who(request).require("servers:read");
+        Model.Server server = servers.get(id);
+        if (server.latest() == null) {
+            throw ApiException.notFound("version");
+        }
+        Model.VersionRef released = store.builds().stream().filter(b -> b.server().equals(id) && b.released())
+                .max(java.util.Comparator.comparing(Model.Build::created))
+                .flatMap(b -> server.versions().stream().filter(v -> v.number() == b.version()).findFirst()).orElse(null);
+        Model.VersionRef after = to == null || to.isBlank() ? server.latest() : endpoint(server, to, released);
+        Model.VersionRef before;
+        if (from == null || from.isBlank()) {
+            before = released != null ? released : server.versions().stream().filter(v -> v.number() == after.number() - 1).findFirst().orElse(after);
+        } else {
+            before = endpoint(server, from, released);
+        }
+        JsonNode beforeManifest = manifestOf(server, before);
+        JsonNode afterManifest = manifestOf(server, after);
+        ro.bitboy.mcpgp.core.diff.ManifestDiff.Result result = ro.bitboy.mcpgp.core.diff.ManifestDiff.compare(beforeManifest, afterManifest);
+        Map<String, Object> answer = new java.util.LinkedHashMap<>();
+        answer.put("from", Map.of("version", before.number(), "serverVersion", result.from(), "released", released != null && released.number() == before.number()));
+        answer.put("to", Map.of("version", after.number(), "serverVersion", result.to()));
+        answer.put("released", released == null ? null : released.number());
+        answer.put("summary", ro.bitboy.mcpgp.core.diff.DiffReport.summary(result));
+        answer.put("breaking", result.breaking());
+        answer.put("changes", changeList(result));
+        answer.put("markdown", ro.bitboy.mcpgp.core.diff.DiffReport.markdown(id, result));
+        return Json.ok(answer);
+    }
+
+    private static List<Map<String, Object>> changeList(ro.bitboy.mcpgp.core.diff.ManifestDiff.Result result) {
+        return result.changes().stream().map(c -> {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("impact", c.impact().name().toLowerCase(java.util.Locale.ROOT));
+            m.put("tool", c.tool());
+            m.put("kind", c.kind());
+            m.put("text", c.text());
+            return m;
+        }).toList();
+    }
+
+    private Model.VersionRef endpoint(Model.Server server, String which, Model.VersionRef released) {
+        if (which.equals("released")) {
+            if (released == null) {
+                throw ApiException.notFound("a released build of " + server.id());
+            }
+            return released;
+        }
+        return servers.version(server, which);
+    }
+
+    private JsonNode manifestOf(Model.Server server, Model.VersionRef ref) {
+        Compilation.Preview preview = compilation.preview(servers.files(ref), ref.created());
+        if (preview.manifest() == null) {
+            throw new ApiException(422, "VALIDATION", "version " + ref.number() + " of " + server.id() + " doesn't compile",
+                    Map.of("diagnostics", diagnostics(preview.result().diagnostics())));
+        }
+        return Json.parse(preview.manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     @GetMapping("/{id}/versions/{version}/manifest")
     public ResponseEntity<byte[]> manifest(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
         who(request).require("servers:read");
@@ -181,6 +380,15 @@ public class ServersApi {
                 ? new com.fasterxml.jackson.databind.ObjectMapper().convertValue(json.path("arguments"), Map.class) : Map.of();
         Model.VersionRef ref = servers.version(servers.get(id), version);
         return Json.ok(trials.call(servers.files(ref), ref.created(), tool, arguments));
+    }
+
+    /** Starts the version's trial server in the background, so the first {@code try} doesn't wait for it: {@code 202}. */
+    @PostMapping("/{id}/versions/{version}/try/warm")
+    public ResponseEntity<byte[]> warmTry(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
+        who(request).require("builds:run");
+        Model.VersionRef ref = servers.version(servers.get(id), version);
+        trials.warm(servers.files(ref), ref.created());
+        return Json.status(202, Map.of("warming", true));
     }
 
     /** The definition as data: the root file as written, and the result with what it extends and includes merged in. */
@@ -240,7 +448,7 @@ public class ServersApi {
                 answer.put("manifest", manifest);
                 answer.put("exampleConfig", ExampleConfig.yaml(manifest));
                 if (json.path("operations").asBoolean(false)) {
-                    answer.put("operations", compilation.operations(result.version(), Instant.now().toString()));
+                    answer.put("operations", compilation.operations(result.version(), Instant.now().toString(), false));
                 }
             } else {
                 answer.put("diagnostics", diagnostics(result.preview().result().diagnostics()));
@@ -323,6 +531,9 @@ public class ServersApi {
             s.put("parent", server.parent());
         }
         s.put("archived", server.archived());
+        if (server.system()) {
+            s.put("system", true);
+        }
         s.put("latestVersion", server.latest() == null ? null : server.latest().number());
         s.put("updated", server.updated());
         return s;

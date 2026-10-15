@@ -20,6 +20,8 @@ public final class CallRecord {
     /** The templated path, e.g. {@code /customers/{id}}. */
     public String path;
     public Integer status;
+    /** The credential type the call used ({@code fromRequest}, {@code bearer}, …), never its value. */
+    public String auth;
     /** The redacted upstream body of a failed call, kept for troubleshooting (runtime-config §4.5). */
     public String errorBody;
     public final List<File> files = new ArrayList<>();

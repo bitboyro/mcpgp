@@ -1,0 +1,146 @@
+name: publish
+
+# The images on Docker Hub, <user>/mcpgp-platform (docs/guides/self-hosting.md) and <user>/mcpgp-cli
+# (spec/cli.md §1), with the same tags:
+#   push to main          → :main, :sha-<commit>
+#   tag vX.Y.Z            → :X.Y.Z, :X.Y, :latest (and :X from 1.0.0), plus a GitHub release with the
+#                           CLI (zip and jar) and SHA256SUMS
+#   Run workflow (manual) → the branch it runs on, as :<branch>, or the tag you type in
+# Needs the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker Hub access token, read &
+# write). Optional: MCPGP_RELEASE_SIGNING_KEY (a minisign key from mcpgp keygen) signs the release files.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag (empty: the branch name)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: mcpgp-platform
+            file: deploy/Dockerfile
+            title: mcpgp platform
+            description: "Generates MCP servers from OpenAPI: web UI, REST API, builds"
+          - image: mcpgp-cli
+            file: deploy/cli.Dockerfile
+            title: mcpgp CLI
+            description: "The mcpgp command line, for CI: validate, build, test, sign, push"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The tag matches the version in the build
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pom=$(python3 -c 'import xml.etree.ElementTree as E; print(E.parse("pom.xml").getroot().find("{http://maven.apache.org/POM/4.0.0}version").text)')
+          code=$(sed -n 's/.*String VERSION = "\(.*\)";/\1/p' core/src/main/java/ro/bitboy/mcpgp/core/Compiler.java)
+          echo "tag $tag, pom.xml $pom, Compiler.VERSION $code"
+          [ "$tag" = "$pom" ] && [ "$tag" = "$code" ]
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
+            type=raw,value=main,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            type=sha,prefix=sha-,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            type=ref,event=branch,enable=${{ github.event_name == 'workflow_dispatch' && inputs.tag == '' }}
+            type=raw,value=${{ inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.tag != '' }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.title }}
+            org.opencontainers.image.description=${{ matrix.description }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          provenance: mode=max
+          sbom: true
+          # the platform image knows its own name, for `setup` (the CLI image ignores it)
+          build-args: |
+            MCPGP_IMAGE=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:${{ steps.meta.outputs.version }}
+
+      - name: Pushed
+        run: echo "${{ steps.meta.outputs.tags }}" | sed 's/^/pushed /'
+
+  release:
+    # the GitHub release for a version tag: its CHANGELOG section and how to pull the image
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: The CLI, zip and jar
+        run: |
+          mvn -B -q -pl cli -am package -DskipTests
+          cli/src/dist/assemble.sh "${GITHUB_REF_NAME#v}" release
+      - name: Sign the release files (when MCPGP_RELEASE_SIGNING_KEY is set)
+        env:
+          MCPGP_RELEASE_SIGNING_KEY: ${{ secrets.MCPGP_RELEASE_SIGNING_KEY }}
+        run: |
+          if [ -n "$MCPGP_RELEASE_SIGNING_KEY" ]; then
+            java -jar "release/mcpgp-cli-${GITHUB_REF_NAME#v}.jar" sign release --key '${env:MCPGP_RELEASE_SIGNING_KEY}'
+          else
+            (cd release && sha256sum -- * > SHA256SUMS)
+          fi
+      - name: Release notes from the CHANGELOG
+        env:
+          VERSION: ${{ github.ref_name }}
+          IMAGE_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          v="${VERSION#v}"
+          awk -v v="$v" '$0 ~ "^## " v "( |$)" {on=1; next} /^## / && on {exit} on' CHANGELOG.md > notes.md
+          test -s notes.md
+          {
+            printf '## Install\n\n'
+            printf -- '- Platform image: `docker pull docker.io/%s/mcpgp-platform:%s` (setting it up: docs/guides/self-hosting.md)\n' "$IMAGE_USER" "$v"
+            printf -- '- CLI image, for CI: `docker.io/%s/mcpgp-cli:%s`\n' "$IMAGE_USER" "$v"
+            printf -- '- CLI: `mcpgp-cli-%s.zip` below (Java 21+); unzip it and put `bin/` on your PATH; checksums in `SHA256SUMS`\n\n' "$v"
+            cat notes.md
+          } > release.md
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes-file release.md --verify-tag release/*

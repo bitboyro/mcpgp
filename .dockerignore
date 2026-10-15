@@ -1,0 +1,8 @@
+.git
+.github
+.claude
+**/target
+**/node_modules
+platform/web/dist
+deploy/secrets
+deploy/.env

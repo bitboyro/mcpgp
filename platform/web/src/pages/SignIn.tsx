@@ -4,6 +4,22 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { ErrorBox, Icon } from '../ui'
 
+/**
+ * The platform's own address when this page isn't on it (scheme, host and port), else null: sign-in
+ * cookies belong to the address people are meant to use, and over plain HTTP an https platform's
+ * cookie is dropped.
+ */
+export function otherAddress(publicUrl: string | null | undefined, here: string): string | null {
+  if (!publicUrl) return null
+  try {
+    const want = new URL(publicUrl)
+    const now = new URL(here)
+    return want.origin === now.origin ? null : want.origin
+  } catch {
+    return null
+  }
+}
+
 /** Only paths on this site: never send the browser elsewhere after signing in. */
 export function safeNext(next: string | null): string {
   return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/'
@@ -35,6 +51,7 @@ export function SignInPage() {
   }
 
   const auth = options.data?.auth
+  const elsewhere = otherAddress(options.data?.publicUrl, window.location.href)
   const withPassword = auth ? auth.local || auth.ldap : true
   const returned = params.get('error')
   return (
@@ -46,6 +63,10 @@ export function SignInPage() {
           <p className="hint">The platform for building MCP servers from API definitions.</p>
         </div>
         {returned && <div className="error" role="alert">{RETURNED[returned] ?? RETURNED.sso}</div>}
+        {elsewhere && (
+          <div className="note" role="note">This platform's address is <a href={elsewhere + window.location.pathname + window.location.search}>{elsewhere}</a>
+            {elsewhere.startsWith('https:') && window.location.protocol === 'http:' ? '; over plain HTTP your browser can\u2019t keep you signed in.' : '.'} Open it there.</div>
+        )}
         {auth?.oidc && (
           // a navigation, not a fetch: the provider's page takes over, then comes back to the platform
           <a className="btn btn-primary" href="/oauth2/authorization/oidc">Sign in with {auth.oidcLabel ?? 'your company account'}</a>

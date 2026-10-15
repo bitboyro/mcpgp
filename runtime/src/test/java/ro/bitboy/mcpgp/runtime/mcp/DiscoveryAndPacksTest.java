@@ -122,7 +122,7 @@ class DiscoveryAndPacksTest {
     @Test
     void catalogStyleListsAndPagesOperations() throws IOException {
         start("");
-        Discovery discovery = new Discovery(ORDERS, config, server.catalog(), server::call);
+        Discovery discovery = new Discovery(ORDERS, config, server.catalog(), server.contracts(), server::call);
         ToolHandler list = discovery.handlers().get("list_operations");
         JsonNode page = JSON.valueToTree(list.call(null, null, Map.of("tag", "customers"), new CallRecord()));
         assertThat(names(page.path("items"))).contains("orders_customer_get", "orders_customer_create_multipart")

@@ -49,6 +49,11 @@ public final class Projects {
         return contentType != null && contentType.startsWith("application/zip") ? unzip(body) : fromJson(body);
     }
 
+    /** The files of an upload (zip or JSON), with the same limits as a project, and without a folder they all share. */
+    public static Map<String, byte[]> files(byte[] body, String contentType) {
+        return stripCommonFolder(read(body, contentType));
+    }
+
     public Model.Version store(Map<String, byte[]> files) {
         return store(files, null, true);
     }
@@ -161,7 +166,7 @@ public final class Projects {
     }
 
     /** A zip of a folder ("orders/orders.mcpgp.yaml", …) stores the folder's contents. */
-    private static Map<String, byte[]> stripCommonFolder(Map<String, byte[]> files) {
+    static Map<String, byte[]> stripCommonFolder(Map<String, byte[]> files) {
         String first = files.keySet().stream().findFirst().orElse("");
         int slash = first.indexOf('/');
         if (slash < 0) {

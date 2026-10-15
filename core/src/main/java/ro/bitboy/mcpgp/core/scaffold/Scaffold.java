@@ -1,4 +1,4 @@
-package ro.bitboy.mcpgp.cli;
+package ro.bitboy.mcpgp.core.scaffold;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -7,8 +7,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/** What {@code mcpgp init} writes: a definition with one API, and a first test case file. */
-final class Scaffold {
+/**
+ * A new definition project around an API's spec, as {@code mcpgp init --from-spec} and the platform's
+ * "new server from a spec" write it: a definition with one API, and a first test case file.
+ */
+public final class Scaffold {
 
     private static final Set<String> FILLER = Set.of("api", "apis", "the", "service", "rest", "openapi", "swagger", "v1", "v2", "v3");
 
@@ -16,7 +19,7 @@ final class Scaffold {
     }
 
     /** An API id from the spec's title: "Orders API" → {@code orders}, "Customer Accounts" → {@code customer_accounts}. */
-    static String apiId(String title) {
+    public static String apiId(String title) {
         List<String> words = new ArrayList<>();
         for (String word : title.toLowerCase(Locale.ROOT).split("[^a-z0-9]+")) {
             if (!word.isEmpty() && !FILLER.contains(word)) {
@@ -33,7 +36,7 @@ final class Scaffold {
         return id;
     }
 
-    static String definition(String name, String title, String api, String version, String contract) {
+    public static String definition(String name, String title, String api, String version, String contract) {
         return """
                 # The definition of %1$s (docs/spec/definition-format.md). Check it with: mcpgp validate %1$s.mcpgp.yaml
                 apiVersion: mcpgp/v1
@@ -60,7 +63,7 @@ final class Scaffold {
     }
 
     /** Test cases for up to three read tools that need no arguments; a commented example otherwise. */
-    static String smoke(JsonNode manifest) {
+    public static String smoke(JsonNode manifest) {
         StringBuilder cases = new StringBuilder();
         int count = 0;
         for (JsonNode tool : manifest.path("tools")) {

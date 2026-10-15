@@ -161,7 +161,49 @@ final class Docs {
             md.append("| `").append(row[0]).append("` | ").append(row[1]).append(" | `").append(row[2]).append("` | ").append(row[3]).append(" |\n");
         }
         md.append("\nExample: `").append(server).append(".example.yaml`.\n");
+        fromRequest(md);
+        tokenExchange(md);
+        apiVersions(md);
         return md.toString();
+    }
+
+    /** With several versions of an API: which one each target server uses, and how to choose (runtime-config §4.4). */
+    private void apiVersions(StringBuilder md) {
+        for (JsonNode api : manifest.path("apis")) {
+            List<String> versions = new ArrayList<>();
+            String fallback = null;
+            for (JsonNode c : api.path("contracts")) {
+                versions.add(c.path("version").asText());
+                if (c.path("default").asBoolean()) {
+                    fallback = c.path("version").asText();
+                }
+            }
+            if (versions.size() < 2) {
+                continue;
+            }
+            String id = api.path("id").asText();
+            String key = multi ? "instances[].contract" : "instance.contract";
+            md.append("\n## Versions of the ").append(api.path("title").asText(id)).append(" API\n\n")
+                    .append("This server works with versions ").append(String.join(", ", versions)).append(" of the API (default ").append(fallback)
+                    .append("). Each target server uses one of them, set with `").append(key).append("`:\n\n");
+            JsonNode detect = api.path("detect");
+            if (detect.isObject()) {
+                boolean refuse = detect.path("onFailure").asText("useDefault").equals("refuse");
+                md.append("- `auto` (the default): when the server starts or reloads, it asks the target which version it runs (`")
+                        .append(detect.path("method").asText("GET")).append(" ").append(detect.path("path").asText())
+                        .append(detect.path("underBasePath").asBoolean() ? "` under each version's base path" : "`")
+                        .append(") and uses that one. If the target can't say, ")
+                        .append(refuse ? "calls to it are refused (`INSTANCE_UNAVAILABLE`) and it is asked again within a minute."
+                                : "it uses the default, " + fallback + ", and the log says why.")
+                        .append(" `prefer: \"").append(versions.get(0)).append("\"` asks about that version first.\n");
+            } else {
+                md.append("- `auto` (the default): the default version, ").append(fallback)
+                        .append(". A target that runs another version needs that version set: this server can't ask it.\n");
+            }
+            md.append("- A version (`\"").append(versions.get(0)).append("\"`): that one, always; the target is never asked.\n\n")
+                    .append("Tools that a target's version doesn't have answer `NOT_AVAILABLE_ON_INSTANCE`; `instances_list` shows each target's version. ")
+                    .append("`doctor` asks every target which version it runs, and warns when one set to a version runs another.\n");
+        }
     }
 
     private void walk(JsonNode node, String path, String env, List<String[]> rows, Set<String> seen) {
@@ -170,7 +212,7 @@ final class Docs {
         resolved.path("properties").fields().forEachRemaining(f -> properties.put(f.getKey(), f.getValue()));
         Map<String, List<String>> constants = new LinkedHashMap<>();
         for (String key : List.of("oneOf", "anyOf")) {
-            for (JsonNode branch : resolved.path(key)) {
+            for (JsonNode branch : branches(resolved.path(key))) {
                 resolve(branch).path("properties").fields().forEachRemaining(f -> {
                     properties.putIfAbsent(f.getKey(), f.getValue());
                     if (f.getValue().has("const")) {
@@ -199,12 +241,26 @@ final class Docs {
             JsonNode child = resolve(p.getValue());
             if (type(child).equals("list") && resolve(child.path("items")).has("properties")) {
                 walk(child.path("items"), childPath + "[]", childEnv + "_<n>__", rows, seen);
-            } else if (child.has("properties") || child.has("oneOf") && resolve(child.path("oneOf").get(0)).has("properties")) {
+            } else if (child.has("properties") || child.has("oneOf") && !branches(child.path("oneOf")).isEmpty()) {
                 walk(child, childPath, childEnv + "__", rows, seen);
             } else if (seen.add(childPath)) {
                 rows.add(new String[] {childPath, type(child), childEnv, notes(child, p.getValue())});
             }
         }
+    }
+
+    /** The object branches of a oneOf, with branches that are themselves a oneOf (one thing or a list of them) opened up. */
+    private List<JsonNode> branches(JsonNode oneOf) {
+        List<JsonNode> result = new ArrayList<>();
+        for (JsonNode branch : oneOf) {
+            JsonNode resolved = resolve(branch);
+            if (resolved.has("properties")) {
+                result.add(branch);
+            } else if (resolved.has("oneOf")) {
+                result.addAll(branches(resolved.path("oneOf")));
+            }
+        }
+        return result;
     }
 
     private JsonNode resolve(JsonNode node) {
@@ -388,6 +444,50 @@ final class Docs {
                 + "- [Configuration](docs/CONFIGURATION.md)\n- [Tools](docs/TOOLS.md)\n- [Operations](docs/OPERATIONS.md)\n";
     }
 
+    /** Calling the API as the signed-in user (auth.md §2.5), when the build allows it. */
+    private void tokenExchange(StringBuilder md) {
+        boolean enabled = false;
+        for (JsonNode api : manifest.path("apis")) {
+            enabled |= api.at("/downstreamAuth/tokenExchange").isObject();
+        }
+        if (!enabled) {
+            return;
+        }
+        md.append("\n## Calling the API as the signed-in user\n\n")
+                .append("With `auth: { type: tokenExchange }` the server calls the API with each user's own identity: the user signs in to the\n")
+                .append("server with OAuth (`server.auth.mode: oauth`, HTTP), and for every call the server exchanges that sign-in at your identity\n")
+                .append("provider for a token issued for the API (RFC 8693, or Microsoft Entra's on-behalf-of with `flavor: entra-obo`). The user's\n")
+                .append("own token goes only to the token endpoint; exchanged tokens stay in memory until shortly before they expire.\n\n")
+                .append("```yaml\nauth:\n  - type: tokenExchange\n    tokenUrl: https://login.example.com/oauth2/token\n")
+                .append("    clientId: ${env:EXCHANGE_CLIENT_ID}\n    clientSecret: ${env:EXCHANGE_CLIENT_SECRET}\n")
+                .append("    audience: https://api.example.com        # what the identity provider issues the token for\n")
+                .append("    scopes: [orders.read]\n  - { type: bearer, token: ${env:SERVICE_TOKEN} }   # optional, for requests without a user\n```\n");
+    }
+
+    /** How a client sends its own credential for the API (auth.md §2.4), when the build allows it. */
+    private void fromRequest(StringBuilder md) {
+        boolean enabled = false;
+        for (JsonNode api : manifest.path("apis")) {
+            enabled |= api.at("/downstreamAuth/fromRequest").isObject();
+        }
+        if (!enabled) {
+            return;
+        }
+        String header = "X-" + java.util.Arrays.stream(server.split("[^A-Za-z0-9]+")).filter(w -> !w.isEmpty())
+                .map(w -> Character.toUpperCase(w.charAt(0)) + w.substring(1).toLowerCase(Locale.ROOT))
+                .collect(java.util.stream.Collectors.joining("-")) + "-Authorization";
+        md.append("\n## Credentials from the MCP client\n\n")
+                .append("With `auth: { type: fromRequest }` the MCP client sends the credential for the API in a request header of its own,\n")
+                .append("set in the client's configuration from the user's environment: the agent never sees it, and the server never\n")
+                .append("stores or logs it. The server sends it to that instance's address only, as `Authorization` (or the header in `as`).\n\n")
+                .append("- The header: `header`, or by default `").append(header).append("` (with the API and instance ids added when there are several).\n")
+                .append("- Each instance reads its own header. List more credentials after it to use them when the header is missing:\n\n")
+                .append("```yaml\nauth:\n  - { type: fromRequest, header: ").append(header).append(" }\n  - { type: bearer, token: ${env:SERVICE_TOKEN} }\n```\n\n")
+                .append("- HTTP only: over stdio there are no request headers. The client, e.g. `.mcp.json`:\n\n")
+                .append("```json\n{ \"mcpServers\": { \"").append(server).append("\": { \"type\": \"http\", \"url\": \"https://…/mcp\",\n")
+                .append("    \"headers\": { \"").append(header).append("\": \"Bearer ${API_TOKEN}\" } } } }\n```\n");
+    }
+
     // ---------------------------------------------------------------------- helpers
 
     private String apiList() {
@@ -398,7 +498,15 @@ final class Docs {
 
     private List<String> authTypes() {
         Set<String> types = new LinkedHashSet<>();
-        manifest.path("apis").forEach(a -> a.at("/downstreamAuth/supported").forEach(t -> types.add(t.asText())));
+        manifest.path("apis").forEach(a -> {
+            a.at("/downstreamAuth/supported").forEach(t -> types.add(t.asText()));
+            if (a.at("/downstreamAuth/fromRequest").isObject()) {
+                types.add("fromRequest");
+            }
+            if (a.at("/downstreamAuth/tokenExchange").isObject()) {
+                types.add("tokenExchange");
+            }
+        });
         return List.copyOf(types);
     }
 
@@ -419,6 +527,7 @@ final class Docs {
             {"INPUT_VALIDATION", "arguments don't match the tool's schema or the instance's contract, or a file input was refused"},
             {"INSTANCE_REQUIRED / INSTANCE_UNKNOWN", "missing or unknown `instance`"},
             {"NOT_AVAILABLE_ON_INSTANCE", "the operation isn't in that instance's contract, or the instance is read-only"},
+            {"INSTANCE_UNAVAILABLE", "the instance's contract version isn't known yet; it's asked again within a minute"},
             {"TOOLSET_DISABLED", "toolsets mode: enable the tool's toolset with toolset_enable first"},
             {"CONFIRMATION_REQUIRED", "the tool needs the user's confirmation"},
             {"AUTH_INBOUND", "the client isn't allowed (HTTP 401/403)"},
@@ -426,6 +535,8 @@ final class Docs {
             {"UPSTREAM_4XX / UPSTREAM_5XX", "the target server answered with an error"},
             {"UPSTREAM_TIMEOUT / UPSTREAM_UNREACHABLE", "no answer in time / DNS, TCP or TLS failure"},
             {"RESPONSE_PARSE_ERROR / RESPONSE_TOO_LARGE", "the answer couldn't be read, or is over the size limit"},
+            {"INPUT_TOO_LARGE", "the arguments, or one text value, are larger than the server accepts; nothing was sent"},
+            {"RATE_LIMITED", "too many calls to that target server; wait the seconds in _meta.mcpgp/retryAfterSeconds"},
             {"CONFIG_INVALID", "the config doesn't load (startup or reload)"},
             {"INTERNAL", "anything else; details are in the server log"},
     };

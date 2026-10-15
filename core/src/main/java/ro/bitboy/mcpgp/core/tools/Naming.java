@@ -49,6 +49,7 @@ final class Naming {
     private final Map<String, String> methodVerbs = new LinkedHashMap<>(Map.of(
             "GET", "get", "LIST", "list", "POST", "create", "PUT", "replace", "PATCH", "update", "DELETE", "delete"));
     private final String serverPrefix;
+    private final String serverSuffix;
     private final boolean perApi;
     final String profile;
     final String onTooLong;
@@ -77,6 +78,7 @@ final class Naming {
             }
         });
         serverPrefix = policy.path("namespace").path("server").asText("");
+        serverSuffix = policy.path("namespace").path("suffix").asText("");
         perApi = policy.path("namespace").path("perApi").asBoolean(true);
         profile = policy.path("limits").path("profile").asText("strict");
         onTooLong = policy.path("limits").path("onTooLong").asText("shorten-then-hash");
@@ -85,6 +87,15 @@ final class Naming {
 
     /** Steps 1–4: the base name (snake case, without prefix) and the steps that produced it. */
     String base(Operation op, List<Step> steps) {
+        return base(op, steps, source);
+    }
+
+    /** The base name made from the method and path whatever the source, for {@code collisions: method-path}. */
+    String methodPathBase(Operation op) {
+        return base(op, new ArrayList<>(), "methodPath");
+    }
+
+    private String base(Operation op, List<Step> steps, String source) {
         String raw = sourceText(op, source);
         String used = source;
         if (raw == null || raw.isBlank()) {
@@ -119,6 +130,9 @@ final class Naming {
         }
         if (!serverPrefix.isEmpty()) {
             result = serverPrefix + "_" + result;
+        }
+        if (!serverSuffix.isEmpty()) {
+            result = result + "_" + serverSuffix;
         }
         return result;
     }

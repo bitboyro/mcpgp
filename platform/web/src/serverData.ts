@@ -44,5 +44,7 @@ export const AUTH_LABELS: Record<string, string> = {
   bearer: 'Bearer',
   apiKey: 'API key',
   oauth2ClientCredentials: 'OAuth client credentials',
+  fromRequest: "The user's own, from the client",
+  tokenExchange: "The signed-in user's identity (token exchange)",
   mtls: 'mTLS',
 }

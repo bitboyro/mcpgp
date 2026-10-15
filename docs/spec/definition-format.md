@@ -58,41 +58,51 @@ build: { … }
 | `apis[].contracts[].spec` | path \| URL | — | Swagger 2.0, OAS 3.0 or 3.1. URLs only for allow-listed hosts. |
 | `apis[].contracts[].overlays` | list of paths | `[]` | Applied in order. |
 | `apis[].contracts[].default` | bool | last listed | Exactly one default per API. |
-| `apis[].detect` | object | none | optional: `{ method, path, pattern, onFailure: useDefault \| refuse }`; first capture group is matched against shipped versions (runtime-config §4.4) |
+| `apis[].contracts[].source` | URL | none | Where the spec is published. The platform records it when it fetches the spec, and fetches it again when someone checks for updates (allowed hosts only, platform-api §2.1). The compiler never fetches it. |
+| `apis[].detect` | object | none | optional: `{ method, path, pattern, field \| header, underBasePath, onFailure: useDefault \| refuse }`; the pattern's first group is matched against shipped versions (runtime-config §4.4) |
+| `apis[].detect.field` / `.header` | string | the body | where the version is: a JSON pointer into the answer (`/version`), or a response header; not both |
+| `apis[].detect.underBasePath` | bool | `false` | ask under each contract's base path in turn (the preferred contract first, then the newest), for APIs whose versions each answer under their own path |
 | `apis[].select.access` | enum | `read-write` | `read-only` · `read-write` (no DELETE) · `all` |
 | `apis[].select.include` / `exclude` | selector | all | See §5. |
 | `apis[].select.deprecated` | enum | `hide` | `hide` · `show` · `mark` |
 | `apis[].downstreamAuth.supported` | list | from spec | `basic` · `apiKey` · `bearer` · `oauth2ClientCredentials` · `mtls` · `custom:<id>` |
-| `apis[].downstreamAuth.identity` | enum | `service-account` | `per-user` is P2. |
+| `apis[].downstreamAuth.fromRequest` | object | absent | Lets the MCP client send the credential for the API in a request header (`{ header: X-… }`, optional name); HTTP only, never stored. auth.md §2.4 |
+| `apis[].downstreamAuth.tokenExchange` | object | absent | `{}` lets instances call the API as the signed-in user (token exchange; inbound oauth). auth.md §2.5 |
+| `apis[].downstreamAuth.identity` | enum | `service-account` | informational; per-user identity comes from `fromRequest` or `tokenExchange` |
 | `apis[].downstreamAuth.unsatisfiedTools` | enum | `hide` | `hide` · `error` |
 | `apis[].requestBody` | object | `{ multiple: split }` | operations with several request body types: `split` (one tool per type, suffixes from `suffixes`) or `prefer` (one tool, first match of `prefer`). Default suffixes: `multipart/form-data → multipart`, `application/x-www-form-urlencoded → form`, `application/octet-stream → binary`. See tools-contract §13 |
-| `apis[].pagination` | object | none | **optional**; normalizes paging (tools-contract §10). `{ style: offset \| page \| cursor \| link-header \| client, request: {…param names}, response: {items, total, next}, defaultLimit, maxLimit }` |
+| `apis[].pagination` | object | none | **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). Planned: normalizes paging (tools-contract §10). `{ style: offset \| page \| cursor \| link-header \| client, request: {…param names}, response: {items, total, next}, defaultLimit, maxLimit }` |
 | `instances.mode` | enum | `single` | `single` · `multi` |
-| `instances.mixedContracts` | enum | `union` | `union` · `namespaced` · `forbid` (multi only) |
-| `instances.max` | int | none | |
+| `instances.mixedContracts` | enum | `union` | multi only. `union`: one tool for every instance, checked per call (tools-contract §4). `namespaced`: one tool per instance, `<instance>__<tool>`, with that instance's contract only (tools-contract §3). `forbid`: every instance on one version; pinned instances on different versions stop startup, an `auto` instance detected on another version is unavailable (runtime-config §7) |
+| `instances.max` | int | none | the most instances a customer may configure; more stop startup |
 | `exposure.mode` | enum | `plain` | `plain` · `discovery` · `toolsets` · `hybrid` (tools-contract §15) |
 | `exposure.discoveryStyle` | enum | `search` | `search` (search → describe → call) · `catalog` (list → schema → invoke); discovery and hybrid only |
 | `exposure.toolsets` | object | by tag | toolsets mode: groups of tools, default one per tag; `{ <name>: { match: <selector>, description } }` |
 | `exposure.pinned` | list of tool names | `[]` | hybrid only |
 | `exposure.plainSearch` | bool | `false` | add `search_tools` + `describe_tool` in plain mode |
 | `safety.confirmDestructive` | bool | `true` | safe by default; destructive tools ask for confirmation (tools-contract §8) |
-| `safety.responseLimitKb` | int | `256` | operator may lower, not raise |
-| `schemas.input` | enum | `full` | `full` · `lean` (tools-contract §11) |
+| `safety.responseLimitKb` | int | `256` | the largest answer an agent gets; above it the answer is cut with a note. At most 4× this (at least 1 MB) is ever downloaded |
+| `safety.cleanTruncation` | bool | `true` | a JSON answer over the limit keeps whole items of its largest list, says how many it left out (`_meta.mcpgp/truncated`) |
+| `safety.inputLimits` | object | on | `{ enabled, requestKb: 1024, stringMaxLength: 65536 }`: a tool call's arguments (inline file contents excluded; `files.base64.maxKb` limits them) and, over HTTP, the request body (`413`); text values whose schema sets no `maxLength`. Over → `INPUT_TOO_LARGE`, nothing sent |
+| `safety.rateLimits` | object | on | `{ enabled, concurrent: 8, perMinute: 120, retryAfter: true }` per target server: more than `concurrent` wait up to 30 s for a slot; over `perMinute` → `RATE_LIMITED` with `_meta.mcpgp/retryAfterSeconds`. `retryAfter` passes a target's `429 Retry-After` to the agent. The operator can change them per instance (runtime-config, `instances[].rateLimits`) |
+| `schemas.input` | enum | `full` | `full`. `lean` (tools-contract §11): **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). |
+| `schemas.output` | bool | `true` | tools carry an `outputSchema` from the success answer's JSON schema (tools-contract §6); `false` (or `mcpgp build --no-output-schemas`, or the platform's Security & safety page) leaves them out |
 | `files.forms` | list | `[base64, path]` | file-input forms the build supports; the operator enables them at runtime |
 | `packs.<id>` | object \| `$ref` | — | presence enables the pack |
 | `runtimeDefaults` | object | see [runtime-config.md](runtime-config.md) | values become defaults in the generated config schema; `allowed` lists restrict the operator |
+| `runtimeDefaults.audit` | object | 30 days, `redacted` | the audit settings the package ships with: `file.retainDays`, `file.rotate`, `file.enabled`, `arguments` (`none` · `redacted` · `hashed`); the operator's config can still change them |
 | `resources.uriScheme` | string | `api` | scheme for operations exposed as resources (tools-contract §14.1) |
 | `prompts` | list | `[]` | prompt templates (tools-contract §14.2) |
 | `extensions` | object | none | custom tools, enrichers, call filters ([extensions.md](extensions.md)) |
-| `generation.mode` | enum | `runtime` | `runtime` · `codegen` · `both` |
+| `generation.mode` | enum | `runtime` | `runtime`. `codegen` · `both`: **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). |
 | `generation.runtime` | semver range | latest | pin the runtime version, e.g. `1.8.x` (see compatibility.md) |
 | `generation.client` | object | `{ library: jdk, json: jackson }` | |
-| `generation.codegen` | object | — | `{ output: build \| repo, extend: subclass \| hooks \| regions, classes: per-tag \| per-tool }` |
+| `generation.codegen` | object | — | planned, with `generation.mode: codegen`: `{ output: build \| repo, extend: subclass \| hooks \| regions, classes: per-tag \| per-tool }` |
 | `build.targets` | list | `[jar]` | `jar` · `mcpb` · `docker` (Kubernetes manifests / Helm: later) |
-| `build.image` | object | Temurin JRE | `docker` target: `{ base, registry, push: true\|false, tar: true\|false }` (packaging.md §7) |
+| `build.image` | object | Temurin JRE | `docker` target: `{ base }` (packaging.md §7). `registry`, `push: true`, `tar: true`: **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). The package's `docker/` folder has the Dockerfile. |
 | `build.docs` | list | `[people]` | `people` · `agents` |
 | `build.sign` | object | `{ key: ${env:MCPGP_SIGNING_KEY} }` | key-pair signature of `SHA256SUMS`; `null` disables (packaging.md §7) |
-| `build.jarSigning` | object | none | optional: `{ keystore, alias, password }` with a company code-signing certificate |
+| `build.jarSigning` | object | none | **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). Planned: `{ keystore, alias, password }` with a company code-signing certificate. Today `build.sign` signs the package (`SHA256SUMS.sig`), which covers the jar. |
 
 ## 3. APIs and contracts
 
@@ -203,6 +213,41 @@ descriptions:
 - They show in a tool's provenance as `notice` steps; `NOTICE_MATCHES_NOTHING` warns about a notice
   that selects no tool. A variant inherits its parent's notices (merged by `id`).
 
+**Shared notices.** Text that many servers carry (a company policy) lives once, in a set of notices:
+a library item of kind `notices` on the platform, a file mapped under `notices:` in
+`mcpgp-workspace.yaml` for the CLI ([notices.schema.json](../../schemas/src/main/resources/schemas/notices.schema.json)):
+
+```yaml
+# mcpgp://acme/notices/company-policy@2
+title: Company policy
+notices:
+  - id: data-policy                     # required in a set
+    text: "Company policy: customer data stays in the EU."
+  - id: writes
+    text: "Changes need a ticket number in the reason."
+    match: { method: [POST, PUT, PATCH, DELETE] }
+```
+
+A definition includes sets with `descriptions.include` (one reference or a list; a file of the
+project works too):
+
+```yaml
+descriptions:
+  include: [mcpgp://acme/notices/company-policy@2]
+  notices:
+    - id: writes                        # replaces the set's notice with this id, in its place
+      text: "Changes need an approved change request."
+      match: { method: [POST, PUT, PATCH, DELETE] }
+```
+
+- The sets' notices come first, in the order of `include` (a later set's notice replaces an earlier
+  one with the same id), then the definition's own notices.
+- Pin a version (`@2`) to keep builds reproducible; a new version of the set reaches the server when
+  its definition moves to it (the platform does that for many servers at once, platform-api.md §2.3).
+- A shared notice's provenance step names its set (`from: mcpgp://acme/notices/company-policy@2`);
+  `mcpgp explain` shows it. A set that doesn't match its schema fails with `NOTICES_INVALID`.
+- A variant gets the notices of the definition it extends, shared ones included.
+
 ## 6. Variants
 
 ```yaml
@@ -230,11 +275,12 @@ build: { targets: [mcpb] }
 | Root restriction | No path may resolve outside the project root (`..` escapes, absolute paths and symlinks out are errors). |
 | Remote references | Off by default; allowed only for hosts in the workspace allowlist. |
 | Cycles | Detected; the error lists the full chain. |
-| Workspace references | `mcpgp://<workspace>/<kind>/<name>@<version>` (kinds: `servers`, `contracts`, `naming`, `rules`, `packs`, `templates`) resolve to the shared library. The CLI maps them to local files with `--workspace <dir>`, using `<dir>/mcpgp-workspace.yaml`. They are the only way to reuse files from outside the project. |
+| Workspace references | `mcpgp://<workspace>/<kind>/<name>@<version>` (kinds: `servers`, `contracts`, `naming`, `rules`, `notices`, `packs`, `templates`) resolve to the shared library. The CLI maps them to local files with `--workspace <dir>`, using `<dir>/mcpgp-workspace.yaml`. They are the only way to reuse files from outside the project. |
 | Maps | Deep-merged; later wins. `null` removes an inherited key (e.g. `packs: { jira: null }` in a variant). |
 | Lists of objects with a key | **Merged item by item**, matched on the key: `apis` and `instances` by `id`, `contracts` by `version`. An item present only in the later file is added; `$remove: true` removes the inherited item (e.g. `- { version: "1.0", $remove: true }`). |
 | Other lists | `overrides.rules` and `include`d rule files **append**; every other list **replaces**. Override with `$merge: append \| replace`. |
 | OpenAPI `$ref`s | Resolved relative to the spec file, under the same root restriction. |
+| OpenAPI schemas in other files | Become shared schemas (`components/schemas`), named after the entry that points to their file or after the file (`complete-tls-certificate.json` → `CompleteTlsCertificate`): each file is read once however many places use it, and a schema that refers back to itself (a tree, a chain) isn't a cycle error. Other `$ref`s to files (path items, parameters, responses) are inlined. |
 
 ## 8. Lock file
 
@@ -272,6 +318,7 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 | `OPERATION_EXCLUDED` | info | an operation becomes no tool, with the reason (access, include/exclude, deprecated, hidden) |
 | `RULE_MATCHES_NOTHING` | warning | a rule matches no tool |
 | `NOTICE_MATCHES_NOTHING` | warning | a notice (`descriptions.notices`) applies to no tool |
+| `NOTICES_INVALID` | error | a set of shared notices (`descriptions.include`) doesn't match its schema |
 | `CONTENT_TYPE_UNKNOWN` | error | a rule binds a content type the operation doesn't accept |
 | `RESOURCE_NOT_GET` | error | `expose: resource` on an operation that isn't a `GET` (tools-contract §14.1) |
 | `PROMPT_UNKNOWN_ARGUMENT` | error | a prompt message uses `{{name}}` for an argument the prompt doesn't declare (tools-contract §14.2) |
@@ -280,6 +327,7 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 | `NAME_TOO_LONG` | error | a name exceeds the limit and `onTooLong: error` |
 | `NAME_COLLISION` | error | two tools get the same name and `collisions: error` |
 | `NAME_DRIFT` | warning | a name would change; the locked name is kept |
+| `NOT_SUPPORTED_YET` | error | a setting this version doesn't do yet (`generation.mode: codegen`/`both`, `schemas.input: lean`, `apis[].pagination`, `build.jarSigning`, `build.image.registry`/`push`/`tar`); the message names it |
 | `NAME_DRIFT_FROZEN` | error | the same with `--frozen-lock` (CLI exit code 3) |
 | `LOCK_INVALID` | error | `mcp-names.lock` doesn't match its schema |
 | `PINNED_TOOL_UNKNOWN` | error | in `hybrid` mode, `exposure.pinned` names a tool the build doesn't produce (ignored in other modes) |
@@ -290,7 +338,7 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 ## 10. Versioning
 
 `apiVersion` changes only for breaking format changes. Every new `apiVersion` ships with an automatic
-migration (`mcpgp migrate`) and a migration note in the changelog.
+migration (`mcpgp migrate`, TODO: built with the first v2) and a migration note in the changelog.
 
 ## 11. Security considerations
 

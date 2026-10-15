@@ -150,10 +150,10 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `server.host` / `port` | `127.0.0.1` / `8080` | |
 | `server.publicUrl` | — | URL clients use; required for OAuth metadata |
 | `server.basePath` | `/mcp` | |
-| `server.tls` | none | `{ cert, key }` or `proxy` (TLS ends at a reverse proxy) |
-| `server.trustProxy` | `[]` | addresses whose `X-Forwarded-*` headers are trusted |
+| `server.tls` | none | `proxy`: TLS ends at a reverse proxy. `{ cert, key }` (HTTPS by the server itself): **Not supported yet:** refused at startup. |
+| `server.trustProxy` | `[]` | **Not supported yet:** refused at startup. Planned: addresses whose `X-Forwarded-*` headers are trusted |
 | `server.allowedOrigins` | `[]` | Origin check for browser clients (DNS rebinding protection) |
-| `server.outboundProxy` | none | HTTP proxy for calls to instances |
+| `server.outboundProxy` | none | **Not supported yet:** refused at startup. Planned: HTTP proxy for calls to instances |
 | `server.management.port` | none | health + metrics on a separate port |
 | `server.auth.mode` | `none` | `none` · `static` · `oauth`, within the build's `allowed` list |
 | `server.auth.keys[]` | — | `static` mode: `{ name, value }` per client key; `value` is a secret field |
@@ -166,10 +166,15 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `instances[].id` | — | `[a-z0-9-]{1,40}`; unique |
 | `instances[].baseUrl` | — | the complete address of the target server (§4.1); must match the build's base-URL allowlist if one is set |
 | `instances[].contract` | `auto` | `auto` or a shipped version |
-| `instances[].auth.type` | — | one of the build's supported types |
+| `instances[].prefer` | the default contract | with `auto`: the contract detection asks about first (§4.4), for a target you expect to run it |
+| `instances[].auth.type` | — | one of the build's supported types, or `fromRequest` when the definition allows it (auth.md §2.4) |
+| `instances[].auth` (list) | — | several credentials tried in order: a `fromRequest` entry when its header is in the request, any other entry always |
+| `instances[].auth` (`tokenExchange`) | — | `tokenUrl`, `clientId`, `clientSecret`, `clientAuth`, `flavor` (`rfc8693` · `entra-obo`), `audience`, `resource`, `scopes`; needs `server.auth.mode: oauth` (auth.md §2.5) |
+| `instances[].auth.header` / `.as` | `X-<Server>[-<Api>][-<Instance>]-Authorization` / `Authorization` | `fromRequest`: the request header the client sends, and the header sent to the API |
 | `instances[].tls` | system trust | trust anchors, client certificate, hostname check: see §5 |
 | `instances[].timeoutSeconds` | `30` | |
 | `instances[].readOnly` | `false` | hides write tools for this instance |
+| `instances[].rateLimits` | the build's (`safety.rateLimits`) | `{ enabled, concurrent, perMinute }` for calls to this instance's target, instead of the build's: raise them for a system that takes more, lower or turn them off for one that takes less |
 | `audit.file.enabled` | `true` | |
 | `storage.root` | `~/.<server>/` | where everything the server writes lives (§4.2); env `<SERVER>_STORAGE__ROOT` |
 | `audit.file.path` | `<storage.root>/audit/audit.jsonl` | |
@@ -237,17 +242,38 @@ directory is created with owner-only permissions; config and `.env` usually live
 
 ### 4.4 Contract detection
 
-For instances with `contract: auto`, when the definition gives a detection rule (`apis[].detect`):
+For instances with `contract: auto`, when the definition gives a detection rule (`apis[].detect`),
+the server asks each target which version it runs, once per instance, at startup and on every reload;
+never per call. Starting waits up to 2 seconds for the answers; a slower target answers in the
+background, and calls to that instance wait for it.
 
-1. At startup (and on reload) the server calls the detection endpoint and matches the reported
-   version against the shipped contracts.
-2. Match → that contract is used.
-3. No rule, endpoint unreachable, or a version that matches no shipped contract → behaviour from the
-   definition's `apis[].detect.onFailure`:
-   - `useDefault` (default): use the default contract, log a warning, record it in the audit
-     `server.start` / `config.reload` event, and show it in `doctor` and `instances_list`;
-   - `refuse`: this instance is unavailable (others keep working) until detection succeeds.
-4. A pinned contract (`contract: "1.0"`) skips detection; if a rule exists, a mismatch is a warning.
+1. **Where it asks.** `detect.path` at the instance's address. With `underBasePath: true`, under each
+   contract's base path in turn: the instance's `prefer` contract (or the build's default) first,
+   then the others, newest first (`/api/v2/version`, then `/api/v1/version`). An address with its own
+   path is used as it is, for every contract.
+2. **What it reads.** `field` (a JSON pointer, `/version`) picks the value from a JSON answer;
+   `header` reads a response header instead; with neither, the whole body. `pattern` is matched
+   against that value, and its first group (or the whole match) names the version: the shipped
+   contract with the same version, or the longest one it starts with (`2.0.3` → `2.0`).
+3. **Which answer counts.** The first answer the pattern matches decides, even when it names a
+   version the build doesn't ship. A `4xx` means "not here": the next base path is asked. A `5xx`, a
+   timeout or an unreachable target ends detection.
+4. **Credentials.** The request carries the instance's own credential (basic, bearer, API key, client
+   credentials). Per-caller credentials (`fromRequest`, `tokenExchange`) only exist with a call, so the
+   request goes without them first; when the target answers `401`/`403`, the first call to that
+   instance asks again with that caller's credential, and the answer serves every caller. Until then
+   the instance behaves as for a failed detection.
+5. **No answer, or a version not shipped** → `apis[].detect.onFailure`:
+   - `useDefault` (default): the default contract, with a warning in the log, an `instance.contract`
+     audit event, and a note in `instances_list` and `doctor`;
+   - `refuse`: this instance is unavailable (others keep working). Its calls answer
+     `INSTANCE_UNAVAILABLE` with the reason, and while it is refused a call asks the target again,
+     at most once a minute, so it recovers without a restart.
+6. **Pinned instances** (`contract: "1.0"`) use that contract and are never asked. `doctor` asks
+   every target with a rule and warns when a pinned instance's target reports another version.
+
+Each result is logged and written as an `instance.contract` audit event (contract, how it was
+chosen, what the target reported).
 
 ### 4.5 Error detail
 
@@ -369,7 +395,10 @@ files:
 The server refuses to start, with a message naming the key, when:
 - the config doesn't match the schema;
 - an instance uses an auth type the build doesn't support (`type: none`, no credentials, is always accepted);
-- a pinned contract isn't shipped, or `mixedContracts: forbid` is violated;
+- a pinned contract isn't shipped, or `mixedContracts: forbid` is violated by pinned instances (an
+  `auto` instance detected on another version than the others, the first pinned one or the default,
+  is unavailable instead: `INSTANCE_UNAVAILABLE` naming both versions);
+- more instances than the build's `instances.max`;
 - `server.auth.mode: none` on a non-loopback HTTP address without `allowInsecure`;
 - a secret reference can't be resolved, or a secret field holds a plain value without `allowInlineSecrets`;
 - indexed environment variables for a list have gaps;

@@ -66,7 +66,8 @@ Rules:
 - Auth headers, auth query parameters and auth cookies are **never** exposed; the runtime injects
   credentials.
 - `readOnly` schema properties are removed from inputs.
-- `$ref`s are inlined up to depth 5, then placed in `$defs`.
+- `$ref`s are inlined up to depth 5, then placed in `$defs`; so are shared schemas that would inline to more
+  than 300 JSON nodes (below the top level), so a wide schema graph doesn't repeat in every tool.
 - JSON Schema 2020-12; `additionalProperties: false` on the top level and on every group.
 - The runtime maps each group straight back to the request: no guessing, no renaming. Path values
   are percent-encoded (a `/` in a value stays inside its segment); empty, `.` and `..` path values
@@ -79,8 +80,12 @@ Rationale and rejected options: [ADR-0006](../decisions/0006-tool-input-schema-s
 - **Single-instance builds:** absent.
 - **Multi-instance builds:** present on **every** tool except `instances_list`; always `required`;
   `enum` of the configured instance ids (filled at startup from the runtime config). No default.
-- `mixedContracts: namespaced`: no `instance` parameter; tools are duplicated per instance
-  (`prod_eu__customer_list`).
+- `mixedContracts: namespaced`: no `instance` parameter; each API tool is offered once per
+  instance as `<instance>__<tool>` (the instance id with `-` as `_`: `prod_eu__orders_customer_list`),
+  described as "On prod-eu (contract 2.0).", with only that contract's fields (no "(2.0 only)"
+  marks) and only when that contract has the operation. The server waits for detection before
+  listing them, so an `auto` instance's tools match the version its target runs. Toolsets and
+  pinned tools name the original tool and cover its copies.
 
 ## 4. Mixed contracts (`union`, default)
 
@@ -113,8 +118,21 @@ Success:
 }
 ```
 
-- `structuredContent` and `outputSchema` when the response schema is known (P1).
-- Bodies over `responseLimitKb` are truncated with a note and a hint to narrow the query.
+- `outputSchema` (on by default, `schemas.output`): from the success answer's JSON schema in the
+  tool's primary contract, self-contained and **loose**: no `required`, extra fields allowed, since a
+  target often answers with more or less than its spec says. None for answers that aren't JSON.
+- `structuredContent` for every JSON answer: an object as it is, a list as `{ "items": [...] }`, any
+  other value as `{ "value": … }`, with `_meta.mcpgp/wrapped: items | value` (the output schema
+  says the same). Extensions get the list or value itself.
+- A result is checked against the output schema, and a difference is logged (once per schema), never
+  turned into an error: the agent gets the answer the target really gave.
+- A tool with an output schema never answers with text alone: an answer cut as text (over the limit
+  and not cut at whole items) is `RESPONSE_TOO_LARGE`, a non-JSON answer `RESPONSE_PARSE_ERROR`.
+- Bodies over `responseLimitKb` are truncated with a note and a hint to narrow the query. A JSON body
+  keeps whole items of its largest list and stays structured, with `_meta.mcpgp/truncated: { list,
+  shown, total }` (`safety.cleanTruncation`). At most 4× the limit (at least 1 MB) is downloaded.
+- A target's `429` carries its `Retry-After` as `_meta.mcpgp/retryAfterSeconds`; so does the
+  server's own `RATE_LIMITED` (`safety.rateLimits`).
 - Binary responses become `resource_link` content (or a base64 file object when the client can't follow links); see §13.2 for the `Accept` header.
 
 Failure from the upstream or input validation: `isError: true` with a readable message, an error code
@@ -129,7 +147,7 @@ request) are JSON-RPC errors.
 
 | Tool | When | Purpose |
 |---|---|---|
-| `instances_list` | multi-instance | `{ instances: [{ name, contract, readOnly, status, tools }] }`, never credentials |
+| `instances_list` | multi-instance | `{ instances: [{ name, contract, contractSelection, detectedVersion?, contractNote?, readOnly, status, tools }] }`; `status` is `configured`, or `unavailable` when detection refused the instance (runtime-config §4.4); never credentials |
 | discovery tools | `discovery` / `hybrid` | find, inspect and call tools not listed directly (§15) |
 | `toolsets_list`, `toolset_enable`, `toolset_disable` | `toolsets` | switch groups of tools on and off (§15.3) |
 | `search_tools`, `describe_tool` | plain + `plainSearch` | search alongside the full list |
@@ -198,10 +216,11 @@ or the whole `body` for `application/octet-stream`):
 Parts that carry secrets (passwords, keys) are marked in the definition (see definition-format §5,
 `parts`) and are redacted in audit and recordings.
 
-## 10. Paging (optional)
+## 10. Paging (optional, not supported yet)
 
-Off by default: list tools return what the API returns, and paging uses the API's own parameters.
-When a definition enables `pagination` for an API (definition-format §2.1), its list tools instead:
+List tools return what the API returns, and paging uses the API's own parameters. **Not supported
+yet:** the compiler refuses `pagination` (`NOT_SUPPORTED_YET`). What follows is the plan. When a
+definition enables `pagination` for an API (definition-format §2.1), its list tools instead:
 
 - take `query.limit` and `query.cursor` (the API's own paging parameters are hidden);
 - return one envelope in `structuredContent`:
@@ -226,7 +245,7 @@ All off by default.
 
 | Option | Effect |
 |---|---|
-| `schemas.input: lean` | Large request bodies are shown one level deep in `inputSchema` (property names and types); nested objects are described as "see `describe_schema`". Default `full`. |
+| `schemas.input: lean` (not supported yet: refused by the compiler) | Large request bodies are shown one level deep in `inputSchema` (property names and types); nested objects are described as "see `describe_schema`". Default `full`. |
 | `packs.schema` | Adds `describe_schema(tool, part?, variant?)`: returns the full input schema of a tool, summarized one level deep with drill-down into one named definition (`part`), and narrowing of `oneOf` / discriminator variants (`variant`). Reads bundled data only; no instance, no network. |
 
 ## 12. Sensitive tools (optional)

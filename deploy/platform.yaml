@@ -1,0 +1,27 @@
+# platform.yaml for docker compose (docs/guides/self-hosting.md; every key: docs/spec/platform-api.md §7).
+# Mounted read-only at /etc/mcpgp/platform.yaml. Secrets are references, never values.
+workspace: acme                     # the <workspace> in mcpgp://acme/naming/… references
+
+http:
+  port: 8443
+  # the address people and agents use; set it whenever a proxy is in front (https:// in production)
+  publicUrl: http://localhost:8443
+
+# storage comes from compose.yaml (the file store) or compose.postgres.yaml (MCPGP_PLATFORM_STORAGE__*)
+
+auth:
+  local: { enabled: true }          # username and password accounts kept by the platform
+  # Company sign-in (optional): uncomment, register the client at your identity provider with the
+  # redirect URI <publicUrl>/login/oauth2/code/oidc, and put the client secret in secrets/oidc_client_secret.
+  # oidc:
+  #   issuer: https://login.example.com/realms/acme
+  #   clientId: mcpgp
+  #   clientSecret: "${file:/run/secrets/oidc_client_secret}"   # mounted by compose.oidc.yaml
+  #   label: Acme SSO
+  #   groupsClaim: groups
+  #   roles: { mcpgp-admins: admin, mcpgp-builders: builder }
+
+# Signs built packages (optional; packages are unsigned without it). Create one with `mcpgp keygen`.
+# or here: signing: { key: "${file:/run/secrets/signing_key}" } (compose.signing.yaml sets it for you)
+
+retention: { archiveAfterDays: 90, deleteArchivedAfterDays: 365, keepLast: 10 }

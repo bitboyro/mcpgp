@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, type Tool } from '../api'
 import { useServer } from '../serverData'
 import { startingArguments } from '../tryArgs'
@@ -22,6 +22,10 @@ export function TryTool({ id, tool }: { id: string; tool: Tool }) {
   } catch (e) {
     invalid = e instanceof Error ? e.message : 'not JSON'
   }
+  // the trial server takes a few seconds to start: begin when the panel opens, not on the first call
+  useEffect(() => {
+    if (base > 0) api.warmTry(id, base).catch(() => { /* the call reports what's wrong */ })
+  }, [id, base])
   const run = useMutation({ mutationFn: () => api.tryTool(id, base, tool.name, parsed) })
   const result = run.data?.result
   const structured = result?.structuredContent
@@ -46,6 +50,9 @@ export function TryTool({ id, tool }: { id: string; tool: Tool }) {
         <>
           {run.data.leftOut.length > 0 && (
             <div className="note">Custom code isn’t run on the platform; left out: {run.data.leftOut.join(', ')}. <span className="mono">mcpgp test</span> runs it.</div>
+          )}
+          {run.data.via && (
+            <div className="note">This tool isn’t in <span className="mono">tools/list</span>; it was called through <span className="mono">{run.data.via}</span>, as an agent would.</div>
           )}
           {run.data.error && <div className="note note-bad">{run.data.error.message}</div>}
           {result && (

@@ -242,6 +242,11 @@ final class InboundFilter extends HttpFilter {
             this.body = request.getInputStream().readAllBytes();
         }
 
+        CachedBody(HttpServletRequest request, byte[] body) {
+            super(request);
+            this.body = body;
+        }
+
         byte[] bytes() {
             return body;
         }

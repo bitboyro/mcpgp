@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, ApiError, type Change, type Tool } from '../api'
-import { ownDescription, overrideId, paramDescriptions, rulePath, setOverride, type Override } from '../descriptions'
+import { baseName, sameTool, ownDescription, overrideId, paramDescriptions, rulePath, setOverride, validBaseName, type Override } from '../descriptions'
 import { useServer } from '../serverData'
 import { ErrorBox } from '../ui'
 import { agentView } from './Overview'
@@ -18,9 +18,10 @@ export function ToolEdit({ id, tool, onClose }: { id: string; tool: Tool; onClos
   const definition = useQuery({ queryKey: ['definition', id, base], queryFn: () => api.definition(id, base), enabled: base > 0 })
   const ruleId = overrideId(tool)
   const existing = definition.data?.root.overrides?.rules?.find((r) => r.id === ruleId)
-  const now: Override = { title: tool.title ?? '', description: ownDescription(tool), params: paramDescriptions(tool) }
+  const now: Override = { title: tool.title ?? '', description: ownDescription(tool), params: paramDescriptions(tool), name: baseName(tool) }
   const [wanted, setWanted] = useState<Override>(now)
-  const change = setOverride(tool, now, wanted, existing)
+  const nameOk = wanted.name === undefined || validBaseName(wanted.name)
+  const change = nameOk ? setOverride(tool, now, wanted, existing) : null
   const [changes, setChanges] = useState<Change[] | null>(null)
   const preview = useQuery({
     queryKey: ['edit-preview', id, base, changes],
@@ -28,10 +29,11 @@ export function ToolEdit({ id, tool, onClose }: { id: string; tool: Tool; onClos
     enabled: !!changes && base > 0,
     retry: false,
   })
-  const previewed = preview.data?.manifest?.tools.find((t) => t.name === tool.name)
+  // a renamed tool has a new name: find it by its operation
+  const previewed = preview.data?.manifest?.tools.find((t) => sameTool(t, tool))
   const save = useMutation({
     mutationFn: (list: Change[]) => api.saveEdit(id, base, list, list[0].op === 'remove' ? `Tools & rules: ${tool.name} back to the spec`
-      : `Tools & rules: ${tool.name} title and descriptions`),
+      : wanted.name !== now.name ? `Tools & rules: ${tool.name} renamed (${wanted.name})` : `Tools & rules: ${tool.name} title and descriptions`),
     onSuccess: async () => {
       for (const key of ['server', 'manifest', 'servers', 'definition', 'version', 'naming', 'operations']) await queryClient.invalidateQueries({ queryKey: [key] })
       onClose()
@@ -42,6 +44,14 @@ export function ToolEdit({ id, tool, onClose }: { id: string; tool: Tool; onClos
   return (
     <form className="stage-card" aria-label={`Edit ${tool.name}`} onSubmit={(e) => { e.preventDefault(); if (change) save.mutate([change]) }}>
       <span className="eyebrow">Change what the agent reads</span>
+      {now.name !== undefined && (
+        <label className="field">Name, without the prefixes and suffix
+          <input className="input input-stage mono" value={wanted.name ?? ''} aria-invalid={!nameOk}
+            onChange={(e) => { setWanted({ ...wanted, name: e.target.value.trim() }); setChanges(null) }} />
+          <span className="hint">{nameOk ? `Now ${tool.name}; the preview shows the new full name. Agents that call the old name need updating.`
+            : 'Letters, digits and _, starting with a letter.'}</span>
+        </label>
+      )}
       <label className="field">Title
         <input className="input input-stage" value={wanted.title} onChange={(e) => { setWanted({ ...wanted, title: e.target.value }); setChanges(null) }} />
       </label>

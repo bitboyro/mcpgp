@@ -44,8 +44,9 @@ public final class Guardrails {
         int limit = builds ? limits.agentBuildsPerHour() : limits.agentVersionsPerHour();
         java.util.Set<String> actions = builds ? java.util.Set.of("build.start") : java.util.Set.of("version.create", "server.create");
         Instant since = clock.instant().minus(Duration.ofHours(1));
-        long used = store.activity(a -> a.actor().equals(who.identity().name()) && actions.contains(a.action())
-                && Instant.parse(a.ts()).isAfter(since), limit + 1).size();
+        // the last hour only: reading stops there however long the log is
+        long used = store.activity(new ro.bitboy.mcpgp.platform.store.Store.ActivityQuery(null, null, who.identity().name(), null, actions, since),
+                limit + 1).size();
         if (used >= limit) {
             throw new ApiException(429, "QUOTA_EXCEEDED", "agent " + who.identity().name() + " reached its limit of " + limit + " "
                     + what + " per hour; try again later", Map.of("limit", limit, "window", "1h"));

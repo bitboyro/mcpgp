@@ -1,16 +1,15 @@
-image: registry.example.com/mcpgp:0.4.2   # pin by digest in real use
+image: docker.io/example/mcpgp-cli:0.2.7   # the CLI image; pin by digest in real use
 
 stages: [check, build, release]
 
 variables:
-  GIT_DEPTH: "0"
+  MCPGP_SIGNING_KEY: $MCPGP_SIGNING_KEY   # a masked CI/CD variable; the definitions ask for signed packages
 
 check:
   stage: check
   script:
     - mcpgp validate --all
-    - mcpgp diff --all --against last-release --format md | tee diff.md
-  artifacts: { paths: [diff.md] }
+    # TODO (not yet): mcpgp diff --all --against last-release --format md
 
 build:
   stage: build

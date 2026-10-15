@@ -1,8 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, type Operation, type OperationList, type Select } from '../api'
-import { changes, turnOff, turnOffAll, turnOn, whyOff, type TurnOn } from '../selection'
+import { asList, changes, entryFor, same, turnOff, turnOffAll, turnOn, whyOff, type TurnOn } from '../selection'
 import { useServer } from '../serverData'
 import { useSession } from '../session'
 import { ErrorBox, Loading, Segmented } from '../ui'
@@ -11,6 +11,14 @@ import { Checks, DefinitionDiff } from './Overview'
 type StateFilter = 'all' | 'on' | 'off'
 
 const isOn = (op: Operation) => op.state === 'tool' || op.state === 'resource'
+const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'TRACE']
+
+/** The resource an operation is on: its path's first segment that isn't a version or a parameter (`/v1/partners/{id}` → `/partners`). */
+export function resourceOf(path: string): string {
+  const segments = path.split('/').filter((s) => s && !s.startsWith('{'))
+  const named = segments.find((s) => !/^(v\d+(\.\d+)*|api)$/i.test(s))
+  return '/' + (named ?? segments[0] ?? '')
+}
 
 interface Asked {
   api: string
@@ -37,6 +45,10 @@ export function OperationsView({ id }: { id: string }) {
   const [stateFilter, setStateFilter] = useState<StateFilter>('all')
   const [tag, setTag] = useState('')
   const [apiFilter, setApiFilter] = useState('')
+  const [methods, setMethods] = useState<string[]>([])
+  const [resource, setResource] = useState('')
+  /** Switches flipped while their preview is on its way: shown at once, replaced by the preview when it comes. */
+  const [flips, setFlips] = useState<Record<string, boolean>>({})
 
   const edits = useMemo(() => (current.data?.apis ?? []).flatMap((a) => (working[a.id] ? changes(a.id, a.select, working[a.id]) : [])),
     [current.data, working])
@@ -50,7 +62,11 @@ export function OperationsView({ id }: { id: string }) {
   const broken = edits.length > 0 && preview.data && !preview.data.operations
   const shown: OperationList | undefined = edits.length > 0 && preview.data?.operations ? preview.data.operations : current.data
   const busy = edits.length > 0 && preview.isFetching
-  const editable = can('servers:write') && !!current.data && !server.data?.archived
+  useEffect(() => {
+    if (!preview.isFetching || edits.length === 0) setFlips({})
+  }, [preview.isFetching, edits.length])
+  const onOf = (apiId: string, op: Operation) => flips[apiId + ' ' + op.key] ?? isOn(op)
+  const editable = can('servers:write') && !!current.data && !server.data?.archived && !server.data?.system
 
   const before = useMemo(() => {
     const map = new Map<string, Operation>()
@@ -75,6 +91,7 @@ export function OperationsView({ id }: { id: string }) {
     mutationFn: () => api.saveEdit(id, base, edits, message || defaultMessage),
     onSuccess: async () => {
       setWorking({})
+      setFlips({})
       setMessage('')
       for (const key of ['server', 'manifest', 'servers', 'operations', 'example-config', 'version']) await queryClient.invalidateQueries({ queryKey: [key] })
     },
@@ -88,14 +105,28 @@ export function OperationsView({ id }: { id: string }) {
   }
 
   const flip = (apiId: string, op: Operation, ops: Operation[]) => {
-    if (isOn(op)) {
-      apply(apiId, turnOff(selectOf(apiId), op))
+    const key = apiId + ' ' + op.key
+    const select = selectOf(apiId)
+    if (onOf(apiId, op)) {
+      apply(apiId, turnOff(select, op))
+      setFlips((now) => ({ ...now, [key]: false }))
       return
     }
-    const result = turnOn(selectOf(apiId), op)
+    if (flips[key] === false) {
+      // turned off a moment ago, before the preview came back: take that entry out again
+      const list = asList(select.exclude)
+      const index = list.map((e) => same(e, entryFor(op))).lastIndexOf(true)
+      if (index >= 0) {
+        apply(apiId, { ...select, exclude: list.filter((_, i) => i !== index) })
+        setFlips((now) => ({ ...now, [key]: true }))
+      }
+      return
+    }
+    const result = turnOn(select, op)
     if (!result) return
     if (!result.broad) {
       apply(apiId, result.select)
+      setFlips((now) => ({ ...now, [key]: true }))
       return
     }
     const e = op.exclusion
@@ -107,10 +138,20 @@ export function OperationsView({ id }: { id: string }) {
   const apis = shown?.apis ?? []
   const tags = useMemo(() => [...new Set(apis.flatMap((a) => a.operations.flatMap((o) => o.tags)))].sort(), [apis])
   const needle = search.trim().toLowerCase()
+  const allOps = apis.flatMap((a) => a.operations)
+  const presentMethods = METHODS.filter((m) => allOps.some((o) => o.method === m))
+  const resources = useMemo(() => {
+    const count = new Map<string, number>()
+    allOps.forEach((o) => count.set(resourceOf(o.path), (count.get(resourceOf(o.path)) ?? 0) + 1))
+    return [...count.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [allOps])
+  const narrowed = methods.length > 0 || !!resource
   const visible = apis.filter((a) => !apiFilter || a.id === apiFilter).map((a) => ({
     ...a,
-    operations: a.operations.filter((o) => (stateFilter === 'all' || (stateFilter === 'on') === isOn(o))
+    operations: a.operations.filter((o) => (stateFilter === 'all' || (stateFilter === 'on') === onOf(a.id, o))
       && (!tag || o.tags.includes(tag))
+      && (methods.length === 0 || methods.includes(o.method))
+      && (!resource || resourceOf(o.path) === resource)
       && (!needle || [o.path, o.method, o.operationId ?? '', o.summary ?? '', o.tool ?? ''].some((v) => v.toLowerCase().includes(needle)))),
   }))
   const shownCount = visible.reduce((n, a) => n + a.operations.length, 0)
@@ -138,6 +179,22 @@ export function OperationsView({ id }: { id: string }) {
                   </select>
                 </label>
               )}
+              {resources.length > 1 && (
+                <label className="field"><span className="visually-hidden">Resource</span>
+                  <select className="input" value={resource} onChange={(e) => setResource(e.target.value)}>
+                    <option value="">Every resource</option>
+                    {resources.map(([r, n]) => <option key={r} value={r}>{r} ({n})</option>)}
+                  </select>
+                </label>
+              )}
+              {presentMethods.length > 1 && (
+                <div className="segmented" role="group" aria-label="Methods">
+                  {presentMethods.map((m) => (
+                    <button key={m} type="button" aria-pressed={methods.includes(m)}
+                      onClick={() => setMethods((now) => now.includes(m) ? now.filter((x) => x !== m) : [...now, m])}>{m}</button>
+                  ))}
+                </div>
+              )}
               {apis.length > 1 && (
                 <label className="field"><span className="visually-hidden">API</span>
                   <select className="input" value={apiFilter} onChange={(e) => setApiFilter(e.target.value)}>
@@ -148,27 +205,32 @@ export function OperationsView({ id }: { id: string }) {
               )}
             </div>
             {visible.map((a) => {
-              const onShown = a.operations.filter(isOn)
+              const onShown = a.operations.filter((o) => onOf(a.id, o))
+              const byTag = !!tag && !needle && !narrowed
               return (
                 <div key={a.id} className="list">
                   <div className="card-head">
                     <span className="hint">{apis.length > 1 && <b>{a.title} · </b>}{a.operations.length} shown, {onShown.length} on</span>
                     {editable && onShown.length > 1 && (
-                      <button type="button" className="btn btn-sm" disabled={busy}
-                        onClick={() => apply(a.id, turnOffAll(selectOf(a.id), onShown, tag && !needle ? tag : undefined))}>
-                        Turn off {tag && !needle ? `tag ${tag}` : `these ${onShown.length}`}
+                      <button type="button" className="btn btn-sm"
+                        onClick={() => {
+                          apply(a.id, turnOffAll(selectOf(a.id), onShown, byTag ? tag : undefined))
+                          setFlips((now) => ({ ...now, ...Object.fromEntries(onShown.map((o) => [a.id + ' ' + o.key, false])) }))
+                        }}>
+                        Turn off {byTag ? `tag ${tag}` : `these ${onShown.length}`}
                       </button>
                     )}
                   </div>
                   <div className="op-list" role="list" aria-label={`Operations of ${a.title}`}>
                     {a.operations.map((o) => {
                       const was = before.get(a.id + ' ' + o.key)
-                      const changed = !!was && isOn(was) !== isOn(o)
+                      const on = onOf(a.id, o)
+                      const changed = !!was && isOn(was) !== on
                       const label = `${o.method} ${o.path}`
                       return (
                         <div key={o.key} role="listitem" className={'op-row' + (changed ? ' changed' : '')}>
-                          <button type="button" role="switch" className="switch" aria-checked={isOn(o)} aria-label={label}
-                            disabled={!editable || busy || o.state === 'hidden'}
+                          <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label}
+                            disabled={!editable || o.state === 'hidden'}
                             title={o.state === 'hidden' ? 'A rule hides it; change the rule in the definition\'s files (Sources)' : undefined}
                             onClick={() => flip(a.id, o, a.operations)} />
                           <span className="what">
@@ -177,7 +239,7 @@ export function OperationsView({ id }: { id: string }) {
                               {changed && <span className="tag">changed</span>}
                             </span>
                             <small>{[o.operationId, o.summary].filter(Boolean).join(' · ')}{o.tags.length > 0 && ` · ${o.tags.join(', ')}`}</small>
-                            <small>{isOn(o) ? <>{o.state === 'resource' ? 'resource ' : 'tool '}<span className="mono">{o.tool}</span></> : whyOff(o)}</small>
+                            <small>{on !== isOn(o) ? (on ? 'turning on…' : 'turning off…') : on ? <>{o.state === 'resource' ? 'resource ' : 'tool '}<span className="mono">{o.tool}</span></> : whyOff(o)}</small>
                             {asked && asked.api === a.id && asked.op.key === o.key && (
                               <span className="note note-warn" role="alertdialog" aria-label="Confirm" style={{ marginTop: 6 }}>
                                 Turning it on {asked.result.broad}
@@ -243,7 +305,7 @@ export function OperationsView({ id }: { id: string }) {
               )}
               <div className="actions">
                 <button type="submit" className="btn btn-primary" disabled={!!broken || busy || save.isPending}>Save as version {base + 1}</button>
-                <button type="button" className="btn btn-stage" onClick={() => { setWorking({}); setAsked(null); save.reset() }}>Discard</button>
+                <button type="button" className="btn btn-stage" onClick={() => { setWorking({}); setFlips({}); setAsked(null); save.reset() }}>Discard</button>
               </div>
             </form>
             <DefinitionDiff id={id} version={base} after={preview.data?.definition} />

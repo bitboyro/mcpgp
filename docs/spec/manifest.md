@@ -85,12 +85,14 @@ Full example: [examples/manifest/orders-mcp.manifest.json](../../examples/manife
     { "version": "1.0", "format": "swagger-2.0", "digest": "sha256:…", "basePath": "/api/v1", "default": false },
     { "version": "2.0", "format": "openapi-3.1", "digest": "sha256:…", "basePath": "/api/v2", "default": true }
   ],
-  "detect": { "method": "GET", "path": "/version", "pattern": "^(\\d+\\.\\d+)" },
+  "detect": { "method": "GET", "path": "/version", "underBasePath": true, "field": "/version", "pattern": "^(\\d+\\.\\d+)" },
   "downstreamAuth": {
     "supported": ["basic", "apiKey", "oauth2ClientCredentials", "mtls"],
     "identity": "service-account",
     "unsatisfiedTools": "hide",
     "apiKey": { "in": "header", "name": "X-Api-Key" }
+    // "fromRequest": { "header": "X-Orders-Authorization" }: when the definition lets clients send the credential (auth.md §2.4)
+    // "schemes": { "apiKey": "apiKey", "basicAuth": "basic", "oauth": "oauth2ClientCredentials" }: what each scheme the tools' security names is (auth.md §2.2)
   },
   "pagination": null
 }],
@@ -103,6 +105,10 @@ Full example: [examples/manifest/orders-mcp.manifest.json](../../examples/manife
 "policies": {
   "confirmDestructive": true,
   "responseLimitKb": 256,
+  "cleanTruncation": true,
+  "outputSchemas": true,
+  "inputLimits": { "enabled": true, "requestKb": 1024, "stringMaxLength": 65536 },
+  "rateLimits": { "enabled": true, "concurrent": 8, "perMinute": 120, "retryAfter": true },
   "files": { "forms": ["base64", "path"] },
   "redaction": { "fields": ["password", "secret", "token", "apiKey", "paymentToken"] },
   "baseUrlAllowlist": [],

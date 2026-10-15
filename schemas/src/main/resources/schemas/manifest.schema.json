@@ -141,6 +141,18 @@
       "properties": {
         "confirmDestructive": { "type": "boolean" },
         "responseLimitKb": { "type": "integer" },
+        "cleanTruncation": { "type": "boolean" },
+        "outputSchemas": { "description": "Tools carry an outputSchema (definition schemas.output)", "type": "boolean" },
+        "inputLimits": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" }, "requestKb": { "type": "integer" }, "stringMaxLength": { "type": "integer" } },
+          "additionalProperties": false
+        },
+        "rateLimits": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" }, "concurrent": { "type": "integer" }, "perMinute": { "type": "integer" }, "retryAfter": { "type": "boolean" } },
+          "additionalProperties": false
+        },
         "files": { "type": "object" },
         "redaction": { "type": "object" },
         "baseUrlAllowlist": { "type": "array", "items": { "type": "string" } },
@@ -250,6 +262,17 @@
             "supported": { "type": "array", "items": { "type": "string" } },
             "identity": { "enum": ["service-account", "per-user"] },
             "unsatisfiedTools": { "enum": ["hide", "error"] },
+            "fromRequest": {
+              "type": "object",
+              "properties": { "header": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,63}$" } },
+              "additionalProperties": false
+            },
+            "tokenExchange": { "type": "object", "additionalProperties": false },
+            "schemes": {
+              "description": "The kind of each security scheme the tools' security requirements name: basic, bearer, apiKey, oauth2ClientCredentials, mtls, oauth2 (other OAuth flows, OpenID Connect) or other",
+              "type": "object",
+              "additionalProperties": { "enum": ["basic", "bearer", "apiKey", "oauth2ClientCredentials", "mtls", "oauth2", "other"] }
+            },
             "apiKey": {
               "type": "object",
               "properties": { "in": { "enum": ["header", "query", "cookie"] }, "name": { "type": "string" } },
@@ -288,7 +311,8 @@
         "line": { "type": "integer" },
         "pointer": { "type": "string" },
         "op": { "type": "string" },
-        "since": { "type": "string" }
+        "since": { "type": "string" },
+        "from": { "type": "string", "description": "The shared item the step comes from, as referenced: mcpgp://<workspace>/<kind>/<name>@<version>." }
       },
       "required": ["step"],
       "additionalProperties": false

@@ -66,13 +66,19 @@ final class ConfigSchema {
             ArrayNode branches = JSON.createArrayNode();
             for (JsonNode branch : auth.path("oneOf")) {
                 String type = branch.at("/properties/type/const").asText();
-                if (type.equals("none") || supported.contains(type)) {
+                boolean fromRequest = type.equals("fromRequest") && api.at("/downstreamAuth/fromRequest").isObject();
+                boolean exchange = type.equals("tokenExchange") && api.at("/downstreamAuth/tokenExchange").isObject();
+                if (type.equals("none") || supported.contains(type) || fromRequest || exchange) {
                     branches.add(branch);
                 }
             }
             auth.set("oneOf", branches);
             defs.set("auth_" + id, auth);
-            ((ObjectNode) instance.get("properties")).set("auth", JSON.createObjectNode().put("$ref", "#/$defs/auth_" + id));
+            // one credential, or a list tried in order (auth.md §2.4)
+            ObjectNode one = JSON.createObjectNode().put("$ref", "#/$defs/auth_" + id);
+            ObjectNode authProperty = JSON.createObjectNode();
+            authProperty.putArray("oneOf").add(one).add(JSON.createObjectNode().put("type", "array").put("minItems", 1).set("items", one.deepCopy()));
+            ((ObjectNode) instance.get("properties")).set("auth", authProperty);
             if (!supported.contains("mtls")) {
                 ObjectNode tls = (ObjectNode) instance.at("/properties/tls/properties");
                 tls.remove(List.of("clientCert", "clientKey", "password"));

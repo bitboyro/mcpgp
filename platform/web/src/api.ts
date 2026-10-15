@@ -4,11 +4,14 @@
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
+  /** The whole problem document: extra fields like `missing` or `candidates` for SPEC_PROBLEMS. */
+  readonly body: Record<string, unknown>
 
-  constructor(status: number, code: string, detail: string) {
+  constructor(status: number, code: string, detail: string, body: Record<string, unknown> = {}) {
     super(detail)
     this.status = status
     this.code = code
+    this.body = body
   }
 }
 
@@ -30,15 +33,16 @@ async function send(method: string, path: string, body?: unknown, contentType?: 
   if (!response.ok) {
     let code = 'ERROR'
     let detail = response.statusText || String(response.status)
+    let problem: Record<string, unknown> = {}
     try {
-      const problem = await response.json() as { code?: string; detail?: string }
-      code = problem.code ?? code
-      detail = problem.detail ?? detail
+      problem = await response.json() as Record<string, unknown>
+      code = (problem.code as string | undefined) ?? code
+      detail = (problem.detail as string | undefined) ?? detail
     } catch {
       // not a problem document
     }
     if (response.status === 401 && path !== '/sessions') window.dispatchEvent(new Event(SIGNED_OUT))
-    throw new ApiError(response.status, code, detail)
+    throw new ApiError(response.status, code, detail, problem)
   }
   return response
 }
@@ -60,6 +64,12 @@ const q = (params: Record<string, string | number | boolean | undefined>) => {
 
 const enc = encodeURIComponent
 
+/** How an auto instance learns which contract version its target runs (runtime-config §4.4). */
+export interface Detect {
+  method: string; path: string; pattern: string; field?: string; header?: string; underBasePath?: boolean
+  onFailure?: 'useDefault' | 'refuse'
+}
+
 export interface Items<T> { items: T[] }
 
 export interface Identity {
@@ -72,6 +82,24 @@ export interface Identity {
   tokenScopes?: string[]
   signsInWith?: 'oidc' | 'ldap'
   rolesFromGroups?: boolean
+  /** People: whether they have a local password; whether it's a temporary one to replace; until when wrong passwords locked them. */
+  password?: boolean
+  mustChangePassword?: boolean
+  lockedUntil?: string
+}
+
+/** One change between two builds: `impact` breaking (agents or clients of the earlier build need updating), notable or info. */
+export interface VersionChange { impact: 'breaking' | 'notable' | 'info'; tool: string | null; kind: string; text: string }
+
+export interface VersionDiff {
+  from: { version: number; serverVersion: string; released: boolean }
+  to: { version: number; serverVersion: string }
+  /** The version of the last released build, if there is one. */
+  released: number | null
+  summary: string
+  breaking: number
+  changes: VersionChange[]
+  markdown: string
 }
 
 export interface Token {
@@ -83,6 +111,7 @@ export interface Token {
   expires: string | null
   revoked: boolean
   value?: string
+  lastUsed?: string | null
 }
 
 export interface VersionRef {
@@ -100,6 +129,8 @@ export interface ServerSummary {
   archived: boolean
   latestVersion: number | null
   updated: string
+  /** The platform's own MCP server: made and updated by the platform; read it, make variants of it. */
+  system?: boolean
 }
 
 export interface Server extends ServerSummary {
@@ -170,6 +201,8 @@ export interface LibraryItem {
   updated: string
   /** Naming policies: the policy as data, and the servers that extend it (`pinned`: the version they pin, null for the latest). */
   policy?: NamingPolicy | null
+  /** Shared notices: the set as data; `usedBy` lists the servers that include it. */
+  set?: NoticeSet | null
   root?: string
   usedBy?: { server: string; pinned: string | null }[]
 }
@@ -213,8 +246,8 @@ export interface ManifestApi {
   title?: string
   toolPrefix?: string
   contracts: Contract[]
-  detect?: { method: string; path: string; pointer?: string; pattern?: string }
-  downstreamAuth?: { supported: string[]; identity?: string; unsatisfiedTools?: string; apiKey?: { in: string; name: string } }
+  detect?: Detect
+  downstreamAuth?: { supported: string[]; identity?: string; unsatisfiedTools?: string; apiKey?: { in: string; name: string }; fromRequest?: { header?: string }; tokenExchange?: Record<string, never> }
 }
 
 export interface Manifest {
@@ -226,7 +259,14 @@ export interface Manifest {
   exposure: { mode: string; discoveryStyle?: string; pinned?: string[] }
   instances: { mode: 'single' | 'multi'; mixedContracts?: string; max?: number | null }
   packs: { id: string; version: string; tools: string[] }[]
-  policies: { confirmDestructive?: boolean; responseLimitKb?: number; redaction?: { fields: string[] } }
+  policies: {
+    confirmDestructive?: boolean; responseLimitKb?: number; redaction?: { fields: string[] }
+    cleanTruncation?: boolean
+    outputSchemas?: boolean
+    inputLimits?: { enabled?: boolean; requestKb?: number; stringMaxLength?: number }
+    rateLimits?: { enabled?: boolean; concurrent?: number; perMinute?: number; retryAfter?: boolean }
+    runtimeDefaults?: { audit?: { file?: { retainDays?: number; rotate?: string; enabled?: boolean }; arguments?: string } }
+  }
   runtime: { transports?: { allowed: string[]; default: string }; inboundAuth?: { allowed: string[]; default: string } }
   diagnostics: Diagnostic[]
 }
@@ -266,6 +306,8 @@ export interface TryResult {
   error?: { code: number; message: string }
   requests: { method: string; path: string; query?: string | null; headers: Record<string, string>; body: string; status: number }[]
   leftOut: string[]
+  /** Set when the server doesn't list the tool (hybrid or discovery exposure): the discovery tool it was called through. */
+  via?: string
 }
 
 /** A notice added to tool descriptions (definition-format.md §5.1). */
@@ -284,9 +326,55 @@ export interface Rule {
 /** The definition as data: the root file as written, and the result with what it extends and includes. */
 export interface DefinitionData {
   version?: number
-  root: { descriptions?: { notices?: Notice[] }; overrides?: { rules?: Rule[] }; [key: string]: unknown }
+  root: { descriptions?: { include?: string | string[]; notices?: Notice[] }; overrides?: { rules?: Rule[] }; [key: string]: unknown }
   resolved: { descriptions?: { notices?: Notice[] }; [key: string]: unknown }
+  /** Notices from `descriptions.include`: notice id → the shared item, `mcpgp://acme/notices/company-policy@1`. */
+  noticeSources?: Record<string, string>
 }
+
+/** What a new server from a spec would be (a dry run of POST /servers/from-spec). */
+export interface FromSpecPlan {
+  id: string; title: string; api: string; version: string; main: string; format: string
+  files: string[]; tools: number; exists: boolean; diagnostics: Diagnostic[]
+  /** Files picked without their folders, put where the spec refers to them. */
+  moved: { from: string; to: string }[]
+}
+
+/** What adding a contract version would do (a dry run of POST /servers/{id}/contracts). */
+export interface ContractPlan {
+  api: string; version: string; spec: string; replaces: boolean; compiles: boolean; diagnostics: Diagnostic[]; moved: { from: string; to: string }[]
+  /** The same spec as the saved one: saving makes no version. */
+  unchanged?: boolean
+  /** Fetched from an address: where from, and what came. */
+  source?: string; fetched?: { url: string; file: string; bytes: number }
+  /** What agents would notice, as on the Changes page. */
+  summary?: string; breaking?: number; changes?: { impact: 'breaking' | 'notable' | 'info'; tool: string | null; kind: string; text: string }[]
+}
+
+/** Where a contract's spec comes from: uploaded files, or fetched from an address (from an allowed host). */
+export type SpecSource = Record<string, string> | Blob | { url: string }
+
+const specBody = (source: SpecSource) => source instanceof Blob ? source : 'url' in source ? undefined : { files: source }
+const specUrl = (source: SpecSource) => !(source instanceof Blob) && 'url' in source && typeof source.url === 'string' ? source.url : undefined
+
+/** The extra fields of a SPEC_PROBLEMS answer: what the upload lacks. */
+/** Operations that would get the same tool name (NAME_COLLISIONS): each later one, with the name it would get from its method and path. */
+export interface NameClash { operation: string; method: string; path: string; operationId?: string; name: string; suggested: string; base: string }
+
+export interface SpecProblems {
+  missing?: { file: string; from: string; pointer: string }[]
+  /** References to a part of a file that isn't there: `file` is `api.json#/definitions/Entry`. */
+  broken?: { file: string; from: string; pointer: string }[]
+  remote?: { file: string; from: string; pointer: string }[]
+  candidates?: string[]
+  problems?: string[]
+}
+
+/** A set of shared notices, the library kind `notices` (definition-format.md §5.1). */
+export interface NoticeSet { title?: string; notices: Notice[] }
+
+/** What applying shared notices did to one server. */
+export interface ApplyResult { server: string; status: 'updated' | 'unchanged' | 'inherited' | 'failed'; version?: number; from?: string; error?: string }
 
 /** What a build of a version will contain, before building it (packaging.md). */
 export interface PackagePreview {
@@ -317,7 +405,7 @@ export interface NamingPolicy {
   shape?: { order?: string; case?: string; number?: string }
   vocabulary?: Record<string, string>
   methodVerbs?: Record<string, string>
-  namespace?: { server?: string; perApi?: boolean }
+  namespace?: { server?: string; suffix?: string; perApi?: boolean }
   limits?: { profile?: string; onTooLong?: string }
   collisions?: string
   [key: string]: unknown
@@ -339,7 +427,7 @@ export interface EditPreview {
 }
 
 export const api = {
-  signInOptions: () => json<{ auth: SignInOptions }>('GET', '/platform'),
+  signInOptions: () => json<{ auth: SignInOptions; publicUrl?: string | null }>('GET', '/platform'),
   signIn: (name: string, password: string) => json<Token>('POST', '/sessions', { name, password }),
   signOut: () => json<{ signedOut: boolean }>('DELETE', '/sessions/current'),
   me: () => json<Identity>('GET', '/me'),
@@ -349,6 +437,15 @@ export const api = {
   server: (id: string) => json<Server>('GET', `/servers/${enc(id)}`),
   createServer: (id: string, files: Record<string, string> | Blob, title?: string) =>
     json<Server>('POST', '/servers' + q({ id, title }), files instanceof Blob ? files : { files }),
+  /** A dry run says what would be created; problems with the upload are ApiError SPEC_PROBLEMS (see SpecProblems). */
+  fromSpecPlan: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string; collisions?: string; renames?: string }) =>
+    json<FromSpecPlan>('POST', '/servers/from-spec' + q({ ...params, dryRun: true }), files instanceof Blob ? files : { files }),
+  createFromSpec: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string; collisions?: string; renames?: string }) =>
+    json<Server>('POST', '/servers/from-spec' + q(params), files instanceof Blob ? files : { files }),
+  contractPlan: (id: string, source: SpecSource, params: { api?: string; version?: string; main?: string; default?: boolean }) =>
+    json<ContractPlan>('POST', `/servers/${enc(id)}/contracts` + q({ ...params, url: specUrl(source), dryRun: true }), specBody(source)),
+  addContract: (id: string, source: SpecSource, params: { api?: string; version?: string; main?: string; default?: boolean }) =>
+    json<Server>('POST', `/servers/${enc(id)}/contracts` + q({ ...params, url: specUrl(source) }), specBody(source)),
   addVersion: (id: string, files: Record<string, string> | Blob, message?: string) =>
     json<Server>('POST', `/servers/${enc(id)}/versions` + q({ message }), files instanceof Blob ? files : { files }),
   version: (id: string, version: string | number) => json<VersionDetail>('GET', `/servers/${enc(id)}/versions/${version}`),
@@ -360,6 +457,7 @@ export const api = {
   manifest: (id: string, version: string | number = 'latest') => json<Manifest>('GET', `/servers/${enc(id)}/versions/${version}/manifest`),
   previewEdit: (id: string, base: number, changes: Change[], operations = false) =>
     json<EditPreview>('POST', `/servers/${enc(id)}/edits`, { base, changes, dryRun: true, operations: operations || undefined }),
+  warmTry: (id: string, version: string | number) => send('POST', `/servers/${enc(id)}/versions/${version}/try/warm`),
   tryTool: (id: string, version: string | number, tool: string, args: unknown) =>
     json<TryResult>('POST', `/servers/${enc(id)}/versions/${version}/try`, { tool, arguments: args }),
   definition: (id: string, version: string | number = 'latest') => json<DefinitionData>('GET', `/servers/${enc(id)}/versions/${version}/definition`),
@@ -393,8 +491,17 @@ export const api = {
     json<LibraryEditPreview>('POST', `/library/${enc(kind)}/${enc(name)}/edits`, { base, changes, dryRun: true }),
   saveLibraryEdit: (kind: string, name: string, base: number, changes: Change[], message?: string) =>
     json<LibraryItem>('POST', `/library/${enc(kind)}/${enc(name)}/edits`, { base, changes, message }),
+  createLibraryItem: (kind: string, name: string, title: string, files: Record<string, string>) =>
+    json<LibraryItem>('POST', `/library/${enc(kind)}` + q({ name, title }), { files }),
+  applyNotices: (name: string, body: { servers?: string[]; version?: number; message?: string }) =>
+    json<{ results: ApplyResult[] }>('POST', `/library/notices/${enc(name)}/apply`, body),
 
+  /** What changed between two versions (`from`/`to`: a number, `latest` or `released`; defaults: the last release, the latest). */
+  diff: (id: string, from?: string, to?: string) => json<VersionDiff>('GET', `/servers/${enc(id)}/diff` + q({ from, to })),
   identities: () => json<Items<Identity>>('GET', '/identities'),
+  setPassword: (id: string, body: { password: string; currentPassword?: string; mustChange?: boolean }) =>
+    json<{ identity: string; mustChange: boolean }>('PUT', `/identities/${enc(id)}/password`, body),
+  unlock: (id: string) => json<{ identity: string; locked: boolean }>('POST', `/identities/${enc(id)}/unlock`),
   createIdentity: (body: { kind: string; name: string; role?: string; scopes?: string[] }) => json<Identity>('POST', '/identities', body),
   tokens: () => json<Items<Token>>('GET', '/tokens'),
   createToken: (body: { identity?: string; label?: string; scopes?: string[]; expiresInDays?: number }) => json<Token>('POST', '/tokens', body),

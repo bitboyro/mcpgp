@@ -52,6 +52,71 @@ class EditsApiTest extends PlatformTestBase {
     }
 
     @Test
+    void clientsCredentialsAreTurnedOnAndOffFromConnections() throws Exception {
+        int base = latest().path("latestVersion").asInt();
+        HttpResponseLike on = save(Map.of("base", base, "changes",
+                List.of(set("/apis/[id=orders]/downstreamAuth/fromRequest", Map.of("header", "X-Orders-Authorization")))));
+        assertThat(on.status()).as(on.body().toString()).isEqualTo(201);
+        JsonNode manifest = json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null)));
+        assertThat(manifest.at("/apis/0/downstreamAuth/fromRequest/header").asText()).isEqualTo("X-Orders-Authorization");
+
+        HttpResponseLike off = save(Map.of("base", base + 1, "changes",
+                List.of(Map.of("op", "remove", "path", "/apis/[id=orders]/downstreamAuth/fromRequest"))));
+        assertThat(off.status()).as(off.body().toString()).isEqualTo(201);
+        assertThat(json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null))).at("/apis/0/downstreamAuth")
+                .has("fromRequest")).isFalse();
+    }
+
+    @Test
+    void versionDetectionIsSetAndTurnedOffFromConnections() throws Exception {
+        int base = latest().path("latestVersion").asInt();
+        HttpResponseLike on = save(Map.of("base", base, "changes", List.of(set("/apis/[id=orders]/detect", Map.of(
+                "method", "GET", "path", "/status", "pattern", "^v?(\\d+\\.\\d+)", "header", "X-Api-Version", "onFailure", "refuse")))));
+        assertThat(on.status()).as(on.body().toString()).isEqualTo(201);
+        JsonNode detect = json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null))).at("/apis/0/detect");
+        assertThat(detect.path("header").asText()).isEqualTo("X-Api-Version");
+        assertThat(detect.path("onFailure").asText()).isEqualTo("refuse");
+        assertThat(detect.has("underBasePath")).as("the whole rule is replaced").isFalse();
+
+        HttpResponseLike off = save(Map.of("base", base + 1, "changes", List.of(Map.of("op", "remove", "path", "/apis/[id=orders]/detect"))));
+        assertThat(off.status()).as(off.body().toString()).isEqualTo(201);
+        assertThat(json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null))).at("/apis/0").has("detect")).isFalse();
+    }
+
+    @Test
+    void auditDefaultsShipWithThePackage() throws Exception {
+        int base = latest().path("latestVersion").asInt();
+        HttpResponseLike saved = save(Map.of("base", base, "changes", List.of(set("/runtimeDefaults/audit/file/retainDays", 90),
+                set("/runtimeDefaults/audit/arguments", "hashed"))));
+        assertThat(saved.status()).as(saved.body().toString()).isEqualTo(201);
+        JsonNode audit = json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null))).at("/policies/runtimeDefaults/audit");
+        assertThat(audit.at("/file/retainDays").asInt()).isEqualTo(90);
+        assertThat(audit.path("arguments").asText()).isEqualTo("hashed");
+        // a typo is refused, not ignored
+        assertThat(save(Map.of("base", base + 1, "changes", List.of(set("/runtimeDefaults/audit/file/retainDay", 90)))).status()).isEqualTo(422);
+    }
+
+    @Test
+    void theChangesBetweenVersionsAreShown() throws Exception {
+        int base = latest().path("latestVersion").asInt();
+        HttpResponseLike saved = save(Map.of("base", base, "message", "read only", "changes", List.of(set("/apis/[id=orders]/select/access", "read-only"),
+                set("/exposure/pinned", List.of("orders_customer_get")))));
+        assertThat(saved.status()).as(saved.body().toString()).isEqualTo(201);
+        // default: the version before the latest (no release here), to the latest
+        JsonNode diff = json(send(bearer("GET", "/api/v1/servers/orders-mcp/diff", null)));
+        assertThat(diff.at("/from/version").asInt()).isEqualTo(base);
+        assertThat(diff.at("/to/version").asInt()).isEqualTo(base + 1);
+        assertThat(diff.path("breaking").asInt()).isPositive();
+        assertThat(diff.path("changes").findValuesAsText("kind")).contains("tool.removed");
+        assertThat(diff.path("changes").findValuesAsText("tool")).contains("orders_customer_create");
+        assertThat(diff.path("markdown").asText()).startsWith("### orders-mcp: ");
+        // the other way round, by number: the tools come back
+        JsonNode back = json(send(bearer("GET", "/api/v1/servers/orders-mcp/diff?from=" + (base + 1) + "&to=" + base, null)));
+        assertThat(back.path("changes").findValuesAsText("kind")).contains("tool.added").doesNotContain("tool.removed");
+        assertThat(send(bearer("GET", "/api/v1/servers/orders-mcp/diff?from=released", null)).statusCode()).isEqualTo(404);
+    }
+
+    @Test
     void changesThatBreakTheDefinitionAreNotSaved() throws Exception {
         int base = latest().path("latestVersion").asInt();
         HttpResponseLike broken = save(Map.of("base", base, "changes", List.of(set("/exposure/mode", "everything"))));

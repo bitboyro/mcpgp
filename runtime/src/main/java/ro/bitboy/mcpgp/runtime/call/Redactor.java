@@ -15,6 +15,8 @@ final class Redactor {
     private static final int MIN_LENGTH = 4;
 
     private final Set<String> secrets = ConcurrentHashMap.newKeySet();
+    /** Credentials the client sent with the call being handled on this thread (auth.md §2.4): masked, never kept. */
+    private static final ThreadLocal<List<String>> CALL = new ThreadLocal<>();
     private volatile List<String> ordered = List.of();
 
     Redactor(Set<String> initial) {
@@ -28,8 +30,49 @@ final class Redactor {
         }
     }
 
+    /** Masks {@code values} in everything redacted on this thread until the returned handle is closed. */
+    static AutoCloseable during(List<String> values) {
+        List<String> masked = new java.util.ArrayList<>();
+        for (String value : values) {
+            if (value != null && value.length() >= MIN_LENGTH) {
+                masked.add(value);
+                int space = value.indexOf(' ');
+                if (space > 0 && value.length() - space - 1 >= MIN_LENGTH) {
+                    masked.add(value.substring(space + 1)); // "Bearer abc…": the token alone, as an API may echo it
+                }
+            }
+        }
+        masked.sort(Comparator.comparingInt(String::length).reversed());
+        List<String> previous = CALL.get();
+        CALL.set(masked);
+        return () -> {
+            if (previous == null) {
+                CALL.remove();
+            } else {
+                CALL.set(previous);
+            }
+        };
+    }
+
+    /** Adds a value learned during the call (an exchanged token) to what this thread's call masks. */
+    static void maskInCall(String value) {
+        List<String> call = CALL.get();
+        if (call != null && value != null && value.length() >= MIN_LENGTH && !call.contains(value)) {
+            List<String> more = new java.util.ArrayList<>(call);
+            more.add(value);
+            more.sort(Comparator.comparingInt(String::length).reversed());
+            CALL.set(more);
+        }
+    }
+
     String redact(String text) {
         String result = text;
+        List<String> call = CALL.get();
+        if (call != null && result != null) {
+            for (String secret : call) {
+                result = result.replace(secret, "***");
+            }
+        }
         for (String secret : ordered) {
             result = result.replace(secret, "***");
         }

@@ -40,8 +40,8 @@ import java.util.Set;
  * Loads one contract (an OpenAPI document plus its overlays) into {@link Contract}.
  *
  * <p>Swagger 2.0, OpenAPI 3.0 and 3.1 are supported; 3.2 is reported as not yet supported. External
- * {@code $ref}s are inlined after checking they stay inside the project root; internal references to
- * shared schemas stay as {@code #/components/schemas/<Name>}. Nothing is fetched from the network.
+ * {@code $ref}s are checked to stay inside the project root; schemas in other files become shared schemas,
+ * everything else is inlined. Internal references to shared schemas stay as {@code #/components/schemas/<Name>}. Nothing is fetched from the network.
  */
 public final class ContractLoader {
 
@@ -84,13 +84,14 @@ public final class ContractLoader {
             return Optional.empty();
         }
         int before = diagnostics.errors().size();
-        new ExternalRefs(diagnostics).inline(document, file, "");
+        new ExternalRefs(diagnostics, file, document, format.get()).inline();
         if (diagnostics.errors().size() > before) {
             return Optional.empty();
         }
         if (format.get() == Format.SWAGGER_2_0) {
             rewriteRefs(document, "#/definitions/", "#/components/schemas/");
         }
+        checkInternalRefs(document, format.get() == Format.SWAGGER_2_0, document, "", diagnostics, location);
         return Optional.of(new Reader(key, format.get(), document, location, diagnostics).contract());
     }
 
@@ -118,106 +119,177 @@ public final class ContractLoader {
 
     // -------------------------------------------------------------------- external references
 
-    /** Inlines every {@code $ref} that points to another file, checking each path. */
+    /**
+     * Inlines the {@code $ref}s that point to another file, checking each path. A schema in another file
+     * becomes a shared schema instead, named after the entry that already points to it or after its file,
+     * and the references to it point there, as they would had it been written in the spec itself: each
+     * file is read once however many places use it (inlining every use grows exponentially with depth),
+     * and a schema that refers back to itself (a tree, a chain) needs no special case.
+     */
     private final class ExternalRefs {
         private final Diagnostics diagnostics;
+        private final Path main;
+        private final ObjectNode document;
+        private final Format format;
         private final Deque<String> stack = new ArrayDeque<>();
         private final Map<Path, JsonNode> cache = new HashMap<>();
+        /** Shared schemas that point to another file, by what they point to. */
+        private final Map<String, String> named = new HashMap<>();
+        /** The schemas from other files: names by what they are, and their content. */
+        private final Map<String, String> shared = new HashMap<>();
+        private final Map<String, JsonNode> hoisted = new LinkedHashMap<>();
 
-        ExternalRefs(Diagnostics diagnostics) {
+        ExternalRefs(Diagnostics diagnostics, Path main, ObjectNode document, Format format) {
             this.diagnostics = diagnostics;
+            this.main = main;
+            this.document = document;
+            this.format = format;
+            sharedSection().fields().forEachRemaining(f -> {
+                String ref = f.getValue().path("$ref").asText("");
+                if (f.getValue().size() == 1 && !ref.isEmpty() && !ref.startsWith("#") && !ProjectPaths.isRemote(ref)) {
+                    int hash = ref.indexOf('#');
+                    try {
+                        Path target = main.getParent().resolve(hash < 0 ? ref : ref.substring(0, hash)).normalize();
+                        named.putIfAbsent(target + "#" + (hash < 0 ? "" : ref.substring(hash + 1)), f.getKey());
+                    } catch (RuntimeException e) {
+                        // reported when it's resolved
+                    }
+                }
+            });
         }
 
-        JsonNode inline(JsonNode node, Path file, String pointer) {
+        void inline() {
+            inline(document, main, "", false);
+            if (!hoisted.isEmpty()) {
+                ObjectNode section = swagger() ? document.with("definitions") : document.with("components").with("schemas");
+                hoisted.forEach(section::set);
+            }
+        }
+
+        private boolean swagger() {
+            return format == Format.SWAGGER_2_0;
+        }
+
+        private JsonNode sharedSection() {
+            return swagger() ? document.path("definitions") : document.path("components").path("schemas");
+        }
+
+        /** {@code schema}: inside a schema, where a reference to another file becomes a shared schema. */
+        private JsonNode inline(JsonNode node, Path file, String pointer, boolean schema) {
             if (node.isObject()) {
                 ObjectNode object = (ObjectNode) node;
                 JsonNode ref = object.get("$ref");
-                if (ref != null && ref.isTextual() && !ref.asText().startsWith("#")) {
-                    return resolve(ref.asText(), file, location(file).withPointer(pointer + "/$ref")).orElse(object);
+                // inside another file, its own "#/..." references are to that file
+                if (ref != null && ref.isTextual() && (!ref.asText().startsWith("#") || !file.equals(main))) {
+                    return resolve(ref.asText(), file, location(file).withPointer(pointer + "/$ref"), schema).orElse(object);
                 }
+                boolean sharedSchemas = file.equals(main) && (swagger() ? pointer.equals("/definitions") : pointer.equals("/components/schemas"));
                 List<String> names = new ArrayList<>();
                 object.fieldNames().forEachRemaining(names::add);
                 for (String name : names) {
-                    object.set(name, inline(object.get(name), file, pointer + "/" + escape(name)));
+                    boolean inside = schema || sharedSchemas || name.equals("schema");
+                    object.set(name, inline(object.get(name), file, pointer + "/" + escape(name), inside));
                 }
             } else if (node.isArray()) {
                 ArrayNode array = (ArrayNode) node;
                 for (int i = 0; i < array.size(); i++) {
-                    array.set(i, inline(array.get(i), file, pointer + "/" + i));
+                    array.set(i, inline(array.get(i), file, pointer + "/" + i, schema));
                 }
             }
             return node;
         }
 
-        private Optional<JsonNode> resolve(String ref, Path from, Location location) {
+        private Optional<JsonNode> resolve(String ref, Path from, Location location, boolean schema) {
             int hash = ref.indexOf('#');
             String filePart = hash < 0 ? ref : ref.substring(0, hash);
             String fragment = hash < 0 ? "" : ref.substring(hash + 1);
-            Optional<Path> target = ProjectPaths.resolveLocal(filePart, from, root, diagnostics, location);
+            Optional<Path> target = filePart.isEmpty() ? Optional.of(from)
+                    : ProjectPaths.resolveLocal(filePart, from, root, diagnostics, location);
             if (target.isEmpty()) {
                 return Optional.empty();
             }
             String id = target.get() + "#" + fragment;
+            if (shared.containsKey(id)) {
+                return Optional.of(sharedRef(shared.get(id)));
+            }
             if (stack.contains(id)) {
+                // not a schema (a path item, a parameter) that includes itself
                 diagnostics.error(Codes.REFERENCE_CYCLE, "Reference cycle through '" + ref + "'", location);
                 return Optional.empty();
             }
-            JsonNode document = cache.computeIfAbsent(target.get(),
+            JsonNode file = cache.computeIfAbsent(target.get(),
                     p -> Documents.read(p, diagnostics, location(p)).orElse(NODES.missingNode()));
-            if (document.isMissingNode()) {
+            if (file.isMissingNode()) {
                 return Optional.empty();
             }
-            JsonNode node = fragment.isEmpty() ? document : document.at(fragment);
+            JsonNode node = fragment.isEmpty() ? file : file.at(fragment);
             if (node.isMissingNode()) {
                 diagnostics.error(Codes.REF_UNRESOLVED, "'" + ref + "' does not exist", location);
                 return Optional.empty();
             }
+            if (schema) {
+                String name = name(id, target.get(), fragment);
+                shared.put(id, name);
+                hoisted.put(name, inline(node.deepCopy(), target.get(), fragment, true));
+                return Optional.of(sharedRef(name));
+            }
             stack.push(id);
             try {
-                JsonNode copy = node.deepCopy();
-                inlineLocalRefs(copy, document, target.get());
-                return Optional.of(inline(copy, target.get(), fragment));
+                return Optional.of(inline(node.deepCopy(), target.get(), fragment, false));
             } finally {
                 stack.pop();
             }
         }
 
-        /** References inside an external file that point within that same file are inlined too. */
-        private void inlineLocalRefs(JsonNode node, JsonNode document, Path file) {
-            Set<String> seen = new HashSet<>();
-            inlineLocal(node, document, file, seen);
+        private ObjectNode sharedRef(String name) {
+            return NODES.objectNode().put("$ref", (swagger() ? "#/definitions/" : "#/components/schemas/") + name);
         }
 
-        private JsonNode inlineLocal(JsonNode node, JsonNode document, Path file, Set<String> seen) {
-            if (node.isObject()) {
-                ObjectNode object = (ObjectNode) node;
-                JsonNode ref = object.get("$ref");
-                if (ref != null && ref.isTextual() && ref.asText().startsWith("#")) {
-                    String pointer = ref.asText().substring(1);
-                    if (!seen.add(pointer)) {
-                        return NODES.objectNode(); // recursive schema inside an external file: stop here
-                    }
-                    JsonNode target = document.at(pointer);
-                    if (target.isMissingNode()) {
-                        diagnostics.error(Codes.REF_UNRESOLVED, "'" + ref.asText() + "' does not exist", location(file).withPointer(pointer));
-                        return object;
-                    }
-                    JsonNode replaced = inlineLocal(target.deepCopy(), document, file, seen);
-                    seen.remove(pointer);
-                    return replaced;
-                }
-                List<String> names = new ArrayList<>();
-                object.fieldNames().forEachRemaining(names::add);
-                for (String name : names) {
-                    object.set(name, inlineLocal(object.get(name), document, file, seen));
-                }
-            } else if (node.isArray()) {
-                ArrayNode array = (ArrayNode) node;
-                for (int i = 0; i < array.size(); i++) {
-                    array.set(i, inlineLocal(array.get(i), document, file, seen));
+        /** The entry that points to it, else its last pointer segment or file name in PascalCase, made unique. */
+        private String name(String id, Path file, String fragment) {
+            if (named.containsKey(id)) {
+                return named.get(id);
+            }
+            String last = fragment.isEmpty() || fragment.equals("/") ? file.getFileName().toString().replaceFirst("\\.[^.]*$", "")
+                    : fragment.substring(fragment.lastIndexOf('/') + 1).replace("~1", "/").replace("~0", "~");
+            StringBuilder base = new StringBuilder();
+            for (String word : last.split("[^A-Za-z0-9]+")) {
+                if (!word.isEmpty()) {
+                    base.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
                 }
             }
-            return node;
+            String name = base.isEmpty() ? "Schema" : base.toString();
+            for (int i = 2; sharedSection().has(name) || shared.containsValue(name); i++) {
+                name = base + String.valueOf(i);
+            }
+            return name;
+        }
+    }
+
+    /**
+     * Every {@code #/…} reference must point at something: a schema that names a missing shared schema
+     * would otherwise end up in tools as an empty placeholder (request and response schemas alike).
+     */
+    private static void checkInternalRefs(JsonNode node, boolean swagger, JsonNode document, String pointer,
+                                          Diagnostics diagnostics, Location location) {
+        if (node.isObject()) {
+            JsonNode ref = node.get("$ref");
+            if (ref != null && ref.isTextual() && ref.asText().startsWith("#")) {
+                String target = ref.asText().substring(1);
+                if (swagger) {
+                    target = target.replaceFirst("^/components/schemas/", "/definitions/");
+                }
+                if (!target.isEmpty() && document.at(target).isMissingNode()) {
+                    String written = swagger ? ref.asText().replaceFirst("^#/components/schemas/", "#/definitions/") : ref.asText();
+                    diagnostics.error(Codes.REF_UNRESOLVED, "'" + written + "' does not exist", location.withPointer(pointer + "/$ref"));
+                }
+            }
+            node.fields().forEachRemaining(f -> checkInternalRefs(f.getValue(), swagger, document, pointer + "/" + escape(f.getKey()),
+                    diagnostics, location));
+        } else if (node.isArray()) {
+            for (int i = 0; i < node.size(); i++) {
+                checkInternalRefs(node.get(i), swagger, document, pointer + "/" + i, diagnostics, location);
+            }
         }
     }
 

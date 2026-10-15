@@ -49,7 +49,7 @@ class LibraryApiTest {
         try (ServerSocket socket = new ServerSocket(0)) {
             port = socket.getLocalPort();
         }
-        PlatformConfig config = new PlatformConfig(dir.resolve("store"), "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT, "acme");
+        PlatformConfig config = TestStores.of(new PlatformConfig(dir.resolve("store"), "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT, "acme"));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PlatformServer.init(config, new String[] {"init", "--admin", "ana"}, new PrintStream(out, true, StandardCharsets.UTF_8));
         admin = out.toString(StandardCharsets.UTF_8).lines().filter(l -> l.strip().startsWith("mcpgp_")).findFirst().orElseThrow().strip();
@@ -62,6 +62,8 @@ class LibraryApiTest {
                 .isEqualTo(201);
         assertThat(call("POST", "/library/naming/acme-standard/versions", files(Map.of("acme-standard.yaml",
                 new String(naming, StandardCharsets.UTF_8)))).statusCode()).isEqualTo(201);
+        assertThat(call("POST", "/library/notices?name=acme-policy", files(Map.of("acme-policy.yaml",
+                Files.readString(EXAMPLES.resolve("workspace/notices/acme-policy.yaml"))))).statusCode()).isEqualTo(201);
         assertThat(call("POST", "/servers?id=orders-mcp", project(EXAMPLES.resolve("orders"), Map.of())).statusCode()).isEqualTo(201);
     }
 

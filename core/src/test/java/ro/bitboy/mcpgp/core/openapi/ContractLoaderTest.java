@@ -135,8 +135,11 @@ class ContractLoaderTest {
                               schema: { $ref: 'schemas/customer.yaml#/Customer' }
                 """);
         Contract c = load(root, "1", spec, List.of());
+        // a schema in another file becomes a shared schema, named after what it is in that file
         var schema = c.operations().get(0).responses().get(0).content().get(0).schema();
-        assertThat(schema.at("/properties/address/properties/city/type").asText()).isEqualTo("string");
+        assertThat(schema.path("$ref").asText()).isEqualTo("#/components/schemas/Customer");
+        assertThat(c.schemas().get("Customer").at("/properties/address/$ref").asText()).isEqualTo("#/components/schemas/Address");
+        assertThat(c.schemas().get("Address").at("/properties/city/type").asText()).isEqualTo("string");
 
         Files.writeString(temp.resolve("evil.yaml"), "X: { type: string }\n");
         Path escaping = Files.writeString(root.resolve("escape.yaml"), """
@@ -152,6 +155,139 @@ class ContractLoaderTest {
         var result = new ContractLoader(root, root).load(new ContractKey("orders", "1"), new ContractFiles(escaping, List.of()), d);
         assertThat(result).isEmpty();
         assertThat(d.errors()).singleElement().satisfies(e -> assertThat(e.code()).isEqualTo("PATH_OUTSIDE_ROOT"));
+    }
+
+    @Test
+    void recursiveSchemasAcrossFilesBecomeSharedSchemas() throws IOException {
+        Path root = Files.createDirectories(temp.resolve("r"));
+        Files.createDirectories(root.resolve("schemas/criteria"));
+        Files.createDirectories(root.resolve("schemas/certificates"));
+        // a tree through two files, as a oneOf
+        Files.writeString(root.resolve("schemas/criteria/criteria-bean.json"), """
+                { "oneOf": [ { "$ref": "metadata-condition.json" }, { "$ref": "conjunctor.json" } ] }
+                """);
+        Files.writeString(root.resolve("schemas/criteria/metadata-condition.json"), """
+                { "type": "object", "properties": { "key": { "type": "string" } } }
+                """);
+        Files.writeString(root.resolve("schemas/criteria/conjunctor.json"), """
+                { "type": "object", "properties": { "children": { "type": "array", "items": { "$ref": "criteria-bean.json" } } } }
+                """);
+        // a chain: the file refers to itself, by name and by "#"
+        Files.writeString(root.resolve("schemas/certificates/complete-tls-certificate.json"), """
+                { "type": "object", "properties": { "parent": { "$ref": "complete-tls-certificate.json" },
+                  "issuer": { "$ref": "#" } } }
+                """);
+        Path spec = Files.writeString(root.resolve("spec.yaml"), """
+                openapi: 3.0.3
+                info: { title: t, version: "1" }
+                paths:
+                  /search:
+                    post:
+                      requestBody:
+                        content:
+                          application/json:
+                            schema: { $ref: '#/components/schemas/Criteria' }
+                      responses:
+                        "200":
+                          description: ok
+                          content:
+                            application/json:
+                              schema: { $ref: 'schemas/certificates/complete-tls-certificate.json' }
+                components:
+                  schemas:
+                    Criteria: { $ref: 'schemas/criteria/criteria-bean.json' }
+                """);
+        Contract c = load(root, "1", spec, List.of());
+        assertThat(diagnostics.errors()).isEmpty();
+
+        // the entry that points to the file keeps its name; the others get their file's
+        assertThat(c.schemas().get("Criteria").at("/oneOf/0/$ref").asText()).isEqualTo("#/components/schemas/MetadataCondition");
+        assertThat(c.schemas().get("Criteria").at("/oneOf/1/$ref").asText()).isEqualTo("#/components/schemas/Conjunctor");
+        assertThat(c.schemas().get("Conjunctor").at("/properties/children/items/$ref").asText()).isEqualTo("#/components/schemas/Criteria");
+        assertThat(c.schemas().get("MetadataCondition").at("/properties/key/type").asText()).isEqualTo("string");
+        var certificate = c.schemas().get("CompleteTlsCertificate");
+        assertThat(certificate.at("/properties/parent/$ref").asText()).isEqualTo("#/components/schemas/CompleteTlsCertificate");
+        assertThat(certificate.at("/properties/issuer/$ref").asText()).isEqualTo("#/components/schemas/CompleteTlsCertificate");
+        assertThat(op(c, "orders:POST:/search").responses().get(0).content().get(0).schema().path("$ref").asText())
+                .isEqualTo("#/components/schemas/CompleteTlsCertificate");
+        // and the tool's schema is self-contained, with the recursive part in $defs
+        var shaped = new ro.bitboy.mcpgp.core.schema.SchemaShaper(c.schemas(), c.format())
+                .selfContained(op(c, "orders:POST:/search").requestBody().content().get(0).schema(), ro.bitboy.mcpgp.core.schema.SchemaShaper.Direction.INPUT);
+        assertThat(shaped.toString()).contains("#/$defs/Criteria").doesNotContain("components");
+        assertThat(shaped.has("$defs")).isTrue();
+    }
+
+    @Test
+    void aSchemaFileUsedEverywhereIsReadOnce() throws IOException {
+        // each schema refers to the next three: inlining every use would be 4^30 copies
+        Path root = Files.createDirectories(temp.resolve("w"));
+        Files.createDirectories(root.resolve("schemas"));
+        for (int i = 0; i < 30; i++) {
+            StringBuilder props = new StringBuilder("\"name\": { \"type\": \"string\" }");
+            for (int j = 1; j <= 3 && i + j < 30; j++) {
+                props.append(", \"c").append(j).append("\": { \"$ref\": \"s").append(i + j).append(".json\" }");
+            }
+            Files.writeString(root.resolve("schemas/s" + i + ".json"), "{ \"type\": \"object\", \"properties\": { " + props + " } }");
+        }
+        Path spec = Files.writeString(root.resolve("spec.yaml"), """
+                openapi: 3.0.3
+                info: { title: t, version: "1" }
+                paths:
+                  /a:
+                    put:
+                      requestBody: { content: { application/json: { schema: { $ref: 'schemas/s0.json' } } } }
+                      responses: { "200": { description: ok } }
+                """);
+        Contract c = load(root, "1", spec, List.of());
+        assertThat(c.schemas()).hasSize(30);
+        var shaped = new ro.bitboy.mcpgp.core.schema.SchemaShaper(c.schemas(), c.format())
+                .selfContained(op(c, "orders:PUT:/a").requestBody().content().get(0).schema(), ro.bitboy.mcpgp.core.schema.SchemaShaper.Direction.INPUT);
+        assertThat(shaped.toString().length()).isLessThan(200_000);
+        assertThat(shaped.at("/properties/name/type").asText()).isEqualTo("string");
+    }
+
+    @Test
+    void recursiveSchemasAcrossFilesInSwagger20() throws IOException {
+        Path root = Files.createDirectories(temp.resolve("s"));
+        Files.writeString(root.resolve("node.yaml"), """
+                type: object
+                properties:
+                  next: { $ref: 'node.yaml' }
+                """);
+        Path spec = Files.writeString(root.resolve("spec.yaml"), """
+                swagger: "2.0"
+                info: { title: t, version: "1" }
+                paths:
+                  /nodes:
+                    get:
+                      responses:
+                        "200": { description: ok, schema: { $ref: 'node.yaml' } }
+                """);
+        Contract c = load(root, "1", spec, List.of());
+        assertThat(c.schemas().get("Node").at("/properties/next/$ref").asText()).isEqualTo("#/components/schemas/Node");
+        assertThat(op(c, "orders:GET:/nodes").responses().get(0).content().get(0).schema().path("$ref").asText())
+                .isEqualTo("#/components/schemas/Node");
+    }
+
+    @Test
+    void aReferenceToASchemaThatIsntThereIsAnError() throws IOException {
+        Path spec = Files.writeString(temp.resolve("broken.yaml"), """
+                swagger: "2.0"
+                info: { title: t, version: "1" }
+                definitions: { Entry: { type: object } }
+                paths:
+                  /entries:
+                    get:
+                      responses:
+                        "200": { description: ok, schema: { type: array, items: { $ref: '#/definitions/Entyr' } } }
+                """);
+        Diagnostics d = new Diagnostics();
+        new ContractLoader(temp, temp).load(new ContractKey("a", "1"), new ContractFiles(spec, List.of()), d);
+        assertThat(d.errors()).singleElement().satisfies(e -> {
+            assertThat(e.code()).isEqualTo("REF_UNRESOLVED");
+            assertThat(e.message()).contains("#/definitions/Entyr");
+            assertThat(e.location().pointer()).isEqualTo("/paths/~1entries/get/responses/200/schema/items/$ref");
+        });
     }
 
     @Test

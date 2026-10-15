@@ -11,6 +11,7 @@ public enum SchemaKind {
     MANIFEST("manifest.schema.json"),
     AUDIT_EVENT("audit-event.schema.json"),
     CLI_CONFIG("cli-config.schema.json"),
+    NOTICES("notices.schema.json"),
     TOOL_TESTS("tool-tests.schema.json"),
     CONFORMANCE_CASE("conformance-case.schema.json"),
     CONFORMANCE_TRAFFIC("conformance-traffic.schema.json"),

@@ -41,7 +41,8 @@ import java.util.Map;
 public class HttpServerConfiguration {
 
     @Bean
-    HttpServletStreamableServerTransportProvider mcpServlet(RuntimeConfig config) {
+    HttpServletStreamableServerTransportProvider mcpServlet(RuntimeConfig config,
+                                                           org.springframework.beans.factory.ObjectProvider<ro.bitboy.mcpgp.runtime.Reloader> reloader) {
         return HttpServletStreamableServerTransportProvider.builder()
                 .jsonMapper(new JacksonMcpJsonMapper(new ObjectMapper()))
                 .mcpEndpoint(config.server().basePath())
@@ -52,9 +53,34 @@ public class HttpServerConfiguration {
                     if (client != null) {
                         context.put(McpServerFactory.CLIENT_KEY, client);
                     }
+                    // only the headers instances are configured to read, and only for this request (auth.md §2.4)
+                    Map<String, String> credentials = new HashMap<>();
+                    for (String header : credentialHeaders(reloader.getObject().current().config())) {
+                        String value = request.getHeader(header);
+                        if (value != null) {
+                            credentials.put(header, value);
+                        }
+                    }
+                    if (!credentials.isEmpty()) {
+                        context.put(McpServerFactory.CREDENTIALS_KEY, Map.copyOf(credentials));
+                    }
+                    // the user's OAuth access token, which InboundFilter checked, for token exchange (auth.md §2.5)
+                    String authorization = request.getHeader("Authorization");
+                    if (client != null && config.server().authMode().equals("oauth") && authorization != null
+                            && authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
+                        context.put(McpServerFactory.SUBJECT_TOKEN_KEY, authorization.substring(7).strip());
+                    }
                     return McpTransportContext.create(context);
                 })
                 .build();
+    }
+
+    /** The headers the instances read their credential from, lower case; they follow config reloads. */
+    static java.util.Set<String> credentialHeaders(RuntimeConfig config) {
+        java.util.Set<String> headers = new java.util.HashSet<>();
+        config.allInstances().forEach(i -> i.authEntries().stream().filter(e -> e.path("type").asText().equals("fromRequest"))
+                .forEach(e -> headers.add(e.path("header").asText().toLowerCase(java.util.Locale.ROOT))));
+        return headers;
     }
 
     @Bean(destroyMethod = "closeGracefully")
@@ -76,6 +102,16 @@ public class HttpServerConfiguration {
                 new ServletRegistrationBean<>(servlet, config.server().basePath());
         registration.setAsyncSupported(true);
         registration.setName("mcp");
+        return registration;
+    }
+
+    /** Requests larger than the input limits allow (safety.inputLimits) are refused before anything reads them whole. */
+    @Bean
+    FilterRegistrationBean<RequestSizeFilter> requestSizeFilter(RuntimeConfig config, McpServerFactory factory) {
+        FilterRegistrationBean<RequestSizeFilter> registration = new FilterRegistrationBean<>(new RequestSizeFilter(factory.inputLimits().maxRequestBytes()));
+        registration.addUrlPatterns(config.server().basePath());
+        registration.setAsyncSupported(true);
+        registration.setOrder(0);
         return registration;
     }
 

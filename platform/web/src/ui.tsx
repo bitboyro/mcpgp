@@ -14,7 +14,9 @@ const paths: Record<string, ReactNode> = {
   package: <path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8" />,
   deliver: <path d="M12 3v12M7 10l5 5 5-5M4 19h16" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
+  changes: <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />,
   mark: <path d="M4 7h7M4 12h16M13 17h7" />,
+  shield: <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4" />,
 }
 
 export function Icon({ name, size = 16, stroke = 'currentColor', width = 1.8 }: { name: keyof typeof paths; size?: number; stroke?: string; width?: number }) {

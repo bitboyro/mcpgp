@@ -111,7 +111,7 @@ build report lists what changed. See [definition-format.md](definition-format.md
 
 | Format | Version field | Change rules |
 |---|---|---|
-| Definition | `apiVersion: mcpgp/vN` | breaking only with a new N + automatic `mcpgp migrate` |
+| Definition | `apiVersion: mcpgp/vN` | breaking only with a new N + automatic `mcpgp migrate` (TODO: comes with the first v2) |
 | Manifest | `manifestVersion` | additive within a major; runtimes refuse unknown majors with a clear message |
 | Runtime config | generated schema `$id` includes runtime version | additive; renamed keys keep an alias for one major |
 | Audit event | `v` | additive; consumers must ignore unknown fields |

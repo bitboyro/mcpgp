@@ -10,6 +10,7 @@
     "contracts": { "$ref": "#/$defs/map" },
     "naming": { "$ref": "#/$defs/map" },
     "rules": { "$ref": "#/$defs/map" },
+    "notices": { "$ref": "#/$defs/map" },
     "packs": { "$ref": "#/$defs/map" },
     "templates": { "$ref": "#/$defs/map" }
   },

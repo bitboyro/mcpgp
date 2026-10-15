@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { ProvenanceStep, Tool } from '../api'
-import { listedTools, useManifest } from '../serverData'
+import { listedTools, useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
 import { Chip, ErrorBox, Loading, PageHead, Segmented } from '../ui'
 import { NamingView } from './Naming'
@@ -106,6 +106,7 @@ export function ToolsPage() {
 
 function ToolDetail({ id, tool }: { id: string; tool: Tool }) {
   const { can } = useSession()
+  const server = useServer(id)
   const [editing, setEditing] = useState(false)
   const [trying, setTrying] = useState(false)
   const a = tool.annotations ?? {}
@@ -123,7 +124,7 @@ function ToolDetail({ id, tool }: { id: string; tool: Tool }) {
       {editing ? <ToolEdit id={id} tool={tool} onClose={() => setEditing(false)} />
         : (
           <div className="actions">
-            {can('servers:write') && <button type="button" className="btn btn-sm btn-stage" onClick={() => setEditing(true)}>Edit title and descriptions</button>}
+            {can('servers:write') && !server.data?.system && <button type="button" className="btn btn-sm btn-stage" onClick={() => setEditing(true)}>Edit title and descriptions</button>}
             {can('builds:run') && tool.kind !== 'custom' && <button type="button" className="btn btn-sm btn-stage" aria-pressed={trying} onClick={() => setTrying(!trying)}>
               {trying ? 'Close the try' : 'Try it'}</button>}
           </div>

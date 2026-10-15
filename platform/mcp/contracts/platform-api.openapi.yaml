@@ -210,6 +210,64 @@ paths:
       responses:
         "200": { description: The example configuration, content: { application/yaml: { schema: { type: string } } } }
         default: { $ref: "#/components/responses/Problem" }
+  /servers/from-spec:
+    post:
+      operationId: createServerFromSpec
+      tags: [servers]
+      summary: Create server from spec
+      description: >
+        A new server around an API's OpenAPI or Swagger document (JSON or YAML; one file, or several that
+        $ref each other, as files or a zip). The definition, the spec under contracts/ and smoke tests are
+        made as `mcpgp init --from-spec` makes them. id, title and version default to the spec's; main picks
+        the main file when several could be. dryRun answers what would be created. Missing referenced files,
+        references to URLs and unreadable versions are 422 SPEC_PROBLEMS, before anything is created.
+      parameters:
+        - { name: id, in: query, schema: { type: string } }
+        - { name: title, in: query, schema: { type: string } }
+        - { name: version, in: query, description: The contract version; default the spec's info.version, schema: { type: string } }
+        - { name: main, in: query, description: The main file of the upload, schema: { type: string } }
+        - { name: message, in: query, schema: { type: string } }
+        - { name: dryRun, in: query, schema: { type: boolean, default: false } }
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/ProjectFiles" } }
+          application/zip: { schema: { type: string, format: binary } }
+      responses:
+        "200": { description: The dry run's answer (id, title, api, version, main, format, files, tools), content: { application/json: { schema: { type: object } } } }
+        "201": { description: The new server, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/contracts:
+    parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+    post:
+      operationId: addServerContract
+      tags: [servers]
+      summary: Add contract version
+      description: >
+        A contract version from an uploaded spec (like from-spec): added to the server's API (or api), or
+        replacing that version's spec when it exists. version defaults to the spec's info.version; default=true
+        makes it the default. The files go under contracts/<version>/ and the server gets its next version.
+        Instead of a body, url fetches the spec from where it is published (hosts the administrator allows
+        only) and records the address; source=true with version fetches that version's recorded address
+        again (check for updates). The same spec as the saved one answers unchanged and makes no version.
+      parameters:
+        - { name: api, in: query, schema: { type: string } }
+        - { name: version, in: query, schema: { type: string } }
+        - { name: main, in: query, schema: { type: string } }
+        - { name: default, in: query, schema: { type: boolean, default: false } }
+        - { name: message, in: query, schema: { type: string } }
+        - { name: dryRun, in: query, schema: { type: boolean, default: false } }
+        - { name: url, in: query, description: "The spec's address (https://…), instead of a body", schema: { type: string, format: uri } }
+        - { name: source, in: query, description: "Fetch the address recorded for version again", schema: { type: boolean, default: false } }
+      requestBody:
+        required: false
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/ProjectFiles" } }
+          application/zip: { schema: { type: string, format: binary } }
+      responses:
+        "200": { description: "The dry run's answer (api, version, spec, replaces, compiles, diagnostics, unchanged, summary, changes), or the server unchanged when the spec is the same", content: { application/json: { schema: { type: object } } } }
+        "201": { description: The server, at its new version, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/edits:
     post:
       operationId: editServer
@@ -321,8 +379,8 @@ paths:
     post:
       operationId: editLibraryItem
       tags: [library]
-      summary: Edit naming policy
-      description: Changes the latest version of a naming policy (base) and saves it as the next version; with dryRun, returns the edited file, its problems and the servers that use it.
+      summary: Edit naming policy or notices
+      description: Changes the latest version of a naming policy or a set of shared notices (base) and saves it as the next version; with dryRun, returns the edited file, its problems and the servers that use it.
       requestBody:
         required: true
         content:
@@ -341,6 +399,48 @@ paths:
       responses:
         "200": { description: The dry run's result, content: { application/json: { schema: { type: object } } } }
         "201": { description: The new version, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /library/{kind}/{name}/apply:
+    parameters:
+      - { $ref: "#/components/parameters/Kind" }
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: applySharedNotices
+      tags: [library]
+      summary: Apply shared notices
+      description: >
+        Shared notices (kind notices) on servers: adds mcpgp://<workspace>/notices/<name>@<version> to each
+        server's descriptions.include, or moves servers that include it to that version. Without servers,
+        every server that isn't archived; without version, the latest. Each changed server gets its next
+        version; variants of a chosen server inherit the notices. Needs servers:write.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                servers: { type: array, items: { type: string } }
+                version: { type: integer }
+                message: { type: string }
+      responses:
+        "200":
+          description: What happened to each server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        server: { type: string }
+                        status: { enum: [updated, unchanged, inherited, failed] }
+                        version: { type: integer }
+                        from: { type: string }
+                        error: { type: string }
         default: { $ref: "#/components/responses/Problem" }
   /library/{kind}/{name}/versions:
     parameters: [ { $ref: "#/components/parameters/Kind" }, { name: name, in: path, required: true, schema: { type: string } } ]
@@ -696,7 +796,7 @@ components:
     ServerId: { name: id, in: path, required: true, schema: { type: string } }
     Version: { name: version, in: path, required: true, description: A version number or latest, schema: { type: string } }
     BuildId: { name: build, in: path, required: true, schema: { type: string } }
-    Kind: { name: kind, in: path, required: true, schema: { enum: [contracts, naming, rules, packs, templates] } }
+    Kind: { name: kind, in: path, required: true, schema: { enum: [contracts, naming, rules, notices, packs, templates] } }
     IfMatch: { name: If-Match, in: header, description: The server's ETag, for optimistic concurrency, schema: { type: string } }
   responses:
     Problem:
@@ -724,6 +824,7 @@ components:
         title: { type: string }
         parent: { type: string }
         archived: { type: boolean }
+        system: { type: boolean, description: "The platform's own server: read it and make variants of it; changes are 409 SYSTEM_SERVER" }
         latestVersion: { type: integer }
         created: { type: string, format: date-time }
         updated: { type: string, format: date-time }
@@ -828,6 +929,7 @@ components:
         expires: { type: string, format: date-time }
         revoked: { type: boolean }
         value: { type: string, description: Only in the answer that creates the token }
+        lastUsed: { type: string, format: date-time, nullable: true, description: When the token was last used, to the minute }
     Activity:
       type: object
       properties:

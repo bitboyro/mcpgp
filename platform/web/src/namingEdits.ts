@@ -48,6 +48,11 @@ export function serverPrefix(prefix: string): Change {
   return prefix ? { op: 'set', path: '/naming/namespace/server', value: prefix } : { op: 'remove', path: '/naming/namespace/server' }
 }
 
+/** A suffix for every API tool's name (`orders_customer_get_v2`); empty removes it. */
+export function serverSuffix(suffix: string): Change {
+  return suffix ? { op: 'set', path: '/naming/namespace/suffix', value: suffix } : { op: 'remove', path: '/naming/namespace/suffix' }
+}
+
 export interface Renamed {
   /** The operation, as `METHOD /path`. */
   operation: string

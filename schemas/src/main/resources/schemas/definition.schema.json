@@ -64,13 +64,38 @@
       "type": "object",
       "properties": {
         "confirmDestructive": { "type": "boolean" },
-        "responseLimitKb": { "type": "integer", "minimum": 1 }
+        "responseLimitKb": { "type": "integer", "minimum": 1 },
+        "cleanTruncation": { "description": "A JSON answer over the limit is cut at whole list items, saying how many were left out (default true)", "type": "boolean" },
+        "inputLimits": {
+          "description": "Caps on what an agent sends (default on)",
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "requestKb": { "description": "The largest tool call's arguments, and over HTTP the largest request (default 1024)", "type": "integer", "minimum": 1 },
+            "stringMaxLength": { "description": "The longest text value, where the spec sets no maxLength (default 65536)", "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "rateLimits": {
+          "description": "Calls to each target server (default on); whoever runs the server can change them per instance",
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "concurrent": { "description": "Calls at once per target server; more wait for a free slot (default 8)", "type": "integer", "minimum": 1 },
+            "perMinute": { "description": "Calls per minute per target server (default 120)", "type": "integer", "minimum": 1 },
+            "retryAfter": { "description": "When the target answers 429, tell the agent how long to wait (default true)", "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },
     "schemas": {
       "type": "object",
-      "properties": { "input": { "enum": ["full", "lean"] } },
+      "properties": {
+        "input": { "description": "lean is not supported yet: refused by the compiler", "enum": ["full", "lean"] },
+        "output": { "description": "Give tools an outputSchema, from the success answer's schema (default true)", "type": "boolean" }
+      },
       "additionalProperties": false
     },
     "files": {
@@ -97,19 +122,13 @@
       "type": "object",
       "description": "Text added to tool descriptions (definition-format.md §5.1).",
       "properties": {
+        "include": {
+          "$ref": "#/$defs/stringOrList",
+          "description": "Shared notices: mcpgp://<workspace>/notices/<name>@<version> library items (or files in the project); their notices come first, and a notice of this definition with the same id replaces one."
+        },
         "notices": {
           "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string", "pattern": "^[A-Za-z0-9:._-]{1,128}$" },
-              "text": { "type": "string", "minLength": 1, "maxLength": 500 },
-              "position": { "enum": ["append", "prepend"] },
-              "match": { "$ref": "#/$defs/selector" }
-            },
-            "required": ["text"],
-            "additionalProperties": false
-          }
+          "items": { "$ref": "#/$defs/notice" }
         }
       },
       "additionalProperties": false
@@ -146,9 +165,13 @@
             "method": { "enum": ["GET", "HEAD", "POST"] },
             "path": { "type": "string", "pattern": "^/" },
             "pattern": { "type": "string" },
+            "field": { "description": "JSON pointer to the version in a JSON answer (/version); the pattern is matched against its value", "type": "string", "pattern": "^/" },
+            "header": { "description": "Read the version from this response header instead of the body", "type": "string", "minLength": 1 },
+            "underBasePath": { "description": "Ask under each contract's base path in turn (the preferred contract first, then the newest), not at the address as given", "type": "boolean" },
             "onFailure": { "enum": ["useDefault", "refuse"] }
           },
           "required": ["path", "pattern"],
+          "not": { "required": ["field", "header"] },
           "additionalProperties": false
         },
         "select": {
@@ -174,6 +197,17 @@
               },
               "uniqueItems": true
             },
+            "tokenExchange": {
+              "description": "lets instances call the API as the signed-in user: their OAuth token exchanged at the identity provider for one for the API (RFC 8693 / on-behalf-of); needs inbound oauth",
+              "type": "object",
+              "additionalProperties": false
+            },
+            "fromRequest": {
+              "description": "lets the MCP client send the credential for the API in a request header (HTTP only); never stored or logged",
+              "type": "object",
+              "properties": { "header": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,63}$" } },
+              "additionalProperties": false
+            },
             "identity": { "enum": ["service-account", "per-user"] },
             "unsatisfiedTools": { "enum": ["hide", "error"] }
           },
@@ -188,7 +222,7 @@
           },
           "additionalProperties": false
         },
-        "pagination": {
+        "pagination": { "description": "Not supported yet: refused by the compiler",
           "type": ["object", "null"],
           "properties": {
             "style": { "enum": ["offset", "page", "cursor", "link-header", "client"] },
@@ -212,6 +246,7 @@
         "spec": { "type": "string", "minLength": 1 },
         "overlays": { "type": "array", "items": { "type": "string" } },
         "default": { "type": "boolean" },
+        "source": { "description": "Where the spec is published (https://…); the platform fetches it again on request, from allowed hosts only. The compiler never fetches it.", "type": "string", "pattern": "^https?://" },
         "$remove": { "type": "boolean" }
       },
       "required": ["version"],
@@ -258,6 +293,18 @@
       },
       "additionalProperties": false,
       "minProperties": 1
+    },
+
+    "notice": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9:._-]{1,128}$" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "position": { "enum": ["append", "prepend"] },
+        "match": { "$ref": "#/$defs/selector" }
+      },
+      "required": ["text"],
+      "additionalProperties": false
     },
 
     "httpMethod": { "enum": ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH", "TRACE", "QUERY"] },
@@ -402,7 +449,23 @@
           "properties": { "fields": { "type": "array", "items": { "type": "string" } } },
           "additionalProperties": false
         },
-        "audit": { "type": "object" },
+        "audit": {
+          "description": "The audit settings the package ships with; the operator's runtime config can still change them (runtime-config.md §4)",
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "rotate": { "type": "string", "pattern": "^(daily|hourly|size:[1-9][0-9]*)$" },
+                "retainDays": { "type": "integer", "minimum": 1 }
+              },
+              "additionalProperties": false
+            },
+            "arguments": { "enum": ["none", "redacted", "hashed"] }
+          },
+          "additionalProperties": false
+        },
         "telemetry": { "type": "object" }
       },
       "additionalProperties": false
@@ -411,7 +474,7 @@
     "generation": {
       "type": "object",
       "properties": {
-        "mode": { "enum": ["runtime", "codegen", "both"] },
+        "mode": { "description": "codegen and both are not supported yet: refused by the compiler", "enum": ["runtime", "codegen", "both"] },
         "runtime": { "type": "string" },
         "client": { "type": "object" },
         "codegen": {
@@ -482,7 +545,7 @@
           "properties": { "key": { "type": "string" } },
           "additionalProperties": false
         },
-        "jarSigning": {
+        "jarSigning": { "description": "Not supported yet: refused by the compiler; build.sign signs the package",
           "type": "object",
           "properties": {
             "keystore": { "type": "string" },
@@ -496,9 +559,9 @@
           "type": "object",
           "properties": {
             "base": { "type": "string" },
-            "registry": { "type": "string" },
-            "push": { "type": "boolean" },
-            "tar": { "type": "boolean" }
+            "registry": { "description": "Not supported yet: refused by the compiler", "type": "string" },
+            "push": { "description": "Not supported yet: refused by the compiler", "type": "boolean" },
+            "tar": { "description": "Not supported yet: refused by the compiler", "type": "boolean" }
           },
           "additionalProperties": false
         }

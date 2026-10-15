@@ -44,6 +44,36 @@ specified. Details live in each spec's "Security considerations" section.
 | Malicious definition change by an agent or user | Publishing needs a person; PR review with diff; audit of platform actions | ci-pipeline guide; requirements §13 |
 | Malicious or buggy extension code | Extensions declared, checksummed and listed in the manifest; no access to credentials | extensions.md |
 | Phone-home or data collection | Packages never contact the platform or vendor | ADR-0003 |
+| Unbounded consumption: huge answers | Answers over `responseLimitKb` are cut (JSON at whole items, with a note); at most 4× the limit is ever downloaded | definition-format `safety`; tools-contract §6 |
+| Unbounded consumption: huge or endless input | Arguments and HTTP request bodies capped, long text values refused before anything is sent (`INPUT_TOO_LARGE`, `413`) | definition-format `safety.inputLimits` |
+| An agent in a loop overwhelming a target | Calls per target server limited at once and per minute (`RATE_LIMITED`, with how long to wait); the target's own `429 Retry-After` passed on | definition-format `safety.rateLimits`; runtime-config `instances[].rateLimits` |
+| Parameter injection (extra cookies, headers, path segments) | Path and cookie values encoded, `.`/`..` refused; header values without line breaks or control characters | tools-contract §13 |
+| The platform fetching from arbitrary hosts (SSRF) | Specs fetched only from hosts an administrator lists (`specHosts`, none by default), on request, redirects only to listed hosts | platform-api §2.1, §8 |
+
+Every protection that can be tuned is on by default and shown on the platform's **Security & safety**
+page, where the builder can change or turn it off; the rest (credentials, redaction, redirects,
+parameter encoding, file roots) has no switch.
+
+## 3.1 OWASP
+
+How the threats above map to the OWASP Top 10 for LLM Applications (2025) and the OWASP API Security
+Top 10 (2023), for the risks a tool server can do something about:
+
+| OWASP | What mcpgp does |
+|---|---|
+| LLM01 Prompt Injection | Spec text is reviewed in the definition, never fetched from targets; results are data (agent docs say so); destructive tools ask for confirmation |
+| LLM02 Sensitive Information Disclosure | Credentials never reach agents; secrets and `redaction.fields` masked in results, errors, audit and recordings; `errors.detail: summary` |
+| LLM03 Supply Chain | Signed, reproducible packages; extensions declared and checksummed |
+| LLM05 Improper Output Handling | Arguments checked against the schema and the size limits before a request is built; parameters encoded; one content type per tool |
+| LLM06 Excessive Agency | Access presets (no deletes by default), read-only instances, confirmation, per-tool exposure |
+| LLM10 Unbounded Consumption | Answer and input size limits, rate limits per target |
+| API4 Unrestricted Resource Consumption | Rate limits and concurrency per target; size limits; timeouts per instance |
+| API7 Server Side Request Forgery | The server calls only configured instances; the platform only `specHosts` |
+| API8 Security Misconfiguration | Secrets only as references; inbound auth required off loopback; no trust-all TLS |
+| API10 Unsafe Consumption of APIs | Target answers size-capped, parsed as data, redirects not followed |
+
+Not covered by the server itself: LLM04, LLM07, LLM08 and LLM09 concern the model and its data, not
+the tools it calls.
 
 ## 4. Responsibilities
 

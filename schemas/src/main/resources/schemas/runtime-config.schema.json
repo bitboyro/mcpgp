@@ -142,6 +142,7 @@
         "publicUrl": { "type": "string", "pattern": "^https?://" },
         "basePath": { "type": "string", "pattern": "^/" },
         "tls": {
+          "description": "proxy: TLS is terminated in front of the server. Serving HTTPS itself (cert, key) is not supported yet: refused at startup",
           "oneOf": [
             { "const": "proxy" },
             {
@@ -152,9 +153,9 @@
             }
           ]
         },
-        "trustProxy": { "type": "array", "items": { "type": "string" } },
+        "trustProxy": { "description": "Not supported yet: refused at startup", "type": "array", "items": { "type": "string" } },
         "allowedOrigins": { "type": "array", "items": { "type": "string" } },
-        "outboundProxy": { "type": "string" },
+        "outboundProxy": { "description": "Not supported yet: refused at startup", "type": "string" },
         "management": {
           "type": "object",
           "properties": { "port": { "$ref": "#/$defs/port" } },
@@ -210,9 +211,26 @@
         "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,39}$" },
         "baseUrl": { "type": "string", "minLength": 1 },
         "contract": { "type": "string", "minLength": 1 },
+        "prefer": { "description": "With contract: auto, the contract detection asks about first (default: the build's default contract)", "type": "string", "minLength": 1 },
+        "rateLimits": {
+          "description": "This instance's limits on calls to its target, instead of the build's (safety.rateLimits): the target's owner knows what it takes",
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "concurrent": { "type": "integer", "minimum": 1 },
+            "perMinute": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
         "readOnly": { "type": "boolean" },
         "timeoutSeconds": { "type": "integer", "minimum": 1 },
-        "auth": { "$ref": "#/$defs/downstreamAuth" },
+        "auth": {
+          "description": "One credential, or a list tried in order: a fromRequest entry when its header is in the request, any other entry always",
+          "oneOf": [
+            { "$ref": "#/$defs/downstreamAuth" },
+            { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/downstreamAuth" } }
+          ]
+        },
         "tls": {
           "type": "object",
           "properties": {
@@ -264,6 +282,30 @@
             "audience": { "type": ["string", "null"] }
           },
           "required": ["type", "tokenUrl", "clientId", "clientSecret"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "tokenExchange" },
+            "tokenUrl": { "type": "string", "pattern": "^https?://" },
+            "clientId": { "type": "string" },
+            "clientSecret": { "$ref": "#/$defs/secret" },
+            "clientAuth": { "enum": ["basic", "post"] },
+            "flavor": { "enum": ["rfc8693", "entra-obo"], "description": "rfc8693 (default) or Microsoft Entra's on-behalf-of flow" },
+            "audience": { "type": ["string", "null"] },
+            "resource": { "type": ["string", "null"] },
+            "scopes": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["type", "tokenUrl", "clientId", "clientSecret"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "fromRequest" },
+            "header": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,63}$", "description": "the request header the MCP client sends the credential in; default X-<Server>[-<Api>][-<Instance>]-Authorization" },
+            "as": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,63}$", "description": "the header it's sent to the API in; default Authorization" }
+          },
+          "required": ["type"],
           "additionalProperties": false
         },
         {

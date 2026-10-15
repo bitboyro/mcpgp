@@ -30,7 +30,8 @@ import java.util.TreeMap;
 public final class ToolShaper {
 
     /** The shaped tool: its served input schema and one variant per contract version, in contract order. */
-    public record Shaped(ObjectNode inputSchema, ObjectNode variants) {
+    /** @param outputSchema the result's schema (tools-contract §6); null when the success answer isn't JSON with a schema, or schemas.output is off */
+    public record Shaped(ObjectNode inputSchema, ObjectNode variants, ObjectNode outputSchema) {
     }
 
     /**
@@ -39,8 +40,12 @@ public final class ToolShaper {
      * @param multiInstance        adds the required {@code instance} parameter
      * @param instanceDescription  the {@code instance} parameter's description
      * @param fileForms            file object forms the build supports ({@code base64}, {@code path})
+     * @param outputSchemas        give tools an {@code outputSchema} ({@code schemas.output}, on by default)
      */
-    public record Context(boolean multiInstance, String instanceDescription, List<String> fileForms) {
+    public record Context(boolean multiInstance, String instanceDescription, List<String> fileForms, boolean outputSchemas) {
+        public Context(boolean multiInstance, String instanceDescription, List<String> fileForms) {
+            this(multiInstance, instanceDescription, fileForms, true);
+        }
     }
 
     static final List<String> GROUPS = List.of("path", "query", "header", "cookie");
@@ -174,7 +179,58 @@ public final class ToolShaper {
 
         ObjectNode variantNodes = NODES.objectNode();
         variants.forEach((version, op) -> variantNodes.set(version, variant(plan, op, contracts.get(version))));
-        return new Shaped(input, variantNodes);
+        ObjectNode output = context.outputSchemas() && primary != null ? outputSchema(variants.get(primary), contracts.get(primary)) : null;
+        return new Shaped(input, variantNodes, output);
+    }
+
+    /**
+     * The result's schema (tools-contract §6), from the success answer of the tool's primary contract
+     * when it is JSON with a schema: self-contained, loose (no {@code required}, extra fields allowed),
+     * because a target often answers with more or less than its spec says, and a strict schema would
+     * make clients reject real answers. A list or a value becomes {@code { items }} or
+     * {@code { value }}, as the result's {@code structuredContent} is.
+     */
+    private static ObjectNode outputSchema(Operation op, Contract contract) {
+        for (Response r : op.responses()) {
+            if (!r.status().startsWith("2") || r.content() == null) {
+                continue;
+            }
+            for (MediaType m : r.content()) {
+                boolean json = m.name().toLowerCase(java.util.Locale.ROOT).contains("json");
+                if (!json || m.schema() == null || m.schema().isMissingNode() || m.schema().isNull()) {
+                    continue;
+                }
+                ObjectNode schema = new SchemaShaper(contract.schemas(), contract.format()).selfContained(m.schema(), Direction.OUTPUT);
+                loosen(schema);
+                String type = schema.path("type").isTextual() ? schema.path("type").asText() : "";
+                if (type.equals("object") || type.isEmpty() && schema.has("properties")) {
+                    return schema;
+                }
+                String field = type.equals("array") ? "items" : "value";
+                ObjectNode wrapped = NODES.objectNode().put("type", "object");
+                JsonNode defs = schema.remove("$defs");
+                wrapped.putObject("properties").set(field, schema);
+                if (defs != null) {
+                    wrapped.set("$defs", defs);
+                }
+                return wrapped;
+            }
+            return null;   // the success answer isn't JSON, or has no schema
+        }
+        return null;
+    }
+
+    private static void loosen(JsonNode node) {
+        if (node instanceof ObjectNode object) {
+            object.remove("required");
+            if (object.path("additionalProperties").isBoolean() && !object.path("additionalProperties").asBoolean()) {
+                object.remove("additionalProperties");
+            }
+            object.remove("readOnly");
+            object.forEach(ToolShaper::loosen);
+        } else if (node instanceof ArrayNode array) {
+            array.forEach(ToolShaper::loosen);
+        }
     }
 
     // ---------------------------------------------------------------------- input body

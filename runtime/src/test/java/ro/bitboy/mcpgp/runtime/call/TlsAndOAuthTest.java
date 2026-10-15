@@ -132,6 +132,7 @@ class TlsAndOAuthTest {
                 instances:
                   - id: a
                     baseUrl: "%1$s"
+                    contract: "2.0"
                     auth: { type: oauth2ClientCredentials, tokenUrl: "%1$s/oauth2/token", clientId: "app 1",
                             clientSecret: "${env:CS}", scopes: [orders.read, orders.write] }
                 """.formatted(target.address());
@@ -166,7 +167,7 @@ class TlsAndOAuthTest {
         target = new MockTarget();
         McpServerFactory server = server(ORDERS, """
                 instances:
-                  - { id: a, baseUrl: "%1$s", auth: { type: oauth2ClientCredentials, tokenUrl: "%1$s/token", clientId: c,
+                  - { id: a, baseUrl: "%1$s", contract: "2.0", auth: { type: oauth2ClientCredentials, tokenUrl: "%1$s/token", clientId: c,
                       clientSecret: "${env:CS}", clientAuth: post } }
                 """.formatted(target.address()), Map.of("CS", "very-secret"));
         target.respond(MockTarget.Response.json(400, "{\"error\":\"invalid_client\",\"error_description\":\"secret very-secret is wrong\"}"));

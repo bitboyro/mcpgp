@@ -186,6 +186,7 @@ public final class ServerCommands {
         }
         for (RuntimeConfig.Instance instance : config.allInstances()) {
             ok &= report(instance, Probe.connectivity(instance));
+            contract(startup.manifest(), instance);
         }
         if (http) {
             try (ServerSocket socket = new ServerSocket()) {
@@ -206,6 +207,33 @@ public final class ServerCommands {
         }
         out.println(ok ? "All checks passed." : "Some checks failed.");
         return ok ? 0 : 1;
+    }
+
+    /**
+     * The version the target reports and the contract it means (runtime-config §4.4), when the build has a
+     * detection rule; a pinned instance whose target reports another version is a warning.
+     */
+    private void contract(ro.bitboy.mcpgp.runtime.manifest.Manifest manifest, RuntimeConfig.Instance instance) {
+        if (!manifest.apis().get(instance.api()).node().path("detect").isObject()) {
+            return;
+        }
+        ro.bitboy.mcpgp.runtime.call.Contracts.Choice probe = ro.bitboy.mcpgp.runtime.call.Contracts.probe(manifest, instance);
+        String reports = probe.reported() == null ? "" : " (the target reports " + probe.reported() + ")";
+        if (!instance.contract().equals("auto")) {
+            if (probe.contract() != null && !probe.contract().equals(instance.contract())) {
+                out.println("! instance " + instance.id() + " is pinned to contract " + instance.contract() + ", but its target runs "
+                        + probe.contract() + reports + ": check its contract setting");
+            } else {
+                out.println("    contract: " + instance.contract() + ", pinned" + (probe.contract() != null ? reports : ""));
+            }
+        } else if (probe.contract() != null) {
+            out.println("    contract: " + probe.contract() + ", detected" + reports);
+        } else {
+            boolean refuse = manifest.apis().get(instance.api()).node().at("/detect/onFailure").asText("useDefault").equals("refuse");
+            out.println("! instance " + instance.id() + ": the version isn't known (" + probe.reason() + "); "
+                    + (refuse ? "the server refuses calls to it until it is" : "it uses the default contract "
+                    + manifest.apis().get(instance.api()).defaultContract()));
+        }
     }
 
     /** Leaves a reload request for the running server (runtime-config §4.6); works on every platform. */
@@ -320,8 +348,8 @@ public final class ServerCommands {
         // second connection, with the new material only
         RuntimeConfig.Instance tested;
         try {
-            tested = new RuntimeConfig.Instance(instance.api(), instance.id(), instance.baseUrl(), instance.contract(), instance.readOnly(),
-                    instance.timeoutSeconds(), instance.auth(), tls, TlsBuilder.build(tls, baseDir, "tls"), baseDir);
+            tested = new RuntimeConfig.Instance(instance.api(), instance.id(), instance.baseUrl(), instance.contract(), instance.prefer(), instance.readOnly(),
+                    instance.timeoutSeconds(), instance.auth(), tls, TlsBuilder.build(tls, baseDir, "tls"), baseDir, instance.rateLimits());
         } catch (IllegalArgumentException e) {
             out.println("✗ " + e.getMessage());
             return 1;

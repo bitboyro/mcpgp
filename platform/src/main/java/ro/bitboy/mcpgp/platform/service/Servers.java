@@ -21,13 +21,22 @@ public final class Servers {
     }
 
     public Model.Server create(String id, String title, byte[] body, String contentType, String message, Access.Principal who) {
+        return create(id, title, () -> projects.store(body, contentType), message, who);
+    }
+
+    /** A new server from files made on the platform (e.g. from an uploaded spec). */
+    public Model.Server create(String id, String title, Map<String, byte[]> files, String message, Access.Principal who) {
+        return create(id, title, () -> projects.store(files), message, who);
+    }
+
+    private Model.Server create(String id, String title, java.util.function.Supplier<Model.Version> files, String message, Access.Principal who) {
         if (id == null || !id.matches("[a-z0-9][a-z0-9-]{1,62}")) {
             throw ApiException.validation("id: lowercase letters, digits and '-', 2–63 characters");
         }
         if (store.server(id).isPresent()) {
             throw new ApiException(409, "CONFLICT", "a server with id " + id + " exists");
         }
-        Model.Version version = projects.store(body, contentType);
+        Model.Version version = files.get();
         String now = Instant.now().toString();
         Model.Server server = new Model.Server(id, title == null || title.isBlank() ? id : title, null, false, now, now,
                 List.of(new Model.VersionRef(1, version.digest(), message, who.identity().name(), now)), 0);
@@ -50,7 +59,7 @@ public final class Servers {
 
     /** Adds a stored version (an upload, or an edit of the latest one); the same content as the latest one adds nothing. */
     public Model.Server addVersion(String id, Model.Version version, String message, Access.Principal who) {
-        Model.Server server = get(id);
+        Model.Server server = writable(id);
         if (server.archived()) {
             throw new ApiException(409, "CONFLICT", "server " + id + " is archived; restore it first");
         }
@@ -62,7 +71,7 @@ public final class Servers {
         int number = versions.isEmpty() ? 1 : server.latest().number() + 1;
         versions.add(new Model.VersionRef(number, version.digest(), message, who.identity().name(), now));
         Model.Server saved = save(new Model.Server(server.id(), server.title(), server.parent(), false, server.created(), now, versions,
-                server.revision()), server.revision());
+                server.revision(), server.system()), server.revision());
         record(who, "version.create", id, Map.of("version", number, "digest", version.digest()));
         return saved;
     }
@@ -109,11 +118,25 @@ public final class Servers {
     }
 
     public Model.Server setArchived(String id, boolean archived, long expectedRevision, Access.Principal who) {
-        Model.Server server = get(id);
+        Model.Server server = writable(id);
         Model.Server saved = save(new Model.Server(server.id(), server.title(), server.parent(), archived, server.created(),
-                Instant.now().toString(), server.versions(), server.revision()), expectedRevision < 0 ? server.revision() : expectedRevision);
+                Instant.now().toString(), server.versions(), server.revision(), server.system()),
+                expectedRevision < 0 ? server.revision() : expectedRevision);
         record(who, archived ? "server.archive" : "server.restore", id, Map.of());
         return saved;
+    }
+
+    /**
+     * A server people and agents may change: not the platform's own (spec/platform-api.md §2.1), which
+     * the platform keeps up to date itself; a variant of it holds a company's changes.
+     */
+    public Model.Server writable(String id) {
+        Model.Server server = get(id);
+        if (server.system()) {
+            throw new ApiException(409, "SYSTEM_SERVER", "server " + id + " is made by the platform and changes with it; "
+                    + "make a variant of it to change what it does");
+        }
+        return server;
     }
 
     public Model.Server get(String id) {

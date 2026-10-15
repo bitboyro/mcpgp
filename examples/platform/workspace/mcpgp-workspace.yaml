@@ -6,3 +6,5 @@ contracts:
   orders@2.0: ../orders/contracts/orders-2.0.yaml
 naming:
   acme-standard@2: naming/acme-standard.yaml
+notices:
+  acme-policy@1: notices/acme-policy.yaml

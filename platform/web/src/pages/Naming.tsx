@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, type Change } from '../api'
 import { methodVerbs, nameRows, policyLines, unusedLockEntries, vocabulary, type NameRow } from '../naming'
-import { apiPrefix, methodVerb, removeWord, validVerb, renames, serverPrefix, setWord, switchOff, validPrefix, validWord, vocabularyPath, wordsKey } from '../namingEdits'
+import { apiPrefix, methodVerb, removeWord, validVerb, renames, serverPrefix, serverSuffix, setWord, switchOff, validPrefix, validWord, vocabularyPath, wordsKey } from '../namingEdits'
 import { useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
 import { ErrorBox, Loading, Segmented } from '../ui'
@@ -42,7 +42,7 @@ export function NamingView({ id }: { id: string }) {
   const [becomes, setBecomes] = useState('')
   const [message, setMessage] = useState('')
   const base = server.data?.latestVersion ?? 0
-  const editable = can('servers:write') && !!naming.data && !!manifest.data && !server.data?.archived
+  const editable = can('servers:write') && !!naming.data && !!manifest.data && !server.data?.archived && !server.data?.system
   const changes = Object.values(pending).map((p) => p.change)
   const summary = Object.values(pending).map((p) => p.label).join('; ')
   const preview = useQuery({
@@ -66,6 +66,10 @@ export function NamingView({ id }: { id: string }) {
     },
   })
 
+  // the clash rule as it will be saved: a pending change, else what the policy says
+  const pendingCollisions = pending['/naming/collisions']?.change
+  const collisionsNow = pendingCollisions ? (pendingCollisions.op === 'remove' ? 'error' : String(pendingCollisions.value))
+    : naming.data?.effective.collisions ?? 'error'
   const put = (label: string, change: Change, unchanged = false) => {
     setPending((now) => {
       const next = { ...now }
@@ -137,9 +141,10 @@ export function NamingView({ id }: { id: string }) {
             </div>
             {manifest.data && (
               <div className="card">
-                <h2>Prefixes</h2>
-                <p className="hint">Tool names start with them, server prefix first: <span className="mono">
-                  {[naming.data.effective.namespace?.server, manifest.data.apis[0]?.toolPrefix ?? manifest.data.apis[0]?.id, 'customer_list'].filter(Boolean).join('_')}</span>.</p>
+                <h2>Prefixes and suffix</h2>
+                <p className="hint">Tool names start with the prefixes, server prefix first, and end with the suffix: <span className="mono">
+                  {[naming.data.effective.namespace?.server, manifest.data.apis[0]?.toolPrefix ?? manifest.data.apis[0]?.id, 'customer_list',
+                    naming.data.effective.namespace?.suffix].filter(Boolean).join('_')}</span>. One tool's name changes in its editor on Tools &amp; rules.</p>
                 {manifest.data.apis.map((a) => {
                   const current = a.toolPrefix ?? a.id
                   return (
@@ -149,6 +154,19 @@ export function NamingView({ id }: { id: string }) {
                 })}
                 <PrefixField key={'server' + (pending['/naming/namespace/server'] ? '*' : '')} label="Server prefix" current={naming.data.effective.namespace?.server ?? ''} disabled={!editable}
                   onPick={(v) => put(v ? `server prefix ${v}` : 'no server prefix', serverPrefix(v), v === (naming.data!.effective.namespace?.server ?? ''))} />
+                <PrefixField key={'suffix' + (pending['/naming/namespace/suffix'] ? '*' : '')} label="Suffix for every tool" current={naming.data.effective.namespace?.suffix ?? ''} disabled={!editable}
+                  onPick={(v) => put(v ? `suffix ${v}` : 'no suffix', serverSuffix(v), v === (naming.data!.effective.namespace?.suffix ?? ''))} />
+              </div>
+            )}
+            {manifest.data && (
+              <div className="card">
+                <h2>When two tools would get the same name</h2>
+                <p className="hint">Usually two operations with the same operationId. One tool's own name can always be set in its editor on Tools &amp; rules.</p>
+                <Segmented label="When two tools would get the same name" value={collisionsNow}
+                  options={[['error', 'Stop and show them'], ['method-path', 'Name from method and path'], ['suffix-number', 'Add a number']]}
+                  onChange={(v) => { if (editable) put(`name clashes: ${v}`, v === 'error' ? { op: 'remove', path: '/naming/collisions' } : { op: 'set', path: '/naming/collisions', value: v },
+                    v === (naming.data!.effective.collisions ?? 'error')) }} />
+                {collisionsNow === 'suffix-number' && <p className="hint">Numbers follow the order of the spec, so a new operation can change which tool gets _2.</p>}
               </div>
             )}
             <div className="card">

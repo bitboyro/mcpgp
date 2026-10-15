@@ -4,6 +4,8 @@ import { api, type Identity, type Token } from '../api'
 import { useSession } from '../session'
 import { ErrorBox, Loading, PageHead, Segmented, ago } from '../ui'
 import { Approvals, describe } from './Activity'
+import { ConnectAgent } from './ConnectAgent'
+import { PersonPassword } from './Passwords'
 
 const ROLES: [string, string][] = [['viewer', 'Viewer'], ['builder', 'Builder'], ['releaser', 'Releaser'], ['admin', 'Admin']]
 
@@ -14,8 +16,9 @@ export function AgentsPage() {
   const tokens = useQuery({ queryKey: ['tokens'], queryFn: api.tokens })
   const agents = useQuery({ queryKey: ['activity', 'agents'], queryFn: () => api.activity({ limit: 200 }) })
   const [issued, setIssued] = useState<Token | null>(null)
+  const [connecting, setConnecting] = useState(false)
   const people = admin ? identities.data?.items ?? [] : [me]
-  const agentActivity = (agents.data?.items ?? []).filter((a) => a.actorKind !== 'person').slice(0, 12)
+  const agentActivity = (agents.data?.items ?? []).filter((a) => a.actorKind === 'agent' || a.actorKind === 'pipeline').slice(0, 12)
 
   return (
     <>
@@ -31,7 +34,7 @@ export function AgentsPage() {
             <div className="rows">
               {people.map((identity) => (
                 <IdentityRow key={identity.id} identity={identity} tokens={(tokens.data?.items ?? []).filter((t) => t.identity === identity.id)}
-                  onIssued={setIssued} canIssue={admin || identity.id === me.id} />
+                  onIssued={setIssued} canIssue={admin || identity.id === me.id} admin={admin} />
               ))}
             </div>
           </div>
@@ -53,11 +56,14 @@ export function AgentsPage() {
             <span className="meta">Bearer tokens · described by <a href="/api/v1/openapi.json">its OpenAPI document</a></span>
             <pre className="code code-wrap" style={{ border: 0, padding: 0 }}>{`curl -H "Authorization: Bearer $MCPGP_TOKEN" \\\n  ${window.location.origin}/api/v1/servers`}</pre>
           </div>
-          <div className="stage-card">
+          {connecting ? <ConnectAgent onClose={() => setConnecting(false)} /> : <div className="stage-card">
             <span className="eyebrow">Platform MCP server</span>
             <p>Built by mcpgp from this API's OpenAPI document. Agents run it themselves with their own token, and get the platform as tools; the
               same scopes, quotas and approvals apply.</p>
-            <a className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }} href="/api/v1/platform-mcp" download>Download mcpgp-platform.zip</a>
+            <div className="actions">
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setConnecting(true)}>Connect an agent</button>
+              <a className="btn btn-stage btn-sm" href="/api/v1/platform-mcp" download>Download mcpgp-platform.zip</a>
+            </div>
             <pre className="code code-wrap" style={{ border: 0, padding: 0 }}>{`# mcpgp-platform.yaml, next to the jar
 instance:
   baseUrl: ${window.location.origin}
@@ -66,7 +72,7 @@ instance:
 # then, for example
 claude mcp add mcpgp-platform -e MCPGP_TOKEN=<the agent's token> \\
   -- java -jar mcpgp-platform.jar --config mcpgp-platform.yaml`}</pre>
-          </div>
+          </div>}
           <Approvals />
           <div>
             <h3 style={{ marginBottom: 8 }}>What agents and pipelines did</h3>
@@ -86,7 +92,9 @@ claude mcp add mcpgp-platform -e MCPGP_TOKEN=<the agent's token> \\
   )
 }
 
-function IdentityRow({ identity, tokens, onIssued, canIssue }: { identity: Identity; tokens: Token[]; onIssued: (t: Token) => void; canIssue: boolean }) {
+function IdentityRow({ identity, tokens, onIssued, canIssue, admin }: {
+  identity: Identity; tokens: Token[]; onIssued: (t: Token) => void; canIssue: boolean; admin: boolean
+}) {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const active = tokens.filter((t) => !t.revoked && (!t.expires || new Date(t.expires) > new Date()))
@@ -111,6 +119,7 @@ function IdentityRow({ identity, tokens, onIssued, canIssue }: { identity: Ident
           {canIssue && <button type="button" className="btn btn-sm btn-soft" disabled={issue.isPending} onClick={() => issue.mutate()}>New token</button>}
         </span>
       </div>
+      {admin && <PersonPassword identity={identity} />}
       <ErrorBox error={issue.error ?? revoke.error} />
       {open && (
         <div className="list">
@@ -158,7 +167,7 @@ function NewIdentity({ onIssued }: { onIssued: (t: Token) => void }) {
           {ROLES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
         </select>
       </label>
-      {kind === 'person' && <p className="hint">People sign in with a password an admin sets through the API, or with company sign-in.</p>}
+      {kind === 'person' && <p className="hint">People sign in with company sign-in, or with a password: give them one with Give a password on their card.</p>}
       <ErrorBox error={create.error} />
       <div><button type="submit" className="btn btn-primary" disabled={!name || create.isPending}>Create {kind}</button></div>
     </form>

@@ -18,9 +18,11 @@ http: { host: 127.0.0.1, port: 8443 }
 storage: { type: files, root: /var/lib/mcpgp }
 ```
 
-Environment variables `MCPGP_PLATFORM_STORAGE__ROOT`, `MCPGP_PLATFORM_HTTP__HOST` and
-`MCPGP_PLATFORM_HTTP__PORT` override the file. Back up by copying the storage root while the
-platform is stopped. TLS: put the platform behind your reverse proxy for now.
+Environment variables `MCPGP_PLATFORM_…` override the file (the list:
+[spec/platform-api.md §7](../spec/platform-api.md#7-platform-configuration-and-storage)). Back up by
+copying the storage root while the platform is stopped. TLS: put the platform behind your reverse
+proxy. For a shared installation (a container image, Docker Compose, PostgreSQL, company sign-in,
+backups) follow [self-hosting.md](self-hosting.md).
 
 ## The web UI
 
@@ -33,7 +35,27 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json
      -d '{"password":"<at least 12 characters>"}' localhost:8443/api/v1/identities/<id>/password
 ```
 
-The pages: **All servers** (duplicate, variant, upload a new server), and per server **Overview**
+**Start from your API's spec:** All servers → **New server** → drop your OpenAPI or Swagger file
+(JSON or YAML; Swagger 2.0, OpenAPI 3.0 or 3.1). When it refers to other files (`$ref`), drop them
+too, or choose the spec's folder or a zip of it; the page says which files are still missing before
+anything is created, and puts files picked without their folders where the spec expects them. It
+shows what it found (title, version, how many operations become tools), you adjust the server id and
+title, and **Create server** makes the server, ready to shape on its Overview. A newer spec goes on
+the server's **Sources** page: **Add a spec version** (or **Replace** a version's spec), optionally as
+the default; each makes the server's next version. The spec can be uploaded, or fetched **from an
+address** where the API publishes it (`https://api.acme.com/openapi.json`); a version fetched from an
+address has **Check for updates**, which fetches it again and shows what agents would notice before
+anything is saved. An administrator decides which hosts can be used (`specHosts` in `platform.yaml`;
+none by default). Teams that keep the definition in git upload the
+whole project instead (**A definition project**, or `mcpgp push`).
+
+**Security & safety** shows what each server protects by default, every protection on: confirmation
+before destructive calls, the answer size limit (long lists cut at whole items), limits on what agents
+send, and limits on calls to each target server (at once and per minute, with the target's own
+"slow down" passed on). Each can be tuned or turned off there; whoever runs a server can still change
+the call limits for their own target server. The protections without a switch are listed beside them.
+
+The pages: **All servers** (new server from a spec or a project, duplicate, variant), and per server **Overview**
 (what agents get, what the customer configures, the package, the checks), **Tools & rules** (each
 tool as the agent gets it, and why), **Connections**, **Sources** (versions, files, upload a new
 version), **Package & deliver** (the formats the next build makes, how it runs, its docs as they ship,
@@ -43,7 +65,13 @@ API as everyone else; nothing it does is UI-only. On Overview, the server's sett
 see, what they may do, target servers, transports, confirmation, packs) can be changed on the page:
 the preview shows the result before anything is saved, Review shows the lines of the definition that
 change, and Save makes the next version. On Overview, **Notices on tool descriptions** adds company policy or disclaimers to every tool, a
-tag's tools, the tools that change data, or chosen tools; notices are never cut off. On Tools & rules,
+tag's tools, the tools that change data, or chosen tools; notices are never cut off. Text that every
+server should carry lives once in the **Shared library** under **Shared notices**: create a set there
+(**New shared notices**), add and change its notices (saved as the set's next version), and **Use
+version N on … servers** puts it on every server (or the ones you tick), or moves them to the new
+version; each changed server gets its next version. On a server's Overview the card lists the shared
+sets it uses (with **Use @N** when a newer version exists, and **Remove**), offers the others, and
+marks each shared notice with its set. On Tools & rules,
 **Try it** on a tool calls it against a mock of the API (made from the spec's examples; nothing
 reaches a real system) and shows what the agent gets back and the HTTP request the server sent;
 extensions are left out there (`mcpgp test` runs them). **Edit title and descriptions** on a tool changes its title, description and parameter descriptions

@@ -6,6 +6,259 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- What changed between builds: `mcpgp diff` (against the last release tag, a tag or commit, a
+  manifest or a release folder; text, Markdown for PR comments, or JSON; `--fail-on-breaking`, exit
+  code 6) and the platform's **Changes** page (any two versions, by default since the last release;
+  linked from a build's Release). Tools are matched by operation, so renames show as renames; inputs
+  and outputs field by field; breaking changes first.
+- `mcpgp preview` (the tools the agent sees, and what the customer configures), `mcpgp try` (a tool
+  call against a real target, a runtime config with credentials, or a mock), `mcpgp migrate` (one
+  format so far: nothing to change), `--no-color`.
+- The platform's own MCP server is the first server people see: `mcpgp-platform`, made by the
+  platform at its first start from the project in its release and given a new version by each upgrade
+  (`system: true`; read, try, build and make variants of it; changes are `409 SYSTEM_SERVER`).
+  `platformServer.enabled: false` archives it. **Connect an agent** (on its card, its Overview and API &
+  agents) creates an agent and its first token, shows the setup for Claude Code, Claude Desktop, Cursor
+  and VS Code, and says when the agent first called; people who aren't admins are asked to have an
+  admin create the agent. On a platform with no servers of its own, All servers opens there.
+- `GET /tokens` says when each token was `lastUsed`.
+- Contract detection for `contract: auto` instances (runtime-config §4.4), which the spec described but
+  the runtime didn't do: an older system got the default contract's requests. The server now asks
+  each target which version it runs, at startup and on reload (starting waits up to 2 s; a slower
+  target answers in the background and its calls wait): under each contract's base path in
+  turn with `detect.underBasePath` (the instance's new `prefer` contract or the default first, then the
+  newest), reading `detect.field` (a JSON pointer) or `detect.header`. Per-caller credentials are used
+  when the target wants them. With `onFailure: refuse` an instance is unavailable
+  (`INSTANCE_UNAVAILABLE`, asked again at most once a minute). `instances_list` shows the detected
+  version, `doctor` warns when a pinned instance's target runs another version, and each result is an
+  `instance.contract` audit event. The orders example's rule reads `/version` under each base path.
+- Connections: **Which version a customer's server runs**, for servers that ship two or more
+  versions of an API. It sets, changes or turns off the detection rule: the path, whether each
+  version answers under its own base path, where the version is (a JSON field, a header or the
+  whole answer), the pattern, and what happens when it can't be found. Before, the page only showed
+  a rule written in the definition by hand.
+
+- A spec version **from an address**: on Sources, **Add a spec version** can fetch the spec from
+  where the API publishes it instead of uploading it, and a version fetched that way has **Check for
+  updates**, which fetches it again and shows what agents would notice (the Changes page's list)
+  before anything is saved; the same spec makes no version. The platform fetches only from hosts an
+  administrator lists in `specHosts` (none by default), on request only; a host's credential is a
+  reference, never stored with a server or shown. API: `POST /servers/{id}/contracts?url=…` and
+  `?source=true&version=…`; the address is recorded as `apis[].contracts[].source`.
+
+- **Security & safety**, a page per server on the platform, with every protection on by default and
+  each one adjustable or off:
+  - **large answers**: the server never downloads more than 4× `responseLimitKb` (a huge answer
+    could exhaust its memory before), and a JSON answer over the limit keeps whole items of its
+    largest list, stays structured and says how many it left out (`safety.cleanTruncation`);
+  - **what agents send**: tool-call arguments and HTTP requests are size-capped and long text values
+    refused, before anything is sent (`safety.inputLimits`, `INPUT_TOO_LARGE`, `413`);
+  - **calls to each target server**: at most 8 at once (more wait) and 120 per minute
+    (`safety.rateLimits`, `RATE_LIMITED` with how long to wait); a target's `429 Retry-After` reaches
+    the agent. Operators can change them per instance (`instances[].rateLimits`).
+  The page lists the protections that have no switch. `docs/security.md` maps them to OWASP.
+- **Output schemas**: tools describe their result (`outputSchema`), from the API spec's success
+  answer, kept loose (no `required`, extra fields allowed) because real answers vary; a result that
+  differs is logged, never refused. On by default; off with `schemas.output: false`, the Security &
+  safety page, or `mcpgp build --no-output-schemas`.
+- JSON lists and plain values are now structured results too (`{ items }`, `{ value }`), not text only.
+- `mixedContracts: namespaced` and `forbid`, and `instances.max`, which the definition accepted
+  but nothing did: namespaced offers each API tool once per instance (`prod__orders_customer_get`),
+  with no `instance` input and only that instance's version's fields; forbid stops startup when
+  pinned instances use different versions and makes an `auto` instance detected on another version
+  unavailable; more instances than `instances.max` stop startup.
+
+### Fixed
+- stdio: answers finishing at the same moment could be dropped (the MCP Java SDK's stdio transport
+  hands each message over in a single attempt, which fails when another is being handed over), so a
+  client sending parallel tool calls never got some of the answers. Messages now go out one at a time.
+- Parameters: cookie values are encoded (a `;` could add a cookie), and a header value with a line
+  break is refused with `INPUT_VALIDATION` instead of an internal error.
+- Settings the docs described but nothing did are now refused, naming each one, instead of being
+  ignored: in the definition `generation.mode: codegen`/`both`, `schemas.input: lean`,
+  `apis[].pagination`, `build.jarSigning`, `build.image.registry`/`push`/`tar` (the compiler's
+  `NOT_SUPPORTED_YET`); in the runtime config `server.tls` with a certificate, `server.trustProxy`
+  and `server.outboundProxy` (at startup). The specs mark them "not supported yet"; the roadmap no
+  longer lists codegen as done.
+- Activity searches read the whole log when few entries matched, and agent quotas read it on every
+  save or build: searches now go to the store as a query (PostgreSQL filters in SQL, with indexes on
+  target and actor) and stop at their time bound. The cache cleanup deletes in one batch.
+
+### Added
+- Passwords in the web UI: Change password on the Account page (the name in the sidebar); Set
+  password and Unlock on a person in API & agents, for admins. An admin's password can be temporary
+  (`mustChange`): the person replaces it at the next sign-in, and the platform answers
+  `PASSWORD_CHANGE_REQUIRED` to anything else until then. `POST /identities/{id}/unlock` ends a lock
+  after wrong passwords. Company accounts show none of this.
+- Calling the API as the signed-in user (`tokenExchange`, auth.md §2.5): on a shared server with
+  OAuth sign-in, each call exchanges the user's token at the identity provider (RFC 8693, or Entra
+  on-behalf-of) for a token issued for the API. Opt-in per server (`downstreamAuth.tokenExchange`, a
+  switch on Connections); exchanged tokens stay in memory per user until shortly before they expire;
+  the user's token goes only to the token endpoint. A `.default` scope (Entra) isn't judged against an
+  operation's scopes.
+- Clashing tool names, the user's choice: when two operations would get the same tool name (often the
+  same operationId twice), the spec upload shows each one with a suggested name from its method and
+  path, to accept or edit (saved as a rule per operation), or to make the server's rule
+  (`naming.collisions: method-path`, new); the Naming page sets the rule too. The compiler's error
+  suggests the name.
+
+## 0.2.7 — 2026-10-13
+
+### Added
+- Tool names from the UI: a suffix for every API tool's name (`naming.namespace.suffix`, e.g.
+  `orders_customer_get_v2`) next to the server prefix on Naming, and a Name field in a tool's editor
+  on Tools & rules that renames that one tool (saved in its rule, `name: { set: … }`).
+- Try starts its server when the panel opens (`POST …/try/warm`), so the first call doesn't wait
+  for it.
+- Audit defaults in the definition, checked: `runtimeDefaults.audit` (`file.retainDays`, `file.rotate`,
+  `file.enabled`, `arguments`) is typed, so a misspelt key is an error instead of being ignored; the
+  platform's Overview sets how long the audit log is kept and how arguments are recorded.
+- `mcpgp init --from-spec` copies the files a local spec refers to (followed from file to file), and
+  says which referenced files are missing before writing anything.
+
+### Fixed
+- A schema reference to a shared schema that isn't there (`#/definitions/Entyr`) was accepted and
+  became an empty placeholder in tools; it's now a `REF_UNRESOLVED` error, in requests and responses.
+- Tools an instance's credentials can't call were listed, and the API refused the call
+  (auth.md §2.2 wasn't enforced). Now a tool no instance can call is hidden (with
+  `unsatisfiedTools: hide`, the default; the startup log says which and why) or kept with a clear
+  error (`error`); calls for an instance that can't call a tool answer `AUTH_DOWNSTREAM` naming what's
+  missing, without calling the API; and each call uses the first of the instance's credentials that
+  fits the operation. Instances without credentials, `fromRequest`, and OAuth clients whose config
+  names no scopes aren't judged. The manifest says what each security scheme is (`schemes`).
+
+## 0.2.6 — 2026-10-13
+
+### Added
+- Credentials from the MCP client (`fromRequest`, auth.md §2.4): when the definition allows it
+  (`downstreamAuth.fromRequest`), the client sends the credential for the API in a configured request
+  header, set in the client's configuration from the user's environment, so the agent never sees it.
+  The server reads it per request for one instance, sends it only to that instance's address, and
+  never stores or logs it (it's masked in results, errors and recordings; the audit records only
+  `upstream.auth: fromRequest`). Each instance reads its own header (default
+  `X-<Server>[-<Api>][-<Instance>]-Authorization`). An instance's `auth` can now be a list tried in
+  order, so a service account takes over when the header is missing. HTTP only.
+
+## 0.2.5 — 2026-10-12
+
+### Fixed
+- The store's cache of compiled results grew without limit: every preview of an unsaved change kept its
+  manifest (several MB for a big server), and nothing was ever removed, which made the store, and with
+  it every page, slower over time. Previews of unsaved changes are now kept in memory only, and the
+  cache keeps each server's last 3 versions (older ones compile again when opened; archived servers'
+  results go). Existing caches are cleared at start.
+- Responses are compressed (gzip) for JSON and the web app: a big server's manifest goes from MBs
+  to tens of KB over the network.
+
+## 0.2.4 — 2026-10-12
+
+### Added
+- Operations: filter by method (several at once) and by resource (the path's first named segment, e.g.
+  `/partners`); "Turn off these" acts on what the filters show.
+
+### Fixed
+- Turning operations on and off was slow: every switch waited for the server and each change compiled
+  the server two or three times. Switches now flip at once (the preview follows), a version is compiled
+  once for all its pages, and saving a server no longer throws away its own and other servers' cached
+  results (they're keyed on what a server actually references). Compiles over 2 s are logged.
+
+## 0.2.3 — 2026-10-12
+
+### Fixed
+- Specs with schemas in separate files that refer to each other compiled in exponential time: a
+  140-operation spec took minutes, and every page of its server with it. Schemas in other files are
+  now shared schemas, read once, and a tool's schema puts big shared schemas in `$defs` instead of
+  copying them five levels deep. The same spec compiles in about a second.
+
+## 0.2.2 — 2026-10-12
+
+### Fixed
+- Specs whose schemas are recursive across files (a criteria tree whose children are criteria, a
+  certificate whose parent is a certificate) failed with `REFERENCE_CYCLE`. Such a schema now becomes
+  a shared schema and the tools reach it through `$defs`, as when it's written in the spec itself.
+
+## 0.2.1 — 2026-10-12
+
+Start from your API's spec in the web UI, and HTTPS without a proxy.
+
+### Added
+- HTTPS served by the platform itself, off unless configured: `http.tls` with a certificate and key
+  (PEM) or a PKCS12 keystore, reloaded when the files change. `setup` asks who does HTTPS for an
+  `https://` address: the platform with a self-signed certificate (made with the JRE's keytool), the
+  platform with your files, or your own proxy (the default with `--yes`, as before); `setup --tls
+  self-signed|files|proxy` switches an existing folder. `check` verifies the certificate: key, host,
+  expiry. The image's health check works over HTTP and HTTPS.
+- Sign-in: a plain `http://` page of a platform whose address is `https://` is told which address to
+  open, instead of a session cookie the browser drops (`409 WRONG_ADDRESS`); the sign-in page says so
+  too when it isn't on the platform's address.
+- The upload of a spec also reports references to parts that aren't there (`#/components/schemas/…`
+  inside the spec, or in a referenced file), not only missing files.
+- Start from your API's spec on the platform: All servers → **New server** takes an OpenAPI 3.0 / 3.1
+  or Swagger 2.0 file in JSON or YAML, several files that `$ref` each other, a folder or a zip. It
+  finds the main file, follows every `$ref`, says which referenced files are missing (and which
+  references are URLs) before anything is created, places files picked without their folders where
+  the spec expects them, and builds the project like `mcpgp init --from-spec`.
+  `POST /api/v1/servers/from-spec`.
+- Sources: **API specs** lists each API's spec versions; **Add a spec version** and **Replace** take an
+  uploaded spec the same way and make the server's next version. `POST /api/v1/servers/{id}/contracts`.
+
+## 0.2.0 — 2026-10-12
+
+Shared notices (company policy text once, on every server), and running the platform image without
+the repository: `setup` writes the Docker Compose folder, `check` says what would fail.
+
+### Added
+- Platform image: `setup` writes everything to run it with Docker Compose into a folder (compose
+  files pointing at the image, `platform.yaml`, `.env`, generated secrets and a signing key), asking
+  or from flags, never overwriting; `setup --upgrade` moves the folder to a newer image. `check` says
+  what would fail at start (secrets, the database, the identity provider, start-up warnings) without
+  starting. No clone of the repository on the server any more.
+- The platform reads its config path from `MCPGP_PLATFORM_CONFIG` when `--config` isn't given; the
+  image sets it, so its commands (`check`, `init`, …) find the mounted `platform.yaml`.
+- Shared notices: company policy text written once and carried by many servers. A library item of
+  kind `notices` (`mcpgp://<workspace>/notices/<name>@<version>`; for the CLI, `notices:` in
+  `mcpgp-workspace.yaml`), included with `descriptions.include`; a server's own notice with the same
+  id replaces a shared one. Provenance and `mcpgp explain` name the set a notice comes from.
+- Platform: shared notices in the Shared library (create, edit, used by), and
+  `POST /library/notices/{name}/apply` to add a set to every server, or chosen ones, or move them to a
+  new version in one step; on a server's Overview, the sets it uses, with **Use @N** and **Remove**.
+
+## 0.1.0 — 2026-10-11
+
+The first release: the compiler, the runtime and packaging, the CLI, and the self-hosted platform
+with its web UI, published as the Docker image `mcpgp-platform` (see
+[docs/guides/self-hosting.md](docs/guides/self-hosting.md)).
+
+### Known limitations
+- Not in this release (marked TODO in the docs): `mcpgp diff`, `preview`, `try`, `migrate`,
+  `--no-color`; `release.versionFrom` other than `contract` and `platform:` in `.mcpgp/config.yaml`;
+  git and URL sources on the platform; a native CLI binary.
+- The web UI has no password page yet: local accounts' passwords are set through the API (0.2.0).
+- One platform process per store; builds run one at a time.
+
+### Added
+- The CLI as a download: `mcpgp-cli-<version>.zip` (launchers `bin/mcpgp`, `bin/mcpgp.cmd`, Java 21+)
+  and `mcpgp-cli-<version>.jar` on the GitHub release, and the CLI image `mcpgp-cli` for CI.
+- CLI: `.mcpgp/config.yaml` is used: `--all` on `validate`, `build` and `test` (its `servers`), the
+  version pin (`cli`, exit code 5, `--ignore-version`), `workspace` and `out` as defaults, `--config`.
+- CLI: `mcpgp sign <dir>` signs a release directory (`SHA256SUMS`, `SHA256SUMS.sig`); `mcpgp verify`
+  checks a signed directory as well as a package; `--help` on every command.
+- Publishing: the platform and CLI images for `linux/amd64` and `linux/arm64` on Docker Hub, with an
+  SBOM and build provenance: `:main` and `:sha-<commit>` from `main`, `:X.Y.Z`, `:X.Y` and `:latest`
+  from release tags, and branch images on request (Run workflow). Release tags also make the GitHub
+  release with the CLI files and `SHA256SUMS`.
+- The pipeline example works as it is: its config points at the example servers, and the orders
+  server's test cases live in `examples/platform/orders/tests/`.
+- Self-hosting: the platform image (`deploy/Dockerfile`, non-root, health check) and Docker Compose
+  files for the file store, PostgreSQL, package signing and company sign-in; `deploy/smoke-test.py`
+  checks an installation end to end. Docs: [docs/deployment.md](docs/deployment.md) and
+  [docs/guides/self-hosting.md](docs/guides/self-hosting.md).
+- Platform: the PostgreSQL store (`storage.type: postgres`), next to the file store, which stays the
+  default; one platform process per store; `copy-store --from <dir>` moves a file store's data into it.
+- Platform: the first administrator from the config (`admin.name`, `admin.password` as a reference),
+  `GET /healthz`, `MCPGP_PLATFORM_STORAGE__*` and `MCPGP_PLATFORM_ADMIN__*` variables, `deployment:`
+  warnings at start, and `Secure` session cookies whenever `http.publicUrl` is `https://`.
+
 - `core` module, the compiler: multi-file definition resolution, Swagger 2.0 / OpenAPI 3.0 / 3.1
   loading with overlays, selection, rules, the naming pipeline with `mcp-names.lock`, grouped input
   schemas, and a deterministic manifest validated against its schema.
@@ -208,6 +461,11 @@ versions follow [SemVer](https://semver.org).
 - OTLP telemetry moved from M3 (P0) to M7 (P1).
 
 ### Fixed
+- **Try it** and `mcpgp test`: tools that a hybrid or discovery server doesn't list are called through
+  `call_tool` (or `invoke_operation`), as an agent would, instead of failing with "Tool not found".
+- Mock servers for **Try it** and `mcpgp test` run with a small fixed heap, and don't inherit
+  `JAVA_TOOL_OPTIONS`.
+- The page header's actions (the Tools / Operations / Naming switcher) keep their place.
 - Discovery: in multi-API servers, `search_tools` matched every API's tools against the first API's
   instance of the given id (and its contract), so tools of other APIs sharing that id went missing.
 - audit-event schema: `args` as `{ "sha256": … }` was rejected (`oneOf` matched two branches).

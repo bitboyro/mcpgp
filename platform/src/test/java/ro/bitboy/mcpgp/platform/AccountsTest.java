@@ -66,7 +66,7 @@ class AccountsTest {
         try (ServerSocket socket = new ServerSocket(0)) {
             port = socket.getLocalPort();
         }
-        PlatformConfig config = new PlatformConfig(store, "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT, "local", true, guardrails);
+        PlatformConfig config = TestStores.of(new PlatformConfig(store, "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT, "local", true, guardrails));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PlatformServer.init(config, new String[] {"init", "--admin", "ana"}, new PrintStream(out, true, StandardCharsets.UTF_8));
         String admin = out.toString(StandardCharsets.UTF_8).lines().filter(l -> l.strip().startsWith("mcpgp_")).findFirst().orElseThrow().strip();
@@ -126,7 +126,9 @@ class AccountsTest {
         assertThat(platform.call("POST", "/sessions", null, JSON.writeValueAsBytes(Map.of("name", "bob", "password", "correct horse battery")),
                 "application/json").statusCode()).isEqualTo(401);
         assertThat(platform.json("GET", "/activity?action=signin", platform.admin(), null).path("items").findValuesAsText("outcome")).contains("denied", "ok");
-        assertThat(Files.readString(dir.resolve("store/identities/credentials.json"))).doesNotContain("correct horse");
+        if (TestStores.URL == null) {   // what the file store writes; the same records go to PostgreSQL as JSON
+            assertThat(Files.readString(dir.resolve("store/identities/credentials.json"))).doesNotContain("correct horse");
+        }
     }
 
     @Test
@@ -145,6 +147,44 @@ class AccountsTest {
                 "application/json").statusCode()).isEqualTo(201);
         assertThat(platform.call("POST", "/identities", platform.admin(), JSON.writeValueAsBytes(Map.of("kind", "agent", "name", "pw-bot",
                 "password", "agents have none")), "application/json").statusCode()).isEqualTo(422);
+    }
+
+    @Test
+    void temporaryPasswordsAreReplacedFirstAndAdminsUnlock() throws Exception {
+        JsonNode dave = platform.json("POST", "/identities", platform.admin(), Map.of("kind", "person", "name", "dave", "role", "viewer",
+                "password", "dave original 1"));
+        String id = dave.path("id").asText();
+        // an admin sets a temporary password
+        JsonNode set = platform.json("PUT", "/identities/" + id + "/password", platform.admin(), Map.of("password", "temporary pass 1", "mustChange", true));
+        assertThat(set.path("mustChange").asBoolean()).isTrue();
+
+        JsonNode session = platform.json("POST", "/sessions", null, Map.of("name", "dave", "password", "temporary pass 1"));
+        assertThat(session.path("mustChangePassword").asBoolean()).isTrue();
+        String token = session.path("value").asText();
+        assertThat(platform.json("GET", "/me", token, null).path("mustChangePassword").asBoolean()).isTrue();
+        // nothing else until it's replaced, and not by the same one
+        HttpResponse<byte[]> blocked = platform.call("GET", "/servers", token, null, null);
+        assertThat(blocked.statusCode()).isEqualTo(403);
+        assertThat(JSON.readTree(blocked.body()).path("code").asText()).isEqualTo("PASSWORD_CHANGE_REQUIRED");
+        assertThat(platform.call("PUT", "/identities/" + id + "/password", token, JSON.writeValueAsBytes(Map.of("password", "temporary pass 1",
+                "currentPassword", "temporary pass 1")), "application/json").statusCode()).isEqualTo(422);
+        assertThat(platform.call("PUT", "/identities/" + id + "/password", token, JSON.writeValueAsBytes(Map.of("password", "dave chose this 2",
+                "currentPassword", "temporary pass 1")), "application/json").statusCode()).isEqualTo(200);
+        assertThat(platform.call("GET", "/servers", token, null, null).statusCode()).isEqualTo(200);
+
+        // five wrong passwords lock the account; the admin sees it and unlocks it
+        for (int i = 0; i < 5; i++) {
+            platform.call("POST", "/sessions", null, JSON.writeValueAsBytes(Map.of("name", "dave", "password", "wrong again")), "application/json");
+        }
+        JsonNode listed = platform.json("GET", "/identities", platform.admin(), null);
+        JsonNode entry = java.util.stream.StreamSupport.stream(listed.path("items").spliterator(), false)
+                .filter(i -> i.path("id").asText().equals(id)).findFirst().orElseThrow();
+        assertThat(entry.path("lockedUntil").asText()).isNotEmpty();
+        assertThat(entry.path("password").asBoolean()).isTrue();
+        assertThat(platform.call("POST", "/identities/" + id + "/unlock", token, null, null).statusCode()).isEqualTo(403);
+        assertThat(platform.json("POST", "/identities/" + id + "/unlock", platform.admin(), null).path("locked").asBoolean()).isFalse();
+        assertThat(platform.call("POST", "/sessions", null, JSON.writeValueAsBytes(Map.of("name", "dave", "password", "dave chose this 2")),
+                "application/json").statusCode()).isEqualTo(201);
     }
 
     @Test

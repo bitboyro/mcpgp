@@ -97,29 +97,44 @@ public final class Compilation {
 
     /** The manifest preview of a version, cached by its digest and the state of the library and servers it may use. */
     public Preview preview(Model.Version version, String createdAt) {
-        String key = version.digest() + "-" + libraryState();
+        return preview(version, createdAt, true);
+    }
+
+    /**
+     * @param keep whether to keep the manifest in the store: not for the preview of an edit that isn't
+     *             saved (an edit's manifest can be several MB, and most edits are previewed many times)
+     */
+    public Preview preview(Model.Version version, String createdAt, boolean keep) {
+        String key = key(version);
         var cached = store.cached("manifest", key);
         if (cached.isPresent()) {
             return new Preview(new String(cached.get(), StandardCharsets.UTF_8), null);
         }
-        Compiler.Result result = compile(version, new ManifestWriter.Build(Instant.parse(createdAt), Compiler.VERSION, null, null, null));
+        Compiler.Result result = compiled(key, version, createdAt);
         if (result.manifest().isEmpty()) {
             return new Preview(null, result);
         }
         ObjectNode manifest = result.manifest().get();
         String text = CanonicalJson.pretty(manifest);
-        store.cache("manifest", key, text.getBytes(StandardCharsets.UTF_8));
+        if (keep) {
+            keep("manifest", key, text.getBytes(StandardCharsets.UTF_8));
+        }
         return new Preview(text, result);
     }
 
     /** Every operation and what became of it ({@link Operations}), cached like the preview; null when the version doesn't compile. */
     public ObjectNode operations(Model.Version version, String createdAt) {
-        return derived("operations", version, createdAt, result -> Operations.of(result));
+        return operations(version, createdAt, true);
+    }
+
+    /** @param keep as for {@link #preview(Model.Version, String, boolean)} */
+    public ObjectNode operations(Model.Version version, String createdAt, boolean keep) {
+        return derived("operations", version, createdAt, keep, result -> Operations.of(result));
     }
 
     /** The version's naming ({@link NamingView}), cached like the preview; null when the version doesn't compile. */
     public ObjectNode naming(Model.Version version, String createdAt) {
-        return derived("naming", version, createdAt, result -> NamingView.of(result, version, store));
+        return derived("naming", version, createdAt, true, result -> NamingView.of(result, version, store));
     }
 
     /**
@@ -127,7 +142,7 @@ public final class Compilation {
      * without building it; null when the version doesn't compile.
      */
     public ObjectNode packagePreview(Model.Version version, String createdAt, boolean signed) {
-        return derived("package-" + (signed ? "signed" : "unsigned"), version, createdAt, result -> {
+        return derived("package-" + (signed ? "signed" : "unsigned"), version, createdAt, true, result -> {
             try {
                 ro.bitboy.mcpgp.packager.Packager.Preview preview = ro.bitboy.mcpgp.packager.Packager.preview(result.manifest().orElseThrow(),
                         result.definition().orElseThrow().document(), signed);
@@ -143,7 +158,7 @@ public final class Compilation {
      * extends and includes merged in); null when the version doesn't compile.
      */
     public ObjectNode definition(Model.Version version, String createdAt) {
-        return derived("definition", version, createdAt, result -> {
+        return derived("definition", version, createdAt, true, result -> {
             ObjectNode answer = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
             try {
                 answer.set("root", new com.fasterxml.jackson.databind.ObjectMapper(new com.fasterxml.jackson.dataformat.yaml.YAMLFactory())
@@ -152,12 +167,16 @@ public final class Compilation {
                 throw new UncheckedIOException(e);
             }
             answer.set("resolved", result.definition().orElseThrow().document().deepCopy());
+            // notices from descriptions.include: id → the shared item they come from
+            com.fasterxml.jackson.databind.node.ObjectNode sources = answer.putObject("noticeSources");
+            result.definition().get().noticeSources().forEach(sources::put);
             return answer;
         });
     }
 
-    private ObjectNode derived(String kind, Model.Version version, String createdAt, java.util.function.Function<Compiler.Result, ObjectNode> from) {
-        String key = version.digest() + "-" + libraryState();
+    private ObjectNode derived(String kind, Model.Version version, String createdAt, boolean keep,
+                               java.util.function.Function<Compiler.Result, ObjectNode> from) {
+        String key = key(version);
         var cached = store.cached(kind, key);
         if (cached.isPresent()) {
             try {
@@ -166,22 +185,125 @@ public final class Compilation {
                 // compile again
             }
         }
-        Compiler.Result result = compile(version, new ManifestWriter.Build(Instant.parse(createdAt), Compiler.VERSION, null, null, null));
+        Compiler.Result result = compiled(key, version, createdAt);
         if (!result.ok() || result.definition().isEmpty()) {
             return null;
         }
         ObjectNode value = from.apply(result);
-        store.cache(kind, key, CanonicalJson.compact(value).getBytes(StandardCharsets.UTF_8));
+        if (keep) {
+            keep(kind, key, CanonicalJson.compact(value).getBytes(StandardCharsets.UTF_8));
+        }
         return value;
     }
 
-    /** Changes whenever a library item or server gets a new version (a reference may then resolve differently). */
-    private String libraryState() {
-        StringBuilder state = new StringBuilder();
-        store.library().forEach(i -> state.append(i.kind()).append('/').append(i.name()).append('@').append(i.latest().digest()).append('\n'));
-        store.servers().forEach(s -> state.append("servers/").append(s.id()).append('@')
-                .append(s.latest() == null ? "" : s.latest().digest()).append('\n'));
-        return ro.bitboy.mcpgp.platform.store.FileStore.sha256(state.toString().getBytes(StandardCharsets.UTF_8)).substring(0, 16);
+    /**
+     * The last few compilations, by {@link #key}: the preview, the operations, the naming and the package
+     * of one version come from one compile, and requests for a version being compiled wait for it
+     * instead of compiling it again.
+     */
+    private final Map<String, java.util.concurrent.CompletableFuture<Compiler.Result>> results = new java.util.LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, java.util.concurrent.CompletableFuture<Compiler.Result>> eldest) {
+            return size() > 3; // a big server's result is tens of MB
+        }
+    };
+
+    private Compiler.Result compiled(String key, Model.Version version, String createdAt) {
+        java.util.concurrent.CompletableFuture<Compiler.Result> mine = new java.util.concurrent.CompletableFuture<>();
+        java.util.concurrent.CompletableFuture<Compiler.Result> running;
+        synchronized (results) {
+            running = results.putIfAbsent(key, mine);
+        }
+        if (running != null) {
+            try {
+                return running.join();
+            } catch (java.util.concurrent.CompletionException e) {
+                // that compile failed: compile here
+            }
+        }
+        long start = System.nanoTime();
+        try {
+            Compiler.Result result = compile(version, new ManifestWriter.Build(Instant.parse(createdAt), Compiler.VERSION, null, null, null));
+            mine.complete(result);
+            long ms = (System.nanoTime() - start) / 1_000_000;
+            if (ms > 2000) {
+                LOG.warn("compiling version {} took {} ms", version.digest().substring(0, Math.min(12, version.digest().length())), ms);
+            }
+            return result;
+        } catch (RuntimeException e) {
+            synchronized (results) {
+                results.remove(key, mine);
+            }
+            mine.completeExceptionally(e);
+            throw e;
+        }
+    }
+
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(Compilation.class);
+    private static final java.util.regex.Pattern REFERENCE = java.util.regex.Pattern.compile("mcpgp://[^/\\s'\"]+/([a-z]+)/([A-Za-z0-9._-]+)");
+
+    /**
+     * What a version's derived data is cached under: its files, and the latest versions of the library
+     * items and servers its {@code mcpgp://} references reach (through each other too). Saving a server
+     * doesn't change the key of its own versions, nor of servers that don't use it.
+     */
+    private String key(Model.Version version) {
+        java.util.Set<String> seen = new java.util.TreeSet<>();
+        StringBuilder state = new StringBuilder(version.digest()).append('\n');
+        java.util.ArrayDeque<Model.Version> queue = new java.util.ArrayDeque<>(List.of(version));
+        while (!queue.isEmpty()) {
+            Model.Version v = queue.poll();
+            for (Map.Entry<String, String> file : v.files().entrySet()) {
+                if (file.getKey().startsWith("contracts/")) {
+                    continue; // specs can't hold references
+                }
+                java.util.regex.Matcher m = REFERENCE.matcher(new String(store.blob(file.getValue()), StandardCharsets.UTF_8));
+                while (m.find()) {
+                    String kind = m.group(1);
+                    String name = m.group(2);
+                    if (!seen.add(kind + "/" + name)) {
+                        continue;
+                    }
+                    Optional<Model.VersionRef> latest = kind.equals("servers")
+                            ? store.server(name).map(Model.Server::latest)
+                            : store.libraryItem(kind, name).map(Model.LibraryItem::latest);
+                    state.append(kind).append('/').append(name).append('@').append(latest.map(Model.VersionRef::digest).orElse("")).append('\n');
+                    latest.flatMap(l -> store.version(l.digest())).ifPresent(queue::add);
+                }
+            }
+        }
+        return version.digest() + "-" + ro.bitboy.mcpgp.platform.store.FileStore.sha256(state.toString().getBytes(StandardCharsets.UTF_8)).substring(0, 16);
+    }
+
+    /** Versions whose derived data is kept: each server's last few. */
+    static final int KEEP_VERSIONS = 3;
+
+    private void keep(String kind, String key, byte[] content) {
+        store.cache(kind, key, content);
+        if (kind.equals("manifest")) {
+            pruneCache(); // a version's first manifest: one more version kept, so maybe one fewer
+        }
+    }
+
+    /**
+     * Drops the derived data of all but each server's last {@link #KEEP_VERSIONS} versions (it's
+     * compiled again if an older version is opened), of archived servers, and of whatever isn't a
+     * version of a server. Run at start and whenever a version's manifest is kept.
+     */
+    public int pruneCache() {
+        java.util.Set<String> kept = new java.util.HashSet<>();
+        for (Model.Server server : store.servers()) {
+            if (server.archived()) {
+                continue;
+            }
+            List<Model.VersionRef> versions = server.versions();
+            versions.subList(Math.max(0, versions.size() - KEEP_VERSIONS), versions.size()).forEach(v -> kept.add(v.digest()));
+        }
+        int removed = store.pruneCache(key -> key.indexOf('-') > 0 && kept.contains(key.substring(0, key.indexOf('-'))));
+        if (removed > 0) {
+            LOG.info("removed {} cached results of older versions", removed);
+        }
+        return removed;
     }
 
     /** A manifest (when the version compiles) and the compiler result (null when served from the cache). */

@@ -29,8 +29,8 @@ class TestCommandTest {
 
     @Test
     void theExampleSuitePassesAgainstTheMock() {
+        // the suite is tests/ next to the definition
         int code = run("test", "--workspace", EXAMPLES.resolve("platform/workspace").toString(),
-                "--suite", EXAMPLES.resolve("pipeline/servers/orders/tests").toString(),
                 EXAMPLES.resolve("platform/orders/orders.mcpgp.yaml").toString());
         assertThat(code).as(out + "\n" + err).isZero();
         assertThat(out.toString()).contains("✓ smoke: the server starts and lists its tools")
@@ -75,6 +75,33 @@ class TestCommandTest {
         Files.writeString(dir.resolve("tests/more.yaml"), "cases: [ { name: typo, tool: example_orders_custmer_list, expect: { ok: true } } ]\n");
         assertThat(run("test", definition.toString())).isEqualTo(4);
         assertThat(out.toString()).contains("✗ more.yaml: typo: no tool named example_orders_custmer_list");
+    }
+
+    @Test
+    void initCopiesTheFilesTheSpecRefersTo(@TempDir Path dir) throws Exception {
+        Path spec = Files.createDirectories(dir.resolve("spec"));
+        Files.createDirectories(spec.resolve("paths"));
+        Files.createDirectories(spec.resolve("schemas"));
+        Files.writeString(spec.resolve("api.json"), """
+                { "swagger": "2.0", "info": { "title": "Ledger", "version": "1.0" },
+                  "paths": { "/entries": { "$ref": "paths/entries.json" } } }""");
+        Files.writeString(spec.resolve("paths/entries.json"), """
+                { "get": { "operationId": "listEntries", "responses": { "200": { "description": "ok",
+                  "schema": { "type": "array", "items": { "$ref": "../schemas/entry.json" } } } } } }""");
+        Files.writeString(spec.resolve("schemas/entry.json"), "{ \"type\": \"object\", \"properties\": { \"id\": { \"type\": \"string\" } } }");
+        Files.writeString(spec.resolve("unrelated.json"), "{}");
+
+        assertThat(run("init", "--from-spec", spec.resolve("api.json").toString(), "--out", dir.resolve("p").toString())).as(err.toString()).isZero();
+        assertThat(out.toString()).contains("with the 2 files it refers to").contains("1 tools");
+        assertThat(dir.resolve("p/contracts/paths/entries.json")).exists();
+        assertThat(dir.resolve("p/contracts/schemas/entry.json")).exists();
+        assertThat(dir.resolve("p/contracts/unrelated.json")).doesNotExist();
+
+        // a referenced file that isn't there: said before anything is written
+        Files.delete(spec.resolve("schemas/entry.json"));
+        assertThat(run("init", "--from-spec", spec.resolve("api.json").toString(), "--out", dir.resolve("q").toString())).isEqualTo(1);
+        assertThat(err.toString()).contains("schemas/entry.json is missing");
+        assertThat(dir.resolve("q")).doesNotExist();
     }
 
     @Test

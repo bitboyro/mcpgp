@@ -100,6 +100,22 @@ export function choices(m: Manifest): Choice[] {
       current: (x) => x.policies.confirmDestructive === false ? 'direct' : 'confirm',
       change: (v) => ({ op: 'set', path: '/safety/confirmDestructive', value: v === 'confirm' }),
     },
+    {
+      id: 'audit-days', title: 'How long the audit log is kept', hint: 'The default the package ships with; whoever runs it can still change it.',
+      options: [{ value: '30', label: '30 days' }, { value: '90', label: '90 days' }, { value: '180', label: '180 days' }, { value: '365', label: 'A year' }],
+      current: (x) => String(x.policies.runtimeDefaults?.audit?.file?.retainDays ?? 30),
+      change: (v) => ({ op: 'set', path: '/runtimeDefaults/audit/file/retainDays', value: Number(v) }),
+    },
+    {
+      id: 'audit-arguments', title: 'Tool arguments in the audit log', hint: 'Credentials and secret fields are always masked.',
+      options: [
+        { value: 'redacted', label: 'Names, values masked' },
+        { value: 'hashed', label: 'A fingerprint' },
+        { value: 'none', label: 'Not recorded' },
+      ],
+      current: (x) => x.policies.runtimeDefaults?.audit?.arguments ?? 'redacted',
+      change: (v) => ({ op: 'set', path: '/runtimeDefaults/audit/arguments', value: v }),
+    },
   )
   return list
 }

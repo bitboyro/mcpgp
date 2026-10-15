@@ -5,13 +5,21 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
- * The platform's data (spec/platform-api.md §7.1). One interface, two planned implementations: the
- * file store now, PostgreSQL later. Blobs and versions are immutable and content-addressed.
+ * The platform's data (spec/platform-api.md §7.1). One interface, two implementations: the file store
+ * ({@link FileStore}) and PostgreSQL ({@link PostgresStore}); {@code storage.type} picks one. Blobs and
+ * versions are immutable and content-addressed.
  */
 public interface Store {
 
     /** The store format this release reads and writes. Before 1.0.0 other formats are refused, not migrated. */
     String FORMAT = "0.1";
+
+    /** Throws when the store can't be reached (the health check). */
+    default void check() {
+    }
+
+    /** Which store this is, for the log and the health check: {@code files (/var/lib/mcpgp)}. */
+    String describe();
 
     // servers
     List<Model.Server> servers();
@@ -68,6 +76,11 @@ public interface Store {
 
     void saveToken(Model.Token token);
 
+    /** The last use of each token that was used. */
+    List<Model.TokenUse> tokenUses();
+
+    void saveTokenUse(Model.TokenUse use);
+
     // local accounts and approvals
     List<Model.Credential> credentials();
 
@@ -82,10 +95,48 @@ public interface Store {
 
     List<Model.Activity> activity(Predicate<Model.Activity> filter, int limit);
 
+    /**
+     * Activity entries, newest first: each field of {@code query} that is set must match ({@code action}
+     * as a prefix; {@code server}: the entry's target, or its details' {@code server}); reading stops at
+     * {@code since}. Stores that can filter themselves (PostgreSQL) don't read what doesn't match.
+     */
+    default List<Model.Activity> activity(ActivityQuery query, int limit) {
+        java.time.Instant since = query.since();
+        List<Model.Activity> result = new java.util.ArrayList<>();
+        boolean[] older = {false};
+        activity(a -> {
+            if (since != null && !java.time.Instant.parse(a.ts()).isAfter(since)) {
+                older[0] = true;
+                return false;
+            }
+            return !older[0] && query.matches(a);
+        }, limit).forEach(result::add);
+        return result;
+    }
+
+    /** What an activity search asks for; null fields match everything. */
+    record ActivityQuery(String target, String server, String actor, String action, java.util.Set<String> actions, java.time.Instant since) {
+        public ActivityQuery(String target, String server, String actor, String action) {
+            this(target, server, actor, action, null, null);
+        }
+
+        public boolean matches(Model.Activity a) {
+            return (target == null || target.equals(a.target()))
+                    && (server == null || server.equals(a.target()) || a.details() != null && server.equals(a.details().get("server")))
+                    && (actor == null || actor.equals(a.actor()))
+                    && (action == null || a.action().startsWith(action))
+                    && (actions == null || actions.contains(a.action()))
+                    && (since == null || java.time.Instant.parse(a.ts()).isAfter(since));
+        }
+    }
+
     // derived data, rebuildable at any time (e.g. compiled manifests by version digest)
     Optional<byte[]> cached(String kind, String key);
 
     void cache(String kind, String key, byte[] content);
+
+    /** Removes the derived data whose key {@code keep} refuses; returns how many entries went. */
+    int pruneCache(java.util.function.Predicate<String> keep);
 
     /** A stale or duplicate write. */
     final class ConflictException extends RuntimeException {

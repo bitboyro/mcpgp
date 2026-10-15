@@ -36,6 +36,7 @@
       "type": "object",
       "properties": {
         "server": { "type": "string" },
+        "suffix": { "type": "string", "description": "added to the end of every API tool's name (before a content-type suffix), e.g. v2" },
         "perApi": { "type": "boolean" }
       },
       "additionalProperties": false
@@ -48,7 +49,7 @@
       },
       "additionalProperties": false
     },
-    "collisions": { "enum": ["error", "suffix-number", "suffix-contract"] }
+    "collisions": { "enum": ["error", "method-path", "suffix-number", "suffix-contract"] }
   },
   "additionalProperties": false
 }

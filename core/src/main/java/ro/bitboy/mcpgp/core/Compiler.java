@@ -29,13 +29,18 @@ import java.util.Optional;
 public final class Compiler {
 
     /** The compiler's own version, recorded in manifests. */
-    public static final String VERSION = "0.1.0-SNAPSHOT";
+    public static final String VERSION = "0.2.7";
 
     /**
      * @param frozenLock fail instead of warning when a tool name would differ from the lock file
      * @param build      build inputs that don't come from the definition (time, version, source)
      */
-    public record Options(Workspace workspace, boolean frozenLock, ManifestWriter.Build build) {
+    /** @param outputSchemas instead of the definition's schemas.output (the CLI's --no-output-schemas); null to follow it */
+    public record Options(Workspace workspace, boolean frozenLock, ManifestWriter.Build build, Boolean outputSchemas) {
+        public Options(Workspace workspace, boolean frozenLock, ManifestWriter.Build build) {
+            this(workspace, frozenLock, build, null);
+        }
+
         public Options(Workspace workspace, boolean frozenLock) {
             this(workspace, frozenLock, new ManifestWriter.Build(Instant.EPOCH, VERSION, null, null, null));
         }
@@ -70,6 +75,14 @@ public final class Compiler {
             return new Result(Optional.empty(), Map.of(), List.of(), Optional.empty(), sorted(collected));
         }
         ResolvedDefinition definition = resolved.definition().get();
+        if (options.outputSchemas() != null) {
+            definition.document().with("schemas").put("output", options.outputSchemas().booleanValue());
+        }
+        Unsupported.check(definition.document(), definition.root().relativize(definition.file()).toString(), diagnostics);
+        if (diagnostics.hasErrors()) {
+            collected.addAll(diagnostics.all());
+            return new Result(Optional.empty(), Map.of(), List.of(), Optional.empty(), sorted(collected));
+        }
 
         ContractLoader loader = new ContractLoader(definition.root(), definition.root());
         Map<ContractKey, Contract> contracts = new LinkedHashMap<>();

@@ -90,7 +90,9 @@ class PlatformMcpTest extends PlatformTestBase {
             assertThat(server.catalog().tool(tool).orElseThrow().path("confirm").asBoolean()).as(tool).isTrue();
         }
         assertThat(server.catalog().tool("platform_build_start").orElseThrow().path("confirm").asBoolean()).isFalse();
-        assertThat(tools.stream().filter(t -> t.startsWith("platform_")).count()).isBetween(40L, 55L);
+        assertThat(tools.stream().filter(t -> t.startsWith("platform_")).count()).isBetween(40L, 65L);
+        // agents can start a server from a spec, and add a spec version, like people on the pages
+        assertThat(tools.stream().filter(t -> t.contains("spec") || t.contains("contract")).toList()).as(tools.toString()).hasSizeGreaterThanOrEqualTo(2);
     }
 
     @Test

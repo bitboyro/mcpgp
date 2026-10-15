@@ -15,9 +15,16 @@ public final class Model {
      *
      * @param parent   the server this one is a variant of, or null
      * @param revision increases with every change of this record (ETag, optimistic concurrency)
+     * @param system   made and kept up to date by the platform itself (the platform's own MCP server); people
+     *                 and agents read it and make variants of it, but don't change it
      */
     public record Server(String id, String title, String parent, boolean archived, String created, String updated,
-                         List<VersionRef> versions, long revision) {
+                         List<VersionRef> versions, long revision, boolean system) {
+        public Server(String id, String title, String parent, boolean archived, String created, String updated,
+                      List<VersionRef> versions, long revision) {
+            this(id, title, parent, archived, created, updated, versions, revision, false);
+        }
+
         public VersionRef latest() {
             return versions.isEmpty() ? null : versions.get(versions.size() - 1);
         }
@@ -72,6 +79,13 @@ public final class Model {
         }
     }
 
+    /**
+     * When a token was last used, at most a minute off: kept apart from the token, so recording a use
+     * never overwrites a revocation made meanwhile.
+     */
+    public record TokenUse(String token, String at) {
+    }
+
     /** An API token: only the hash of its secret is stored. */
     public record Token(String id, String identity, String hash, Set<String> scopes, String label, String created, String expires,
                         boolean revoked) {
@@ -83,7 +97,11 @@ public final class Model {
      * @param failures    sign-in failures in a row
      * @param lockedUntil no sign-in before this time, or null
      */
-    public record Credential(String identity, String salt, int iterations, String hash, int failures, String lockedUntil) {
+    /** @param mustChange set by an admin's temporary password: the person chooses a new one before anything else */
+    public record Credential(String identity, String salt, int iterations, String hash, int failures, String lockedUntil, boolean mustChange) {
+        public Credential(String identity, String salt, int iterations, String hash, int failures, String lockedUntil) {
+            this(identity, salt, iterations, hash, failures, lockedUntil, false);
+        }
     }
 
     /** A request waiting for a person's decision (spec/platform-api.md §5), e.g. an agent's release. */

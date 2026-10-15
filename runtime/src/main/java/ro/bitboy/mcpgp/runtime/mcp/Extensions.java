@@ -232,7 +232,7 @@ final class Extensions {
     /** A tool's value as an extension sees it. */
     static ToolResult result(Object value) {
         if (value instanceof ToolOutput output) {
-            return output.structured() != null ? ToolResult.of(JSON.valueToTree(output.structured())) : ToolResult.text(output.text());
+            return output.structured() != null ? ToolResult.of(JSON.valueToTree(output.answer())) : ToolResult.text(output.text());
         }
         if (value instanceof String text) {
             return ToolResult.text(text);

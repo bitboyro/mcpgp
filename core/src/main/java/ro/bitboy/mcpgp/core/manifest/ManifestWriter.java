@@ -128,7 +128,8 @@ public final class ManifestWriter {
             JsonNode api = apis.stream().filter(a -> a.path("id").asText().equals(plan.api())).findFirst().orElseThrow();
             String apiTitle = api.path("title").asText(plan.api());
             ToolShaper shaper = new ToolShaper(new ToolShaper.Context(multi,
-                    "Target " + apiTitle + " server. Filled in at startup from the runtime config.", fileForms));
+                    "Target " + apiTitle + " server. Filled in at startup from the runtime config.", fileForms,
+                    doc.at("/schemas/output").asBoolean(true)));
             ToolShaper.Shaped shaped = shaper.shape(plan, contractsByApi.get(plan.api()), defaultVersions.get(plan.api()));
             Contract primary = contractsByApi.get(plan.api()).getOrDefault(defaultVersions.get(plan.api()),
                     contractsByApi.get(plan.api()).values().iterator().next());
@@ -339,6 +340,8 @@ public final class ManifestWriter {
         Set<String> supported = new LinkedHashSet<>();
         declared.path("supported").forEach(s -> supported.add(s.asText()));
         SecurityScheme apiKey = null;
+        // what each scheme the operations name is, so the runtime can tell which credential satisfies them (auth.md §2.2)
+        Map<String, String> schemes = new TreeMap<>();
         for (Contract contract : versions.values()) {
             for (SecurityScheme scheme : new TreeMap<>(contract.securitySchemes()).values()) {
                 String kind = switch (scheme.type() == null ? "" : scheme.type()) {
@@ -350,6 +353,8 @@ public final class ManifestWriter {
                     case "mutualTLS" -> "mtls";
                     default -> null;
                 };
+                schemes.putIfAbsent(scheme.name(), kind != null ? kind
+                        : "oauth2".equals(scheme.type()) || "openIdConnect".equals(scheme.type()) ? "oauth2" : "other");
                 if (kind != null && !declared.has("supported")) {
                     supported.add(kind);
                 }
@@ -366,6 +371,18 @@ public final class ManifestWriter {
         }
         if (declared.has("unsatisfiedTools")) {
             auth.put("unsatisfiedTools", declared.get("unsatisfiedTools").asText());
+        }
+        if (declared.has("tokenExchange")) {
+            auth.set("tokenExchange", declared.get("tokenExchange").deepCopy()); // per-user identity (auth.md §2.5)
+        }
+        if (declared.has("fromRequest")) {
+            // the client may send the credential in a request header (auth.md §2.4); the runtime derives the
+            // header's default name when the definition gives none
+            auth.set("fromRequest", declared.get("fromRequest").deepCopy());
+        }
+        if (!schemes.isEmpty()) {
+            ObjectNode schemesNode = auth.putObject("schemes");
+            schemes.forEach(schemesNode::put);
         }
         if (supported.contains("apiKey") && apiKey != null && apiKey.in() != null && apiKey.parameterName() != null) {
             auth.set("apiKey", NODES.objectNode().put("in", apiKey.in()).put("name", apiKey.parameterName()));
@@ -391,7 +408,17 @@ public final class ManifestWriter {
         JsonNode defaults = doc.path("runtimeDefaults");
         ObjectNode policies = NODES.objectNode()
                 .put("confirmDestructive", safety.path("confirmDestructive").asBoolean(true))
-                .put("responseLimitKb", safety.path("responseLimitKb").asInt(256));
+                .put("responseLimitKb", safety.path("responseLimitKb").asInt(256))
+                .put("cleanTruncation", safety.path("cleanTruncation").asBoolean(true))
+                .put("outputSchemas", doc.at("/schemas/output").asBoolean(true));
+        // on by default; the definition can tune or turn them off (definition-format §2, safety)
+        JsonNode inputs = safety.path("inputLimits");
+        policies.putObject("inputLimits").put("enabled", inputs.path("enabled").asBoolean(true))
+                .put("requestKb", inputs.path("requestKb").asInt(1024)).put("stringMaxLength", inputs.path("stringMaxLength").asInt(65536));
+        JsonNode rates = safety.path("rateLimits");
+        policies.putObject("rateLimits").put("enabled", rates.path("enabled").asBoolean(true))
+                .put("concurrent", rates.path("concurrent").asInt(8)).put("perMinute", rates.path("perMinute").asInt(120))
+                .put("retryAfter", rates.path("retryAfter").asBoolean(true));
         ArrayNode forms = NODES.arrayNode();
         fileForms.forEach(forms::add);
         policies.set("files", NODES.objectNode().set("forms", forms));
@@ -423,7 +450,7 @@ public final class ManifestWriter {
         tool.put("sensitive", plan.sensitive());
         tool.put("confirm", plan.confirm());
         tool.set("inputSchema", shaped.inputSchema());
-        tool.set("outputSchema", NODES.nullNode());
+        tool.set("outputSchema", shaped.outputSchema() == null ? NODES.nullNode() : shaped.outputSchema());
         tool.put("api", plan.api());
         ObjectNode operation = NODES.objectNode().put("key", plan.operationKey());
         if (plan.operationId() != null) {
@@ -675,8 +702,12 @@ public final class ManifestWriter {
                 }
                 matched++;
                 (prepend ? before : after).computeIfAbsent(tool, t -> new ArrayList<>()).add(text);
-                provenanceSteps(tool, "description").addObject().put("step", "notice").put("value", text)
+                ObjectNode step = provenanceSteps(tool, "description").addObject().put("step", "notice").put("value", text)
                         .put("file", at.file()).put("pointer", at.pointer());
+                String from = notice.hasNonNull("id") ? definition.noticeSources().get(notice.get("id").asText()) : null;
+                if (from != null) {
+                    step.put("from", from);
+                }
             }
             if (matched == 0) {
                 diagnostics.warning(Codes.NOTICE_MATCHES_NOTHING, "Notice applies to no tool", at);

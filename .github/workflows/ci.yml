@@ -26,6 +26,157 @@ jobs:
           MCPGP_PACKAGE_CHECK: "1"
         run: mvn -B verify
 
+  postgres:
+    # the platform's tests again, on the PostgreSQL store (TestStores)
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: mcpgp
+          POSTGRES_USER: mcpgp
+          POSTGRES_PASSWORD: ci-only
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U mcpgp" --health-interval 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Build the modules the platform uses
+        run: mvn -B -q install -DskipTests
+      - name: Platform tests on PostgreSQL
+        env:
+          MCPGP_TEST_POSTGRES_URL: jdbc:postgresql://127.0.0.1:5432/mcpgp
+          MCPGP_TEST_POSTGRES_PASSWORD: ci-only
+        run: mvn -B -pl platform verify
+
+  deploy:
+    # the image and docker compose as docs/guides/self-hosting.md describes them, checked end to end
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy
+    env:
+      COMPOSE_FILE: compose.yaml:compose.postgres.yaml:compose.signing.yaml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Secrets and settings for this run only
+        run: |
+          openssl rand -base64 24 > secrets/admin_password
+          openssl rand -base64 24 > secrets/db_password
+          (cd .. && mvn -B -q -pl cli -am package -DskipTests)
+          java -jar ../cli/target/mcpgp-cli-*-exec.jar keygen --out /tmp/key
+          cp /tmp/key/mcpgp.key secrets/signing_key
+          chmod 644 secrets/*_password secrets/signing_key
+          cp .env.example .env
+      - name: Start the platform with PostgreSQL
+        run: docker compose up -d --build --wait --wait-timeout 300
+      - name: Smoke test
+        run: python3 smoke-test.py http://127.0.0.1:8443 admin secrets/admin_password
+      - name: Data survives a restart
+        run: |
+          docker compose restart platform
+          docker compose up -d --wait --wait-timeout 120
+          python3 - <<'PY'
+          import json, urllib.request
+          base = "http://127.0.0.1:8443/api/v1"
+          password = open("secrets/admin_password").read().strip()
+          request = urllib.request.Request(base + "/sessions", data=json.dumps({"name": "admin", "password": password}).encode(),
+                                           headers={"Content-Type": "application/json"}, method="POST")
+          token = json.load(urllib.request.urlopen(request))["value"]
+          servers = json.load(urllib.request.urlopen(urllib.request.Request(base + "/servers", headers={"Authorization": "Bearer " + token})))
+          assert "smoke-orders-mcp" in json.dumps(servers), servers
+          print("✓ smoke-orders-mcp is still there after a restart")
+          PY
+      - name: Logs
+        if: always()
+        run: docker compose logs --no-color | tail -200
+
+  setup:
+    # the published way: setup writes the folder from the image, check, then compose up (no repository)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -f deploy/Dockerfile --build-arg MCPGP_IMAGE=mcpgp-platform:ci -t mcpgp-platform:ci .
+      - name: setup, as the guide shows it
+        run: |
+          mkdir /tmp/mcpgp
+          docker run --rm --user "$(id -u):$(id -g)" -v /tmp/mcpgp:/setup mcpgp-platform:ci \
+            setup --yes --public-url http://localhost:8443 --workspace acme
+          ls -la /tmp/mcpgp /tmp/mcpgp/secrets
+          grep -q "MCPGP_IMAGE=mcpgp-platform:ci" /tmp/mcpgp/.env
+          ! grep -q "build:" /tmp/mcpgp/compose.yaml
+      - name: check, then start
+        working-directory: /tmp/mcpgp
+        run: |
+          docker compose run --rm platform check
+          docker compose up -d --no-build --wait --wait-timeout 300
+      - name: Smoke test
+        run: python3 deploy/smoke-test.py http://127.0.0.1:8443 admin /tmp/mcpgp/secrets/admin_password
+      - name: Logs
+        if: always()
+        working-directory: /tmp/mcpgp
+        run: docker compose logs --no-color | tail -200
+
+  setup-tls:
+    # setup with HTTPS served by the platform (a self-signed certificate), checked over HTTPS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -f deploy/Dockerfile --build-arg MCPGP_IMAGE=mcpgp-platform:ci -t mcpgp-platform:ci .
+      - name: setup --tls self-signed
+        run: |
+          mkdir /tmp/mcpgp
+          docker run --rm --user "$(id -u):$(id -g)" -v /tmp/mcpgp:/setup mcpgp-platform:ci \
+            setup --yes --public-url https://localhost:9443 --workspace acme --tls self-signed
+          grep -q "MCPGP_PORT=9443" /tmp/mcpgp/.env
+          grep -q "compose.tls.yaml" /tmp/mcpgp/.env
+      - name: check, then start
+        working-directory: /tmp/mcpgp
+        run: |
+          docker compose run --rm platform check
+          docker compose up -d --no-build --wait --wait-timeout 300
+          curl -fsS --cacert tls/certificate.pem https://localhost:9443/healthz
+      - name: Smoke test over HTTPS
+        run: python3 deploy/smoke-test.py https://localhost:9443 admin /tmp/mcpgp/secrets/admin_password --ca /tmp/mcpgp/tls/certificate.pem
+      - name: Logs
+        if: always()
+        working-directory: /tmp/mcpgp
+        run: docker compose logs --no-color | tail -200
+
+  cli-image:
+    # the CLI image as CI jobs use it: mcpgp on the PATH, the repository mounted
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the CLI image
+        run: docker build -f deploy/cli.Dockerfile -t mcpgp-cli:ci .
+      - name: validate --all and test --all in the pipeline example
+        run: |
+          docker run --rm -v "$PWD":/work -w /work/examples/pipeline mcpgp-cli:ci validate --all
+          docker run --rm -v "$PWD":/work -w /work/examples/pipeline mcpgp-cli:ci test --all --quiet
+          docker run --rm --entrypoint sh mcpgp-cli:ci -c 'mcpgp --version && git --version'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: The CLI zip and its launcher
+        run: |
+          mvn -B -q -pl cli -am package -DskipTests
+          cli/src/dist/assemble.sh "$(python3 -c 'import xml.etree.ElementTree as E; print(E.parse("pom.xml").getroot().find("{http://maven.apache.org/POM/4.0.0}version").text)')" /tmp/release
+          cd /tmp/release && unzip -q mcpgp-cli-*.zip && mcpgp-cli-*/bin/mcpgp --version
+
   links:
     runs-on: ubuntu-latest
     steps:

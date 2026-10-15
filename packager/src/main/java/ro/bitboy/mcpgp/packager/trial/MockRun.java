@@ -58,8 +58,21 @@ public final class MockRun implements AutoCloseable {
 
     /** @param root the definition's folder, where extension artifacts are copied from (next to the manifest the server runs) */
     public MockRun(JsonNode manifest, Collection<ApiModel.Contract> contracts, InputStream runtimeJar, Path dir, Path root) throws IOException {
+        this(manifest, new SpecMock(contracts), null, runtimeJar, dir, root);
+    }
+
+    /**
+     * The server against real target servers ({@code mcpgp try --target}): {@code config} is the runtime
+     * config to run with (its instances and credentials, secrets as references); there is no mock, so
+     * calls answer without {@code requests}.
+     */
+    public static MockRun against(JsonNode manifest, JsonNode config, InputStream runtimeJar, Path dir, Path root) throws IOException {
+        return new MockRun(manifest, null, config, runtimeJar, dir, root);
+    }
+
+    private MockRun(JsonNode manifest, SpecMock mock, JsonNode targetConfig, InputStream runtimeJar, Path dir, Path root) throws IOException {
         this.manifest = manifest;
-        this.mock = new SpecMock(contracts);
+        this.mock = mock;
         Path jar = dir.resolve("runtime.jar");
         try (runtimeJar) {
             Files.copy(runtimeJar, jar);
@@ -75,10 +88,15 @@ public final class MockRun implements AutoCloseable {
         Path manifestFile = dir.resolve("manifest.json");
         Files.writeString(manifestFile, CanonicalJson.pretty(manifest));
         Path config = dir.resolve("config.yaml");
-        Files.writeString(config, JSON.writeValueAsString(config(manifest, mock.address())));
+        Files.writeString(config, JSON.writeValueAsString(mock != null ? config(manifest, mock.address()) : targetConfig));
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        process = new ProcessBuilder(java, "-jar", jar.toString(), "--manifest", manifestFile.toString(), "--config", config.toString(),
-                "--storage.root", dir.resolve("data").toString()).directory(dir.toFile()).start();
+        // a small, fixed heap: the platform keeps a few of these warm next to itself, and a container's
+        // JAVA_TOOL_OPTIONS (sized for the platform) must not apply to them
+        ProcessBuilder builder = new ProcessBuilder(java, "-Xmx256m", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-jar", jar.toString(),
+                "--manifest", manifestFile.toString(), "--config", config.toString(), "--storage.root", dir.resolve("data").toString())
+                .directory(dir.toFile());
+        builder.environment().remove("JAVA_TOOL_OPTIONS");
+        process = builder.start();
         stdin = process.getOutputStream();
         Thread reader = new Thread(() -> read(process.getInputStream()), "mcpgp-test-stdout");
         reader.setDaemon(true);
@@ -86,6 +104,11 @@ public final class MockRun implements AutoCloseable {
         Thread errors = new Thread(() -> drain(process.getErrorStream()), "mcpgp-test-stderr");
         errors.setDaemon(true);
         errors.start();
+    }
+
+    /** Runtime config with every API's one instance at {@code baseUrl}, without credentials ({@code mcpgp try --target}). */
+    public static ObjectNode configAt(JsonNode manifest, String baseUrl) {
+        return config(manifest, baseUrl);
     }
 
     /** Runtime config with every API's instance at the mock: {@code instance}, {@code instances} or {@code apis}. */
@@ -271,16 +294,39 @@ public final class MockRun implements AutoCloseable {
         if (served != null && INSTANCE.equals(args.get("instance")) && !served.at("/inputSchema/properties").has("instance")) {
             args.remove("instance");
         }
-        mock.drain();
+        String via = viaDiscovery(tool);
+        if (mock != null) {
+            mock.drain();
+        }
         ObjectNode answer = JSON.createObjectNode();
-        JsonNode response = request("tools/call", Map.of("name", tool, "arguments", args));
+        JsonNode response = via == null ? request("tools/call", Map.of("name", tool, "arguments", args))
+                : request("tools/call", Map.of("name", via, "arguments", Map.of("name", tool, "arguments", args)));
+        if (via != null) {
+            answer.put("via", via);
+        }
         if (response.has("error")) {
             answer.set("error", response.get("error"));
         } else {
             answer.set("result", response.path("result"));
         }
-        answer.set("requests", JSON.valueToTree(mock.drain()));
+        if (mock != null) {
+            answer.set("requests", JSON.valueToTree(mock.drain()));
+        }
         return answer;
+    }
+
+    /**
+     * The discovery tool to call {@code tool} through, when the server doesn't list it (hybrid or
+     * discovery exposure: agents reach it with {@code call_tool} or {@code invoke_operation}); null
+     * when it is listed, or when there is no discovery tool (the call then fails as it would for an agent).
+     */
+    private String viaDiscovery(String tool) throws IOException {
+        java.util.Set<String> listed = new java.util.HashSet<>();
+        request("tools/list", Map.of()).at("/result/tools").forEach(t -> listed.add(t.path("name").asText()));
+        if (listed.contains(tool)) {
+            return null;
+        }
+        return listed.contains("call_tool") ? "call_tool" : listed.contains("invoke_operation") ? "invoke_operation" : null;
     }
 
     /**
@@ -403,7 +449,9 @@ public final class MockRun implements AutoCloseable {
             Thread.currentThread().interrupt();
             process.destroyForcibly();
         }
-        mock.close();
+        if (mock != null) {
+            mock.close();
+        }
     }
 
     /** Results as JSON for {@code --json}. */

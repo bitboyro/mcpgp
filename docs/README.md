@@ -18,7 +18,10 @@
 | [spec/cli.md](spec/cli.md) | You script the CLI or run it in CI. |
 | [spec/platform-api.md](spec/platform-api.md) | You work on the platform: store, builds, identities, the REST API. |
 | [guides/ci-pipeline.md](guides/ci-pipeline.md) | You want reliable builds from a git repo in CI. |
+| [deployment.md](deployment.md) | You plan a platform installation: container, store, network, sign-in, backups, upgrades. |
+| [guides/self-hosting.md](guides/self-hosting.md) | You install the platform with Docker Compose, step by step. |
 | [guides/platform.md](guides/platform.md) | You run the platform: sign-in, the web UI, the API. |
+| [guides/new-api-version.md](guides/new-api-version.md) | Your API has a new version: what you do, and what your customers do. |
 | [guides/agents.md](guides/agents.md) | An agent should build MCP servers on the platform. |
 | [guides/extensions.md](guides/extensions.md) | A server needs a bit of custom code. |
 | [spec/compatibility.md](spec/compatibility.md) | MCP or OpenAPI publish a new version, or you change one of our formats. |
@@ -27,7 +30,7 @@
 | [design/ui.md](design/ui.md) | You work on the web UI. |
 | [process/development.md](process/development.md) | Before your first change. |
 | [process/roadmap.md](process/roadmap.md) | You want to know what comes next. |
-| [process/release-gate.md](process/release-gate.md) | You are working on the release gate (planned after 0.1.0). |
+| [process/release-gate.md](process/release-gate.md) | You are working on the release gate. |
 | [process/feature-matrix.md](process/feature-matrix.md) | You need every feature, its settings and what tests it. |
 
 Examples that follow these specs live in [../examples](../examples).

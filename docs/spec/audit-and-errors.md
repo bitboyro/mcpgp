@@ -22,7 +22,7 @@ JSON Lines, one event per line, UTF-8. Written to `audit.file.path`. **Never to 
 | `tool`, `api`, `instance`, `contract` | for tool events | |
 | `outcome` | yes | `ok` · `error` · `denied` (`CONFIRMATION_REQUIRED`, `NOT_AVAILABLE_ON_INSTANCE`) |
 | `code` | when not ok | §3 |
-| `upstream` | for tool events | method, **templated** path, status |
+| `upstream` | for tool events | method, **templated** path, status, and `auth`: the credential type the call used (`fromRequest`, `bearer`, …), never its value |
 | `latencyMs` | for calls | |
 | `args` | for tool events | `"none"`; redacted (default): the arguments' keys with every value replaced by `"***"` (only `instance` is kept); or `{ "sha256": … }` of the canonical arguments |
 | `files` | for calls that send files | `[{ name, sizeBytes, sha256 }]`, never contents |
@@ -45,6 +45,7 @@ build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `auth
 | `resource.read` | every resource read (tools-contract §14.1); the same fields as `tool.call` |
 | `tool.confirm` | confirmation asked / given / refused |
 | `instance.health` | instance status change (healthy, degraded, unreachable) |
+| `instance.contract` | an `auto` instance's contract: detected, or the default and why (`detection`: `selection`, `reported`, `reason`); `error` with `INSTANCE_UNAVAILABLE` when refused (runtime-config §4.4) |
 | `config.reload` | runtime config or instances reloaded |
 | `pack.<id>.<action>` | pack-specific (e.g. `pack.recording.start`) |
 
@@ -55,6 +56,7 @@ build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `auth
 | `INPUT_VALIDATION` | arguments don't match the schema (or the instance's contract), or a file input is rejected (with a reason) | `isError` |
 | `INSTANCE_REQUIRED` / `INSTANCE_UNKNOWN` | missing or unknown `instance` | `isError`, lists valid names |
 | `NOT_AVAILABLE_ON_INSTANCE` | operation not in that instance's contract, or instance read-only | `isError` |
+| `INSTANCE_UNAVAILABLE` | the instance's contract version couldn't be determined and its API's rule says `refuse` (runtime-config §4.4) | `isError`, with the reason |
 | `TOOLSET_DISABLED` | toolsets mode: the tool's toolsets are not enabled for this session | `isError` |
 | `CONFIRMATION_REQUIRED` | destructive tool needs confirmation | `isError` + `confirm` token |
 | `AUTH_INBOUND` | client not allowed | JSON-RPC / HTTP 401/403 |
@@ -65,6 +67,8 @@ build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `auth
 | `UPSTREAM_UNREACHABLE` | DNS/TCP/TLS failure | `isError` |
 | `RESPONSE_PARSE_ERROR` | target returned 2xx with a body that doesn't parse as declared | `isError` |
 | `RESPONSE_TOO_LARGE` | over limit even after truncation | `isError` |
+| `INPUT_TOO_LARGE` | the arguments, or one text value, are over `safety.inputLimits`; nothing was sent | `isError` |
+| `RATE_LIMITED` | over `safety.rateLimits` for that target (calls per minute, or no free slot within 30 s); nothing was sent | `isError`, `_meta.mcpgp/retryAfterSeconds` |
 | `CONFIG_INVALID` | startup/reload config error | startup failure |
 | `INTERNAL` | anything else | `isError`, no internals leaked |
 

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { App } from './App'
 import { api, SIGNED_OUT, type Manifest, type Tool } from './api'
-import { safeNext } from './pages/SignIn'
+import { otherAddress, safeNext } from './pages/SignIn'
 import { listedTools } from './serverData'
 import { ME, SETTINGS, fakeApi } from './test-api'
 
@@ -52,6 +52,10 @@ describe('signing in', () => {
   it('only returns to pages on this site', () => {
     expect(safeNext('/servers/orders-mcp')).toBe('/servers/orders-mcp')
     expect(safeNext('//evil.example/x')).toBe('/')
+    // the sign-in page says where the platform really is
+    expect(otherAddress('https://mcpgp.acme.example:9443', 'http://mcpgp.acme.example:8443/sign-in')).toBe('https://mcpgp.acme.example:9443')
+    expect(otherAddress('https://mcpgp.acme.example:9443', 'https://mcpgp.acme.example:9443/sign-in?next=%2F')).toBeNull()
+    expect(otherAddress(null, 'http://localhost:5173/sign-in')).toBeNull()
     expect(safeNext('/\\evil.example')).toBe('/')
     expect(safeNext('https://evil.example')).toBe('/')
     expect(safeNext(null)).toBe('/')
@@ -377,6 +381,8 @@ describe('trying a tool', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Call the tool' }))
     expect((await screen.findByLabelText('Result')).textContent).toContain('"status": "refunded"')
     expect(screen.getByLabelText('Request').textContent).toContain('POST /api/v2/orders/example/refund  → 200')
-    expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ tool: 'orders_order_refund', arguments: { instance: 'mock', path: { id: 'example' } } })
+    // opening the panel starts the trial server first
+    expect(calls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual(['/servers/orders-mcp/versions/3/try/warm', '/servers/orders-mcp/versions/3/try'])
+    expect(calls.find((c) => c.method === 'POST' && c.path.endsWith('/try'))!.body).toEqual({ tool: 'orders_order_refund', arguments: { instance: 'mock', path: { id: 'example' } } })
   })
 })

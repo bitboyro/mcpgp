@@ -1,0 +1,9 @@
+# Shared notices: company policy every Acme server carries (definition-format.md §5.1).
+# Servers use it with descriptions.include: mcpgp://acme/notices/acme-policy@1
+title: Acme policy
+notices:
+  - id: acme-data
+    text: "Acme policy: customer data stays inside the EU; don't copy it into other tools."
+  - id: acme-writes
+    text: "Changes are audited. Give the ticket number in the reason when there is a field for it."
+    match: { method: [POST, PUT, PATCH, DELETE] }

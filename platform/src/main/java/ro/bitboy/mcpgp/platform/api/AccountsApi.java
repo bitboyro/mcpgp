@@ -59,11 +59,22 @@ public class AccountsApi {
         if (!config.localAccounts() && config.ldap() == null) {
             throw new ApiException(404, "NOT_FOUND", "sign-in with a name and password is turned off; sign in with your company account");
         }
+        String origin = request.getHeader("Origin");
+        if (AuthFilter.isWeb(request) && config.publicUrl() != null && config.publicUrl().startsWith("https://")
+                && origin != null && origin.startsWith("http://")) {
+            // the session cookie is Secure for an https:// platform: a browser on plain HTTP would drop it
+            throw new ApiException(409, "WRONG_ADDRESS", "This platform's address is " + config.publicUrl() + ", and this page is "
+                    + origin + ": over plain HTTP the browser can't keep you signed in. Open " + config.publicUrl() + " instead.",
+                    Map.of("publicUrl", config.publicUrl()));
+        }
         JsonNode json = Json.parse(body);
         Access.IssuedToken token = accounts.signIn(json.path("name").asText(null), json.path("password").asText(null));
         Map<String, Object> result = IdentitiesApi.token(token.record());
+        if (accounts.mustChange(token.record().identity())) {
+            result.put("mustChangePassword", true); // until then, only the password change is allowed (AuthFilter)
+        }
         if (AuthFilter.isWeb(request)) {
-            return ResponseEntity.status(201).header(HttpHeaders.SET_COOKIE, sessionCookie(request, token.value(), Accounts.SESSION).toString())
+            return ResponseEntity.status(201).header(HttpHeaders.SET_COOKIE, sessionCookie(request, token.value(), Accounts.SESSION, config.publicUrl()).toString())
                     .contentType(MediaType.APPLICATION_JSON).body(Json.status(201, result).getBody());
         }
         result.put("value", token.value());
@@ -82,14 +93,17 @@ public class AccountsApi {
                 token.expires(), true));
         store.append(new Model.Activity(Instant.now().toString(), who.identity().name(), who.identity().kind(), "signout",
                 who.identity().name(), "ok", Map.of("token", token.id())));
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, sessionCookie(request, "", Duration.ZERO).toString())
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, sessionCookie(request, "", Duration.ZERO, config.publicUrl()).toString())
                 .contentType(MediaType.APPLICATION_JSON).body(Json.ok(Map.of("signedOut", true)).getBody());
     }
 
     /** How people can sign in; needed before signing in, so it has no token and tells nothing else. */
     @GetMapping("/platform")
     public ResponseEntity<byte[]> platform() {
-        return Json.ok(Map.of("auth", authOptions(config)));
+        Map<String, Object> answer = new LinkedHashMap<>();
+        answer.put("auth", authOptions(config));
+        answer.put("publicUrl", config.publicUrl());
+        return Json.ok(answer);
     }
 
     /** The installation's settings, as far as builders need them (spec/platform-api.md §7). */
@@ -117,12 +131,18 @@ public class AccountsApi {
         return auth;
     }
 
-    public static ResponseCookie sessionCookie(HttpServletRequest request, String value, Duration maxAge) {
-        boolean https = request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"));
+    /** Secure when the request came over https, or when the platform's public address is https (behind a TLS proxy). */
+    public static ResponseCookie sessionCookie(HttpServletRequest request, String value, Duration maxAge, String publicUrl) {
+        boolean https = request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"))
+                || (publicUrl != null && publicUrl.startsWith("https://"));
         return ResponseCookie.from(AuthFilter.COOKIE, value).httpOnly(true).secure(https).sameSite("Strict").path("/").maxAge(maxAge).build();
     }
 
-    /** {@code {password, currentPassword?}}: admins set anyone's; people change their own with the current one. */
+    /**
+     * {@code {password, currentPassword?, mustChange?}}: admins set anyone's, as a temporary password with
+     * {@code mustChange} (the person chooses a new one at the next sign-in); people change their own with
+     * the current one, which also ends a temporary password.
+     */
     @PutMapping("/identities/{id}/password")
     public ResponseEntity<byte[]> password(HttpServletRequest request, @PathVariable String id, @RequestBody(required = false) byte[] body) {
         Access.Principal who = ServersApi.who(request);
@@ -137,10 +157,29 @@ public class AccountsApi {
                 throw new ApiException(403, "FORBIDDEN", "the current password is wrong");
             }
         }
-        accounts.setPassword(identity, json.path("password").asText(null));
+        boolean own = identity.id().equals(who.identity().id());
+        if (own && accounts.mustChange(identity.id()) && accounts.check(identity, json.path("password").asText(""))) {
+            throw ApiException.validation("choose a password other than the temporary one");
+        }
+        boolean mustChange = !own && json.path("mustChange").asBoolean(false);
+        accounts.setPassword(identity, json.path("password").asText(null), mustChange);
         store.append(new Model.Activity(Instant.now().toString(), who.identity().name(), who.identity().kind(), "password.set",
-                identity.name(), "ok", Map.of()));
-        return Json.ok(Map.of("identity", identity.id(), "password", "set"));
+                identity.name(), "ok", mustChange ? Map.of("temporary", true) : Map.of()));
+        return Json.ok(Map.of("identity", identity.id(), "password", "set", "mustChange", mustChange));
+    }
+
+    /** Ends a lock after wrong passwords (admins), for a local account or a directory sign-in. */
+    @PostMapping("/identities/{id}/unlock")
+    public ResponseEntity<byte[]> unlock(HttpServletRequest request, @PathVariable String id) {
+        Access.Principal who = ServersApi.who(request);
+        who.require("admin");
+        Model.Identity identity = store.identities().stream().filter(i -> i.id().equals(id)).findFirst()
+                .orElseThrow(() -> ApiException.notFound("identity"));
+        boolean wasLocked = accounts.lockedUntil(identity).isPresent();
+        accounts.unlock(identity);
+        store.append(new Model.Activity(Instant.now().toString(), who.identity().name(), who.identity().kind(), "identity.unlock",
+                identity.name(), "ok", Map.of("wasLocked", wasLocked)));
+        return Json.ok(Map.of("identity", identity.id(), "locked", false));
     }
 
     @GetMapping("/approvals")
