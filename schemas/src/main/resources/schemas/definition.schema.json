@@ -221,6 +221,7 @@
         "spec": { "type": "string", "minLength": 1 },
         "overlays": { "type": "array", "items": { "type": "string" } },
         "default": { "type": "boolean" },
+        "source": { "description": "Where the spec is published (https://…); the platform fetches it again on request, from allowed hosts only. The compiler never fetches it.", "type": "string", "pattern": "^https?://" },
         "$remove": { "type": "boolean" }
       },
       "required": ["version"],

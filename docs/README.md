@@ -21,6 +21,7 @@
 | [deployment.md](deployment.md) | You plan a platform installation: container, store, network, sign-in, backups, upgrades. |
 | [guides/self-hosting.md](guides/self-hosting.md) | You install the platform with Docker Compose, step by step. |
 | [guides/platform.md](guides/platform.md) | You run the platform: sign-in, the web UI, the API. |
+| [guides/new-api-version.md](guides/new-api-version.md) | Your API has a new version: what you do, and what your customers do. |
 | [guides/agents.md](guides/agents.md) | An agent should build MCP servers on the platform. |
 | [guides/extensions.md](guides/extensions.md) | A server needs a bit of custom code. |
 | [spec/compatibility.md](spec/compatibility.md) | MCP or OpenAPI publish a new version, or you change one of our formats. |

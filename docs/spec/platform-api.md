@@ -62,7 +62,19 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   checks): to the server's API (`api=<id>` when it has several), as `version` (default the spec's
   `info.version`), with `default=true` to make it the default; the same version again replaces its
   spec. The files go under `contracts/<version>/`, and the server gets its next version. `dryRun=true`
-  answers `{ api, version, spec, replaces, compiles, diagnostics, moved }`.
+  answers `{ api, version, spec, replaces, compiles, diagnostics, moved, unchanged }`, and when it
+  compiles, what agents would notice: `summary`, `breaking`, `changes` (as `/diff`).
+  - Instead of a body, `url=<address>` **fetches the spec** from where it is published: one file
+    (named after the address's last segment, else `openapi.json` / `openapi.yaml`), from a host in
+    `specHosts` only (§7; `422 SPEC_HOST_NOT_ALLOWED` otherwise, also for a redirect to another
+    host), HTTPS unless the host is listed with `http://`, at most 10 MB, 30 s. The address is recorded
+    as the contract's `source`; a failed fetch is `502 SPEC_FETCH_FAILED`. The dry run adds `source`
+    and `fetched: { url, file, bytes }`.
+  - `source=true&version=<v>` fetches the address recorded for that version again (**check for
+    updates**).
+  - A spec the same as the saved one (same files, same address) answers `unchanged: true`; saving it
+    answers `200` and makes no version. A spec uploaded by hand over a fetched one removes its
+    `source`.
 - `POST /servers` creates a server from a first version: a zip of the project, or JSON
   `{ files: { "<path>": "<content>" } }`. The root definition is the single `*.mcpgp.yaml` at the
   top. Files are checked with the same rules as the CLI (root restriction, no remote references).
@@ -345,7 +357,11 @@ auth:
     # activeDirectory: { domain: acme.com }                      # instead of the searches
     roles: { mcpgp-admins: admin, mcpgp-releasers: releaser }
 signing: { key: "${env:MCPGP_SIGNING_KEY}" }
-specHosts: []                      # hosts definitions may fetch specs from (none by default)
+specHosts: []                      # hosts specs may be fetched from (none by default; §2.1, §8):
+#  - api.acme.com                     #   HTTPS on 443
+#  - specs.acme.com:8443              #   another port
+#  - http://build.acme.internal       #   plain HTTP, for an internal host
+#  - { host: specs.acme.com, header: Authorization, value: "${env:SPECS_TOKEN}" }  # a credential, as a reference
 retention: { archiveAfterDays: 90, deleteArchivedAfterDays: 365, keepLast: 10 }
 platformServer: { enabled: true }  # the platform's own MCP server among the servers (§2.1); false archives it
 ```
@@ -417,6 +433,12 @@ and monitoring.
 
 - Uploaded projects are checked like CLI projects: root restriction, no remote references (unless
   the host is in `specHosts`), size limits per file and per project.
+- The platform fetches specs only from hosts an administrator lists in `specHosts` (none by
+  default), only when someone asks (adding a version, checking for updates), never on a schedule,
+  and never from a customer's target server. Redirects are followed only to another listed host. A
+  host's credential is a reference, read at each fetch and sent only to that host; it is never
+  stored with a server, shown, or written to the activity log. Agents can fetch from listed hosts
+  (with `servers:write`) but can't change `specHosts`, which is in the platform's config file.
 - Builds run the compiler and packager only; nothing from a definition is executed (extensions are
   compiled code the builder adds to the platform, never uploaded with a definition).
 - Tokens and passwords are stored as hashes; the signing key, the OIDC client secret and the LDAP

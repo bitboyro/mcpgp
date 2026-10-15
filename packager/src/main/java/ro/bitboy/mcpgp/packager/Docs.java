@@ -163,7 +163,47 @@ final class Docs {
         md.append("\nExample: `").append(server).append(".example.yaml`.\n");
         fromRequest(md);
         tokenExchange(md);
+        apiVersions(md);
         return md.toString();
+    }
+
+    /** With several versions of an API: which one each target server uses, and how to choose (runtime-config §4.4). */
+    private void apiVersions(StringBuilder md) {
+        for (JsonNode api : manifest.path("apis")) {
+            List<String> versions = new ArrayList<>();
+            String fallback = null;
+            for (JsonNode c : api.path("contracts")) {
+                versions.add(c.path("version").asText());
+                if (c.path("default").asBoolean()) {
+                    fallback = c.path("version").asText();
+                }
+            }
+            if (versions.size() < 2) {
+                continue;
+            }
+            String id = api.path("id").asText();
+            String key = multi ? "instances[].contract" : "instance.contract";
+            md.append("\n## Versions of the ").append(api.path("title").asText(id)).append(" API\n\n")
+                    .append("This server works with versions ").append(String.join(", ", versions)).append(" of the API (default ").append(fallback)
+                    .append("). Each target server uses one of them, set with `").append(key).append("`:\n\n");
+            JsonNode detect = api.path("detect");
+            if (detect.isObject()) {
+                boolean refuse = detect.path("onFailure").asText("useDefault").equals("refuse");
+                md.append("- `auto` (the default): when the server starts or reloads, it asks the target which version it runs (`")
+                        .append(detect.path("method").asText("GET")).append(" ").append(detect.path("path").asText())
+                        .append(detect.path("underBasePath").asBoolean() ? "` under each version's base path" : "`")
+                        .append(") and uses that one. If the target can't say, ")
+                        .append(refuse ? "calls to it are refused (`INSTANCE_UNAVAILABLE`) and it is asked again within a minute."
+                                : "it uses the default, " + fallback + ", and the log says why.")
+                        .append(" `prefer: \"").append(versions.get(0)).append("\"` asks about that version first.\n");
+            } else {
+                md.append("- `auto` (the default): the default version, ").append(fallback)
+                        .append(". A target that runs another version needs that version set: this server can't ask it.\n");
+            }
+            md.append("- A version (`\"").append(versions.get(0)).append("\"`): that one, always; the target is never asked.\n\n")
+                    .append("Tools that a target's version doesn't have answer `NOT_AVAILABLE_ON_INSTANCE`; `instances_list` shows each target's version. ")
+                    .append("`doctor` asks every target which version it runs, and warns when one set to a version runs another.\n");
+        }
     }
 
     private void walk(JsonNode node, String path, String env, List<String[]> rows, Set<String> seen) {

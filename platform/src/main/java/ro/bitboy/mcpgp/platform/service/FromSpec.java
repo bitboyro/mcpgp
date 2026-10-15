@@ -50,8 +50,17 @@ public final class FromSpec {
     }
 
     public Upload read(byte[] body, String contentType, String main) {
+        return read(Projects.files(body, contentType), main);
+    }
+
+    /** A spec fetched from its address: one file, named after it. */
+    public Upload read(SpecFetch.Fetched fetched) {
+        return read(Map.of(fetched.name(), fetched.body()), null);
+    }
+
+    private Upload read(Map<String, byte[]> uploaded, String main) {
         String chosen = main == null || main.isBlank() ? null : main;
-        SpecFiles.Placed placed = SpecFiles.place(SpecFiles.specFiles(Projects.files(body, contentType)), chosen);
+        SpecFiles.Placed placed = SpecFiles.place(SpecFiles.specFiles(uploaded), chosen);
         SpecFiles.Analysis analysis = SpecFiles.analyze(placed.files(), chosen);
         if (!analysis.ok()) {
             throw problems(analysis);
@@ -213,7 +222,12 @@ public final class FromSpec {
     }
 
     /** A contract version for a server's API: what changes in its definition, and the files it adds. */
-    public record ContractChange(String api, String version, String spec, boolean replaces, List<YamlEdit.Change> changes, Map<String, byte[]> files) {
+    /**
+     * @param source    the address the spec was fetched from, recorded in the definition; null for an upload
+     * @param unchanged the version exists with exactly these files (and source): saving would change nothing
+     */
+    public record ContractChange(String api, String version, String spec, boolean replaces, List<YamlEdit.Change> changes, Map<String, byte[]> files,
+                                 String source, boolean unchanged) {
     }
 
     /**
@@ -221,6 +235,42 @@ public final class FromSpec {
      * replaces that version's spec when it exists. The files go under {@code contracts/<version>/}.
      */
     public ContractChange contract(String id, Upload upload, String api, String version, boolean makeDefault) {
+        return contract(id, upload, api, version, makeDefault, null);
+    }
+
+    /** The address the spec of an API's contract version was fetched from ({@code source}); empty when it was uploaded. */
+    public java.util.Optional<String> source(String id, String api, String version) {
+        Model.Server server = servers.get(id);
+        if (server.latest() == null) {
+            return java.util.Optional.empty();
+        }
+        JsonNode definition;
+        try {
+            Model.Version files = servers.files(server.latest());
+            definition = YAML.readTree(store.blob(files.files().get(files.root())));
+        } catch (IOException e) {
+            throw ApiException.validation("the server's definition can't be read");
+        }
+        List<JsonNode> apis = new ArrayList<>();
+        if (definition.has("api")) {
+            apis.add(definition.get("api"));
+        } else {
+            definition.path("apis").forEach(apis::add);
+        }
+        for (JsonNode a : apis) {
+            if (api == null || api.isBlank() || a.path("id").asText().equals(api)) {
+                for (JsonNode c : a.path("contracts")) {
+                    if (c.path("version").asText().equals(version) && c.hasNonNull("source")) {
+                        return java.util.Optional.of(c.get("source").asText());
+                    }
+                }
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    /** @param source the spec's address when it was fetched ({@code apis[].contracts[].source}); null for an upload */
+    public ContractChange contract(String id, Upload upload, String api, String version, boolean makeDefault, String source) {
         Model.Server server = servers.get(id);
         if (server.latest() == null) {
             throw new ApiException(409, "CONFLICT", "server " + id + " has no version yet; upload one");
@@ -267,19 +317,33 @@ public final class FromSpec {
         String folder = "contracts/" + contractVersion + "/";
         String spec = folder + a.main();
         Map<String, byte[]> added = SpecFiles.under(folder, upload.files(), a);
-        boolean exists = false;
+        JsonNode existing = null;
         for (JsonNode c : target.path("contracts")) {
             if (c.path("version").asText().equals(contractVersion)) {
-                exists = true;
+                existing = c;
             }
         }
+        boolean exists = existing != null;
         List<YamlEdit.Change> changes = new ArrayList<>();
         String at = base + "/contracts/[version=" + contractVersion + "]";
+        boolean unchanged = exists && existing.path("spec").asText().equals(spec) && java.util.Objects.equals(existing.path("source").asText(null), source);
         if (exists) {
             changes.add(new YamlEdit.Change("set", at + "/spec", JsonNodeFactory.instance.textNode(spec)));
+            if (source != null) {
+                changes.add(new YamlEdit.Change("set", at + "/source", JsonNodeFactory.instance.textNode(source)));
+            } else if (existing.has("source")) {
+                changes.add(new YamlEdit.Change("remove", at + "/source", null)); // uploaded by hand: no longer from that address
+            }
         } else {
             ObjectNode contract = JsonNodeFactory.instance.objectNode().put("version", contractVersion).put("spec", spec);
+            if (source != null) {
+                contract.put("source", source);
+            }
             changes.add(new YamlEdit.Change("set", at, contract));
+        }
+        for (Map.Entry<String, byte[]> file : SpecFiles.under(folder, upload.files(), a).entrySet()) {
+            String blob = files.files().get(file.getKey());
+            unchanged &= blob != null && java.util.Arrays.equals(store.blob(blob), file.getValue());
         }
         if (makeDefault) {
             for (JsonNode c : target.path("contracts")) {
@@ -289,7 +353,8 @@ public final class FromSpec {
             }
             changes.add(new YamlEdit.Change("set", at + "/default", JsonNodeFactory.instance.booleanNode(true)));
         }
-        return new ContractChange(apiId, contractVersion, spec, exists, changes, added);
+        unchanged = unchanged && (!makeDefault || existing.path("default").asBoolean(false));
+        return new ContractChange(apiId, contractVersion, spec, exists, changes, added, source, unchanged);
     }
 
     private static Compiler.Result compile(Map<String, byte[]> project, String definition) {

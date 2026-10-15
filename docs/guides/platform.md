@@ -42,7 +42,11 @@ anything is created, and puts files picked without their folders where the spec 
 shows what it found (title, version, how many operations become tools), you adjust the server id and
 title, and **Create server** makes the server, ready to shape on its Overview. A newer spec goes on
 the server's **Sources** page: **Add a spec version** (or **Replace** a version's spec), optionally as
-the default; each makes the server's next version. Teams that keep the definition in git upload the
+the default; each makes the server's next version. The spec can be uploaded, or fetched **from an
+address** where the API publishes it (`https://api.acme.com/openapi.json`); a version fetched from an
+address has **Check for updates**, which fetches it again and shows what agents would notice before
+anything is saved. An administrator decides which hosts can be used (`specHosts` in `platform.yaml`;
+none by default). Teams that keep the definition in git upload the
 whole project instead (**A definition project**, or `mcpgp push`).
 
 The pages: **All servers** (new server from a spec or a project, duplicate, variant), and per server **Overview**

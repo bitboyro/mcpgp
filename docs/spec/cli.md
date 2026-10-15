@@ -205,7 +205,7 @@ The server's version **follows the API version**: by default it is the default c
 (contract `2.0` → server `2.0.0`). Rebuilding the same contract version (new rules, fixes) adds a build
 number as SemVer build metadata: `2.0.0+3`. `release.versionFrom` or `--version` can override this.
 
-Breaking-change detection between builds is out of scope for now: tool changes come with API versions.
+`mcpgp diff` (§3.5) lists what changed between builds, breaking changes first.
 
 ## 6. Reproducibility guarantees
 

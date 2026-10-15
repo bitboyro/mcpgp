@@ -247,6 +247,9 @@ paths:
         A contract version from an uploaded spec (like from-spec): added to the server's API (or api), or
         replacing that version's spec when it exists. version defaults to the spec's info.version; default=true
         makes it the default. The files go under contracts/<version>/ and the server gets its next version.
+        Instead of a body, url fetches the spec from where it is published (hosts the administrator allows
+        only) and records the address; source=true with version fetches that version's recorded address
+        again (check for updates). The same spec as the saved one answers unchanged and makes no version.
       parameters:
         - { name: api, in: query, schema: { type: string } }
         - { name: version, in: query, schema: { type: string } }
@@ -254,13 +257,15 @@ paths:
         - { name: default, in: query, schema: { type: boolean, default: false } }
         - { name: message, in: query, schema: { type: string } }
         - { name: dryRun, in: query, schema: { type: boolean, default: false } }
+        - { name: url, in: query, description: "The spec's address (https://…), instead of a body", schema: { type: string, format: uri } }
+        - { name: source, in: query, description: "Fetch the address recorded for version again", schema: { type: boolean, default: false } }
       requestBody:
-        required: true
+        required: false
         content:
           application/json: { schema: { $ref: "#/components/schemas/ProjectFiles" } }
           application/zip: { schema: { type: string, format: binary } }
       responses:
-        "200": { description: The dry run's answer (api, version, spec, replaces, compiles, diagnostics), content: { application/json: { schema: { type: object } } } }
+        "200": { description: "The dry run's answer (api, version, spec, replaces, compiles, diagnostics, unchanged, summary, changes), or the server unchanged when the spec is the same", content: { application/json: { schema: { type: object } } } }
         "201": { description: The server, at its new version, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/edits:

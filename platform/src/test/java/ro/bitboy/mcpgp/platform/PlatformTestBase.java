@@ -38,14 +38,21 @@ abstract class PlatformTestBase {
     static ConfigurableApplicationContext context;
     static String root;
     static String admin;
+    /** A test class's changes to the platform's config (set in its static initializer); used once, by the next start. */
+    static java.util.function.UnaryOperator<PlatformConfig> configure = c -> c;
 
     @BeforeAll
-    static void start() throws Exception {
+    static void start(org.junit.jupiter.api.TestInfo test) throws Exception {
+        // the test class's static initializer may set configure: run it before the platform starts
+        Class<?> testClass = test.getTestClass().orElseThrow();
+        Class.forName(testClass.getName(), true, testClass.getClassLoader());
         int port;
         try (ServerSocket socket = new ServerSocket(0)) {
             port = socket.getLocalPort();
         }
-        PlatformConfig config = TestStores.of(new PlatformConfig(dir.resolve("store"), "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT, "acme"));
+        PlatformConfig config = configure.apply(TestStores.of(new PlatformConfig(dir.resolve("store"), "127.0.0.1", port, null,
+                PlatformConfig.Retention.DEFAULT, "acme")));
+        configure = c -> c;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PlatformServer.init(config, new String[] {"init", "--admin", "ana"}, new PrintStream(out, true, StandardCharsets.UTF_8));
         admin = out.toString(StandardCharsets.UTF_8).lines().filter(l -> l.strip().startsWith("mcpgp_")).findFirst().orElseThrow().strip();

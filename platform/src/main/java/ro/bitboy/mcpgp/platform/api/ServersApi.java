@@ -21,6 +21,7 @@ import ro.bitboy.mcpgp.platform.service.YamlEdit;
 import ro.bitboy.mcpgp.platform.service.Access;
 import ro.bitboy.mcpgp.platform.service.Compilation;
 import ro.bitboy.mcpgp.platform.service.Servers;
+import ro.bitboy.mcpgp.platform.service.SpecFetch;
 import ro.bitboy.mcpgp.platform.store.Model;
 import ro.bitboy.mcpgp.platform.store.Store;
 
@@ -44,10 +45,13 @@ public class ServersApi {
     private final ro.bitboy.mcpgp.platform.service.Trials trials;
     private final ro.bitboy.mcpgp.platform.service.FromSpec fromSpec;
 
+    private final SpecFetch specFetch;
+
     public ServersApi(Store store, Servers servers, Compilation compilation, ro.bitboy.mcpgp.platform.PlatformConfig config,
                       ro.bitboy.mcpgp.platform.service.Guardrails guardrails, Edits edits, ro.bitboy.mcpgp.platform.service.Trials trials,
                       ro.bitboy.mcpgp.platform.service.FromSpec fromSpec) {
         this.fromSpec = fromSpec;
+        this.specFetch = new SpecFetch(config.specHosts(), System.getenv());
         this.edits = edits;
         this.trials = trials;
         this.store = store;
@@ -138,20 +142,39 @@ public class ServersApi {
      * A contract version from an uploaded spec, like {@code from-spec}: added to the server's API (or
      * {@code api}), or replacing the spec of that version when it exists; {@code version} defaults to
      * the spec's {@code info.version}, {@code default=true} makes it the default. The files go under
-     * {@code contracts/<version>/}; the server gets its next version. A dry run answers whether it compiles.
+     * {@code contracts/<version>/}; the server gets its next version. A dry run answers whether it
+     * compiles and what would change for agents. Instead of a body, {@code url} fetches the spec from
+     * an allowed host ({@code specHosts}) and records the address as the version's {@code source};
+     * {@code source=true} fetches it again from the address recorded for {@code version}. A spec that
+     * is the same as the saved one answers {@code unchanged} and makes no version.
      */
     @PostMapping("/{id}/contracts")
     public ResponseEntity<byte[]> addContract(HttpServletRequest request, @PathVariable String id, @RequestParam(required = false) String api,
                                               @RequestParam(required = false) String version, @RequestParam(required = false) String main,
                                               @RequestParam(name = "default", defaultValue = "false") boolean makeDefault,
                                               @RequestParam(required = false) String message, @RequestParam(defaultValue = "false") boolean dryRun,
+                                              @RequestParam(required = false) String url,
+                                              @RequestParam(name = "source", defaultValue = "false") boolean fromSource,
                                               @RequestHeader(value = "Content-Type", required = false) String contentType,
                                               @RequestBody(required = false) byte[] body) {
         Access.Principal who = who(request);
         who.require("servers:write");
-        var upload = fromSpec.read(body == null ? new byte[0] : body, contentType, main);
-        var change = fromSpec.contract(id, upload, api, version, makeDefault);
-        int base = servers.get(id).latest().number();
+        if (fromSource) {
+            if (version == null || version.isBlank()) {
+                throw ApiException.validation("version: say which version's recorded address to fetch again");
+            }
+            url = fromSpec.source(id, api, version).orElseThrow(() -> ApiException.validation(
+                    "version " + version + " wasn't fetched from an address; upload its spec, or give url"));
+        }
+        boolean fetching = url != null && !url.isBlank();
+        if (fetching && body != null && body.length > 0) {
+            throw ApiException.validation("url: fetch the spec or upload it, not both");
+        }
+        SpecFetch.Fetched fetched = fetching ? specFetch.fetch(url) : null;
+        var upload = fetching ? fromSpec.read(fetched) : fromSpec.read(body == null ? new byte[0] : body, contentType, main);
+        var change = fromSpec.contract(id, upload, api, version, makeDefault, fetching ? url.strip() : null);
+        Model.Server current = servers.get(id);
+        int base = current.latest().number();
         if (dryRun) {
             Edits.Result result = edits.preview(id, base, change.changes(), change.files());
             Map<String, Object> answer = new java.util.LinkedHashMap<>();
@@ -161,14 +184,31 @@ public class ServersApi {
             answer.put("replaces", change.replaces());
             answer.put("moved", upload.moves().stream().map(m -> Map.of("from", m.from(), "to", m.to())).toList());
             answer.put("compiles", result.compiles());
+            answer.put("unchanged", change.unchanged());
+            if (fetched != null) {
+                answer.put("source", change.source());
+                answer.put("fetched", Map.of("url", fetched.url(), "file", fetched.name(), "bytes", fetched.body().length));
+            }
+            if (result.compiles() && !change.unchanged()) {
+                // what agents would notice, as on the Changes page
+                var diff = ro.bitboy.mcpgp.core.diff.ManifestDiff.compare(manifestOf(current, current.latest()),
+                        Json.parse(result.preview().manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                answer.put("summary", ro.bitboy.mcpgp.core.diff.DiffReport.summary(diff));
+                answer.put("breaking", diff.breaking());
+                answer.put("changes", changeList(diff));
+            }
             // a preview from the cache has no compiler result; its manifest lists the diagnostics
             answer.put("diagnostics", result.preview().result() != null ? diagnostics(result.preview().result().diagnostics())
                     : Json.parse(result.preview().manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8)).path("diagnostics"));
             return Json.ok(answer);
         }
+        if (change.unchanged()) {
+            return withEtag(Json.ok(detail(current)), current); // the same spec: no new version
+        }
         guardrails.quota(who, "versions");
         String text = message != null && !message.isBlank() ? message
-                : (change.replaces() ? "Replace the spec of " : "Add contract ") + change.api() + "@" + change.version();
+                : (change.replaces() ? "Replace the spec of " : "Add contract ") + change.api() + "@" + change.version()
+                + (fetching ? " from " + change.source() : "");
         Model.Server server = edits.save(id, base, change.changes(), change.files(), text, who);
         return withEtag(Json.status(201, detail(server)), server);
     }
@@ -260,16 +300,20 @@ public class ServersApi {
         answer.put("released", released == null ? null : released.number());
         answer.put("summary", ro.bitboy.mcpgp.core.diff.DiffReport.summary(result));
         answer.put("breaking", result.breaking());
-        answer.put("changes", result.changes().stream().map(c -> {
+        answer.put("changes", changeList(result));
+        answer.put("markdown", ro.bitboy.mcpgp.core.diff.DiffReport.markdown(id, result));
+        return Json.ok(answer);
+    }
+
+    private static List<Map<String, Object>> changeList(ro.bitboy.mcpgp.core.diff.ManifestDiff.Result result) {
+        return result.changes().stream().map(c -> {
             Map<String, Object> m = new java.util.LinkedHashMap<>();
             m.put("impact", c.impact().name().toLowerCase(java.util.Locale.ROOT));
             m.put("tool", c.tool());
             m.put("kind", c.kind());
             m.put("text", c.text());
             return m;
-        }).toList());
-        answer.put("markdown", ro.bitboy.mcpgp.core.diff.DiffReport.markdown(id, result));
-        return Json.ok(answer);
+        }).toList();
     }
 
     private Model.VersionRef endpoint(Model.Server server, String which, Model.VersionRef released) {

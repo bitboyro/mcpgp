@@ -38,6 +38,14 @@ versions follow [SemVer](https://semver.org).
   whole answer), the pattern, and what happens when it can't be found. Before, the page only showed
   a rule written in the definition by hand.
 
+- A spec version **from an address**: on Sources, **Add a spec version** can fetch the spec from
+  where the API publishes it instead of uploading it, and a version fetched that way has **Check for
+  updates**, which fetches it again and shows what agents would notice (the Changes page's list)
+  before anything is saved; the same spec makes no version. The platform fetches only from hosts an
+  administrator lists in `specHosts` (none by default), on request only; a host's credential is a
+  reference, never stored with a server or shown. API: `POST /servers/{id}/contracts?url=…` and
+  `?source=true&version=…`; the address is recorded as `apis[].contracts[].source`.
+
 ### Fixed
 - Activity searches read the whole log when few entries matched, and agent quotas read it on every
   save or build: searches now go to the store as a query (PostgreSQL filters in SQL, with indexes on

@@ -58,6 +58,7 @@ build: { … }
 | `apis[].contracts[].spec` | path \| URL | — | Swagger 2.0, OAS 3.0 or 3.1. URLs only for allow-listed hosts. |
 | `apis[].contracts[].overlays` | list of paths | `[]` | Applied in order. |
 | `apis[].contracts[].default` | bool | last listed | Exactly one default per API. |
+| `apis[].contracts[].source` | URL | none | Where the spec is published. The platform records it when it fetches the spec, and fetches it again when someone checks for updates (allowed hosts only, platform-api §2.1). The compiler never fetches it. |
 | `apis[].detect` | object | none | optional: `{ method, path, pattern, field \| header, underBasePath, onFailure: useDefault \| refuse }`; the pattern's first group is matched against shipped versions (runtime-config §4.4) |
 | `apis[].detect.field` / `.header` | string | the body | where the version is: a JSON pointer into the answer (`/version`), or a response header; not both |
 | `apis[].detect.underBasePath` | bool | `false` | ask under each contract's base path in turn (the preferred contract first, then the newest), for APIs whose versions each answer under their own path |
