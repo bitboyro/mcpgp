@@ -69,6 +69,12 @@ versions follow [SemVer](https://semver.org).
   client sending parallel tool calls never got some of the answers. Messages now go out one at a time.
 - Parameters: cookie values are encoded (a `;` could add a cookie), and a header value with a line
   break is refused with `INPUT_VALIDATION` instead of an internal error.
+- Settings the docs described but nothing did are now refused, naming each one, instead of being
+  ignored: in the definition `generation.mode: codegen`/`both`, `schemas.input: lean`,
+  `apis[].pagination`, `build.jarSigning`, `build.image.registry`/`push`/`tar` (the compiler's
+  `NOT_SUPPORTED_YET`); in the runtime config `server.tls` with a certificate, `server.trustProxy`
+  and `server.outboundProxy` (at startup). The specs mark them "not supported yet"; the roadmap no
+  longer lists codegen as done.
 - Activity searches read the whole log when few entries matched, and agent quotas read it on every
   save or build: searches now go to the store as a query (PostgreSQL filters in SQL, with indexes on
   target and actor) and stop at their time bound. The cache cleanup deletes in one batch.

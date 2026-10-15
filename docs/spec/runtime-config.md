@@ -150,10 +150,10 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `server.host` / `port` | `127.0.0.1` / `8080` | |
 | `server.publicUrl` | — | URL clients use; required for OAuth metadata |
 | `server.basePath` | `/mcp` | |
-| `server.tls` | none | `{ cert, key }` or `proxy` (TLS ends at a reverse proxy) |
-| `server.trustProxy` | `[]` | addresses whose `X-Forwarded-*` headers are trusted |
+| `server.tls` | none | `proxy`: TLS ends at a reverse proxy. `{ cert, key }` (HTTPS by the server itself): **Not supported yet:** refused at startup. |
+| `server.trustProxy` | `[]` | **Not supported yet:** refused at startup. Planned: addresses whose `X-Forwarded-*` headers are trusted |
 | `server.allowedOrigins` | `[]` | Origin check for browser clients (DNS rebinding protection) |
-| `server.outboundProxy` | none | HTTP proxy for calls to instances |
+| `server.outboundProxy` | none | **Not supported yet:** refused at startup. Planned: HTTP proxy for calls to instances |
 | `server.management.port` | none | health + metrics on a separate port |
 | `server.auth.mode` | `none` | `none` · `static` · `oauth`, within the build's `allowed` list |
 | `server.auth.keys[]` | — | `static` mode: `{ name, value }` per client key; `value` is a secret field |

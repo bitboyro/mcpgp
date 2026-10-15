@@ -259,6 +259,16 @@ public final class ConfigLoader {
         if (!allowedAuth.isEmpty() && !allowedAuth.contains(authMode)) {
             problems.add("/server/auth/mode: '" + authMode + "' is not available in this build (allowed: " + allowedAuth + ")");
         }
+        // described in runtime-config, not done yet: refused, so nobody relies on them (runtime-config §3)
+        if (server.path("tls").isObject()) {
+            problems.add("/server/tls: serving HTTPS itself isn't supported yet; put a reverse proxy in front for TLS and set tls: proxy");
+        }
+        if (server.has("trustProxy")) {
+            problems.add("/server/trustProxy isn't supported yet: the server doesn't read X-Forwarded-* headers; remove it");
+        }
+        if (server.has("outboundProxy")) {
+            problems.add("/server/outboundProxy isn't supported yet: calls to target servers go direct; remove it");
+        }
         String host = server.path("host").asText("127.0.0.1");
         boolean allowInsecure = server.path("auth").path("allowInsecure").asBoolean(false);
         if (transport.equals("http") && authMode.equals("none") && !LOOPBACK.contains(host) && !allowInsecure) {

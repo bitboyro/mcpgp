@@ -44,6 +44,8 @@ public final class Codes {
     public static final String NOTICE_MATCHES_NOTHING = "NOTICE_MATCHES_NOTHING";
     public static final String CONTENT_TYPE_UNKNOWN = "CONTENT_TYPE_UNKNOWN";
     public static final String RESOURCE_NOT_GET = "RESOURCE_NOT_GET";
+    /** A setting the format describes that this version doesn't do yet (definition-format §2). */
+    public static final String NOT_SUPPORTED_YET = "NOT_SUPPORTED_YET";
     public static final String RESOURCE_NEEDS_HEADER = "RESOURCE_NEEDS_HEADER";
     public static final String PROMPT_UNKNOWN_ARGUMENT = "PROMPT_UNKNOWN_ARGUMENT";
     public static final String DESCRIPTION_TRUNCATED = "DESCRIPTION_TRUNCATED";
