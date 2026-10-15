@@ -15,6 +15,10 @@ on:
         description: "Branch, tag or commit to check (empty: the one chosen above)"
         required: false
         default: ""
+      formats:
+        description: "Package formats: jar,mcpb,docker"
+        required: false
+        default: "jar,mcpb,docker"
       transports:
         description: "Transports: stdio,http"
         required: false
@@ -34,6 +38,10 @@ on:
         type: string
         required: false
         default: ""
+      formats:
+        type: string
+        required: false
+        default: "jar,mcpb,docker"
       transports:
         type: string
         required: false
@@ -92,6 +100,7 @@ jobs:
       - name: Integration suite
         working-directory: conformance/runner/ts
         env:
+          GATE_FORMATS: ${{ inputs.formats }}
           GATE_TRANSPORTS: ${{ inputs.transports }}
           GATE_REVISIONS: ${{ inputs.revisions }}
         run: |

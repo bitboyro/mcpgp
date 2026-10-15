@@ -14,7 +14,9 @@ versions follow [SemVer](https://semver.org).
   of the mock. `gate.yml` runs it with the Java tests for every version tag, before anything is
   published (a failure publishes nothing), and when started by hand; a release candidate tag
   (`vX.Y.Z-rcN`) runs only the gate. The release carries its report (`gate-report.html`,
-  `gate-report.json`).
+  `gate-report.json`). G2 so far: every package format as the customer runs it (the jar, the desktop
+  bundle through its manifest, the Docker image from its Dockerfile), golden surfaces of what each
+  package lists, and a fixture per exposure mode checked against the plain build.
 - What changed between builds: `mcpgp diff` (against the last release tag, a tag or commit, a
   manifest or a release folder; text, Markdown for PR comments, or JSON; `--fail-on-breaking`, exit
   code 6) and the platform's **Changes** page (any two versions, by default since the last release;

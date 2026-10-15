@@ -4,12 +4,20 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { join, relative } from "node:path";
 import { cliJar, java, workDir, WORK } from "./paths.js";
 
-/** A server package as the customer gets it, unpacked to the server jar the customer runs. */
+/** A server package as the customer gets it, unpacked. */
 export interface Package {
   /** The definition it was built from. */
   definition: string;
-  /** The server jar inside the package. */
+  /** The server's name, e.g. kitchen-sink. */
+  name: string;
+  /** Where the package's zip was unpacked (its top directory, as the customer has it). */
+  dir: string;
+  /** The server jar: what `java -jar` runs. */
   jar: string;
+  /** The desktop bundle, unpacked, when the build has the mcpb target. */
+  mcpb?: string;
+  /** docker/Dockerfile, when the build has the docker target. */
+  dockerfile?: string;
   /** The package's zip name, e.g. kitchen-sink-1.0.0.zip. */
   zip: string;
 }
@@ -21,8 +29,9 @@ function files(dir: string): string[] {
 }
 
 /** Same definition files and same CLI → same package, so it is built once. */
-function key(definitionDir: string, cli: string): string {
+function key(definition: string, definitionDir: string, cli: string): string {
   const hash = createHash("sha256");
+  hash.update(`${relative(definitionDir, definition)}\n`);   // several root definitions can share a project
   const stat = statSync(cli);
   hash.update(`${cli}:${stat.size}:${stat.mtimeMs}\n`);
   for (const file of files(definitionDir).sort()) {
@@ -39,7 +48,7 @@ function key(definitionDir: string, cli: string): string {
 export function buildPackage(definition: string, options: { workspace?: string } = {}): Package {
   const cli = cliJar();
   const definitionDir = join(definition, "..");
-  const dir = join(WORK, "packages", key(definitionDir, cli));
+  const dir = join(WORK, "packages", key(definition, definitionDir, cli));
   const done = join(dir, "package.json");
   if (existsSync(done)) return JSON.parse(readFileSync(done, "utf8")) as Package;
 
@@ -56,12 +65,22 @@ export function buildPackage(definition: string, options: { workspace?: string }
     const zip = readdirSync(out).find((f) => f.endsWith(".zip"));
     if (!zip) throw new Error(`mcpgp build ${definition} wrote no zip in ${out}`);
     mkdirSync(dir, { recursive: true });
-    // only the top-level server jar: what `java -jar <server>.jar` runs at the customer
-    const unzip = spawnSync("unzip", ["-o", "-q", "-j", join(out, zip), "*.jar", "-x", "*/*", "-d", dir], { encoding: "utf8" });
+    // the whole package, as the customer unpacks it
+    const unzip = spawnSync("unzip", ["-o", "-q", join(out, zip), "-d", dir], { encoding: "utf8" });
     if (unzip.status !== 0) throw new Error(`unzip ${zip}: ${unzip.stderr}`);
     const jar = readdirSync(dir).find((f) => f.endsWith(".jar"));
     if (!jar) throw new Error(`${zip} has no server jar`);
-    const pkg: Package = { definition, jar: join(dir, jar), zip };
+    const pkg: Package = { definition, name: jar.replace(/\.jar$/, ""), dir, jar: join(dir, jar), zip };
+    const bundle = readdirSync(dir).find((f) => f.endsWith(".mcpb"));
+    if (bundle) {
+      // unpacked as a desktop client installs it
+      const target = join(dir, "mcpb");
+      const unpack = spawnSync("unzip", ["-o", "-q", join(dir, bundle), "-d", target], { encoding: "utf8" });
+      if (unpack.status !== 0) throw new Error(`unzip ${bundle}: ${unpack.stderr}`);
+      rmSync(join(dir, bundle));   // ~35 MB; the unpacked copy is what runs
+      pkg.mcpb = target;
+    }
+    if (existsSync(join(dir, "docker", "Dockerfile"))) pkg.dockerfile = join(dir, "docker", "Dockerfile");
     writeFileSync(done, JSON.stringify(pkg));
     return pkg;
   } finally {

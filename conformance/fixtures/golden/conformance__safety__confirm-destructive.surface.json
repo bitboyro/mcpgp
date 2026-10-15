@@ -1,0 +1,109 @@
+{
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Lists the configured notes servers (instances) with their contract version, access and status. Use an instance's name as the `instance` argument of the other tools.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "name": "instances_list",
+      "title": "List instances"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete note",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm": {
+            "description": "Confirmation token from a CONFIRMATION_REQUIRED result. Only send it after the user agreed.",
+            "type": "string"
+          },
+          "instance": {
+            "description": "Target notes server. Filled in at startup from the runtime config.",
+            "enum": [
+              "mock"
+            ],
+            "type": "string"
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path"
+        ],
+        "type": "object"
+      },
+      "name": "notes_note_delete",
+      "title": "Delete note"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "Get note",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "Target notes server. Filled in at startup from the runtime config.",
+            "enum": [
+              "mock"
+            ],
+            "type": "string"
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "instance",
+          "path"
+        ],
+        "type": "object"
+      },
+      "name": "notes_note_get",
+      "outputSchema": {
+        "type": "object"
+      },
+      "title": "Get note"
+    }
+  ]
+}

@@ -56,7 +56,7 @@ function rowsOf(modules: ReadonlyArray<TestModule>): Row[] {
       const describe = describeName(test);
       const { suite, combination } = split(describe);
       const combo = combination.split(" · ");
-      const env = combo.length >= 3 ? `GATE_TRANSPORTS=${combo[1]} GATE_REVISIONS=${combo[2]} ` : "";
+      const env = combo.length >= 3 ? `GATE_FORMATS=${combo[0]} GATE_TRANSPORTS=${combo[1]} GATE_REVISIONS=${combo[2]} ` : "";
       rows.push({
         suite,
         combination,
@@ -117,6 +117,7 @@ ${suites.map((s) => `<tr><th>${escape(s)}</th>${combos.map((c) => cell(s, c)).jo
 </tbody></table></div>
 <h2>Run</h2>
 <table><tbody>
+<tr><th>Formats</th><td>${escape(report.run.formats)}</td></tr>
 <tr><th>Transports</th><td>${escape(report.run.transports)}</td></tr>
 <tr><th>Revisions</th><td>${escape(report.run.revisions)}</td></tr>
 <tr><th>Seed</th><td>${escape(String(report.run.seed))}</td></tr>
@@ -149,6 +150,7 @@ export default class GateReport implements Reporter {
         commit: command("git", ["-C", REPO, "rev-parse", "--short", "HEAD"]),
         finishedAt: new Date().toISOString(),
         durationMs: Date.now() - this.started,
+        formats: process.env.GATE_FORMATS ?? "jar,mcpb,docker (docker on Linux with a daemon)",
         transports: process.env.GATE_TRANSPORTS ?? "stdio,http",
         revisions: process.env.GATE_REVISIONS ?? "all claimed",
         seed: Number(process.env.GATE_SEED ?? 0),

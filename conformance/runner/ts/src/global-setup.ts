@@ -1,6 +1,7 @@
 import { rmSync } from "node:fs";
 import type { TestProject } from "vitest/node";
 import { buildPackage } from "./packages.js";
+import { buildImage, formats } from "./formats.js";
 import { fixtures, trafficCases } from "./fixtures.js";
 import { WORK } from "./paths.js";
 
@@ -21,6 +22,9 @@ export default function setup(project: TestProject) {
   ];
   for (const { definition, workspace } of definitions) {
     if (!packages[definition]) packages[definition] = buildPackage(definition, { workspace });
+  }
+  if (formats().includes("docker")) {
+    for (const pkg of Object.values(packages)) if (pkg.dockerfile) buildImage(pkg);
   }
   project.provide("packages", packages);
 }
