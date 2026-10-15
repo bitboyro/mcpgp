@@ -20,8 +20,12 @@ public final class Results {
     public static McpSchema.CallToolResult ok(Object value, Map<String, Object> meta) {
         if (value instanceof ToolOutput output) {
             String text = output.text() != null ? output.text() : json(output.structured());
+            Map<String, Object> all = new LinkedHashMap<>(output.meta() == null ? Map.of() : output.meta());
+            if (output.wrappedAs() != null) {
+                all.put("mcpgp/wrapped", output.wrappedAs());   // structuredContent.<this> is the API's list or value
+            }
             return new McpSchema.CallToolResult(List.of(new McpSchema.TextContent(text)), false, output.structured(),
-                    output.meta() == null || output.meta().isEmpty() ? null : output.meta());
+                    all.isEmpty() ? null : all);
         }
         String text = json(value);
         Object structured = value instanceof Map<?, ?> ? value : null;

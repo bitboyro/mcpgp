@@ -38,6 +38,7 @@ public final class ApiToolHandler implements ToolHandler {
     private final Recordings recordings;
     private final ResponseMapper responses;
     private final Contracts contracts;
+    private final RateLimits rateLimits;
 
     public ApiToolHandler(Manifest manifest, RuntimeConfig config) {
         this.manifest = manifest;
@@ -51,16 +52,27 @@ public final class ApiToolHandler implements ToolHandler {
             }
         });
         this.redactor = new Redactor(config.secrets());
-        this.upstream = new Upstream(apiKeys, redactor);
+        int responseLimit = manifest.policies().path("responseLimitKb").asInt(256) * 1024;
+        // a little more than the limit is read, so a JSON answer can be cut at whole items; never more than this
+        this.upstream = new Upstream(apiKeys, redactor, Math.max(4 * responseLimit, 1024 * 1024));
         this.contracts = new Contracts(manifest, config.allInstances(), upstream, java.time.Clock.systemUTC());
+        this.rateLimits = new RateLimits(manifest, java.time.Clock.systemUTC());
         this.recordings = recordings(manifest, config, apiKeys);
         this.responses = new ResponseMapper(manifest.policies().path("responseLimitKb").asInt(256),
-                config.errorDetail(), redactor);
+                config.errorDetail(), redactor, manifest.policies().path("cleanTruncation").asBoolean(true),
+                manifest.policies().at("/rateLimits/retryAfter").asBoolean(true));
     }
 
     /** Which contract each instance uses (runtime-config §4.4). */
     public Contracts contracts() {
         return contracts;
+    }
+
+    /** The first or the last non-empty line of a text (a truncation note is the last), at most 200 characters. */
+    private static String line(String text, boolean last) {
+        java.util.stream.Stream<String> lines = text == null ? java.util.stream.Stream.empty() : text.lines().filter(l -> !l.isBlank());
+        String line = (last ? lines.reduce((a, b) -> b) : lines.findFirst()).orElse("");
+        return line.length() <= 200 ? line : line.substring(0, 199) + "…";
     }
 
     /** The request enrichers to run before each call is sent (extensions.md §3). */
@@ -102,8 +114,10 @@ public final class ApiToolHandler implements ToolHandler {
         record.instance = instance.id();
         Contracts.Choice choice = contracts.forCall(instance, credentials);
         if (!choice.available()) {
-            throw new ToolError("INSTANCE_UNAVAILABLE", instance.id() + " is unavailable: its contract version isn't known (" + choice.reason() + ")",
-                    "It's asked again within a minute; use another instance, or ask whoever runs this server to check it (doctor)")
+            throw new ToolError("INSTANCE_UNAVAILABLE", instance.id() + " is unavailable: " + (choice.selection().equals("detected") ? choice.reason()
+                            : "its contract version isn't known (" + choice.reason() + ")"),
+                    choice.selection().equals("detected") ? "Use another instance; whoever runs this server can pin it or change the build"
+                            : "It's asked again within a minute; use another instance, or ask whoever runs this server to check it (doctor)")
                     .withMeta(Map.<String, Object>of("mcpgp/instance", instance.id()));
         }
         String contract = choice.contract();
@@ -136,21 +150,42 @@ public final class ApiToolHandler implements ToolHandler {
             record.auth = credential.type().equals("none") ? null : credential.type();
             HttpResponse<byte[]> response;
             Recordings.RuntimeConfig_Instance recorded = new Recordings.RuntimeConfig_Instance(instance.api(), instance.id());
-            try {
+            try (AutoCloseable slot = rateLimits.enter(instance)) {
                 response = upstream.send(instance, request, credential, publicOperation);
+            } catch (ToolError e) {
+                if (recordings != null && !e.code().equals("RATE_LIMITED")) {
+                    recordings.capture(tool.path("name").asText(), recorded, request, null, e.getMessage());
+                }
+                throw e;
             } catch (RuntimeException e) {
                 if (recordings != null) {
                     recordings.capture(tool.path("name").asText(), recorded, request, null, e.getMessage());
                 }
                 throw e;
+            } catch (Exception e) {
+                throw new IllegalStateException(e); // releasing a slot doesn't throw
             }
             if (recordings != null) {
                 recordings.capture(tool.path("name").asText(), recorded, request, response, null);
             }
             record.status = response.statusCode();
-            return responses.map(response, instance.id(), meta, record);
+            ro.bitboy.mcpgp.runtime.mcp.ToolOutput output = responses.map(response, instance.id(), meta, record);
+            // a tool that declares an outputSchema answers with structured content, or says why it can't (MCP tools/call)
+            if (output.structured() == null && tool.path("outputSchema").isObject()) {
+                boolean cut = meta.containsKey("mcpgp/truncated");
+                throw new ToolError(cut ? "RESPONSE_TOO_LARGE" : "RESPONSE_PARSE_ERROR", cut
+                        ? "The answer is over the size limit and couldn't be cut at whole items: " + line(output.text(), true)
+                        : "The target answered without the JSON this tool's output schema describes",
+                        cut ? "Narrow the query (filters, a smaller page)" : "The answer starts: " + line(output.text(), false)).withMeta(meta);
+            }
+            return output;
         } catch (ToolError e) {
-            throw e.meta().isEmpty() ? e.withMeta(meta) : e;
+            if (e.meta().isEmpty()) {
+                throw e.withMeta(meta);
+            }
+            Map<String, Object> merged = new LinkedHashMap<>(meta);
+            merged.putAll(e.meta());          // e.g. how long to wait
+            throw e.withMeta(merged);
         }
     }
 

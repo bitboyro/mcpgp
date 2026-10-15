@@ -259,6 +259,16 @@ public final class ConfigLoader {
         if (!allowedAuth.isEmpty() && !allowedAuth.contains(authMode)) {
             problems.add("/server/auth/mode: '" + authMode + "' is not available in this build (allowed: " + allowedAuth + ")");
         }
+        // described in runtime-config, not done yet: refused, so nobody relies on them (runtime-config §3)
+        if (server.path("tls").isObject()) {
+            problems.add("/server/tls: serving HTTPS itself isn't supported yet; put a reverse proxy in front for TLS and set tls: proxy");
+        }
+        if (server.has("trustProxy")) {
+            problems.add("/server/trustProxy isn't supported yet: the server doesn't read X-Forwarded-* headers; remove it");
+        }
+        if (server.has("outboundProxy")) {
+            problems.add("/server/outboundProxy isn't supported yet: calls to target servers go direct; remove it");
+        }
         String host = server.path("host").asText("127.0.0.1");
         boolean allowInsecure = server.path("auth").path("allowInsecure").asBoolean(false);
         if (transport.equals("http") && authMode.equals("none") && !LOOPBACK.contains(host) && !allowInsecure) {
@@ -422,10 +432,25 @@ public final class ConfigLoader {
                         problems.add(e.getMessage());
                     }
                 }
+                JsonNode rateLimits = node.has("rateLimits") ? node.get("rateLimits").deepCopy() : JsonNodeFactory.instance.objectNode();
                 list.add(new RuntimeConfig.Instance(api.id(), id, baseUrl, contract, prefer, node.path("readOnly").asBoolean(false),
-                        timeout, auth, tls, context, baseDir));
+                        timeout, auth, tls, context, baseDir, rateLimits));
             }
             result.put(api.id(), List.copyOf(list));
+            // forbid: every instance of an API on one contract version (runtime-config §7); auto instances are checked once detected
+            if (manifest.root().at("/instances/mixedContracts").asText("union").equals("forbid")) {
+                Map<String, String> pinned = new LinkedHashMap<>();
+                list.stream().filter(i -> !i.contract().equals("auto")).forEach(i -> pinned.put(i.id(), i.contract()));
+                if (new java.util.HashSet<>(pinned.values()).size() > 1) {
+                    problems.add("/instances: mixedContracts: forbid: every instance must use the same contract version, but "
+                            + String.join(", ", pinned.entrySet().stream().map(e -> e.getKey() + " uses " + e.getValue()).toList()));
+                }
+            }
+        }
+        JsonNode max = manifest.root().at("/instances/max");
+        int total = result.values().stream().mapToInt(List::size).sum();
+        if (max.isInt() && total > max.asInt()) {
+            problems.add("/instances: " + total + " instances are configured; this server allows at most " + max.asInt() + " (instances.max)");
         }
         return result;
     }

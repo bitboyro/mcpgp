@@ -4,6 +4,7 @@ import { ActivityPage } from './pages/Activity'
 import { AgentsPage } from './pages/Agents'
 import { AllBuildsPage, ServerBuildsPage } from './pages/Builds'
 import { ConnectionsPage } from './pages/Connections'
+import { SafetyPage } from './pages/Safety'
 import { LibraryPage } from './pages/Library'
 import { OverviewPage } from './pages/Overview'
 import { PackagePage } from './pages/Package'
@@ -33,6 +34,7 @@ export function App() {
       <Route path="/servers/:id" element={<Signed><OverviewPage /></Signed>} />
       <Route path="/servers/:id/tools" element={<Signed><ToolsPage /></Signed>} />
       <Route path="/servers/:id/connections" element={<Signed><ConnectionsPage /></Signed>} />
+      <Route path="/servers/:id/safety" element={<Signed><SafetyPage /></Signed>} />
       <Route path="/servers/:id/sources" element={<Signed><SourcesPage /></Signed>} />
       <Route path="/servers/:id/changes" element={<Signed><ChangesPage /></Signed>} />
       <Route path="/servers/:id/package" element={<Signed><PackagePage /></Signed>} />

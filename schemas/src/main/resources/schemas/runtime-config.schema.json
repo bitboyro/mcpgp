@@ -142,6 +142,7 @@
         "publicUrl": { "type": "string", "pattern": "^https?://" },
         "basePath": { "type": "string", "pattern": "^/" },
         "tls": {
+          "description": "proxy: TLS is terminated in front of the server. Serving HTTPS itself (cert, key) is not supported yet: refused at startup",
           "oneOf": [
             { "const": "proxy" },
             {
@@ -152,9 +153,9 @@
             }
           ]
         },
-        "trustProxy": { "type": "array", "items": { "type": "string" } },
+        "trustProxy": { "description": "Not supported yet: refused at startup", "type": "array", "items": { "type": "string" } },
         "allowedOrigins": { "type": "array", "items": { "type": "string" } },
-        "outboundProxy": { "type": "string" },
+        "outboundProxy": { "description": "Not supported yet: refused at startup", "type": "string" },
         "management": {
           "type": "object",
           "properties": { "port": { "$ref": "#/$defs/port" } },
@@ -211,6 +212,16 @@
         "baseUrl": { "type": "string", "minLength": 1 },
         "contract": { "type": "string", "minLength": 1 },
         "prefer": { "description": "With contract: auto, the contract detection asks about first (default: the build's default contract)", "type": "string", "minLength": 1 },
+        "rateLimits": {
+          "description": "This instance's limits on calls to its target, instead of the build's (safety.rateLimits): the target's owner knows what it takes",
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "concurrent": { "type": "integer", "minimum": 1 },
+            "perMinute": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
         "readOnly": { "type": "boolean" },
         "timeoutSeconds": { "type": "integer", "minimum": 1 },
         "auth": {

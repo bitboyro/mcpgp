@@ -150,10 +150,10 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `server.host` / `port` | `127.0.0.1` / `8080` | |
 | `server.publicUrl` | — | URL clients use; required for OAuth metadata |
 | `server.basePath` | `/mcp` | |
-| `server.tls` | none | `{ cert, key }` or `proxy` (TLS ends at a reverse proxy) |
-| `server.trustProxy` | `[]` | addresses whose `X-Forwarded-*` headers are trusted |
+| `server.tls` | none | `proxy`: TLS ends at a reverse proxy. `{ cert, key }` (HTTPS by the server itself): **Not supported yet:** refused at startup. |
+| `server.trustProxy` | `[]` | **Not supported yet:** refused at startup. Planned: addresses whose `X-Forwarded-*` headers are trusted |
 | `server.allowedOrigins` | `[]` | Origin check for browser clients (DNS rebinding protection) |
-| `server.outboundProxy` | none | HTTP proxy for calls to instances |
+| `server.outboundProxy` | none | **Not supported yet:** refused at startup. Planned: HTTP proxy for calls to instances |
 | `server.management.port` | none | health + metrics on a separate port |
 | `server.auth.mode` | `none` | `none` · `static` · `oauth`, within the build's `allowed` list |
 | `server.auth.keys[]` | — | `static` mode: `{ name, value }` per client key; `value` is a secret field |
@@ -174,6 +174,7 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `instances[].tls` | system trust | trust anchors, client certificate, hostname check: see §5 |
 | `instances[].timeoutSeconds` | `30` | |
 | `instances[].readOnly` | `false` | hides write tools for this instance |
+| `instances[].rateLimits` | the build's (`safety.rateLimits`) | `{ enabled, concurrent, perMinute }` for calls to this instance's target, instead of the build's: raise them for a system that takes more, lower or turn them off for one that takes less |
 | `audit.file.enabled` | `true` | |
 | `storage.root` | `~/.<server>/` | where everything the server writes lives (§4.2); env `<SERVER>_STORAGE__ROOT` |
 | `audit.file.path` | `<storage.root>/audit/audit.jsonl` | |
@@ -394,7 +395,10 @@ files:
 The server refuses to start, with a message naming the key, when:
 - the config doesn't match the schema;
 - an instance uses an auth type the build doesn't support (`type: none`, no credentials, is always accepted);
-- a pinned contract isn't shipped, or `mixedContracts: forbid` is violated;
+- a pinned contract isn't shipped, or `mixedContracts: forbid` is violated by pinned instances (an
+  `auto` instance detected on another version than the others, the first pinned one or the default,
+  is unavailable instead: `INSTANCE_UNAVAILABLE` naming both versions);
+- more instances than the build's `instances.max`;
 - `server.auth.mode: none` on a non-loopback HTTP address without `allowInsecure`;
 - a secret reference can't be resolved, or a secret field holds a plain value without `allowInlineSecrets`;
 - indexed environment variables for a list have gaps;

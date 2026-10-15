@@ -92,14 +92,14 @@ class DeliveryTest {
     @Test
     void theContainerRunsOverHttpAsANonRootUser() throws Exception {
         List<String> warnings = new ArrayList<>();
-        JsonNode definition = JSON.readTree("{\"build\":{\"image\":{\"base\":\"registry.acme.internal/ubi9/openjdk-21-runtime\",\"tar\":true}}}");
+        JsonNode definition = JSON.readTree("{\"build\":{\"image\":{\"base\":\"registry.acme.internal/ubi9/openjdk-21-runtime\"}}}");
         Map<String, String> files = Container.files(orders(), definition, warnings);
         String dockerfile = files.get("docker/Dockerfile");
         assertThat(dockerfile).contains("FROM registry.acme.internal/ubi9/openjdk-21-runtime", "COPY orders-mcp.jar /app/orders-mcp.jar",
                 "ORDERS_MCP_SERVER__TRANSPORT=http", "ORDERS_MCP_SERVER__HOST=0.0.0.0", "ORDERS_MCP_STORAGE__ROOT=/data", "USER 10001:10001",
                 "\"--config\", \"/config/orders-mcp.yaml\"");
         assertThat(files.get("docker/docker-compose.yml")).contains("dockerfile: docker/Dockerfile", "- ../config:/config:ro");
-        assertThat(warnings).singleElement().asString().contains("push and tar are not available");
+        assertThat(warnings).isEmpty();   // push, tar and registry: refused by the compiler (NOT_SUPPORTED_YET)
 
         ObjectNode stdioOnly = orders();
         stdioOnly.with("runtime").with("transports").putArray("allowed").add("stdio");

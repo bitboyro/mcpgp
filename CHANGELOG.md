@@ -46,7 +46,40 @@ versions follow [SemVer](https://semver.org).
   reference, never stored with a server or shown. API: `POST /servers/{id}/contracts?url=…` and
   `?source=true&version=…`; the address is recorded as `apis[].contracts[].source`.
 
+- **Security & safety**, a page per server on the platform, with every protection on by default and
+  each one adjustable or off:
+  - **large answers**: the server never downloads more than 4× `responseLimitKb` (a huge answer
+    could exhaust its memory before), and a JSON answer over the limit keeps whole items of its
+    largest list, stays structured and says how many it left out (`safety.cleanTruncation`);
+  - **what agents send**: tool-call arguments and HTTP requests are size-capped and long text values
+    refused, before anything is sent (`safety.inputLimits`, `INPUT_TOO_LARGE`, `413`);
+  - **calls to each target server**: at most 8 at once (more wait) and 120 per minute
+    (`safety.rateLimits`, `RATE_LIMITED` with how long to wait); a target's `429 Retry-After` reaches
+    the agent. Operators can change them per instance (`instances[].rateLimits`).
+  The page lists the protections that have no switch. `docs/security.md` maps them to OWASP.
+- **Output schemas**: tools describe their result (`outputSchema`), from the API spec's success
+  answer, kept loose (no `required`, extra fields allowed) because real answers vary; a result that
+  differs is logged, never refused. On by default; off with `schemas.output: false`, the Security &
+  safety page, or `mcpgp build --no-output-schemas`.
+- JSON lists and plain values are now structured results too (`{ items }`, `{ value }`), not text only.
+- `mixedContracts: namespaced` and `forbid`, and `instances.max`, which the definition accepted
+  but nothing did: namespaced offers each API tool once per instance (`prod__orders_customer_get`),
+  with no `instance` input and only that instance's version's fields; forbid stops startup when
+  pinned instances use different versions and makes an `auto` instance detected on another version
+  unavailable; more instances than `instances.max` stop startup.
+
 ### Fixed
+- stdio: answers finishing at the same moment could be dropped (the MCP Java SDK's stdio transport
+  hands each message over in a single attempt, which fails when another is being handed over), so a
+  client sending parallel tool calls never got some of the answers. Messages now go out one at a time.
+- Parameters: cookie values are encoded (a `;` could add a cookie), and a header value with a line
+  break is refused with `INPUT_VALIDATION` instead of an internal error.
+- Settings the docs described but nothing did are now refused, naming each one, instead of being
+  ignored: in the definition `generation.mode: codegen`/`both`, `schemas.input: lean`,
+  `apis[].pagination`, `build.jarSigning`, `build.image.registry`/`push`/`tar` (the compiler's
+  `NOT_SUPPORTED_YET`); in the runtime config `server.tls` with a certificate, `server.trustProxy`
+  and `server.outboundProxy` (at startup). The specs mark them "not supported yet"; the roadmap no
+  longer lists codegen as done.
 - Activity searches read the whole log when few entries matched, and agent quotas read it on every
   save or build: searches now go to the store as a query (PostgreSQL filters in SQL, with indexes on
   target and actor) and stop at their time bound. The cache cleanup deletes in one batch.

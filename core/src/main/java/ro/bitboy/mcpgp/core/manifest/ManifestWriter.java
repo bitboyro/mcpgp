@@ -128,7 +128,8 @@ public final class ManifestWriter {
             JsonNode api = apis.stream().filter(a -> a.path("id").asText().equals(plan.api())).findFirst().orElseThrow();
             String apiTitle = api.path("title").asText(plan.api());
             ToolShaper shaper = new ToolShaper(new ToolShaper.Context(multi,
-                    "Target " + apiTitle + " server. Filled in at startup from the runtime config.", fileForms));
+                    "Target " + apiTitle + " server. Filled in at startup from the runtime config.", fileForms,
+                    doc.at("/schemas/output").asBoolean(true)));
             ToolShaper.Shaped shaped = shaper.shape(plan, contractsByApi.get(plan.api()), defaultVersions.get(plan.api()));
             Contract primary = contractsByApi.get(plan.api()).getOrDefault(defaultVersions.get(plan.api()),
                     contractsByApi.get(plan.api()).values().iterator().next());
@@ -407,7 +408,17 @@ public final class ManifestWriter {
         JsonNode defaults = doc.path("runtimeDefaults");
         ObjectNode policies = NODES.objectNode()
                 .put("confirmDestructive", safety.path("confirmDestructive").asBoolean(true))
-                .put("responseLimitKb", safety.path("responseLimitKb").asInt(256));
+                .put("responseLimitKb", safety.path("responseLimitKb").asInt(256))
+                .put("cleanTruncation", safety.path("cleanTruncation").asBoolean(true))
+                .put("outputSchemas", doc.at("/schemas/output").asBoolean(true));
+        // on by default; the definition can tune or turn them off (definition-format §2, safety)
+        JsonNode inputs = safety.path("inputLimits");
+        policies.putObject("inputLimits").put("enabled", inputs.path("enabled").asBoolean(true))
+                .put("requestKb", inputs.path("requestKb").asInt(1024)).put("stringMaxLength", inputs.path("stringMaxLength").asInt(65536));
+        JsonNode rates = safety.path("rateLimits");
+        policies.putObject("rateLimits").put("enabled", rates.path("enabled").asBoolean(true))
+                .put("concurrent", rates.path("concurrent").asInt(8)).put("perMinute", rates.path("perMinute").asInt(120))
+                .put("retryAfter", rates.path("retryAfter").asBoolean(true));
         ArrayNode forms = NODES.arrayNode();
         fileForms.forEach(forms::add);
         policies.set("files", NODES.objectNode().set("forms", forms));
@@ -439,7 +450,7 @@ public final class ManifestWriter {
         tool.put("sensitive", plan.sensitive());
         tool.put("confirm", plan.confirm());
         tool.set("inputSchema", shaped.inputSchema());
-        tool.set("outputSchema", NODES.nullNode());
+        tool.set("outputSchema", shaped.outputSchema() == null ? NODES.nullNode() : shaped.outputSchema());
         tool.put("api", plan.api());
         ObjectNode operation = NODES.objectNode().put("key", plan.operationKey());
         if (plan.operationId() != null) {
