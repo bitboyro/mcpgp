@@ -337,7 +337,21 @@ export interface FromSpecPlan {
 }
 
 /** What adding a contract version would do (a dry run of POST /servers/{id}/contracts). */
-export interface ContractPlan { api: string; version: string; spec: string; replaces: boolean; compiles: boolean; diagnostics: Diagnostic[]; moved: { from: string; to: string }[] }
+export interface ContractPlan {
+  api: string; version: string; spec: string; replaces: boolean; compiles: boolean; diagnostics: Diagnostic[]; moved: { from: string; to: string }[]
+  /** The same spec as the saved one: saving makes no version. */
+  unchanged?: boolean
+  /** Fetched from an address: where from, and what came. */
+  source?: string; fetched?: { url: string; file: string; bytes: number }
+  /** What agents would notice, as on the Changes page. */
+  summary?: string; breaking?: number; changes?: { impact: 'breaking' | 'notable' | 'info'; tool: string | null; kind: string; text: string }[]
+}
+
+/** Where a contract's spec comes from: uploaded files, or fetched from an address (from an allowed host). */
+export type SpecSource = Record<string, string> | Blob | { url: string }
+
+const specBody = (source: SpecSource) => source instanceof Blob ? source : 'url' in source ? undefined : { files: source }
+const specUrl = (source: SpecSource) => !(source instanceof Blob) && 'url' in source && typeof source.url === 'string' ? source.url : undefined
 
 /** The extra fields of a SPEC_PROBLEMS answer: what the upload lacks. */
 /** Operations that would get the same tool name (NAME_COLLISIONS): each later one, with the name it would get from its method and path. */
@@ -424,10 +438,10 @@ export const api = {
     json<FromSpecPlan>('POST', '/servers/from-spec' + q({ ...params, dryRun: true }), files instanceof Blob ? files : { files }),
   createFromSpec: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string; collisions?: string; renames?: string }) =>
     json<Server>('POST', '/servers/from-spec' + q(params), files instanceof Blob ? files : { files }),
-  contractPlan: (id: string, files: Record<string, string> | Blob, params: { api?: string; version?: string; main?: string; default?: boolean }) =>
-    json<ContractPlan>('POST', `/servers/${enc(id)}/contracts` + q({ ...params, dryRun: true }), files instanceof Blob ? files : { files }),
-  addContract: (id: string, files: Record<string, string> | Blob, params: { api?: string; version?: string; main?: string; default?: boolean }) =>
-    json<Server>('POST', `/servers/${enc(id)}/contracts` + q(params), files instanceof Blob ? files : { files }),
+  contractPlan: (id: string, source: SpecSource, params: { api?: string; version?: string; main?: string; default?: boolean }) =>
+    json<ContractPlan>('POST', `/servers/${enc(id)}/contracts` + q({ ...params, url: specUrl(source), dryRun: true }), specBody(source)),
+  addContract: (id: string, source: SpecSource, params: { api?: string; version?: string; main?: string; default?: boolean }) =>
+    json<Server>('POST', `/servers/${enc(id)}/contracts` + q({ ...params, url: specUrl(source) }), specBody(source)),
   addVersion: (id: string, files: Record<string, string> | Blob, message?: string) =>
     json<Server>('POST', `/servers/${enc(id)}/versions` + q({ message }), files instanceof Blob ? files : { files }),
   version: (id: string, version: string | number) => json<VersionDetail>('GET', `/servers/${enc(id)}/versions/${version}`),

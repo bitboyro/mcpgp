@@ -40,6 +40,26 @@ class DeploymentTest {
     }
 
     @Test
+    void specHostsAreNoneByDefaultAndCredentialsAreReferences() throws Exception {
+        assertThat(PlatformConfig.load(config("workspace: acme\n"), Map.of()).specHosts()).isEmpty();
+        PlatformConfig hosts = PlatformConfig.load(config("""
+                specHosts:
+                  - api.acme.com
+                  - { host: "https://specs.acme.com:8443/", header: Authorization, value: "${env:SPECS_TOKEN}" }
+                  - http://build.acme.internal
+                """), Map.of());
+        assertThat(hosts.specHosts()).containsExactly(
+                new PlatformConfig.SpecHost("api.acme.com", false, null, null),
+                new PlatformConfig.SpecHost("specs.acme.com:8443", false, "Authorization", "${env:SPECS_TOKEN}"),
+                new PlatformConfig.SpecHost("build.acme.internal", true, null, null));
+        assertThatThrownBy(() -> PlatformConfig.load(config("specHosts: [ { host: api.acme.com, header: Authorization, value: Bearer-abc } ]\n"),
+                Map.of())).hasMessageContaining("must be a reference");
+        assertThatThrownBy(() -> PlatformConfig.load(config("specHosts: [ \"api.acme.com/specs\" ]\n"), Map.of()))
+                .hasMessageContaining("not a host name");
+        assertThatThrownBy(() -> PlatformConfig.load(config("specHosts: api.acme.com\n"), Map.of())).hasMessageContaining("a list of hosts");
+    }
+
+    @Test
     void storageIsFilesOrPostgres() throws Exception {
         PlatformConfig files = PlatformConfig.load(config("storage: { type: files, root: data }\n"), Map.of());
         assertThat(files.postgres()).isNull();

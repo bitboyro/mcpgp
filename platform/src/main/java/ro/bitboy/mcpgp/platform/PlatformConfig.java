@@ -20,10 +20,31 @@ import java.util.Map;
  * @param admin    the first administrator, created at start when the store has no identities yet, or null
  * @param platformServer {@code platformServer.enabled}: the platform's own MCP server is one of its servers
  *                 (default); false archives it at the next start
+ * @param specHosts the hosts the platform may fetch specs from (§7, §8); none by default
  */
 public record PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
                              boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl, Postgres postgres,
-                             Admin admin, Tls tls, boolean platformServer) {
+                             Admin admin, Tls tls, boolean platformServer, List<SpecHost> specHosts) {
+
+    public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
+                          boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl, Postgres postgres, Admin admin,
+                          Tls tls, boolean platformServer) {
+        this(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl, postgres, admin, tls,
+                platformServer, List.of());
+    }
+
+    /**
+     * {@code specHosts[]}: a host specs may be fetched from, as {@code name} or {@code name:port} (HTTPS),
+     * or {@code http://name[:port]} for plain HTTP; with {@code header} and {@code value} (a reference),
+     * every fetch from it sends that header, for a spec that needs a credential.
+     */
+    public record SpecHost(String host, boolean plainHttp, String header, String value) {
+    }
+
+    public PlatformConfig withSpecHosts(List<SpecHost> specHosts) {
+        return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
+                postgres, admin, tls, platformServer, List.copyOf(specHosts));
+    }
 
     public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
                           boolean localAccounts, Guardrails guardrails, Oidc oidc, Ldap ldap, String publicUrl, Postgres postgres, Admin admin,
@@ -50,7 +71,7 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
 
     public PlatformConfig withTls(Tls tls) {
         return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
-                postgres, admin, tls, platformServer);
+                postgres, admin, tls, platformServer, specHosts);
     }
 
     public PlatformConfig(Path storageRoot, String host, int port, String signingKey, Retention retention, String workspace,
@@ -73,12 +94,12 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
 
     public PlatformConfig withPostgres(Postgres postgres) {
         return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
-                postgres, admin, tls, platformServer);
+                postgres, admin, tls, platformServer, specHosts);
     }
 
     public PlatformConfig withAdmin(Admin admin) {
         return new PlatformConfig(storageRoot, host, port, signingKey, retention, workspace, localAccounts, guardrails, oidc, ldap, publicUrl,
-                postgres, admin, tls, platformServer);
+                postgres, admin, tls, platformServer, specHosts);
     }
 
     /**
@@ -182,7 +203,35 @@ public record PlatformConfig(Path storageRoot, String host, int port, String sig
         return new PlatformConfig(storage, host, port, signing, r, workspace, local, g, oidc(doc.at("/auth/oidc")), ldap(doc.at("/auth/ldap")),
                 publicUrl == null ? null : publicUrl.replaceAll("/+$", ""), postgres, admin, tls(doc.at("/http/tls"), env),
                 Boolean.parseBoolean(env.getOrDefault("MCPGP_PLATFORM_PLATFORM_SERVER__ENABLED",
-                        doc.at("/platformServer/enabled").asText("true"))));
+                        doc.at("/platformServer/enabled").asText("true"))), specHosts(doc.path("specHosts")));
+    }
+
+    private static List<SpecHost> specHosts(JsonNode node) {
+        if (node.isMissingNode() || node.isNull()) {
+            return List.of();
+        }
+        if (!node.isArray()) {
+            throw new IllegalArgumentException("specHosts: a list of hosts (api.acme.com, or { host, header, value })");
+        }
+        List<SpecHost> hosts = new java.util.ArrayList<>();
+        for (JsonNode entry : node) {
+            String name = entry.isTextual() ? entry.asText() : entry.path("host").asText("");
+            boolean plain = name.startsWith("http://");
+            name = name.replaceFirst("^https?://", "").replaceAll("/+$", "").toLowerCase(java.util.Locale.ROOT);
+            if (!name.matches("[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\\d{1,5})?")) {
+                throw new IllegalArgumentException("specHosts: '" + entry + "' is not a host name (api.acme.com or api.acme.com:8443)");
+            }
+            String header = entry.path("header").asText(null);
+            String value = entry.path("value").asText(null);
+            if ((header == null) != (value == null)) {
+                throw new IllegalArgumentException("specHosts: " + name + " needs both header and value, or neither");
+            }
+            if (value != null && !Secrets.isReference(value)) {
+                throw new IllegalArgumentException("specHosts: " + name + ": value must be a reference (${env:…} or ${file:…}), not the credential");
+            }
+            hosts.add(new SpecHost(name, plain, header, value));
+        }
+        return List.copyOf(hosts);
     }
 
     private static Tls tls(JsonNode node, Map<String, String> env) {
