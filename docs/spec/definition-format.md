@@ -73,8 +73,8 @@ build: { … }
 | `apis[].requestBody` | object | `{ multiple: split }` | operations with several request body types: `split` (one tool per type, suffixes from `suffixes`) or `prefer` (one tool, first match of `prefer`). Default suffixes: `multipart/form-data → multipart`, `application/x-www-form-urlencoded → form`, `application/octet-stream → binary`. See tools-contract §13 |
 | `apis[].pagination` | object | none | **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). Planned: normalizes paging (tools-contract §10). `{ style: offset \| page \| cursor \| link-header \| client, request: {…param names}, response: {items, total, next}, defaultLimit, maxLimit }` |
 | `instances.mode` | enum | `single` | `single` · `multi` |
-| `instances.mixedContracts` | enum | `union` | `union` · `namespaced` · `forbid` (multi only) |
-| `instances.max` | int | none | |
+| `instances.mixedContracts` | enum | `union` | multi only. `union`: one tool for every instance, checked per call (tools-contract §4). `namespaced`: one tool per instance, `<instance>__<tool>`, with that instance's contract only (tools-contract §3). `forbid`: every instance on one version; pinned instances on different versions stop startup, an `auto` instance detected on another version is unavailable (runtime-config §7) |
+| `instances.max` | int | none | the most instances a customer may configure; more stop startup |
 | `exposure.mode` | enum | `plain` | `plain` · `discovery` · `toolsets` · `hybrid` (tools-contract §15) |
 | `exposure.discoveryStyle` | enum | `search` | `search` (search → describe → call) · `catalog` (list → schema → invoke); discovery and hybrid only |
 | `exposure.toolsets` | object | by tag | toolsets mode: groups of tools, default one per tag; `{ <name>: { match: <selector>, description } }` |

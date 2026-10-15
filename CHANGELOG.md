@@ -62,6 +62,11 @@ versions follow [SemVer](https://semver.org).
   differs is logged, never refused. On by default; off with `schemas.output: false`, the Security &
   safety page, or `mcpgp build --no-output-schemas`.
 - JSON lists and plain values are now structured results too (`{ items }`, `{ value }`), not text only.
+- `mixedContracts: namespaced` and `forbid`, and `instances.max`, which the definition accepted
+  but nothing did: namespaced offers each API tool once per instance (`prod__orders_customer_get`),
+  with no `instance` input and only that instance's version's fields; forbid stops startup when
+  pinned instances use different versions and makes an `auto` instance detected on another version
+  unavailable; more instances than `instances.max` stop startup.
 
 ### Fixed
 - stdio: answers finishing at the same moment could be dropped (the MCP Java SDK's stdio transport

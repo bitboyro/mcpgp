@@ -80,12 +80,29 @@ public final class Contracts {
     private final Upstream upstream;
     private final Clock clock;
     private final Map<String, Detection> detections = new ConcurrentHashMap<>();
+    /**
+     * With {@code mixedContracts: forbid}: the one version each API's instances use, the first pinned
+     * one or the default; a target detected on another version is unavailable (runtime-config §7).
+     */
+    private final Map<String, String> onlyVersion = new ConcurrentHashMap<>();
     private volatile BiConsumer<RuntimeConfig.Instance, Choice> listener = (instance, choice) -> { };
 
     Contracts(Manifest manifest, List<RuntimeConfig.Instance> instances, Upstream upstream, Clock clock) {
         this.manifest = manifest;
         this.upstream = upstream;
         this.clock = clock;
+        if (manifest.root().at("/instances/mixedContracts").asText("union").equals("forbid")) {
+            for (RuntimeConfig.Instance instance : instances) {
+                if (!instance.contract().equals("auto")) {
+                    onlyVersion.putIfAbsent(instance.api(), instance.contract());
+                }
+            }
+            manifest.apis().forEach((id, api) -> {
+                if (api.defaultContract() != null) {
+                    onlyVersion.putIfAbsent(id, api.defaultContract());
+                }
+            });
+        }
         for (RuntimeConfig.Instance instance : instances) {
             Manifest.Api api = manifest.apis().get(instance.api());
             if (api != null && instance.contract().equals("auto") && api.node().path("detect").isObject()) {
@@ -219,10 +236,15 @@ public final class Contracts {
     }
 
     private Choice choice(Detection d, Outcome outcome) {
+        String only = onlyVersion.get(d.api.id());
         if (outcome.contract() != null) {
+            if (only != null && !only.equals(outcome.contract())) {
+                return new Choice(null, "detected", outcome.reported(), "mixedContracts: forbid: the target runs " + outcome.contract()
+                        + ", and this server's instances all use " + only);
+            }
             return new Choice(outcome.contract(), "detected", outcome.reported(), null);
         }
-        return new Choice(refuses(d) ? null : d.api.defaultContract(), "default", outcome.reported(), outcome.reason());
+        return new Choice(refuses(d) ? null : only != null ? only : d.api.defaultContract(), "default", outcome.reported(), outcome.reason());
     }
 
     private Choice fixed(RuntimeConfig.Instance instance) {

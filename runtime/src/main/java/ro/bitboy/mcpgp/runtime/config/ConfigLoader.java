@@ -437,6 +437,20 @@ public final class ConfigLoader {
                         timeout, auth, tls, context, baseDir, rateLimits));
             }
             result.put(api.id(), List.copyOf(list));
+            // forbid: every instance of an API on one contract version (runtime-config §7); auto instances are checked once detected
+            if (manifest.root().at("/instances/mixedContracts").asText("union").equals("forbid")) {
+                Map<String, String> pinned = new LinkedHashMap<>();
+                list.stream().filter(i -> !i.contract().equals("auto")).forEach(i -> pinned.put(i.id(), i.contract()));
+                if (new java.util.HashSet<>(pinned.values()).size() > 1) {
+                    problems.add("/instances: mixedContracts: forbid: every instance must use the same contract version, but "
+                            + String.join(", ", pinned.entrySet().stream().map(e -> e.getKey() + " uses " + e.getValue()).toList()));
+                }
+            }
+        }
+        JsonNode max = manifest.root().at("/instances/max");
+        int total = result.values().stream().mapToInt(List::size).sum();
+        if (max.isInt() && total > max.asInt()) {
+            problems.add("/instances: " + total + " instances are configured; this server allows at most " + max.asInt() + " (instances.max)");
         }
         return result;
     }

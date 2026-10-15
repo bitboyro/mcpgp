@@ -80,8 +80,12 @@ Rationale and rejected options: [ADR-0006](../decisions/0006-tool-input-schema-s
 - **Single-instance builds:** absent.
 - **Multi-instance builds:** present on **every** tool except `instances_list`; always `required`;
   `enum` of the configured instance ids (filled at startup from the runtime config). No default.
-- `mixedContracts: namespaced`: no `instance` parameter; tools are duplicated per instance
-  (`prod_eu__customer_list`).
+- `mixedContracts: namespaced`: no `instance` parameter; each API tool is offered once per
+  instance as `<instance>__<tool>` (the instance id with `-` as `_`: `prod_eu__orders_customer_list`),
+  described as "On prod-eu (contract 2.0).", with only that contract's fields (no "(2.0 only)"
+  marks) and only when that contract has the operation. The server waits for detection before
+  listing them, so an `auto` instance's tools match the version its target runs. Toolsets and
+  pinned tools name the original tool and cover its copies.
 
 ## 4. Mixed contracts (`union`, default)
 
