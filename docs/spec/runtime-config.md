@@ -174,6 +174,7 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `instances[].tls` | system trust | trust anchors, client certificate, hostname check: see §5 |
 | `instances[].timeoutSeconds` | `30` | |
 | `instances[].readOnly` | `false` | hides write tools for this instance |
+| `instances[].rateLimits` | the build's (`safety.rateLimits`) | `{ enabled, concurrent, perMinute }` for calls to this instance's target, instead of the build's: raise them for a system that takes more, lower or turn them off for one that takes less |
 | `audit.file.enabled` | `true` | |
 | `storage.root` | `~/.<server>/` | where everything the server writes lives (§4.2); env `<SERVER>_STORAGE__ROOT` |
 | `audit.file.path` | `<storage.root>/audit/audit.jsonl` | |

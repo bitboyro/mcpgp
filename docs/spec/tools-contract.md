@@ -115,7 +115,11 @@ Success:
 ```
 
 - `structuredContent` and `outputSchema` when the response schema is known (P1).
-- Bodies over `responseLimitKb` are truncated with a note and a hint to narrow the query.
+- Bodies over `responseLimitKb` are truncated with a note and a hint to narrow the query. A JSON body
+  keeps whole items of its largest list and stays structured, with `_meta.mcpgp/truncated: { list,
+  shown, total }` (`safety.cleanTruncation`). At most 4× the limit (at least 1 MB) is downloaded.
+- A target's `429` carries its `Retry-After` as `_meta.mcpgp/retryAfterSeconds`; so does the
+  server's own `RATE_LIMITED` (`safety.rateLimits`).
 - Binary responses become `resource_link` content (or a base64 file object when the client can't follow links); see §13.2 for the `Accept` header.
 
 Failure from the upstream or input validation: `isError: true` with a readable message, an error code

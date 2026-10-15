@@ -349,7 +349,7 @@ public final class ServerCommands {
         RuntimeConfig.Instance tested;
         try {
             tested = new RuntimeConfig.Instance(instance.api(), instance.id(), instance.baseUrl(), instance.contract(), instance.prefer(), instance.readOnly(),
-                    instance.timeoutSeconds(), instance.auth(), tls, TlsBuilder.build(tls, baseDir, "tls"), baseDir);
+                    instance.timeoutSeconds(), instance.auth(), tls, TlsBuilder.build(tls, baseDir, "tls"), baseDir, instance.rateLimits());
         } catch (IllegalArgumentException e) {
             out.println("✗ " + e.getMessage());
             return 1;

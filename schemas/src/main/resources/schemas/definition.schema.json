@@ -64,7 +64,29 @@
       "type": "object",
       "properties": {
         "confirmDestructive": { "type": "boolean" },
-        "responseLimitKb": { "type": "integer", "minimum": 1 }
+        "responseLimitKb": { "type": "integer", "minimum": 1 },
+        "cleanTruncation": { "description": "A JSON answer over the limit is cut at whole list items, saying how many were left out (default true)", "type": "boolean" },
+        "inputLimits": {
+          "description": "Caps on what an agent sends (default on)",
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "requestKb": { "description": "The largest tool call's arguments, and over HTTP the largest request (default 1024)", "type": "integer", "minimum": 1 },
+            "stringMaxLength": { "description": "The longest text value, where the spec sets no maxLength (default 65536)", "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "rateLimits": {
+          "description": "Calls to each target server (default on); whoever runs the server can change them per instance",
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "concurrent": { "description": "Calls at once per target server; more wait for a free slot (default 8)", "type": "integer", "minimum": 1 },
+            "perMinute": { "description": "Calls per minute per target server (default 120)", "type": "integer", "minimum": 1 },
+            "retryAfter": { "description": "When the target answers 429, tell the agent how long to wait (default true)", "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },

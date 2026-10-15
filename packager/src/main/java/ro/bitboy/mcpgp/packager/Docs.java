@@ -535,6 +535,8 @@ final class Docs {
             {"UPSTREAM_4XX / UPSTREAM_5XX", "the target server answered with an error"},
             {"UPSTREAM_TIMEOUT / UPSTREAM_UNREACHABLE", "no answer in time / DNS, TCP or TLS failure"},
             {"RESPONSE_PARSE_ERROR / RESPONSE_TOO_LARGE", "the answer couldn't be read, or is over the size limit"},
+            {"INPUT_TOO_LARGE", "the arguments, or one text value, are larger than the server accepts; nothing was sent"},
+            {"RATE_LIMITED", "too many calls to that target server; wait the seconds in _meta.mcpgp/retryAfterSeconds"},
             {"CONFIG_INVALID", "the config doesn't load (startup or reload)"},
             {"INTERNAL", "anything else; details are in the server log"},
     };

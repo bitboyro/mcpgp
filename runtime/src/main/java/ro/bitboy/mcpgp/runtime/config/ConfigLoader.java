@@ -422,8 +422,9 @@ public final class ConfigLoader {
                         problems.add(e.getMessage());
                     }
                 }
+                JsonNode rateLimits = node.has("rateLimits") ? node.get("rateLimits").deepCopy() : JsonNodeFactory.instance.objectNode();
                 list.add(new RuntimeConfig.Instance(api.id(), id, baseUrl, contract, prefer, node.path("readOnly").asBoolean(false),
-                        timeout, auth, tls, context, baseDir));
+                        timeout, auth, tls, context, baseDir, rateLimits));
             }
             result.put(api.id(), List.copyOf(list));
         }

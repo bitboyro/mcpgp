@@ -141,6 +141,17 @@
       "properties": {
         "confirmDestructive": { "type": "boolean" },
         "responseLimitKb": { "type": "integer" },
+        "cleanTruncation": { "type": "boolean" },
+        "inputLimits": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" }, "requestKb": { "type": "integer" }, "stringMaxLength": { "type": "integer" } },
+          "additionalProperties": false
+        },
+        "rateLimits": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" }, "concurrent": { "type": "integer" }, "perMinute": { "type": "integer" }, "retryAfter": { "type": "boolean" } },
+          "additionalProperties": false
+        },
         "files": { "type": "object" },
         "redaction": { "type": "object" },
         "baseUrlAllowlist": { "type": "array", "items": { "type": "string" } },

@@ -30,11 +30,21 @@ final class ResponseMapper {
     private final int limitBytes;
     private final boolean fullErrors;
     private final Redactor redactor;
+    /** A JSON answer over the limit is cut at whole list items (safety.cleanTruncation). */
+    private final boolean cleanTruncation;
+    /** A target's 429 tells the agent how long to wait (safety.rateLimits.retryAfter). */
+    private final boolean retryAfter;
 
     ResponseMapper(int responseLimitKb, String errorDetail, Redactor redactor) {
+        this(responseLimitKb, errorDetail, redactor, true, true);
+    }
+
+    ResponseMapper(int responseLimitKb, String errorDetail, Redactor redactor, boolean cleanTruncation, boolean retryAfter) {
         this.limitBytes = responseLimitKb * 1024;
         this.fullErrors = !"summary".equals(errorDetail);
         this.redactor = redactor;
+        this.cleanTruncation = cleanTruncation;
+        this.retryAfter = retryAfter;
     }
 
     /** Upstream error bodies kept in the audit event are capped at this size. */
@@ -61,6 +71,13 @@ final class ResponseMapper {
             record.errorBody = full.length() > AUDIT_BODY_LIMIT ? full.substring(0, AUDIT_BODY_LIMIT) + "…" : full;
         }
         String detail = body.length == 0 ? "" : ": " + (fullErrors ? truncate(text(body)) : summary(body, contentType));
+        if (status == 429 && retryAfter) {
+            Long seconds = retryAfterSeconds(response.headers().firstValue("Retry-After").orElse(null));
+            if (seconds != null) {
+                meta.put("mcpgp/retryAfterSeconds", seconds);
+            }
+            hint = "The target is limiting calls" + (seconds != null ? ": wait " + seconds + " s before calling " + instance + " again" : "; wait before trying again");
+        }
         throw new ToolError(code, "HTTP " + status + " from " + instance + detail, hint).withMeta(meta);
     }
 
@@ -69,6 +86,18 @@ final class ResponseMapper {
             return new ToolOutput(Map.of("status", response.statusCode()), "HTTP " + response.statusCode() + ", no content", meta);
         }
         String type = contentType.split(";")[0].strip().toLowerCase();
+        // the target sent more than the server reads: the end of it was never downloaded
+        boolean cutWhileReading = response instanceof CappedResponse capped && capped.cut();
+        if (cutWhileReading) {
+            String size = ((CappedResponse) response).declaredLength().map(n -> (n / 1024) + " KB").orElse("more than " + (body.length / 1024) + " KB");
+            if (!RequestBuilder.isJson(type) && !isText(type, contentType) && !(type.isEmpty() && looksLikeJson(body))) {
+                throw new ToolError("RESPONSE_TOO_LARGE", "The file is " + size + "; the limit is " + (limitBytes / 1024) + " KB",
+                        "Ask the operator to raise responseLimitKb, or fetch a smaller file").withMeta(meta);
+            }
+            meta.put("mcpgp/truncated", Map.of("reason", "too large", "limitKb", limitBytes / 1024));
+            return new ToolOutput(null, head(redact(new String(body, StandardCharsets.UTF_8))) + "\n[truncated: the answer is " + size
+                    + ", over the " + (limitBytes / 1024) + " KB limit; narrow the query (filters, a smaller page) to see the rest]", meta);
+        }
         if (RequestBuilder.isJson(type) || type.isEmpty() && looksLikeJson(body)) {
             String text = redact(new String(body, StandardCharsets.UTF_8));
             JsonNode value;
@@ -79,7 +108,8 @@ final class ResponseMapper {
                         + " that doesn't parse as JSON").withMeta(meta);
             }
             if (body.length > limitBytes) {
-                return new ToolOutput(null, truncate(text), meta);
+                ToolOutput items = cleanTruncation ? cutAtItems(value, body.length, meta) : null;
+                return items != null ? items : new ToolOutput(null, truncate(text), meta);
             }
             Object structured = value.isObject() ? JSON.convertValue(value, Map.class) : null;
             return new ToolOutput(structured, text, meta);
@@ -99,6 +129,23 @@ final class ResponseMapper {
         file.put("size", body.length);
         file.put("base64", Base64.getEncoder().encodeToString(body));
         return new ToolOutput(file, null, meta);
+    }
+
+    /** Retry-After as seconds: a number, or an HTTP date; null when absent or unreadable. */
+    static Long retryAfterSeconds(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Math.max(0, Long.parseLong(value.strip()));
+        } catch (NumberFormatException e) {
+            try {
+                long at = java.time.ZonedDateTime.parse(value.strip(), java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toEpochSecond();
+                return Math.max(0, at - java.time.Instant.now().getEpochSecond());
+            } catch (java.time.format.DateTimeParseException again) {
+                return null;
+            }
+        }
     }
 
     /** A short line: problem+json title/detail, a JSON message field, or the first line of text. */
@@ -129,6 +176,91 @@ final class ResponseMapper {
 
     private String text(byte[] body) {
         return redact(new String(body, StandardCharsets.UTF_8));
+    }
+
+    /**
+     * A JSON answer over the limit with whole items of its largest list (the answer itself, or a list
+     * in it): as many as fit, and a note with how many there were. Null when no list makes it fit.
+     */
+    private ToolOutput cutAtItems(JsonNode value, int size, Map<String, Object> meta) {
+        String pointer = largestList(value, "", 0);
+        if (pointer == null) {
+            return null;
+        }
+        com.fasterxml.jackson.databind.node.ArrayNode list = (com.fasterxml.jackson.databind.node.ArrayNode) value.at(pointer);
+        int total = list.size();
+        int budget = limitBytes - 400;  // room for the note
+        int low = 0;
+        int high = total;
+        while (low < high) {        // the most items that fit
+            int mid = (low + high + 1) / 2;
+            if (bytes(withItems(value, pointer, mid)) <= budget) {
+                low = mid;
+            } else {
+                high = mid - 1;
+            }
+        }
+        if (low == 0) {
+            return null;
+        }
+        JsonNode cut = withItems(value, pointer, low);
+        String where = pointer.isEmpty() ? "the answer" : pointer;
+        meta.put("mcpgp/truncated", Map.of("reason", "too large", "limitKb", limitBytes / 1024, "list", pointer.isEmpty() ? "/" : pointer,
+                "shown", low, "total", total));
+        String note = "[truncated: " + low + " of " + total + " items of " + where + " shown; the answer is " + (size / 1024) + " KB, over the "
+                + (limitBytes / 1024) + " KB limit. Narrow the query or ask for a smaller page to see the rest]";
+        Object structured = cut.isObject() ? JSON.convertValue(cut, Map.class) : null;
+        return new ToolOutput(structured, cut.toString() + "\n" + note, meta);
+    }
+
+    /** The JSON pointer of the list with the most bytes, at most two levels down; null without one. */
+    private static String largestList(JsonNode value, String at, int depth) {
+        if (value.isArray() && value.size() > 1) {
+            return at;
+        }
+        if (!value.isObject() || depth >= 2) {
+            return null;
+        }
+        String best = null;
+        long bestSize = 0;
+        for (java.util.Iterator<Map.Entry<String, JsonNode>> it = value.fields(); it.hasNext(); ) {
+            Map.Entry<String, JsonNode> field = it.next();
+            String found = largestList(field.getValue(), at + "/" + field.getKey().replace("~", "~0").replace("/", "~1"), depth + 1);
+            if (found != null) {
+                long size = bytes(field.getValue());
+                if (size > bestSize) {
+                    best = found;
+                    bestSize = size;
+                }
+            }
+        }
+        return best;
+    }
+
+    private static JsonNode withItems(JsonNode value, String pointer, int count) {
+        if (pointer.isEmpty()) {
+            com.fasterxml.jackson.databind.node.ArrayNode copy = JSON.createArrayNode();
+            for (int i = 0; i < count; i++) {
+                copy.add(value.get(i));
+            }
+            return copy;
+        }
+        JsonNode copy = value.deepCopy();
+        com.fasterxml.jackson.databind.node.ArrayNode list = (com.fasterxml.jackson.databind.node.ArrayNode) copy.at(pointer);
+        while (list.size() > count) {
+            list.remove(list.size() - 1);
+        }
+        return copy;
+    }
+
+    private static long bytes(JsonNode value) {
+        return value.toString().getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    /** The first {@code limitBytes} of a text, without a note. */
+    private String head(String text) {
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        return bytes.length <= limitBytes ? text : new String(bytes, 0, limitBytes, StandardCharsets.UTF_8);
     }
 
     private String truncate(String text) {

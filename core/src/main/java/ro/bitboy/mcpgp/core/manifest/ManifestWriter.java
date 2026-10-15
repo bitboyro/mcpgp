@@ -407,7 +407,16 @@ public final class ManifestWriter {
         JsonNode defaults = doc.path("runtimeDefaults");
         ObjectNode policies = NODES.objectNode()
                 .put("confirmDestructive", safety.path("confirmDestructive").asBoolean(true))
-                .put("responseLimitKb", safety.path("responseLimitKb").asInt(256));
+                .put("responseLimitKb", safety.path("responseLimitKb").asInt(256))
+                .put("cleanTruncation", safety.path("cleanTruncation").asBoolean(true));
+        // on by default; the definition can tune or turn them off (definition-format §2, safety)
+        JsonNode inputs = safety.path("inputLimits");
+        policies.putObject("inputLimits").put("enabled", inputs.path("enabled").asBoolean(true))
+                .put("requestKb", inputs.path("requestKb").asInt(1024)).put("stringMaxLength", inputs.path("stringMaxLength").asInt(65536));
+        JsonNode rates = safety.path("rateLimits");
+        policies.putObject("rateLimits").put("enabled", rates.path("enabled").asBoolean(true))
+                .put("concurrent", rates.path("concurrent").asInt(8)).put("perMinute", rates.path("perMinute").asInt(120))
+                .put("retryAfter", rates.path("retryAfter").asBoolean(true));
         ArrayNode forms = NODES.arrayNode();
         fileForms.forEach(forms::add);
         policies.set("files", NODES.objectNode().set("forms", forms));

@@ -81,7 +81,10 @@ build: { … }
 | `exposure.pinned` | list of tool names | `[]` | hybrid only |
 | `exposure.plainSearch` | bool | `false` | add `search_tools` + `describe_tool` in plain mode |
 | `safety.confirmDestructive` | bool | `true` | safe by default; destructive tools ask for confirmation (tools-contract §8) |
-| `safety.responseLimitKb` | int | `256` | operator may lower, not raise |
+| `safety.responseLimitKb` | int | `256` | the largest answer an agent gets; above it the answer is cut with a note. At most 4× this (at least 1 MB) is ever downloaded |
+| `safety.cleanTruncation` | bool | `true` | a JSON answer over the limit keeps whole items of its largest list, says how many it left out (`_meta.mcpgp/truncated`) |
+| `safety.inputLimits` | object | on | `{ enabled, requestKb: 1024, stringMaxLength: 65536 }`: a tool call's arguments (inline file contents excluded; `files.base64.maxKb` limits them) and, over HTTP, the request body (`413`); text values whose schema sets no `maxLength`. Over → `INPUT_TOO_LARGE`, nothing sent |
+| `safety.rateLimits` | object | on | `{ enabled, concurrent: 8, perMinute: 120, retryAfter: true }` per target server: more than `concurrent` wait up to 30 s for a slot; over `perMinute` → `RATE_LIMITED` with `_meta.mcpgp/retryAfterSeconds`. `retryAfter` passes a target's `429 Retry-After` to the agent. The operator can change them per instance (runtime-config, `instances[].rateLimits`) |
 | `schemas.input` | enum | `full` | `full` · `lean` (tools-contract §11) |
 | `files.forms` | list | `[base64, path]` | file-input forms the build supports; the operator enables them at runtime |
 | `packs.<id>` | object \| `$ref` | — | presence enables the pack |

@@ -47,10 +47,17 @@ final class Upstream {
     private final Map<String, JsonNode> apiKeys;
     private final OAuthTokens tokens;
     private final TokenExchange exchanges = new TokenExchange(Clock.systemUTC());
+    /** The most of an answer that is read; the rest is never downloaded. */
+    private final int readLimit;
 
     Upstream(Map<String, JsonNode> apiKeys, Redactor redactor) {
+        this(apiKeys, redactor, 16 * 1024 * 1024);
+    }
+
+    Upstream(Map<String, JsonNode> apiKeys, Redactor redactor, int readLimit) {
         this.apiKeys = apiKeys;
         this.tokens = new OAuthTokens(redactor, Clock.systemUTC());
+        this.readLimit = readLimit;
     }
 
     /** The credential a call uses: an entry of the instance's {@code auth}, and for fromRequest the value the client sent. */
@@ -229,7 +236,7 @@ final class Upstream {
         http.uri(uri);
 
         try {
-            return client.http().send(http.build(), HttpResponse.BodyHandlers.ofByteArray());
+            return CappedResponse.read(client.http().send(http.build(), HttpResponse.BodyHandlers.ofInputStream()), readLimit);
         } catch (HttpConnectTimeoutException e) {
             throw new ToolError("UPSTREAM_UNREACHABLE", instance.id() + " did not accept a connection within " + instance.timeoutSeconds() + " s",
                     "Check that the instance's baseUrl is reachable from the server");

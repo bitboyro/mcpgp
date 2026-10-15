@@ -41,6 +41,8 @@ public final class McpServerFactory {
     private final ro.bitboy.mcpgp.runtime.call.ApiToolHandler apiTools;
     private final AuditLog audit;
     private final Confirmations confirmations;
+    /** Caps on the arguments agents send (safety.inputLimits). */
+    private final InputLimits inputLimits;
     private final Clock clock;
     /** GET operations exposed as resources (tools-contract §14.1). */
     private final Resources resources;
@@ -69,6 +71,7 @@ public final class McpServerFactory {
         this.audit = audit;
         this.clock = clock;
         this.confirmations = new Confirmations(clock);
+        this.inputLimits = InputLimits.of(manifest, config);
         this.catalog = new ToolCatalog(manifest, config);
         this.apiTools = new ApiToolHandler(manifest, config);
         ro.bitboy.mcpgp.runtime.call.Contracts contracts = apiTools.contracts();
@@ -132,6 +135,10 @@ public final class McpServerFactory {
     /** Which contract each instance uses (runtime-config §4.4). */
     public ro.bitboy.mcpgp.runtime.call.Contracts contracts() {
         return apiTools.contracts();
+    }
+
+    public InputLimits inputLimits() {
+        return inputLimits;
     }
 
     public ToolCatalog catalog() {
@@ -300,6 +307,7 @@ public final class McpServerFactory {
             if (tool == null) {
                 throw new ToolError("INPUT_VALIDATION", "Unknown tool " + name);
             }
+            inputLimits.check(tool, arguments);
             if (toolsets != null && tool.path("kind").asText().equals("api")) {
                 java.util.Optional<List<String>> blocked = toolsets.blocked(name, Toolsets.session(exchange));
                 if (blocked.isPresent()) {

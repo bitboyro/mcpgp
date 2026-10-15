@@ -38,6 +38,7 @@ public final class ApiToolHandler implements ToolHandler {
     private final Recordings recordings;
     private final ResponseMapper responses;
     private final Contracts contracts;
+    private final RateLimits rateLimits;
 
     public ApiToolHandler(Manifest manifest, RuntimeConfig config) {
         this.manifest = manifest;
@@ -51,11 +52,15 @@ public final class ApiToolHandler implements ToolHandler {
             }
         });
         this.redactor = new Redactor(config.secrets());
-        this.upstream = new Upstream(apiKeys, redactor);
+        int responseLimit = manifest.policies().path("responseLimitKb").asInt(256) * 1024;
+        // a little more than the limit is read, so a JSON answer can be cut at whole items; never more than this
+        this.upstream = new Upstream(apiKeys, redactor, Math.max(4 * responseLimit, 1024 * 1024));
         this.contracts = new Contracts(manifest, config.allInstances(), upstream, java.time.Clock.systemUTC());
+        this.rateLimits = new RateLimits(manifest, java.time.Clock.systemUTC());
         this.recordings = recordings(manifest, config, apiKeys);
         this.responses = new ResponseMapper(manifest.policies().path("responseLimitKb").asInt(256),
-                config.errorDetail(), redactor);
+                config.errorDetail(), redactor, manifest.policies().path("cleanTruncation").asBoolean(true),
+                manifest.policies().at("/rateLimits/retryAfter").asBoolean(true));
     }
 
     /** Which contract each instance uses (runtime-config §4.4). */
@@ -136,13 +141,20 @@ public final class ApiToolHandler implements ToolHandler {
             record.auth = credential.type().equals("none") ? null : credential.type();
             HttpResponse<byte[]> response;
             Recordings.RuntimeConfig_Instance recorded = new Recordings.RuntimeConfig_Instance(instance.api(), instance.id());
-            try {
+            try (AutoCloseable slot = rateLimits.enter(instance)) {
                 response = upstream.send(instance, request, credential, publicOperation);
+            } catch (ToolError e) {
+                if (recordings != null && !e.code().equals("RATE_LIMITED")) {
+                    recordings.capture(tool.path("name").asText(), recorded, request, null, e.getMessage());
+                }
+                throw e;
             } catch (RuntimeException e) {
                 if (recordings != null) {
                     recordings.capture(tool.path("name").asText(), recorded, request, null, e.getMessage());
                 }
                 throw e;
+            } catch (Exception e) {
+                throw new IllegalStateException(e); // releasing a slot doesn't throw
             }
             if (recordings != null) {
                 recordings.capture(tool.path("name").asText(), recorded, request, response, null);
@@ -150,7 +162,12 @@ public final class ApiToolHandler implements ToolHandler {
             record.status = response.statusCode();
             return responses.map(response, instance.id(), meta, record);
         } catch (ToolError e) {
-            throw e.meta().isEmpty() ? e.withMeta(meta) : e;
+            if (e.meta().isEmpty()) {
+                throw e.withMeta(meta);
+            }
+            Map<String, Object> merged = new LinkedHashMap<>(meta);
+            merged.putAll(e.meta());          // e.g. how long to wait
+            throw e.withMeta(merged);
         }
     }
 

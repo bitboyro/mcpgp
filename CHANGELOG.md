@@ -46,7 +46,21 @@ versions follow [SemVer](https://semver.org).
   reference, never stored with a server or shown. API: `POST /servers/{id}/contracts?url=…` and
   `?source=true&version=…`; the address is recorded as `apis[].contracts[].source`.
 
+- **Security & safety**, a page per server on the platform, with every protection on by default and
+  each one adjustable or off:
+  - **large answers**: the server never downloads more than 4× `responseLimitKb` (a huge answer
+    could exhaust its memory before), and a JSON answer over the limit keeps whole items of its
+    largest list, stays structured and says how many it left out (`safety.cleanTruncation`);
+  - **what agents send**: tool-call arguments and HTTP requests are size-capped and long text values
+    refused, before anything is sent (`safety.inputLimits`, `INPUT_TOO_LARGE`, `413`);
+  - **calls to each target server**: at most 8 at once (more wait) and 120 per minute
+    (`safety.rateLimits`, `RATE_LIMITED` with how long to wait); a target's `429 Retry-After` reaches
+    the agent. Operators can change them per instance (`instances[].rateLimits`).
+  The page lists the protections that have no switch. `docs/security.md` maps them to OWASP.
+
 ### Fixed
+- Parameters: cookie values are encoded (a `;` could add a cookie), and a header value with a line
+  break is refused with `INPUT_VALIDATION` instead of an internal error.
 - Activity searches read the whole log when few entries matched, and agent quotas read it on every
   save or build: searches now go to the store as a query (PostgreSQL filters in SQL, with indexes on
   target and actor) and stop at their time bound. The cache cleanup deletes in one batch.
