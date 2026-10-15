@@ -76,6 +76,11 @@ versions follow [SemVer](https://semver.org).
   unavailable; more instances than `instances.max` stop startup.
 
 ### Fixed
+- Retries of upstream calls, as the release gate found them: a `GET` or `HEAD` is sent a second time
+  when the target closes the connection without answering. That is the JDK HTTP client's own retry,
+  allowed by HTTP for those methods and impossible to turn off; the spec now says so (tools-contract
+  §6, requirements §7). Other methods are still sent once. The client's retry after a refused
+  connection is now turned off (`jdk.httpclient.disableRetryConnect`, unless the operator sets it).
 - stdio: answers finishing at the same moment could be dropped (the MCP Java SDK's stdio transport
   hands each message over in a single attempt, which fails when another is being handed over), so a
   client sending parallel tool calls never got some of the answers. Messages now go out one at a time.

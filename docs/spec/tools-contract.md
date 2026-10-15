@@ -138,7 +138,10 @@ Success:
 Failure from the upstream or input validation: `isError: true` with a readable message, an error code
 from [audit-and-errors.md](audit-and-errors.md) and a hint. How much of an upstream error body is
 included is the operator's choice (`errors.detail`, runtime-config §4.5). No upstream call is retried
-automatically; the agent decides whether to try again. Redirects (3xx) are not followed, so
+automatically; the agent decides whether to try again. The one exception is HTTP's own: a `GET` or
+`HEAD` is sent a second time, once, when the target closes the connection without answering (RFC 9110
+§9.2.2 allows it for these methods; the JDK client does it and can't be told not to). No other method
+is ever sent twice, and a refused connection isn't tried again. Redirects (3xx) are not followed, so
 credentials never travel to another address; they are returned as `UPSTREAM_4XX` with a note. Secret
 values from the config are replaced with `***` in everything returned from upstream. Protocol errors (unknown tool, malformed
 request) are JSON-RPC errors.

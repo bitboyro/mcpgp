@@ -107,7 +107,7 @@ Every configurable thing, grouped by concern.
 | Health endpoints (`/health/live`, `/health/ready`), JSON operational logs, never on stdout for stdio | B→R | P0 |
 | Host, port, public URL, base path, TLS or proxy, trusted proxies, allowed origins, outbound proxy, management port | R | P0 |
 | Timeouts | B→R | P0 |
-| No automatic retries of upstream calls (agents decide); only the single protocol retries: token refresh on 401, certificate file rotation | B | P0 |
+| No automatic retries of upstream calls (agents decide); only the single protocol retries: token refresh on 401, certificate file rotation, and a `GET`/`HEAD` sent once more when the target closed the connection without answering (HTTP's idempotent retry, tools-contract §6) | B | P0 |
 | Error codes and `isError` mapping (fixed) | B | P0 |
 | Logging; stdio logs never on stdout | R | P0 |
 | Health/readiness endpoints | B→R | P1 |
