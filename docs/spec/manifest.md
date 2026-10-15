@@ -106,6 +106,7 @@ Full example: [examples/manifest/orders-mcp.manifest.json](../../examples/manife
   "confirmDestructive": true,
   "responseLimitKb": 256,
   "cleanTruncation": true,
+  "outputSchemas": true,
   "inputLimits": { "enabled": true, "requestKb": 1024, "stringMaxLength": 65536 },
   "rateLimits": { "enabled": true, "concurrent": 8, "perMinute": 120, "retryAfter": true },
   "files": { "forms": ["base64", "path"] },

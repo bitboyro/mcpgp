@@ -50,8 +50,16 @@ class SafetyTest {
     }
 
     McpServerFactory server(Consumer<ObjectNode> policies, String instanceExtra) throws IOException {
+        return server(policies, instanceExtra, true);
+    }
+
+    /** @param outputSchemas false: the tools declare none, so an answer cut as text is returned as text */
+    McpServerFactory server(Consumer<ObjectNode> policies, String instanceExtra, boolean outputSchemas) throws IOException {
         ObjectNode root = (ObjectNode) JSON.readTree(ORDERS.toFile());
         policies.accept((ObjectNode) root.path("policies"));
+        if (!outputSchemas) {
+            root.path("tools").forEach(t -> ((ObjectNode) t).putNull("outputSchema"));
+        }
         Path file = dir.resolve("orders-mcp.yaml");
         Files.writeString(file, "instances:\n  - { id: prod, baseUrl: \"" + target.address() + "\", contract: \"2.0\"" + instanceExtra + " }\n");
         Manifest manifest = Manifest.of(root);
@@ -106,7 +114,7 @@ class SafetyTest {
 
     @Test
     void withCleanTruncationOffTheAnswerIsCutAsText() throws IOException {
-        McpServerFactory server = server(p -> p.put("responseLimitKb", 16).put("cleanTruncation", false), "");
+        McpServerFactory server = server(p -> p.put("responseLimitKb", 16).put("cleanTruncation", false), "", false);
         target.respond(MockTarget.Response.json(200, customers(2000)));
 
         McpSchema.CallToolResult result = list(server, Map.of());
@@ -117,7 +125,7 @@ class SafetyTest {
 
     @Test
     void aHugeAnswerIsNeverReadWhole() throws IOException {
-        McpServerFactory server = server(p -> p.put("responseLimitKb", 16), "");   // reads at most 1 MB
+        McpServerFactory server = server(p -> p.put("responseLimitKb", 16), "", false);   // reads at most 1 MB
         target.respond(MockTarget.Response.json(200, customers(60_000)));        // about 5 MB
 
         McpSchema.CallToolResult result = list(server, Map.of());
@@ -125,6 +133,17 @@ class SafetyTest {
         assertThat(result.isError()).isFalse();
         assertThat(text(result)).contains("over the 16 KB limit").contains("narrow the query");
         assertThat(text(result).length()).isLessThan(20 * 1024);
+    }
+
+    @Test
+    void aHugeAnswerForAToolWithAnOutputSchemaSaysItIsTooLarge() throws IOException {
+        McpServerFactory server = server(p -> p.put("responseLimitKb", 16), "");
+        target.respond(MockTarget.Response.json(200, customers(60_000)));
+
+        McpSchema.CallToolResult result = list(server, Map.of());
+
+        assertThat(structured(result).path("code").asText()).isEqualTo("RESPONSE_TOO_LARGE");
+        assertThat(text(result)).contains("over the 16 KB limit").contains("Narrow the query");
     }
 
     @Test

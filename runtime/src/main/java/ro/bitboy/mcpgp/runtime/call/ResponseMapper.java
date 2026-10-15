@@ -109,10 +109,13 @@ final class ResponseMapper {
             }
             if (body.length > limitBytes) {
                 ToolOutput items = cleanTruncation ? cutAtItems(value, body.length, meta) : null;
-                return items != null ? items : new ToolOutput(null, truncate(text), meta);
+                if (items != null) {
+                    return items;
+                }
+                meta.put("mcpgp/truncated", Map.of("reason", "too large", "limitKb", limitBytes / 1024));
+                return new ToolOutput(null, truncate(text), meta);
             }
-            Object structured = value.isObject() ? JSON.convertValue(value, Map.class) : null;
-            return new ToolOutput(structured, text, meta);
+            return new ToolOutput(structured(value), text, meta, wrapper(value));
         }
         if (isText(type, contentType)) {
             return new ToolOutput(null, truncate(redact(new String(body, StandardCharsets.UTF_8))), meta);
@@ -209,8 +212,24 @@ final class ResponseMapper {
                 "shown", low, "total", total));
         String note = "[truncated: " + low + " of " + total + " items of " + where + " shown; the answer is " + (size / 1024) + " KB, over the "
                 + (limitBytes / 1024) + " KB limit. Narrow the query or ask for a smaller page to see the rest]";
-        Object structured = cut.isObject() ? JSON.convertValue(cut, Map.class) : null;
-        return new ToolOutput(structured, cut.toString() + "\n" + note, meta);
+        return new ToolOutput(structured(cut), cut.toString() + "\n" + note, meta, wrapper(cut));
+    }
+
+    /**
+     * A JSON answer as {@code structuredContent}, which MCP requires to be an object: an object as it
+     * is, a list as {@code { items }}, any other value as {@code { value }} (the tool's outputSchema says the same).
+     */
+    static Map<?, ?> structured(JsonNode value) {
+        if (value.isObject()) {
+            return JSON.convertValue(value, Map.class);
+        }
+        return value.isArray() ? Map.of("items", JSON.convertValue(value, List.class))
+                : value.isNull() ? null : Map.of("value", JSON.convertValue(value, Object.class));
+    }
+
+    /** Which wrapper {@link #structured} puts a value in: null for an object. */
+    static String wrapper(JsonNode value) {
+        return value.isObject() || value.isNull() ? null : value.isArray() ? "items" : "value";
     }
 
     /** The JSON pointer of the list with the most bytes, at most two levels down; null without one. */

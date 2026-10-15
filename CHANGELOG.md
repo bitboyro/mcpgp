@@ -57,8 +57,16 @@ versions follow [SemVer](https://semver.org).
     (`safety.rateLimits`, `RATE_LIMITED` with how long to wait); a target's `429 Retry-After` reaches
     the agent. Operators can change them per instance (`instances[].rateLimits`).
   The page lists the protections that have no switch. `docs/security.md` maps them to OWASP.
+- **Output schemas**: tools describe their result (`outputSchema`), from the API spec's success
+  answer, kept loose (no `required`, extra fields allowed) because real answers vary; a result that
+  differs is logged, never refused. On by default; off with `schemas.output: false`, the Security &
+  safety page, or `mcpgp build --no-output-schemas`.
+- JSON lists and plain values are now structured results too (`{ items }`, `{ value }`), not text only.
 
 ### Fixed
+- stdio: answers finishing at the same moment could be dropped (the MCP Java SDK's stdio transport
+  hands each message over in a single attempt, which fails when another is being handed over), so a
+  client sending parallel tool calls never got some of the answers. Messages now go out one at a time.
 - Parameters: cookie values are encoded (a `;` could add a cookie), and a header value with a line
   break is refused with `INPUT_VALIDATION` instead of an internal error.
 - Activity searches read the whole log when few entries matched, and agent quotas read it on every

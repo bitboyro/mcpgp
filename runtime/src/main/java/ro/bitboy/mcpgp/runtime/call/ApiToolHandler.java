@@ -68,6 +68,13 @@ public final class ApiToolHandler implements ToolHandler {
         return contracts;
     }
 
+    /** The first or the last non-empty line of a text (a truncation note is the last), at most 200 characters. */
+    private static String line(String text, boolean last) {
+        java.util.stream.Stream<String> lines = text == null ? java.util.stream.Stream.empty() : text.lines().filter(l -> !l.isBlank());
+        String line = (last ? lines.reduce((a, b) -> b) : lines.findFirst()).orElse("");
+        return line.length() <= 200 ? line : line.substring(0, 199) + "…";
+    }
+
     /** The request enrichers to run before each call is sent (extensions.md §3). */
     public void enrichment(Enrichment enrichment) {
         this.enrichment = enrichment;
@@ -160,7 +167,16 @@ public final class ApiToolHandler implements ToolHandler {
                 recordings.capture(tool.path("name").asText(), recorded, request, response, null);
             }
             record.status = response.statusCode();
-            return responses.map(response, instance.id(), meta, record);
+            ro.bitboy.mcpgp.runtime.mcp.ToolOutput output = responses.map(response, instance.id(), meta, record);
+            // a tool that declares an outputSchema answers with structured content, or says why it can't (MCP tools/call)
+            if (output.structured() == null && tool.path("outputSchema").isObject()) {
+                boolean cut = meta.containsKey("mcpgp/truncated");
+                throw new ToolError(cut ? "RESPONSE_TOO_LARGE" : "RESPONSE_PARSE_ERROR", cut
+                        ? "The answer is over the size limit and couldn't be cut at whole items: " + line(output.text(), true)
+                        : "The target answered without the JSON this tool's output schema describes",
+                        cut ? "Narrow the query (filters, a smaller page)" : "The answer starts: " + line(output.text(), false)).withMeta(meta);
+            }
+            return output;
         } catch (ToolError e) {
             if (e.meta().isEmpty()) {
                 throw e.withMeta(meta);

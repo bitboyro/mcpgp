@@ -114,7 +114,16 @@ Success:
 }
 ```
 
-- `structuredContent` and `outputSchema` when the response schema is known (P1).
+- `outputSchema` (on by default, `schemas.output`): from the success answer's JSON schema in the
+  tool's primary contract, self-contained and **loose**: no `required`, extra fields allowed, since a
+  target often answers with more or less than its spec says. None for answers that aren't JSON.
+- `structuredContent` for every JSON answer: an object as it is, a list as `{ "items": [...] }`, any
+  other value as `{ "value": … }`, with `_meta.mcpgp/wrapped: items | value` (the output schema
+  says the same). Extensions get the list or value itself.
+- A result is checked against the output schema, and a difference is logged (once per schema), never
+  turned into an error: the agent gets the answer the target really gave.
+- A tool with an output schema never answers with text alone: an answer cut as text (over the limit
+  and not cut at whole items) is `RESPONSE_TOO_LARGE`, a non-JSON answer `RESPONSE_PARSE_ERROR`.
 - Bodies over `responseLimitKb` are truncated with a note and a hint to narrow the query. A JSON body
   keeps whole items of its largest list and stays structured, with `_meta.mcpgp/truncated: { list,
   shown, total }` (`safety.cleanTruncation`). At most 4× the limit (at least 1 MB) is downloaded.

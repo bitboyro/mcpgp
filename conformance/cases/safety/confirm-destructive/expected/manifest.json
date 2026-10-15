@@ -63,6 +63,7 @@
       "requestKb": 1024,
       "stringMaxLength": 65536
     },
+    "outputSchemas": true,
     "rateLimits": {
       "concurrent": 8,
       "enabled": true,
@@ -287,7 +288,9 @@
         "operationId": "getNote",
         "tags": [ ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {

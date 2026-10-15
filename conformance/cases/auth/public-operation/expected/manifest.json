@@ -68,6 +68,7 @@
       "requestKb": 1024,
       "stringMaxLength": 65536
     },
+    "outputSchemas": true,
     "rateLimits": {
       "concurrent": 8,
       "enabled": true,
@@ -133,7 +134,14 @@
         "operationId": "getHealth",
         "tags": [ ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
@@ -220,7 +228,17 @@
         "operationId": "listIncidents",
         "tags": [ ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {

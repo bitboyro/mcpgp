@@ -262,6 +262,7 @@ export interface Manifest {
   policies: {
     confirmDestructive?: boolean; responseLimitKb?: number; redaction?: { fields: string[] }
     cleanTruncation?: boolean
+    outputSchemas?: boolean
     inputLimits?: { enabled?: boolean; requestKb?: number; stringMaxLength?: number }
     rateLimits?: { enabled?: boolean; concurrent?: number; perMinute?: number; retryAfter?: boolean }
     runtimeDefaults?: { audit?: { file?: { retainDays?: number; rotate?: string; enabled?: boolean }; arguments?: string } }

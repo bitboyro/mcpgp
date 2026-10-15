@@ -19,6 +19,7 @@ interface Settings {
   concurrent: number
   perMinute: number
   retryAfter: boolean
+  outputSchemas: boolean
 }
 
 function current(p: Manifest['policies']): Settings {
@@ -33,6 +34,7 @@ function current(p: Manifest['policies']): Settings {
     concurrent: p.rateLimits?.concurrent ?? 8,
     perMinute: p.rateLimits?.perMinute ?? 120,
     retryAfter: p.rateLimits?.retryAfter !== false,
+    outputSchemas: p.outputSchemas !== false,
   }
 }
 
@@ -47,6 +49,7 @@ const PATHS: Record<keyof Settings, string> = {
   concurrent: '/safety/rateLimits/concurrent',
   perMinute: '/safety/rateLimits/perMinute',
   retryAfter: '/safety/rateLimits/retryAfter',
+  outputSchemas: '/schemas/output',
 }
 
 /**
@@ -109,6 +112,13 @@ function SafetyForm({ id, saved }: { id: string; saved: Settings }) {
           hint="Above this the answer is cut, with a note to narrow the query. The server never downloads more than 4 times this (at least 1 MB), so a huge answer can't exhaust its memory." />
         <Toggle label="Cut long lists at whole items" checked={s.cleanTruncation} disabled={off} onChange={(v) => set('cleanTruncation', v)}
           hint="The agent keeps valid data (as many items as fit) and is told how many were left out, instead of JSON cut in the middle." />
+      </div>
+
+      <div className="card">
+        <h2>Tool results</h2>
+        <Toggle label="Describe each tool's result (output schema)" checked={s.outputSchemas} disabled={off}
+          onChange={(v) => set('outputSchemas', v)}
+          hint="From the API's spec, so agents and clients know the fields before calling. Kept loose (fields may be missing or extra), because real answers often differ from the spec; a difference is logged, never turned into an error. Lists come back as items." />
       </div>
 
       <div className="card">

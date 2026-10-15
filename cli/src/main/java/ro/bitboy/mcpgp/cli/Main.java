@@ -467,6 +467,9 @@ public final class Main {
         @Option(names = "--frozen-lock", description = "Fail when a tool name would differ from mcp-names.lock (exit code 3).")
         boolean frozenLock;
 
+        @Option(names = "--no-output-schemas", description = "Build without tools' output schemas, whatever schemas.output says.")
+        boolean noOutputSchemas;
+
         @Override
         public Integer call() throws IOException {
             List<Path> chosen = definitions(common, all, definitions);
@@ -485,7 +488,8 @@ public final class Main {
             Diagnostics workspaceDiagnostics = new Diagnostics();
             Workspace workspace = common.workspace(workspaceDiagnostics);
             ManifestWriter.Build build = new ManifestWriter.Build(createdAt(definition), Compiler.VERSION, version, buildNumber, source);
-            Compiler.Result result = new Compiler(common.schemas).compile(definition, new Compiler.Options(workspace, frozenLock, build));
+            Compiler.Result result = new Compiler(common.schemas).compile(definition,
+                    new Compiler.Options(workspace, frozenLock, build, noOutputSchemas ? Boolean.FALSE : null));
             List<Diagnostic> all = new ArrayList<>(workspaceDiagnostics.all());
             all.addAll(result.diagnostics());
             int code = common.report(definition, all);

@@ -63,6 +63,7 @@
       "requestKb": 1024,
       "stringMaxLength": 65536
     },
+    "outputSchemas": true,
     "rateLimits": {
       "concurrent": 8,
       "enabled": true,
@@ -177,7 +178,17 @@
           "customers"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
@@ -336,7 +347,17 @@
           "customers"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {

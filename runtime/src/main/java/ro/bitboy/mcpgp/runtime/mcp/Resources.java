@@ -156,7 +156,7 @@ final class Resources {
                         String.valueOf(file.get("contentType")), String.valueOf(file.get("base64")))));
             }
             return new McpSchema.ReadResourceResult(List.of(new McpSchema.TextResourceContents(uri, "application/json",
-                    Results.json(tool.structured()))));
+                    Results.json(tool.answer()))));
         }
         return new McpSchema.ReadResourceResult(List.of(new McpSchema.TextResourceContents(uri, mimeType, Results.json(output))));
     }

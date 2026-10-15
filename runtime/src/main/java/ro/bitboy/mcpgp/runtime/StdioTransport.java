@@ -50,6 +50,57 @@ final class StdioTransport extends StdioServerTransportProvider {
         return revisions;
     }
 
+    /** Every session's messages go out one at a time ({@link SerialSends}). */
+    @Override
+    public void setSessionFactory(io.modelcontextprotocol.spec.McpServerSession.Factory factory) {
+        super.setSessionFactory(transport -> factory.create(new SerialSends(transport)));
+    }
+
+    /**
+     * Sends one message at a time. The SDK's stdio transport hands each message to its output with a
+     * single attempt, which fails when another thread is handing over one at the same moment; the
+     * message is then dropped ("Failed to enqueue message") and the client never gets that answer.
+     * Parallel tool calls finish at the same moment often enough for that to happen.
+     */
+    static final class SerialSends implements io.modelcontextprotocol.spec.McpServerTransport {
+        private final io.modelcontextprotocol.spec.McpServerTransport delegate;
+        private final Object lock = new Object();
+
+        SerialSends(io.modelcontextprotocol.spec.McpServerTransport delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public reactor.core.publisher.Mono<Void> sendMessage(io.modelcontextprotocol.spec.McpSchema.JSONRPCMessage message) {
+            // once the transport is ready, subscribing hands the message over at once: inside the lock
+            return reactor.core.publisher.Mono.create(sink -> {
+                synchronized (lock) {
+                    delegate.sendMessage(message).subscribe(v -> { }, sink::error, sink::success);
+                }
+            });
+        }
+
+        @Override
+        public reactor.core.publisher.Mono<Void> closeGracefully() {
+            return delegate.closeGracefully();
+        }
+
+        @Override
+        public void close() {
+            delegate.close();
+        }
+
+        @Override
+        public <T> T unmarshalFrom(Object data, io.modelcontextprotocol.json.TypeRef<T> type) {
+            return delegate.unmarshalFrom(data, type);
+        }
+
+        @Override
+        public List<String> protocolVersions() {
+            return delegate.protocolVersions();
+        }
+    }
+
     /** Ids of client requests read but not yet answered. */
     static final class Pending {
         private final Set<String> ids = new HashSet<>();

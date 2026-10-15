@@ -142,6 +142,7 @@
         "confirmDestructive": { "type": "boolean" },
         "responseLimitKb": { "type": "integer" },
         "cleanTruncation": { "type": "boolean" },
+        "outputSchemas": { "description": "Tools carry an outputSchema (definition schemas.output)", "type": "boolean" },
         "inputLimits": {
           "type": "object",
           "properties": { "enabled": { "type": "boolean" }, "requestKb": { "type": "integer" }, "stringMaxLength": { "type": "integer" } },

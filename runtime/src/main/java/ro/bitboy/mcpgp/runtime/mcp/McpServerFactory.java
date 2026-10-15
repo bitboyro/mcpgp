@@ -237,6 +237,7 @@ public final class McpServerFactory {
                 .capabilities(capabilities.build())
                 .requestTimeout(Duration.ofSeconds(maxTimeout() + 30L))
                 .validateToolInputs(false)       // validated per instance contract by the runtime
+                .jsonSchemaValidator(new LenientOutputValidator())   // results follow the target, not only its spec
                 .tools(specs);
         manifest.instructions().ifPresent(builder::instructions);
         return builder.build();
@@ -507,7 +508,10 @@ public final class McpServerFactory {
                         message == null ? "the tool failed" : message.toString());
             }
             if (result.structuredContent() != null) {
-                return ro.bitboy.mcpgp.extension.ToolResult.of(new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(result.structuredContent()));
+                // a list or value the server wrapped for MCP reaches the extension as the API gave it
+                Object wrapped = result.meta() == null ? null : result.meta().get("mcpgp/wrapped");
+                Object value = wrapped != null && result.structuredContent() instanceof Map<?, ?> m ? m.get(wrapped.toString()) : result.structuredContent();
+                return ro.bitboy.mcpgp.extension.ToolResult.of(new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(value));
             }
             String text = result.content().stream().filter(c -> c instanceof McpSchema.TextContent).map(c -> ((McpSchema.TextContent) c).text())
                     .findFirst().orElse("");

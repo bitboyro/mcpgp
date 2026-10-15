@@ -92,7 +92,10 @@
     },
     "schemas": {
       "type": "object",
-      "properties": { "input": { "enum": ["full", "lean"] } },
+      "properties": {
+        "input": { "enum": ["full", "lean"] },
+        "output": { "description": "Give tools an outputSchema, from the success answer's schema (default true)", "type": "boolean" }
+      },
       "additionalProperties": false
     },
     "files": {
