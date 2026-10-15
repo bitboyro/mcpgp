@@ -70,6 +70,11 @@ public final class Compiler {
             return new Result(Optional.empty(), Map.of(), List.of(), Optional.empty(), sorted(collected));
         }
         ResolvedDefinition definition = resolved.definition().get();
+        Unsupported.check(definition.document(), definition.root().relativize(definition.file()).toString(), diagnostics);
+        if (diagnostics.hasErrors()) {
+            collected.addAll(diagnostics.all());
+            return new Result(Optional.empty(), Map.of(), List.of(), Optional.empty(), sorted(collected));
+        }
 
         ContractLoader loader = new ContractLoader(definition.root(), definition.root());
         Map<ContractKey, Contract> contracts = new LinkedHashMap<>();

@@ -71,7 +71,7 @@ build: { … }
 | `apis[].downstreamAuth.identity` | enum | `service-account` | informational; per-user identity comes from `fromRequest` or `tokenExchange` |
 | `apis[].downstreamAuth.unsatisfiedTools` | enum | `hide` | `hide` · `error` |
 | `apis[].requestBody` | object | `{ multiple: split }` | operations with several request body types: `split` (one tool per type, suffixes from `suffixes`) or `prefer` (one tool, first match of `prefer`). Default suffixes: `multipart/form-data → multipart`, `application/x-www-form-urlencoded → form`, `application/octet-stream → binary`. See tools-contract §13 |
-| `apis[].pagination` | object | none | **optional**; normalizes paging (tools-contract §10). `{ style: offset \| page \| cursor \| link-header \| client, request: {…param names}, response: {items, total, next}, defaultLimit, maxLimit }` |
+| `apis[].pagination` | object | none | **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). Planned: normalizes paging (tools-contract §10). `{ style: offset \| page \| cursor \| link-header \| client, request: {…param names}, response: {items, total, next}, defaultLimit, maxLimit }` |
 | `instances.mode` | enum | `single` | `single` · `multi` |
 | `instances.mixedContracts` | enum | `union` | `union` · `namespaced` · `forbid` (multi only) |
 | `instances.max` | int | none | |
@@ -82,7 +82,7 @@ build: { … }
 | `exposure.plainSearch` | bool | `false` | add `search_tools` + `describe_tool` in plain mode |
 | `safety.confirmDestructive` | bool | `true` | safe by default; destructive tools ask for confirmation (tools-contract §8) |
 | `safety.responseLimitKb` | int | `256` | operator may lower, not raise |
-| `schemas.input` | enum | `full` | `full` · `lean` (tools-contract §11) |
+| `schemas.input` | enum | `full` | `full`. `lean` (tools-contract §11): **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). |
 | `files.forms` | list | `[base64, path]` | file-input forms the build supports; the operator enables them at runtime |
 | `packs.<id>` | object \| `$ref` | — | presence enables the pack |
 | `runtimeDefaults` | object | see [runtime-config.md](runtime-config.md) | values become defaults in the generated config schema; `allowed` lists restrict the operator |
@@ -90,15 +90,15 @@ build: { … }
 | `resources.uriScheme` | string | `api` | scheme for operations exposed as resources (tools-contract §14.1) |
 | `prompts` | list | `[]` | prompt templates (tools-contract §14.2) |
 | `extensions` | object | none | custom tools, enrichers, call filters ([extensions.md](extensions.md)) |
-| `generation.mode` | enum | `runtime` | `runtime` · `codegen` · `both` |
+| `generation.mode` | enum | `runtime` | `runtime`. `codegen` · `both`: **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). |
 | `generation.runtime` | semver range | latest | pin the runtime version, e.g. `1.8.x` (see compatibility.md) |
 | `generation.client` | object | `{ library: jdk, json: jackson }` | |
-| `generation.codegen` | object | — | `{ output: build \| repo, extend: subclass \| hooks \| regions, classes: per-tag \| per-tool }` |
+| `generation.codegen` | object | — | planned, with `generation.mode: codegen`: `{ output: build \| repo, extend: subclass \| hooks \| regions, classes: per-tag \| per-tool }` |
 | `build.targets` | list | `[jar]` | `jar` · `mcpb` · `docker` (Kubernetes manifests / Helm: later) |
-| `build.image` | object | Temurin JRE | `docker` target: `{ base, registry, push: true\|false, tar: true\|false }` (packaging.md §7) |
+| `build.image` | object | Temurin JRE | `docker` target: `{ base }` (packaging.md §7). `registry`, `push: true`, `tar: true`: **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). The package's `docker/` folder has the Dockerfile. |
 | `build.docs` | list | `[people]` | `people` · `agents` |
 | `build.sign` | object | `{ key: ${env:MCPGP_SIGNING_KEY} }` | key-pair signature of `SHA256SUMS`; `null` disables (packaging.md §7) |
-| `build.jarSigning` | object | none | optional: `{ keystore, alias, password }` with a company code-signing certificate |
+| `build.jarSigning` | object | none | **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). Planned: `{ keystore, alias, password }` with a company code-signing certificate. Today `build.sign` signs the package (`SHA256SUMS.sig`), which covers the jar. |
 
 ## 3. APIs and contracts
 
@@ -323,6 +323,7 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 | `NAME_TOO_LONG` | error | a name exceeds the limit and `onTooLong: error` |
 | `NAME_COLLISION` | error | two tools get the same name and `collisions: error` |
 | `NAME_DRIFT` | warning | a name would change; the locked name is kept |
+| `NOT_SUPPORTED_YET` | error | a setting this version doesn't do yet (`generation.mode: codegen`/`both`, `schemas.input: lean`, `apis[].pagination`, `build.jarSigning`, `build.image.registry`/`push`/`tar`); the message names it |
 | `NAME_DRIFT_FROZEN` | error | the same with `--frozen-lock` (CLI exit code 3) |
 | `LOCK_INVALID` | error | `mcp-names.lock` doesn't match its schema |
 | `PINNED_TOOL_UNKNOWN` | error | in `hybrid` mode, `exposure.pinned` names a tool the build doesn't produce (ignored in other modes) |

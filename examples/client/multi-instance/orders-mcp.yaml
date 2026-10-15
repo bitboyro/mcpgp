@@ -7,7 +7,6 @@ server:
   publicUrl: https://orders-mcp.acme.internal
   basePath: /mcp
   tls: proxy                     # TLS terminated by the reverse proxy
-  trustProxy: [10.0.0.0/8]
   allowedOrigins: []
   management: { port: 8081 }     # /health, /ready, /metrics
   auth:

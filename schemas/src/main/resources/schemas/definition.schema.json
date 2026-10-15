@@ -70,7 +70,7 @@
     },
     "schemas": {
       "type": "object",
-      "properties": { "input": { "enum": ["full", "lean"] } },
+      "properties": { "input": { "description": "lean is not supported yet: refused by the compiler", "enum": ["full", "lean"] } },
       "additionalProperties": false
     },
     "files": {
@@ -197,7 +197,7 @@
           },
           "additionalProperties": false
         },
-        "pagination": {
+        "pagination": { "description": "Not supported yet: refused by the compiler",
           "type": ["object", "null"],
           "properties": {
             "style": { "enum": ["offset", "page", "cursor", "link-header", "client"] },
@@ -449,7 +449,7 @@
     "generation": {
       "type": "object",
       "properties": {
-        "mode": { "enum": ["runtime", "codegen", "both"] },
+        "mode": { "description": "codegen and both are not supported yet: refused by the compiler", "enum": ["runtime", "codegen", "both"] },
         "runtime": { "type": "string" },
         "client": { "type": "object" },
         "codegen": {
@@ -520,7 +520,7 @@
           "properties": { "key": { "type": "string" } },
           "additionalProperties": false
         },
-        "jarSigning": {
+        "jarSigning": { "description": "Not supported yet: refused by the compiler; build.sign signs the package",
           "type": "object",
           "properties": {
             "keystore": { "type": "string" },
@@ -534,9 +534,9 @@
           "type": "object",
           "properties": {
             "base": { "type": "string" },
-            "registry": { "type": "string" },
-            "push": { "type": "boolean" },
-            "tar": { "type": "boolean" }
+            "registry": { "description": "Not supported yet: refused by the compiler", "type": "string" },
+            "push": { "description": "Not supported yet: refused by the compiler", "type": "boolean" },
+            "tar": { "description": "Not supported yet: refused by the compiler", "type": "boolean" }
           },
           "additionalProperties": false
         }

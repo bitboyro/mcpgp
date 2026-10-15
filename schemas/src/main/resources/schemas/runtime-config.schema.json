@@ -142,6 +142,7 @@
         "publicUrl": { "type": "string", "pattern": "^https?://" },
         "basePath": { "type": "string", "pattern": "^/" },
         "tls": {
+          "description": "proxy: TLS is terminated in front of the server. Serving HTTPS itself (cert, key) is not supported yet: refused at startup",
           "oneOf": [
             { "const": "proxy" },
             {
@@ -152,9 +153,9 @@
             }
           ]
         },
-        "trustProxy": { "type": "array", "items": { "type": "string" } },
+        "trustProxy": { "description": "Not supported yet: refused at startup", "type": "array", "items": { "type": "string" } },
         "allowedOrigins": { "type": "array", "items": { "type": "string" } },
-        "outboundProxy": { "type": "string" },
+        "outboundProxy": { "description": "Not supported yet: refused at startup", "type": "string" },
         "management": {
           "type": "object",
           "properties": { "port": { "$ref": "#/$defs/port" } },

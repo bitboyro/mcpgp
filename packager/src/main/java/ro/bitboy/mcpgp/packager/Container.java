@@ -33,10 +33,7 @@ final class Container {
             return Map.of();
         }
         JsonNode image = definition.at("/build/image");
-        if (image.path("push").asBoolean(false) || image.path("tar").asBoolean(false)) {
-            warnings.add("build.image push and tar are not available in this version; docker/ has the files to build the image with "
-                    + "`docker build -f docker/Dockerfile -t " + server + ":" + version + " .`");
-        }
+        // push, tar and registry are refused by the compiler (NOT_SUPPORTED_YET)
         String base = image.path("base").asText(DEFAULT_BASE);
         String prefix = server.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", "_") + "_";
         String dockerfile = """

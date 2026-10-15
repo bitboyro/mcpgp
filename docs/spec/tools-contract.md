@@ -199,10 +199,11 @@ or the whole `body` for `application/octet-stream`):
 Parts that carry secrets (passwords, keys) are marked in the definition (see definition-format §5,
 `parts`) and are redacted in audit and recordings.
 
-## 10. Paging (optional)
+## 10. Paging (optional, not supported yet)
 
-Off by default: list tools return what the API returns, and paging uses the API's own parameters.
-When a definition enables `pagination` for an API (definition-format §2.1), its list tools instead:
+List tools return what the API returns, and paging uses the API's own parameters. **Not supported
+yet:** the compiler refuses `pagination` (`NOT_SUPPORTED_YET`). What follows is the plan. When a
+definition enables `pagination` for an API (definition-format §2.1), its list tools instead:
 
 - take `query.limit` and `query.cursor` (the API's own paging parameters are hidden);
 - return one envelope in `structuredContent`:
@@ -227,7 +228,7 @@ All off by default.
 
 | Option | Effect |
 |---|---|
-| `schemas.input: lean` | Large request bodies are shown one level deep in `inputSchema` (property names and types); nested objects are described as "see `describe_schema`". Default `full`. |
+| `schemas.input: lean` (not supported yet: refused by the compiler) | Large request bodies are shown one level deep in `inputSchema` (property names and types); nested objects are described as "see `describe_schema`". Default `full`. |
 | `packs.schema` | Adds `describe_schema(tool, part?, variant?)`: returns the full input schema of a tool, summarized one level deep with drill-down into one named definition (`part`), and narrowing of `oneOf` / discriminator variants (`variant`). Reads bundled data only; no instance, no network. |
 
 ## 12. Sensitive tools (optional)

@@ -11,7 +11,7 @@ orders-mcp-1.4.1.zip
 ├─ orders-mcp.jar                     if target jar (always for Java)
 ├─ orders-mcp-1.4.1.mcpb              if target mcpb (desktop bundle, §7.3)
 ├─ docker/                          if target docker: Dockerfile, docker-compose.yml (§7.2)
-├─ source/                          if generation.mode is codegen or both
+├─ source/                          planned: generation.mode codegen or both (not supported yet)
 ├─ orders-mcp.example.yaml            example runtime config for this build
 ├─ server.config.schema.json        runtime config schema for this build
 ├─ docs/                            README · INSTALL · CONFIGURATION · TOOLS · OPERATIONS · CHANGELOG
