@@ -56,6 +56,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <Item to={`/servers/${id}`} icon="shape" end>Overview</Item>
               <Item to={`/servers/${id}/tools`} icon="tools">Tools &amp; rules</Item>
               <Item to={`/servers/${id}/connections`} icon="connections">Connections</Item>
+              <Item to={`/servers/${id}/safety`} icon="shield">Security &amp; safety</Item>
               <Item to={`/servers/${id}/sources`} icon="sources">Sources</Item>
               <Item to={`/servers/${id}/changes`} icon="changes">Changes</Item>
               <Item to={`/servers/${id}/package`} icon="deliver">Package &amp; deliver</Item>

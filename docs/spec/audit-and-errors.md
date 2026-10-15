@@ -67,6 +67,8 @@ build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `auth
 | `UPSTREAM_UNREACHABLE` | DNS/TCP/TLS failure | `isError` |
 | `RESPONSE_PARSE_ERROR` | target returned 2xx with a body that doesn't parse as declared | `isError` |
 | `RESPONSE_TOO_LARGE` | over limit even after truncation | `isError` |
+| `INPUT_TOO_LARGE` | the arguments, or one text value, are over `safety.inputLimits`; nothing was sent | `isError` |
+| `RATE_LIMITED` | over `safety.rateLimits` for that target (calls per minute, or no free slot within 30 s); nothing was sent | `isError`, `_meta.mcpgp/retryAfterSeconds` |
 | `CONFIG_INVALID` | startup/reload config error | startup failure |
 | `INTERNAL` | anything else | `isError`, no internals leaked |
 

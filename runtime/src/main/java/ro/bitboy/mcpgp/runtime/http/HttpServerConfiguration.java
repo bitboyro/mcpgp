@@ -105,6 +105,16 @@ public class HttpServerConfiguration {
         return registration;
     }
 
+    /** Requests larger than the input limits allow (safety.inputLimits) are refused before anything reads them whole. */
+    @Bean
+    FilterRegistrationBean<RequestSizeFilter> requestSizeFilter(RuntimeConfig config, McpServerFactory factory) {
+        FilterRegistrationBean<RequestSizeFilter> registration = new FilterRegistrationBean<>(new RequestSizeFilter(factory.inputLimits().maxRequestBytes()));
+        registration.addUrlPatterns(config.server().basePath());
+        registration.setAsyncSupported(true);
+        registration.setOrder(0);
+        return registration;
+    }
+
     @Bean
     FilterRegistrationBean<InboundFilter> inboundFilter(RuntimeConfig config, McpServerFactory factory, ro.bitboy.mcpgp.runtime.Reloader reloader) {
         RuntimeConfig.Server server = config.server();

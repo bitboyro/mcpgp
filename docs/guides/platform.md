@@ -49,6 +49,12 @@ anything is saved. An administrator decides which hosts can be used (`specHosts`
 none by default). Teams that keep the definition in git upload the
 whole project instead (**A definition project**, or `mcpgp push`).
 
+**Security & safety** shows what each server protects by default, every protection on: confirmation
+before destructive calls, the answer size limit (long lists cut at whole items), limits on what agents
+send, and limits on calls to each target server (at once and per minute, with the target's own
+"slow down" passed on). Each can be tuned or turned off there; whoever runs a server can still change
+the call limits for their own target server. The protections without a switch are listed beside them.
+
 The pages: **All servers** (new server from a spec or a project, duplicate, variant), and per server **Overview**
 (what agents get, what the customer configures, the package, the checks), **Tools & rules** (each
 tool as the agent gets it, and why), **Connections**, **Sources** (versions, files, upload a new

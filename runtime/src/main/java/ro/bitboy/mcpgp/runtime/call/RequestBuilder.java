@@ -61,8 +61,9 @@ final class RequestBuilder {
                     path = path.replace("{" + name + "}", encodePath(text));
                 }
                 case "query" -> appendQuery(query, name, value, style, explode);
-                case "header" -> headers.add(Map.entry(name, simple(value, explode)));
-                case "cookie" -> cookies.add(name + "=" + simple(value, false));
+                case "header" -> headers.add(Map.entry(name, headerValue(name, simple(value, explode))));
+                // encoded: a ';' or ',' in a value can't add another cookie
+                case "cookie" -> cookies.add(name + "=" + encodeCookie(simple(value, false)));
                 default -> {
                 }
             }
@@ -149,6 +150,32 @@ final class RequestBuilder {
 
     private static String encodeQuery(String text) {
         return URLEncoder.encode(text, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    /** A header value as sent: no line breaks or control characters, which would end the header or add one. */
+    static String headerValue(String name, String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '\r' || c == '\n' || c < 0x20 && c != '\t' || c == 0x7f) {
+                throw new ToolError("INPUT_VALIDATION", "header." + name + " may not contain line breaks or control characters");
+            }
+        }
+        return value;
+    }
+
+    /** Percent-encodes what isn't a cookie-octet (RFC 6265 §4.1.1): spaces, quotes, ',', ';', '\\' and non-ASCII. */
+    static String encodeCookie(String value) {
+        StringBuilder out = new StringBuilder();
+        for (byte b : value.getBytes(StandardCharsets.UTF_8)) {
+            int c = b & 0xff;
+            boolean octet = c == 0x21 || c >= 0x23 && c <= 0x2b || c >= 0x2d && c <= 0x3a || c >= 0x3c && c <= 0x5b || c >= 0x5d && c <= 0x7e;
+            if (octet && c != '%') {
+                out.append((char) c);
+            } else {
+                out.append('%').append(String.format("%02X", c));
+            }
+        }
+        return out.toString();
     }
 
     private static String encodePath(String text) {

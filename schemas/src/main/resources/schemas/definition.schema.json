@@ -64,13 +64,38 @@
       "type": "object",
       "properties": {
         "confirmDestructive": { "type": "boolean" },
-        "responseLimitKb": { "type": "integer", "minimum": 1 }
+        "responseLimitKb": { "type": "integer", "minimum": 1 },
+        "cleanTruncation": { "description": "A JSON answer over the limit is cut at whole list items, saying how many were left out (default true)", "type": "boolean" },
+        "inputLimits": {
+          "description": "Caps on what an agent sends (default on)",
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "requestKb": { "description": "The largest tool call's arguments, and over HTTP the largest request (default 1024)", "type": "integer", "minimum": 1 },
+            "stringMaxLength": { "description": "The longest text value, where the spec sets no maxLength (default 65536)", "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "rateLimits": {
+          "description": "Calls to each target server (default on); whoever runs the server can change them per instance",
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "concurrent": { "description": "Calls at once per target server; more wait for a free slot (default 8)", "type": "integer", "minimum": 1 },
+            "perMinute": { "description": "Calls per minute per target server (default 120)", "type": "integer", "minimum": 1 },
+            "retryAfter": { "description": "When the target answers 429, tell the agent how long to wait (default true)", "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },
     "schemas": {
       "type": "object",
-      "properties": { "input": { "enum": ["full", "lean"] } },
+      "properties": {
+        "input": { "description": "lean is not supported yet: refused by the compiler", "enum": ["full", "lean"] },
+        "output": { "description": "Give tools an outputSchema, from the success answer's schema (default true)", "type": "boolean" }
+      },
       "additionalProperties": false
     },
     "files": {
@@ -197,7 +222,7 @@
           },
           "additionalProperties": false
         },
-        "pagination": {
+        "pagination": { "description": "Not supported yet: refused by the compiler",
           "type": ["object", "null"],
           "properties": {
             "style": { "enum": ["offset", "page", "cursor", "link-header", "client"] },
@@ -449,7 +474,7 @@
     "generation": {
       "type": "object",
       "properties": {
-        "mode": { "enum": ["runtime", "codegen", "both"] },
+        "mode": { "description": "codegen and both are not supported yet: refused by the compiler", "enum": ["runtime", "codegen", "both"] },
         "runtime": { "type": "string" },
         "client": { "type": "object" },
         "codegen": {
@@ -520,7 +545,7 @@
           "properties": { "key": { "type": "string" } },
           "additionalProperties": false
         },
-        "jarSigning": {
+        "jarSigning": { "description": "Not supported yet: refused by the compiler; build.sign signs the package",
           "type": "object",
           "properties": {
             "keystore": { "type": "string" },
@@ -534,9 +559,9 @@
           "type": "object",
           "properties": {
             "base": { "type": "string" },
-            "registry": { "type": "string" },
-            "push": { "type": "boolean" },
-            "tar": { "type": "boolean" }
+            "registry": { "description": "Not supported yet: refused by the compiler", "type": "string" },
+            "push": { "description": "Not supported yet: refused by the compiler", "type": "boolean" },
+            "tar": { "description": "Not supported yet: refused by the compiler", "type": "boolean" }
           },
           "additionalProperties": false
         }

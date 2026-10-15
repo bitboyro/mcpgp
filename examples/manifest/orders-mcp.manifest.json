@@ -204,12 +204,25 @@
   ],
   "policies": {
     "baseUrlAllowlist": [ ],
+    "cleanTruncation": true,
     "confirmDestructive": true,
     "files": {
       "forms": [
         "base64",
         "path"
       ]
+    },
+    "inputLimits": {
+      "enabled": true,
+      "requestKb": 1024,
+      "stringMaxLength": 65536
+    },
+    "outputSchemas": true,
+    "rateLimits": {
+      "concurrent": 8,
+      "enabled": true,
+      "perMinute": 120,
+      "retryAfter": true
     },
     "redaction": {
       "fields": [
@@ -564,7 +577,25 @@
           "accounts"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
@@ -846,7 +877,25 @@
           "customer-contacts"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
@@ -1023,7 +1072,28 @@
           "customers"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
@@ -1306,7 +1376,28 @@
           "customers"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
@@ -1546,7 +1637,28 @@
           "customers"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
@@ -1784,7 +1896,42 @@
           "customers"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "data": {
+            "items": {
+              "properties": {
+                "accountId": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "email": {
+                  "format": "email",
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
@@ -2070,7 +2217,28 @@
           "customers"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
@@ -2559,7 +2727,29 @@
           "orders"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "paid",
+              "refunded",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
@@ -2848,7 +3038,37 @@
           "orders"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "customerId": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "open",
+                    "paid",
+                    "refunded",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
@@ -3065,7 +3285,26 @@
           "invoices"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "properties": {
+          "items": {
+            "items": {
+              "properties": {
+                "dueDate": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "provenance": {
         "description": [
           {
