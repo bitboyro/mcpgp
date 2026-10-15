@@ -20,7 +20,9 @@ conformance/
 │     ├─ runtime.yaml              runtime config used for the traffic part (instances point to `mock`)
 │     ├─ mock.yaml                 how the mock target answers
 │     └─ traffic.yaml              steps: MCP request → expected upstream request → expected MCP response
-└─ runner/                         one small runner per runtime
+├─ fixtures/                       definitions shared by the release gate (e.g. the kitchen sink)
+└─ runner/                         one small runner per runtime; runner/ts is the release gate:
+                                   packaged servers, an independent MCP client, a validating mock
 ```
 
 Areas: `resolve` (multi-file), `naming`, `rules`, `schemas`, `content-types`, `files`, `auth`,

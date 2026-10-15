@@ -28,7 +28,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    # the release gate (docs/process/release-gate.md): nothing below runs unless it passes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: conformance/runner/ts/package-lock.json
+      - name: The CLI that builds the packages under test
+        run: mvn -B -q -pl cli -am package -DskipTests
+      - name: Gate (packaged servers, an independent MCP client, a validating API mock)
+        working-directory: conformance/runner/ts
+        run: |
+          npm ci --no-audit --no-fund
+          npm run gate
+      - name: Gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-report
+          path: conformance/runner/ts/.gate/report/
+          if-no-files-found: warn
+
   image:
+    needs: gate
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -116,6 +147,13 @@ jobs:
         run: |
           mvn -B -q -pl cli -am package -DskipTests
           cli/src/dist/assemble.sh "${GITHUB_REF_NAME#v}" release
+      - name: The gate report this version passed
+        uses: actions/download-artifact@v4
+        with:
+          name: gate-report
+          path: gate-report
+      - name: Attach the gate report
+        run: cp gate-report/gate-report.html gate-report/gate-report.json release/
       - name: Sign the release files (when MCPGP_RELEASE_SIGNING_KEY is set)
         env:
           MCPGP_RELEASE_SIGNING_KEY: ${{ secrets.MCPGP_RELEASE_SIGNING_KEY }}

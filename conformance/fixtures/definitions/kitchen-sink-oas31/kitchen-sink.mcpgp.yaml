@@ -1,0 +1,16 @@
+# The release gate's kitchen-sink fixture (docs/process/release-gate.md §6.1): one API, every method,
+# many parameter, body and answer kinds. The runner points its instance at the gate's mock.
+apiVersion: mcpgp/v1
+kind: McpServer
+metadata:
+  name: kitchen-sink
+  title: Kitchen sink
+apis:
+  - id: kitchen
+    toolPrefix: kitchen
+    contracts:
+      - { version: "1.0", spec: contracts/kitchen-sink-1.0.yaml, default: true }
+    select:
+      access: all
+instances:
+  mode: single

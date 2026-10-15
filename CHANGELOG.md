@@ -6,6 +6,13 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- The release gate, first milestone (G1): `conformance/runner/ts` builds packages with `mcpgp build`,
+  starts each server jar as a customer would, and drives it with the official TypeScript MCP SDK over
+  stdio and Streamable HTTP on every claimed MCP revision, against a mock that checks every request
+  against the contract. Suites: package start-up, the conformance cases, and calls generated for every
+  tool of a kitchen-sink fixture (valid, invalid, every documented answer, faults), plus a self-check
+  of the mock. It runs on every PR (`ci.yml`) and before anything is published (`publish.yml`); the
+  release carries its report (`gate-report.html`, `gate-report.json`).
 - What changed between builds: `mcpgp diff` (against the last release tag, a tag or commit, a
   manifest or a release folder; text, Markdown for PR comments, or JSON; `--fail-on-breaking`, exit
   code 6) and the platform's **Changes** page (any two versions, by default since the last release;
