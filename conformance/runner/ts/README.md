@@ -41,7 +41,7 @@ Each failure in the report has the command that runs it alone.
 |---|---|---|
 | S0 Package | `tests/s0-package.test.ts` | Every package starts on every transport and revision, negotiates that revision, lists its tools, and puts nothing but the protocol on the wire |
 | Conformance | `tests/conformance.test.ts` | Every `conformance/cases/**/traffic.yaml`, against the package over real transports (the Java runner plays the same files in-process) |
-| S3 Operations | `tests/s3-operations.test.ts` | For every tool of every fixture: valid arguments made from its input schema reach the API once and the contract accepts the request; one-constraint mutations give `INPUT_VALIDATION` with nothing sent; every documented answer becomes its code with no retry; a dropped connection and an unparsable answer become their codes |
+| S3 Operations | `tests/s3-operations.test.ts` | For every tool of every fixture: valid arguments made from its input schema reach the API once and the contract accepts the request; one-constraint mutations give `INPUT_VALIDATION` with nothing sent; every documented answer becomes its code with no retry; a dropped connection becomes `UPSTREAM_UNREACHABLE` after one request (a `GET` or `HEAD` is resent once and the agent gets that answer, tools-contract §6), and an unparsable answer becomes its code |
 | Self-check | `tests/self-check.test.ts` | The mock flags requests that are wrong in each way it checks, so a green run means something |
 
 Error codes must be among those in `docs/spec/audit-and-errors.md` §3, read from the spec at run time.

@@ -107,14 +107,22 @@ for (const fixture of fixtures()) {
             expect(problems, problems.join("\n")).toEqual([]);
           });
 
-          test(`${tool.name} › a dropped connection is UPSTREAM_UNREACHABLE`, async () => {
+          test(`${tool.name} › a dropped connection is UPSTREAM_UNREACHABLE, or resent once for GET/HEAD`, async () => {
             const key = await operationFor(tool);
-            mock.forOperation(key, { fault: "reset" });
+            mock.forOperation(key, { fault: "reset" });   // the next request only
             const result = await callConfirmed(server, tool.name, validArguments(tool, "required", seed));
             const problems: string[] = [];
-            checkResult(result, { isError: true, code: "UPSTREAM_UNREACHABLE" }, problems);
-            // requirements.md §7: no automatic retries of upstream calls; the agent decides
-            if (mock.journal.length !== 1) problems.push(`expected 1 API request (no retry), got ${mock.journal.length}`);
+            // requirements.md §7: no automatic retries of upstream calls, except HTTP's own for GET and HEAD:
+            // sent once more when the connection closes without an answer (tools-contract §6, RFC 9110 §9.2.2),
+            // so the agent gets the answer to the resend
+            const method = (mock.operations().find((o) => o.key === key)?.method ?? "").toUpperCase();
+            if (method === "GET" || method === "HEAD") {
+              if (result.isError) problems.push(`expected the answer to the resend, got ${codeOf(result)}: ${text(result).slice(0, 200)}`);
+              if (mock.journal.length !== 2) problems.push(`expected 2 API requests (one resend for ${method}), got ${mock.journal.length}`);
+            } else {
+              checkResult(result, { isError: true, code: "UPSTREAM_UNREACHABLE" }, problems);
+              if (mock.journal.length !== 1) problems.push(`expected 1 API request (no retry), got ${mock.journal.length}`);
+            }
             expect(problems, problems.join("\n")).toEqual([]);
           });
 
