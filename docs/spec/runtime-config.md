@@ -394,7 +394,10 @@ files:
 The server refuses to start, with a message naming the key, when:
 - the config doesn't match the schema;
 - an instance uses an auth type the build doesn't support (`type: none`, no credentials, is always accepted);
-- a pinned contract isn't shipped, or `mixedContracts: forbid` is violated;
+- a pinned contract isn't shipped, or `mixedContracts: forbid` is violated by pinned instances (an
+  `auto` instance detected on another version than the others, the first pinned one or the default,
+  is unavailable instead: `INSTANCE_UNAVAILABLE` naming both versions);
+- more instances than the build's `instances.max`;
 - `server.auth.mode: none` on a non-loopback HTTP address without `allowInsecure`;
 - a secret reference can't be resolved, or a secret field holds a plain value without `allowInlineSecrets`;
 - indexed environment variables for a list have gaps;

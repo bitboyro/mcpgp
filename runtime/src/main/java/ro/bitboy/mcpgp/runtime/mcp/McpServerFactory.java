@@ -110,6 +110,45 @@ public final class McpServerFactory {
             LOG.warn("Not offered, because this runtime version doesn't implement them yet: {}", String.join(", ", unsupported));
             catalog.remove(unsupported);
         }
+        if (manifest.multiInstance() && manifest.root().at("/instances/mixedContracts").asText("union").equals("namespaced")) {
+            namespace(config, contracts);
+        }
+    }
+
+    /**
+     * {@code mixedContracts: namespaced} (tools-contract §3): each API tool becomes one tool per instance,
+     * {@code <instance>__<tool>}, without the {@code instance} input and with only the fields of that
+     * instance's contract; a tool its contract lacks isn't offered for it. Detection is waited for, so
+     * each instance's tools match the version its target runs.
+     */
+    private void namespace(RuntimeConfig config, ro.bitboy.mcpgp.runtime.call.Contracts contracts) {
+        for (JsonNode tool : List.copyOf(catalog.all().values())) {
+            if (!tool.path("kind").asText().equals("api")) {
+                continue;
+            }
+            String name = tool.path("name").asText();
+            ToolHandler handler = handlers.remove(name);
+            catalog.remove(List.of(name));
+            if (handler == null) {
+                continue;
+            }
+            Manifest.Api api = manifest.apis().get(tool.path("api").asText());
+            for (RuntimeConfig.Instance instance : config.instances().getOrDefault(api.id(), List.of())) {
+                String contract = contracts.of(instance).contract();
+                String version = contract != null ? contract : api.defaultContract();   // an unavailable instance: calls say why
+                if (!tool.path("variants").has(version)) {
+                    continue;
+                }
+                ObjectNode copy = ToolCatalog.forInstance(tool, instance.id(), version);
+                String copyName = copy.path("name").asText();
+                catalog.add(copy);
+                handlers.put(copyName, (exchange, served, arguments, record) -> {
+                    Map<String, Object> withInstance = new LinkedHashMap<>(arguments);
+                    withInstance.put("instance", instance.id());
+                    return handler.call(exchange, tool, withInstance, record);
+                });
+            }
+        }
     }
 
     /** An auto instance's detected contract, or why there's none (runtime-config §4.4), in the audit. */
@@ -148,7 +187,11 @@ public final class McpServerFactory {
      * the SDK tells the client its tool list changed.
      */
     public void showToolsets(McpSyncServer server, String session) {
-        java.util.Set<String> wanted = toolsets.visible(session);
+        // namespaced: a toolset's tool stands for its copy on every instance
+        java.util.Set<String> wanted = new java.util.LinkedHashSet<>();
+        for (String name : toolsets.visible(session)) {
+            catalog.servedAs(name).forEach(t -> wanted.add(t.path("name").asText()));
+        }
         for (String name : wanted) {
             catalog.tool(name).ifPresent(tool -> {
                 if (shown.add(name)) {
@@ -301,7 +344,7 @@ public final class McpServerFactory {
                 throw new ToolError("INPUT_VALIDATION", "Unknown tool " + name);
             }
             if (toolsets != null && tool.path("kind").asText().equals("api")) {
-                java.util.Optional<List<String>> blocked = toolsets.blocked(name, Toolsets.session(exchange));
+                java.util.Optional<List<String>> blocked = toolsets.blocked(tool.path("x-mcpgp-original").asText(name), Toolsets.session(exchange));
                 if (blocked.isPresent()) {
                     throw new ToolError("TOOLSET_DISABLED", blocked.get().isEmpty() ? "Tool " + name + " is in no toolset"
                             : "Tool " + name + " is in the toolset " + String.join(" or ", blocked.get()) + ", which is not enabled",

@@ -46,6 +46,12 @@ versions follow [SemVer](https://semver.org).
   reference, never stored with a server or shown. API: `POST /servers/{id}/contracts?url=…` and
   `?source=true&version=…`; the address is recorded as `apis[].contracts[].source`.
 
+- `mixedContracts: namespaced` and `forbid`, and `instances.max`, which the definition accepted
+  but nothing did: namespaced offers each API tool once per instance (`prod__orders_customer_get`),
+  with no `instance` input and only that instance's version's fields; forbid stops startup when
+  pinned instances use different versions and makes an `auto` instance detected on another version
+  unavailable; more instances than `instances.max` stop startup.
+
 ### Fixed
 - Activity searches read the whole log when few entries matched, and agent quotas read it on every
   save or build: searches now go to the store as a query (PostgreSQL filters in SQL, with indexes on

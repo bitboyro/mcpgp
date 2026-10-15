@@ -102,8 +102,10 @@ public final class ApiToolHandler implements ToolHandler {
         record.instance = instance.id();
         Contracts.Choice choice = contracts.forCall(instance, credentials);
         if (!choice.available()) {
-            throw new ToolError("INSTANCE_UNAVAILABLE", instance.id() + " is unavailable: its contract version isn't known (" + choice.reason() + ")",
-                    "It's asked again within a minute; use another instance, or ask whoever runs this server to check it (doctor)")
+            throw new ToolError("INSTANCE_UNAVAILABLE", instance.id() + " is unavailable: " + (choice.selection().equals("detected") ? choice.reason()
+                            : "its contract version isn't known (" + choice.reason() + ")"),
+                    choice.selection().equals("detected") ? "Use another instance; whoever runs this server can pin it or change the build"
+                            : "It's asked again within a minute; use another instance, or ask whoever runs this server to check it (doctor)")
                     .withMeta(Map.<String, Object>of("mcpgp/instance", instance.id()));
         }
         String contract = choice.contract();

@@ -112,6 +112,86 @@ public final class ToolCatalog {
         return Optional.ofNullable(tools.get(name));
     }
 
+    /** Adds a tool (a namespaced instance's copy). */
+    void add(JsonNode tool) {
+        tools.put(tool.path("name").asText(), tool);
+    }
+
+    /** The tools made from {@code name} for each instance (namespaced), or the tool itself. */
+    public List<JsonNode> servedAs(String name) {
+        JsonNode own = tools.get(name);
+        if (own != null) {
+            return List.of(own);
+        }
+        return tools.values().stream().filter(t -> name.equals(t.path("x-mcpgp-original").asText(null))).toList();
+    }
+
+    private static final java.util.regex.Pattern ONLY = java.util.regex.Pattern.compile(" ?\\([0-9][^)]* only\\)");
+
+    /**
+     * An API tool for one instance (mixedContracts: namespaced): named {@code <instance>__<tool>}, without
+     * the {@code instance} input, with only the fields of {@code contract} and no "(2.0 only)" marks.
+     */
+    static ObjectNode forInstance(JsonNode tool, String instance, String contract) {
+        ObjectNode copy = tool.deepCopy();
+        String name = tool.path("name").asText();
+        copy.put("name", instance.toLowerCase(java.util.Locale.ROOT).replace('-', '_') + "__" + name);
+        copy.put("x-mcpgp-original", name);
+        copy.put("description", "On " + instance + " (contract " + contract + "). " + tool.path("description").asText(""));
+        ObjectNode schema = (ObjectNode) copy.path("inputSchema");
+        if (schema.path("properties") instanceof ObjectNode properties) {
+            properties.remove("instance");
+            for (java.util.Iterator<Map.Entry<String, JsonNode>> groups = properties.fields(); groups.hasNext(); ) {
+                if (groups.next().getValue() instanceof ObjectNode group) {
+                    onlyContract(group, contract);
+                }
+            }
+        }
+        dropRequired(schema, "instance");
+        return copy;
+    }
+
+    private static void onlyContract(ObjectNode group, String contract) {
+        if (!(group.path("properties") instanceof ObjectNode members)) {
+            return;
+        }
+        for (String field : List.copyOf(iterable(members.fieldNames()))) {
+            JsonNode member = members.get(field);
+            JsonNode marks = member.path("x-mcpgp-contracts");
+            if (marks.isArray()) {
+                boolean has = false;
+                for (JsonNode mark : marks) {
+                    has |= mark.asText().equals(contract);
+                }
+                if (!has) {
+                    members.remove(field);
+                    dropRequired(group, field);
+                    continue;
+                }
+                ((ObjectNode) member).remove("x-mcpgp-contracts");
+                if (member.path("description").isTextual()) {
+                    ((ObjectNode) member).put("description", ONLY.matcher(member.path("description").asText()).replaceAll(""));
+                }
+            }
+        }
+    }
+
+    private static void dropRequired(ObjectNode schema, String field) {
+        if (schema.path("required") instanceof ArrayNode required) {
+            for (int i = required.size() - 1; i >= 0; i--) {
+                if (required.get(i).asText().equals(field)) {
+                    required.remove(i);
+                }
+            }
+        }
+    }
+
+    private static <T> List<T> iterable(java.util.Iterator<T> it) {
+        List<T> list = new ArrayList<>();
+        it.forEachRemaining(list::add);
+        return list;
+    }
+
     /** Removes tools this runtime can't run, so they are neither listed nor callable. */
     void remove(java.util.Collection<String> names) {
         names.forEach(tools::remove);
@@ -130,7 +210,7 @@ public final class ToolCatalog {
         for (JsonNode tool : tools.values()) {
             boolean api = tool.path("kind").asText().equals("api");
             boolean show = switch (mode) {
-                case "hybrid" -> !api || pinned.contains(tool.path("name").asText());
+                case "hybrid" -> !api || pinned.contains(tool.path("x-mcpgp-original").asText(tool.path("name").asText()));
                 case "discovery", "toolsets" -> !api;
                 default -> true;
             };
