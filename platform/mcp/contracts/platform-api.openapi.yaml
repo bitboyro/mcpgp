@@ -106,6 +106,7 @@ paths:
         name the parts you need with fields (e.g. tools, or apis,instances), returned in that order.
       parameters:
         - { name: fields, in: query, description: "Comma-separated top-level keys to return, e.g. tools.", schema: { type: string } }
+        - { name: format, in: query, description: "tools-list: the result of MCP tools/list (what a client receives: name, title, description, inputSchema, outputSchema, annotations), to audit the server without running it.", schema: { enum: [tools-list] } }
       responses:
         "200": { description: Manifest, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }

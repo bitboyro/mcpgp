@@ -364,13 +364,20 @@ public class ServersApi {
 
     @GetMapping("/{id}/versions/{version}/manifest")
     public ResponseEntity<byte[]> manifest(HttpServletRequest request, @PathVariable String id, @PathVariable String version,
-                                           @RequestParam(required = false) String fields) {
+                                           @RequestParam(required = false) String fields, @RequestParam(required = false) String format) {
         who(request).require("servers:read");
         Model.VersionRef ref = servers.version(servers.get(id), version);
         Compilation.Preview preview = compilation.preview(servers.files(ref), ref.created());
         if (preview.manifest() == null) {
             throw new ApiException(422, "VALIDATION", "version " + ref.number() + " does not compile",
                     Map.of("diagnostics", diagnostics(preview.result().diagnostics())));
+        }
+        if (format != null && !format.isBlank()) {
+            if (!format.equals("tools-list")) {
+                throw ApiException.validation("format is tools-list");
+            }
+            // the result of MCP tools/list for this version, as a client receives it
+            return Json.ok(ro.bitboy.mcpgp.core.manifest.ToolsList.of(Json.parse(preview.manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8))));
         }
         if (fields == null || fields.isBlank()) {
             return Json.ok(preview.manifest());

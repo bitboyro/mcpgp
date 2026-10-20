@@ -32,6 +32,19 @@ class TrimmedAnswersApiTest extends PlatformTestBase {
     }
 
     @Test
+    void theManifestIsAlsoAvailableAsAToolsListResult() throws Exception {
+        JsonNode list = json(send(bearer("GET", VERSION + "/manifest?format=tools-list", null)));
+        assertThat(list.fieldNames()).toIterable().containsExactly("tools");
+        assertThat(list.path("tools")).isNotEmpty();
+        for (JsonNode tool : list.path("tools")) {
+            assertThat(tool.path("name").asText()).isNotBlank();
+            assertThat(tool.at("/inputSchema/type").asText()).isEqualTo("object");
+            assertThat(tool.path("annotations").has("readOnlyHint")).isTrue();
+        }
+        assertThat(send(bearer("GET", VERSION + "/manifest?format=xml", null)).statusCode()).isEqualTo(422);
+    }
+
+    @Test
     void validationCountsEveryLevelAndReturnsTheOnesAskedFor() throws Exception {
         JsonNode all = json(send(bearer("POST", VERSION + "/validate", null)));
         int total = all.path("diagnostics").size();

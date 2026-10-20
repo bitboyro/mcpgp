@@ -20,6 +20,10 @@ From a stakeholder's run of the platform's MCP server and the CLI on a 570-opera
   `level` (`error`, `warning`, `info`) and `limit`, lists errors first and always says how many there
   are of each level (`counts`, `omitted`); the manifest takes `fields` (e.g. `tools`), in the order
   asked; an artifact takes `offset` and `limit` (bytes), with the whole size in `X-Total-Size`.
+- The manifest as an MCP client sees it: `mcpgp preview --format tools-list` and
+  `GET …/manifest?format=tools-list` return the result of `tools/list` (name, title, description,
+  `inputSchema`, `outputSchema`, annotations) in the build's exposure mode, so a server can be audited
+  without starting it. A test keeps it equal to what the runtime sends.
 - The specs and guides (`docs/spec`, `docs/guides`, concepts, security, deployment) are in the CLI
   zip and the CLI and platform images under `docs/`, and the files `init` writes link to them for
   this version.
@@ -28,6 +32,7 @@ From a stakeholder's run of the platform's MCP server and the CLI on a 570-opera
 - `client add` failed with "This server isn't running from a jar" for the packaged server, even with
   `--print`: the jar is now found from the class path or the Spring Boot jar's location, and `--print`
   writes a placeholder to replace when it can't be found.
+- The platform's MCP tools `validate` and `try` are marked read-only (they were "changes data").
 - The hint after a failed TLS check named `tls_certificate_fetch`, a tool that exists only with the
   diagnostics pack; it now also names `instance trust <id>`.
 

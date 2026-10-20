@@ -174,7 +174,10 @@ Changes page.
 
 The tools in the build's exposure mode (listed, or found by search), with their title, read-only
 or destructive, and their inputs (`*` required); and the example config the customer starts from.
-`--tools` or `--customer` for one of the two; `--format md` (default) or `json`.
+`--tools` or `--customer` for one of the two; `--format md` (default) or `json`. `--format tools-list`
+prints the result of MCP `tools/list` for the build, in its exposure mode (name, title, description,
+`inputSchema`, `outputSchema`, annotations: what a client receives), so a server can be audited without
+starting it; the `instance` input of a multi-instance build has no `enum` (the customer's instances fill it in).
 
 ### 3.7 `try`
 
