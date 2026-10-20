@@ -27,7 +27,7 @@ mcp-servers/
 `.mcpgp/config.yaml` ([cli.md §2](../spec/cli.md#2-repository-config-mcpgpconfigyaml)):
 
 ```yaml
-cli: 0.2.7                         # the exact CLI version; another version refuses to run (exit 5)
+cli: 0.3.0                         # the exact CLI version; another version refuses to run (exit 5)
 workspace: workspace
 servers:                           # what --all works on
   - servers/orders/orders.mcpgp.yaml
@@ -82,7 +82,7 @@ change spec or rules ─► pull request ─► CI: validate · build · test �
 | Different CLI behaviour between runs | CLI version pinned in `.mcpgp/config.yaml` (exit code 5 on a mismatch); the CLI image pinned by digest |
 | Spec changed under you | Specs committed in the repo |
 | Tool silently renamed | `mcp-names.lock` + `--frozen-lock`; renames need `mcpgp names accept` in the PR |
-| Unreviewed tool changes | Definition and lock changes reviewed in the PR (**TODO:** `diff` posted on every PR) |
+| Unreviewed tool changes | Definition and lock changes reviewed in the PR (`mcpgp diff` posted on every PR, §2) |
 | Build not reproducible | Byte-identical output for the same inputs (`SOURCE_DATE_EPOCH`, else the commit time) |
 | Package tampered with | Signed `SHA256SUMS` in each package and over `dist/`; customers run `mcpgp verify` |
 | Secrets leaking | CI needs no upstream credentials at all: tests use mocks ([ADR-0011](../decisions/0011-platform-never-calls-targets.md)). Only the signing key and the platform token are CI secrets |
@@ -91,7 +91,7 @@ change spec or rules ─► pull request ─► CI: validate · build · test �
 
 1. Open a PR that replaces or adds the contract file.
 2. CI shows what breaks: validation errors, names that would drift (`--frozen-lock`), failing test
-   cases. **TODO:** the `diff` comment listing new tools, changed parameters and removed tools.
+   cases. The `diff` comment lists new tools, changed parameters and removed tools.
 3. Adjust rules if needed, accept intended renames (`mcpgp names accept`), merge, tag.
 
 ## 5. Tool test cases (optional)

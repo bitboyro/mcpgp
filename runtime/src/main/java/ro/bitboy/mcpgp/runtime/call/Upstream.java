@@ -236,7 +236,7 @@ final class Upstream {
         http.uri(uri);
 
         try {
-            return CappedResponse.read(client.http().send(http.build(), HttpResponse.BodyHandlers.ofInputStream()), readLimit);
+            return CappedResponse.read(sendCancellable(client.http(), http.build()), readLimit);
         } catch (HttpConnectTimeoutException e) {
             throw new ToolError("UPSTREAM_UNREACHABLE", instance.id() + " did not accept a connection within " + instance.timeoutSeconds() + " s",
                     "Check that the instance's baseUrl is reachable from the server");
@@ -249,6 +249,10 @@ final class Upstream {
             throw new ToolError("UPSTREAM_UNREACHABLE", instance.id() + " refused the connection",
                     "Check that the instance's baseUrl is reachable from the server");
         } catch (IOException e) {
+            ro.bitboy.mcpgp.runtime.mcp.Inflight.Handle inflight = ro.bitboy.mcpgp.runtime.mcp.Inflight.current();
+            if (inflight != null && inflight.cancelled()) {
+                throw cancelled(inflight);
+            }
             if (e.getCause() instanceof SSLException ssl) {
                 throw ssl;
             }
@@ -258,6 +262,54 @@ final class Upstream {
             Thread.currentThread().interrupt();
             throw new ToolError("INTERNAL", "the call was interrupted");
         }
+    }
+
+    /**
+     * Sends the request; when the client cancels the call being served ({@code notifications/cancelled}),
+     * the request is aborted at once, and so is reading the answer.
+     */
+    private static HttpResponse<java.io.InputStream> sendCancellable(HttpClient http, HttpRequest request) throws IOException, InterruptedException {
+        ro.bitboy.mcpgp.runtime.mcp.Inflight.Handle inflight = ro.bitboy.mcpgp.runtime.mcp.Inflight.current();
+        if (inflight == null) {
+            return http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        }
+        java.util.concurrent.CompletableFuture<HttpResponse<java.io.InputStream>> pending =
+                http.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream());
+        Runnable abort = () -> pending.cancel(true);
+        inflight.onCancel(abort);
+        try {
+            HttpResponse<java.io.InputStream> response = pending.get();
+            Runnable closeBody = () -> {
+                try {
+                    response.body().close();
+                } catch (IOException e) {
+                    LOG.debug("Closing a cancelled answer failed: {}", e.getMessage());
+                }
+            };
+            inflight.onCancel(closeBody);
+            return response;
+        } catch (java.util.concurrent.CancellationException e) {
+            throw cancelled(inflight);
+        } catch (java.util.concurrent.ExecutionException e) {
+            if (inflight.cancelled()) {
+                throw cancelled(inflight);
+            }
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException io) {
+                throw io;
+            }
+            if (cause instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            throw new IOException(cause);
+        } finally {
+            inflight.forget(abort);
+        }
+    }
+
+    static ToolError cancelled(ro.bitboy.mcpgp.runtime.mcp.Inflight.Handle inflight) {
+        return new ToolError("CANCELLED", "The client cancelled this call" + (inflight.reason() == null ? "" : " (" + inflight.reason() + ")")
+                + "; the request to the API was stopped, and it may already have taken effect there");
     }
 
     private static ToolError tlsError(RuntimeConfig.Instance instance, SSLException e) {

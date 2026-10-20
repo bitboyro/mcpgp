@@ -6,7 +6,7 @@
 
   <groupId>ro.bitboy.mcpgp</groupId>
   <artifactId>mcpgp-parent</artifactId>
-  <version>0.2.7</version>
+  <version>0.3.0</version>
   <packaging>pom</packaging>
   <name>mcpgp</name>
   <description>Generate MCP servers from OpenAPI contracts</description>

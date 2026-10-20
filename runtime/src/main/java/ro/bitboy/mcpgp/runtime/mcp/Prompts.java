@@ -93,17 +93,19 @@ final class Prompts {
         JsonNode prompt = promptName == null ? null : prompts.get(promptName);
         List<String> values = new ArrayList<>();
         if (prompt != null && request.argument() != null) {
-            String typed = request.argument().value() == null ? "" : request.argument().value().toLowerCase(Locale.ROOT);
             for (JsonNode a : prompt.path("arguments")) {
                 if (a.path("name").asText().equals(request.argument().name())) {
-                    a.path("enum").forEach(v -> {
-                        if (v.asText().toLowerCase(Locale.ROOT).startsWith(typed)) {
-                            values.add(v.asText());
-                        }
-                    });
+                    a.path("enum").forEach(v -> values.add(v.asText()));
                 }
             }
         }
+        return result(values, request.argument() == null ? null : request.argument().value());
+    }
+
+    /** The candidates that start with what the user has typed (any case), at most {@value #MAX_COMPLETIONS} of them. */
+    static McpSchema.CompleteResult result(List<String> candidates, String typedValue) {
+        String typed = typedValue == null ? "" : typedValue.toLowerCase(Locale.ROOT);
+        List<String> values = candidates.stream().filter(v -> v.toLowerCase(Locale.ROOT).startsWith(typed)).toList();
         List<String> shown = values.subList(0, Math.min(MAX_COMPLETIONS, values.size()));
         return new McpSchema.CompleteResult(new McpSchema.CompleteResult.CompleteCompletion(List.copyOf(shown), values.size(),
                 values.size() > shown.size()));
