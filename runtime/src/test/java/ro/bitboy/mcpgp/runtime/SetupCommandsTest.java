@@ -153,6 +153,35 @@ class SetupCommandsTest {
     }
 
     @Test
+    void theRunningJarIsFoundWhereverTheLauncherPutIt() throws IOException {
+        Path jar = Files.writeString(dir.resolve("orders mcp.jar"), "x");
+        // java -jar x.jar: the class path is the jar
+        assertThat(ClientRegistration.locateJar(jar.toString(), "jar:nested:/gone/elsewhere.jar/!BOOT-INF/classes/!/")).isEqualTo(jar);
+        // a Spring Boot jar seen through its code source, whatever the class path says
+        assertThat(ClientRegistration.locateJar("/", "jar:nested:" + dir + "/orders%20mcp.jar/!BOOT-INF/classes/!/")).isEqualTo(jar);
+        assertThat(ClientRegistration.locateJar(null, "jar:file:" + dir + "/orders%20mcp.jar!/BOOT-INF/classes!/")).isEqualTo(jar);
+        // from an IDE or a classes folder there is no jar
+        assertThat(ClientRegistration.locateJar("/work/classes", "file:/work/classes/")).isNull();
+    }
+
+    @Test
+    void printWorksWithoutAJarAndOtherModesSayWhy() throws IOException {
+        Files.writeString(config(), "instances: [ { id: a, baseUrl: \"" + target.address() + "\" } ]\n");
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        PrintStream stream = new PrintStream(captured, true, StandardCharsets.UTF_8);
+        ServerCommands commands = new ServerCommands(Map.of(), dir, new ByteArrayInputStream(new byte[0]), stream);
+        // no jar override: the test runs from classes, so the jar can't be located
+        assertThat(commands.run(new String[] {"client", "add", "cursor", "--print", "--config", config().toString(),
+                "--manifest", ORDERS, "--storage.root", dir.resolve("data").toString()})).isZero();
+        assertThat(captured.toString(StandardCharsets.UTF_8)).contains("couldn't be located").contains("<path to the server jar>");
+
+        captured.reset();
+        assertThat(commands.run(new String[] {"client", "add", "cursor", "--file", dir.resolve("c.json").toString(),
+                "--config", config().toString(), "--manifest", ORDERS, "--storage.root", dir.resolve("data").toString()})).isEqualTo(1);
+        assertThat(captured.toString(StandardCharsets.UTF_8)).contains("isn't running from a jar").contains("--print");
+    }
+
+    @Test
     void httpServersRegisterByUrl() throws IOException {
         Files.writeString(config(), "server: { transport: http, publicUrl: \"https://orders-mcp.acme.example\", auth: { mode: none, allowInsecure: true } }\n"
                 + "instances: [ { id: a, baseUrl: \"" + target.address() + "\" } ]\n");

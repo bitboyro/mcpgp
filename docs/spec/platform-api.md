@@ -81,9 +81,12 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
 - `POST /servers/{id}/versions` adds a version (same bodies), with an optional `message`. A version
   whose digest equals the current one is not created again.
 - `GET /servers/{id}/versions/{version}/files[/<path>]` lists or returns files.
-- `POST /servers/{id}/versions/{version}/validate` returns the compiler's diagnostics.
+- `POST /servers/{id}/versions/{version}/validate` returns the compiler's diagnostics, errors first,
+  with `counts` of each level. `?level=error|warning|info` returns that level and worse, `?limit=n` at
+  most n (`omitted` says how many were left out): a big server has hundreds of info notes.
 - `GET /servers/{id}/versions/{version}/manifest` returns the manifest (compiled on demand, cached by
   digest): what agents will get, with provenance. This is what the UI's previews show.
+  `?fields=tools,apis` returns only those top-level keys, in that order.
 - `GET /servers/{id}/versions/{version}/operations` lists every operation of the version's contracts
   per API, with the API's `select` and, per operation, `state`: `tool` or `resource` (with its `tool`
   name), `excluded` (left out by `select`, with `exclusion: { kind, reason, index?, selector? }`:
@@ -150,7 +153,8 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
   diagnostics and log; `GET /builds/{id}/log` streams the log while it runs.
 - Artifacts (packaging.md §1): `GET /builds/{id}/artifacts` lists them;
   `GET /builds/{id}/artifacts/{name}` downloads the package zip, the manifest or any single file of the
-  package. Downloads are recorded in the activity log.
+  package (`?file=`); `?offset=` and `?limit=` (bytes) read a big file in parts, and `X-Total-Size` is
+  its whole size. Downloads are recorded in the activity log.
 - **Release:** `POST /builds/{id}/release` marks a succeeded build as released (the version customers
   get). Builds started by agents need an approval first (§5).
 - **Archive / restore / delete** (packaging.md §2): archived builds leave the active list and stay

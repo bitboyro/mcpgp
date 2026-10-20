@@ -3,6 +3,34 @@
 All notable changes are documented here. Format: [Keep a Changelog](https://keepachangelog.com),
 versions follow [SemVer](https://semver.org).
 
+## Unreleased
+
+From a stakeholder's run of the platform's MCP server and the CLI on a 570-operation API.
+
+### Added
+- `mcpgp init --from-spec` for big APIs: `--tag`, `--path` (a glob) and `--access` start with part of
+  the API (written as `select`), and `--collisions` (default `method-path`) names operations that
+  would get the same tool name from their method and path instead of stopping the build; `--collisions error`
+  keeps the old behaviour. A definition that doesn't compile prints its first 20 errors and says how many
+  more there are.
+- `<server> instance trust <id> --fingerprint <sha256>`: trusts the chain without a terminal, only if
+  it holds the certificate with that SHA-256. Without a terminal and without `--yes` it now says
+  so and names both options, instead of "Nothing saved".
+- The platform's API, and so its MCP server, can return big answers in parts: `validate` takes
+  `level` (`error`, `warning`, `info`) and `limit`, lists errors first and always says how many there
+  are of each level (`counts`, `omitted`); the manifest takes `fields` (e.g. `tools`), in the order
+  asked; an artifact takes `offset` and `limit` (bytes), with the whole size in `X-Total-Size`.
+- The specs and guides (`docs/spec`, `docs/guides`, concepts, security, deployment) are in the CLI
+  zip and the CLI and platform images under `docs/`, and the files `init` writes link to them for
+  this version.
+
+### Fixed
+- `client add` failed with "This server isn't running from a jar" for the packaged server, even with
+  `--print`: the jar is now found from the class path or the Spring Boot jar's location, and `--print`
+  writes a placeholder to replace when it can't be found.
+- The hint after a failed TLS check named `tls_certificate_fetch`, a tool that exists only with the
+  diagnostics pack; it now also names `instance trust <id>`.
+
 ## 0.3.0 — 2026-10-20
 
 ### Added

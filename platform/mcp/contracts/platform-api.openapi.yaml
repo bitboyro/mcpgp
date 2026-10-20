@@ -86,7 +86,12 @@ paths:
       operationId: validateVersion
       tags: [servers]
       summary: Validate version
-      description: Runs the compiler and returns its diagnostics.
+      description: >
+        Runs the compiler and returns its diagnostics, errors first, with how many there are of each level.
+        A big server has hundreds of info notes: pass level=warning to leave them out, and limit to cap the list.
+      parameters:
+        - { name: level, in: query, description: "The least serious level to return: error, warning or info (default: all).", schema: { enum: [error, warning, info] } }
+        - { name: limit, in: query, description: How many diagnostics to return at most; the answer says how many it left out., schema: { type: integer, minimum: 0 } }
       responses:
         "200": { description: Diagnostics, content: { application/json: { schema: { $ref: "#/components/schemas/Validation" } } } }
         default: { $ref: "#/components/responses/Problem" }
@@ -96,7 +101,11 @@ paths:
       operationId: getManifest
       tags: [servers]
       summary: Get manifest
-      description: The manifest of a version (what agents will get, with provenance).
+      description: >
+        The manifest of a version (what agents will get, with provenance). A big server's manifest is large:
+        name the parts you need with fields (e.g. tools, or apis,instances), returned in that order.
+      parameters:
+        - { name: fields, in: query, description: "Comma-separated top-level keys to return, e.g. tools.", schema: { type: string } }
       responses:
         "200": { description: Manifest, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }
@@ -561,8 +570,13 @@ paths:
       operationId: downloadArtifact
       tags: [builds]
       summary: Download artifact
+      description: >
+        A build's package or manifest. A whole package is a large binary: list its files with listArtifacts and
+        ask for one with file, or read a big file in parts with offset and limit (the header X-Total-Size is the whole size).
       parameters:
         - { name: file, in: query, description: One file of the package, e.g. docs/INSTALL.md, schema: { type: string } }
+        - { name: offset, in: query, description: Start at this byte., schema: { type: integer, minimum: 0 } }
+        - { name: limit, in: query, description: Return at most this many bytes., schema: { type: integer, minimum: 0 } }
       responses:
         "200": { description: The file, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
         default: { $ref: "#/components/responses/Problem" }
@@ -878,6 +892,8 @@ components:
       type: object
       properties:
         ok: { type: boolean }
+        counts: { type: object, description: How many diagnostics there are of each level, whatever is returned., properties: { error: { type: integer }, warning: { type: integer }, info: { type: integer } } }
+        omitted: { type: integer, description: How many diagnostics the limit left out. }
         diagnostics: { type: array, items: { type: object, properties: { level: { type: string }, code: { type: string }, message: { type: string }, location: { type: string } } } }
     Build:
       type: object

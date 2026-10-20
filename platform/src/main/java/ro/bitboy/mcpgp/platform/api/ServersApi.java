@@ -259,12 +259,39 @@ public class ServersApi {
     }
 
     @PostMapping("/{id}/versions/{version}/validate")
-    public ResponseEntity<byte[]> validate(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
+    public ResponseEntity<byte[]> validate(HttpServletRequest request, @PathVariable String id, @PathVariable String version,
+                                           @RequestParam(required = false) String level, @RequestParam(required = false) Integer limit) {
         who(request).require("servers:read");
         Model.VersionRef ref = servers.version(servers.get(id), version);
         Compiler.Result result = compilation.compile(servers.files(ref),
                 new ManifestWriter.Build(Instant.parse(ref.created()), Compiler.VERSION, null, null, null));
-        return Json.ok(Map.of("ok", result.ok(), "diagnostics", diagnostics(result.diagnostics())));
+        List<Map<String, Object>> all = diagnostics(result.diagnostics());
+        Map<String, Object> answer = new LinkedHashMap<>();
+        answer.put("ok", result.ok());
+        // how many there are of each level, whatever is shown
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (String name : List.of("error", "warning", "info")) {
+            counts.put(name, all.stream().filter(d -> name.equals(d.get("level"))).count());
+        }
+        answer.put("counts", counts);
+        List<Map<String, Object>> shown = minimumLevel(all, level);
+        if (limit != null && limit >= 0 && shown.size() > limit) {
+            answer.put("omitted", shown.size() - limit);
+            shown = shown.subList(0, limit);
+        }
+        answer.put("diagnostics", shown);
+        return Json.ok(answer);
+    }
+
+    /** The diagnostics at {@code level} or worse ({@code error}, {@code warning}, {@code info}; default all), errors first. */
+    private static List<Map<String, Object>> minimumLevel(List<Map<String, Object>> all, String level) {
+        List<String> order = List.of("error", "warning", "info");
+        int worst = level == null || level.isBlank() ? order.size() - 1 : order.indexOf(level.toLowerCase(java.util.Locale.ROOT));
+        if (worst < 0) {
+            throw ApiException.validation("level is error, warning or info");
+        }
+        return all.stream().filter(d -> order.indexOf((String) d.get("level")) <= worst)
+                .sorted(java.util.Comparator.comparingInt(d -> order.indexOf((String) d.get("level")))).toList();
     }
 
     /**
@@ -336,7 +363,8 @@ public class ServersApi {
     }
 
     @GetMapping("/{id}/versions/{version}/manifest")
-    public ResponseEntity<byte[]> manifest(HttpServletRequest request, @PathVariable String id, @PathVariable String version) {
+    public ResponseEntity<byte[]> manifest(HttpServletRequest request, @PathVariable String id, @PathVariable String version,
+                                           @RequestParam(required = false) String fields) {
         who(request).require("servers:read");
         Model.VersionRef ref = servers.version(servers.get(id), version);
         Compilation.Preview preview = compilation.preview(servers.files(ref), ref.created());
@@ -344,7 +372,22 @@ public class ServersApi {
             throw new ApiException(422, "VALIDATION", "version " + ref.number() + " does not compile",
                     Map.of("diagnostics", diagnostics(preview.result().diagnostics())));
         }
-        return Json.ok(preview.manifest());
+        if (fields == null || fields.isBlank()) {
+            return Json.ok(preview.manifest());
+        }
+        // only the named top-level keys, in the order asked for (a big manifest can be read one part at a time)
+        JsonNode whole = Json.parse(preview.manifest().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        com.fasterxml.jackson.databind.node.ObjectNode part = Json.MAPPER.createObjectNode();
+        for (String field : fields.split(",")) {
+            String key = field.strip();
+            if (!whole.has(key)) {
+                List<String> names = new ArrayList<>();
+                whole.fieldNames().forEachRemaining(names::add);
+                throw ApiException.validation("the manifest has no '" + key + "'; it has " + String.join(", ", names));
+            }
+            part.set(key, whole.get(key));
+        }
+        return Json.ok(part);
     }
 
     /** Every operation of the version's contracts: a tool, a resource, left out by {@code select} (and by what), or hidden by a rule. */

@@ -416,7 +416,7 @@ The server refuses to start, with a message naming the key, when:
 | `<server> reload` | Reload the config now (§4.6) |
 | `<server> doctor [--quick]` | Validates config, tests instances, port, public URL (`--quick`: config + liveness only, for health checks) |
 | `<server> instance add/test/remove <id>` | Manage instances without editing YAML; `add` offers trust on first use (§5.5) |
-| `<server> instance trust <id> [--base64] [--yes]` | Fetch, show and save the certificate an instance presents |
+| `<server> instance trust <id> [--base64] [--yes \| --fingerprint <sha256>]` | Fetch, show and save the certificate an instance presents; `--fingerprint` trusts it without asking when the chain holds the certificate with that SHA-256 (for scripts) |
 | `<server> client add <claude-code\|claude-desktop\|cursor\|vscode> [--print]` | Register with an MCP client |
 
 Commands run without starting the server, take the same `--config` and `--<key> <value>` options,
