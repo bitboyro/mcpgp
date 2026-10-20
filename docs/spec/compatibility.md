@@ -43,6 +43,26 @@ The MCP adapter maps manifest features to what the negotiated revision supports,
 | URL elicitation (per-user sign-in) | 2025-11-25+ | feature unavailable; tool explains |
 | Streamable HTTP | 2025-03-26+ | legacy HTTP+SSE transport, only if the build enables `transports.legacySse` |
 
+What the runtime does today, by protocol feature (the Java SDK it builds on stops at 2025-11-25; 2026-07-28 is
+planned, see [the roadmap](../process/roadmap.md)):
+
+| Protocol feature | Support | Notes |
+|---|---|---|
+| Tools, resources, resource templates, prompts | ✓ | |
+| Completion (`completion/complete`) | ✓ prompts, resource templates | enum and boolean values; tool arguments have no completion in MCP |
+| Progress (`notifications/progress`) | ✓ | only when the client sent a `progressToken`; increasing, `total` is the instance's timeout |
+| Cancellation (`notifications/cancelled`) | ✓ | a waiting API call or confirmation stops; audited `cancelled`. Over stdio the cancelled request gets no answer (as the spec says); over HTTP the SDK still writes an error result, which clients ignore |
+| Pagination (`cursor` / `nextCursor`) | ✓ when `server.pageSize` > 0 | tools, resources, templates, prompts; cursors bound to the list they were made for |
+| Logging (`logging/setLevel`, `notifications/message`) | ✓ | upstream failures are sent as `warning` from logger `mcpgp` |
+| Elicitation, form mode | ✓ | confirmations of destructive tools; else `CONFIRMATION_REQUIRED` + token |
+| Elicitation, URL mode | not yet | roadmap |
+| Tasks | not yet | roadmap |
+| MRTR, request-scoped stateless transport (2026-07-28) | not yet | roadmap; needs more than the SDK offers |
+
+Protocol-level behaviour (cancellation, paging, progress, log messages) is tested in the runtime's own
+tests (`CancellationTest`, `StdioCancellationTest`, `PaginationTest`, `StdioPaginationTest`): the
+conformance traffic format describes one tool call and its API request, which has no step for them.
+
 Rule: a feature is **never silently dropped**. Either a fallback applies, or the tool returns a clear
 error naming the client's revision. Fallbacks are covered by the conformance suite per revision.
 

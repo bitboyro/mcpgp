@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
+import ro.bitboy.mcpgp.runtime.mcp.Inflight;
+import ro.bitboy.mcpgp.runtime.mcp.ListPager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -33,16 +36,29 @@ final class StdioTransport extends StdioServerTransportProvider {
 
     private final List<String> revisions;
 
+    private final String scope;
+    private final int pageSize;
+    private final Pending pending;
+
+    /** @param pageSize list operations answer this many items at a time ({@code server.pageSize}); 0 = all at once */
     StdioTransport(McpJsonMapper mapper, InputStream in, OutputStream out, List<String> revisions,
-                   Duration drainTimeout, Runnable onClose) {
-        this(mapper, new Pending(), in, out, revisions, drainTimeout, onClose);
+                   Duration drainTimeout, Runnable onClose, int pageSize) {
+        this(mapper, "stdio:" + java.util.UUID.randomUUID(), in, out, revisions, drainTimeout, onClose, pageSize);
     }
 
-    private StdioTransport(McpJsonMapper mapper, Pending pending, InputStream in, OutputStream out, List<String> revisions,
-                           Duration drainTimeout, Runnable onClose) {
-        super(mapper, new TappedInput(in, pending::inbound, () -> pending.drain(drainTimeout), onClose),
+    private StdioTransport(McpJsonMapper mapper, String scope, InputStream in, OutputStream out, List<String> revisions,
+                           Duration drainTimeout, Runnable onClose, int pageSize) {
+        this(mapper, new Pending(scope), scope, in, out, revisions, drainTimeout, onClose, pageSize);
+    }
+
+    private StdioTransport(McpJsonMapper mapper, Pending pending, String scope, InputStream in, OutputStream out, List<String> revisions,
+                           Duration drainTimeout, Runnable onClose, int pageSize) {
+        super(mapper, new TappedInput(new Tagging(in, scope, pageSize), pending::inbound, () -> pending.drain(drainTimeout), onClose),
                 new TappedOutput(out, pending::outbound));
         this.revisions = List.copyOf(revisions);
+        this.scope = scope;
+        this.pageSize = pageSize;
+        this.pending = pending;
     }
 
     @Override
@@ -53,7 +69,7 @@ final class StdioTransport extends StdioServerTransportProvider {
     /** Every session's messages go out one at a time ({@link SerialSends}). */
     @Override
     public void setSessionFactory(io.modelcontextprotocol.spec.McpServerSession.Factory factory) {
-        super.setSessionFactory(transport -> factory.create(new SerialSends(transport)));
+        super.setSessionFactory(transport -> factory.create(new SerialSends(transport, scope, pageSize, pending)));
     }
 
     /**
@@ -65,13 +81,58 @@ final class StdioTransport extends StdioServerTransportProvider {
     static final class SerialSends implements io.modelcontextprotocol.spec.McpServerTransport {
         private final io.modelcontextprotocol.spec.McpServerTransport delegate;
         private final Object lock = new Object();
+        private final String scope;
+        private final int pageSize;
+        private final Pending pending;
 
-        SerialSends(io.modelcontextprotocol.spec.McpServerTransport delegate) {
+        SerialSends(io.modelcontextprotocol.spec.McpServerTransport delegate, String scope, int pageSize, Pending pending) {
             this.delegate = delegate;
+            this.scope = scope;
+            this.pageSize = pageSize;
+            this.pending = pending;
+        }
+
+        /** The client cancelled this request: the spec says not to answer it. */
+        private boolean cancelled(io.modelcontextprotocol.spec.McpSchema.JSONRPCMessage message) {
+            if (!(message instanceof io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse response) || response.id() == null) {
+                return false;
+            }
+            JsonNode id = JSON.valueToTree(response.id());
+            if (!Inflight.cancelled(Inflight.key(scope, id))) {
+                return false;
+            }
+            pending.answered(id);
+            return true;
+        }
+
+        /** A list answer is cut to one page ({@link ListPager}) before it goes out. */
+        private io.modelcontextprotocol.spec.McpSchema.JSONRPCMessage paged(io.modelcontextprotocol.spec.McpSchema.JSONRPCMessage message) {
+            if (pageSize <= 0 || !(message instanceof io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse response)
+                    || response.id() == null || response.result() == null) {
+                return message;
+            }
+            ListPager.Pending pending = ListPager.take(Inflight.key(scope, JSON.valueToTree(response.id())));
+            if (pending == null) {
+                return message;
+            }
+            JsonNode answered = ListPager.answer(pending, JSON.createObjectNode().put("jsonrpc", "2.0")
+                    .<com.fasterxml.jackson.databind.node.ObjectNode>set("id", JSON.valueToTree(response.id()))
+                    .<com.fasterxml.jackson.databind.node.ObjectNode>set("result", JSON.valueToTree(response.result())), pageSize);
+            if (answered.has("error")) {
+                return new io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse("2.0", response.id(), null,
+                        new io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse.JSONRPCError(answered.at("/error/code").asInt(),
+                                answered.at("/error/message").asText(), null));
+            }
+            return new io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse("2.0", response.id(),
+                    JSON.convertValue(answered.get("result"), Map.class), null);
         }
 
         @Override
-        public reactor.core.publisher.Mono<Void> sendMessage(io.modelcontextprotocol.spec.McpSchema.JSONRPCMessage message) {
+        public reactor.core.publisher.Mono<Void> sendMessage(io.modelcontextprotocol.spec.McpSchema.JSONRPCMessage original) {
+            if (cancelled(original)) {
+                return reactor.core.publisher.Mono.empty();
+            }
+            io.modelcontextprotocol.spec.McpSchema.JSONRPCMessage message = paged(original);
             // once the transport is ready, subscribing hands the message over at once: inside the lock
             return reactor.core.publisher.Mono.create(sink -> {
                 synchronized (lock) {
@@ -104,6 +165,11 @@ final class StdioTransport extends StdioServerTransportProvider {
     /** Ids of client requests read but not yet answered. */
     static final class Pending {
         private final Set<String> ids = new HashSet<>();
+        private final String scope;
+
+        Pending(String scope) {
+            this.scope = scope;
+        }
 
         void inbound(String line) {
             JsonNode message = parse(line);
@@ -114,9 +180,19 @@ final class StdioTransport extends StdioServerTransportProvider {
             }
         }
 
+        /** A request that is never answered (the client cancelled it): it no longer holds up shutdown. */
+        void answered(JsonNode id) {
+            Inflight.end(Inflight.key(scope, id));
+            synchronized (this) {
+                ids.remove(id.toString());
+                notifyAll();
+            }
+        }
+
         void outbound(String line) {
             JsonNode message = parse(line);
             if (message != null && !message.has("method") && message.hasNonNull("id")) {
+                Inflight.end(Inflight.key(scope, message.get("id")));
                 synchronized (this) {
                     ids.remove(message.get("id").toString());
                     notifyAll();
@@ -144,12 +220,96 @@ final class StdioTransport extends StdioServerTransportProvider {
             }
         }
 
-        private static JsonNode parse(String line) {
+        static JsonNode parse(String line) {
             try {
                 return line.isBlank() ? null : JSON.readTree(line);
             } catch (IOException e) {
                 return null;
             }
+        }
+    }
+
+    /**
+     * Reads stdin a line at a time and lets {@link Inflight} tag the requests that can be cancelled, and
+     * see the cancel notifications, before the SDK reads them.
+     */
+    private static final class Tagging extends InputStream {
+        private final InputStream in;
+        private final String scope;
+        private byte[] line = new byte[0];
+        private int position;
+
+        private final int pageSize;
+
+        Tagging(InputStream in, String scope, int pageSize) {
+            this.in = new java.io.BufferedInputStream(in);
+            this.scope = scope;
+            this.pageSize = pageSize;
+        }
+
+        @Override
+        public int read() throws IOException {
+            if (position >= line.length && !fill()) {
+                return -1;
+            }
+            return line[position++] & 0xff;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            if (len == 0) {
+                return 0;
+            }
+            if (position >= line.length && !fill()) {
+                return -1;
+            }
+            int n = Math.min(len, line.length - position);
+            System.arraycopy(line, position, b, off, n);
+            position += n;
+            return n;
+        }
+
+        private boolean fill() throws IOException {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            int c;
+            while ((c = in.read()) >= 0) {
+                buffer.write(c);
+                if (c == '\n') {
+                    break;
+                }
+            }
+            if (buffer.size() == 0) {
+                return false;
+            }
+            line = tag(buffer.toByteArray());
+            position = 0;
+            return true;
+        }
+
+        private byte[] tag(byte[] raw) {
+            JsonNode message = Pending.parse(new String(raw, StandardCharsets.UTF_8));
+            if (message == null) {
+                return raw;
+            }
+            ListPager.accept(scope, message, pageSize);       // noted only; the line goes on unchanged
+            if (Inflight.accept(scope, message) == null) {
+                return raw;
+            }
+            try {
+                return (JSON.writeValueAsString(message) + "\n").getBytes(StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                return raw;
+            }
+        }
+
+        @Override
+        public int available() throws IOException {
+            return position < line.length ? line.length - position : in.available();
+        }
+
+        @Override
+        public void close() throws IOException {
+            in.close();
         }
     }
 

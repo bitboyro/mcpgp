@@ -3,9 +3,27 @@
 All notable changes are documented here. Format: [Keep a Changelog](https://keepachangelog.com),
 versions follow [SemVer](https://semver.org).
 
-## Unreleased
+## 0.3.0 — 2026-10-20
 
 ### Added
+- Cancelling a call that is waiting for the user's confirmation stops it. Over stdio a cancelled request is no
+  longer answered, as the spec says. Upstream failures are sent to the client as MCP log messages (`warning`,
+  logger `mcpgp`, filtered by `logging/setLevel`). Telemetry: the span and the call metrics carry
+  `mcpgp.transport`, spans `mcpgp.progress.sent`, and `mcpgp.outcome` can be `cancelled`.
+- Completion for resource templates: a variable whose parameter lists values (an enum, or a boolean) completes
+  like a prompt argument (`ref/resource`). Progress notifications now carry `total` (the instance's timeout, the
+  most the wait can come to) and a message naming the instance. (Tool arguments have no completion in MCP:
+  `completion/complete` takes only prompts and resource templates.)
+- `server.pageSize`: the list operations (tools, resources, resource templates, prompts) answer one page at a
+  time with an opaque `nextCursor` (MCP pagination), over stdio and HTTP; off by default. Cursors are bound
+  to the list they were made for.
+- Audit events of tool and resource calls carry `mcp`: the transport, the revision the client named (HTTP),
+  progress asked for and sent, and why a call was cancelled; cancelled and refused calls are logged at INFO.
+- Cancellation (MCP `notifications/cancelled`), over stdio and Streamable HTTP: a `tools/call` or
+  `resources/read` waiting for its API stops at once and the request to the API is aborted (a reply that
+  arrives later is dropped); the audit event says `outcome: cancelled`, `code: CANCELLED`. A cancel that
+  comes too late, names an unknown request or comes from another session is ignored. The SDK ignores the
+  notification, so the transports read it themselves (`Inflight`).
 - What changed between builds: `mcpgp diff` (against the last release tag, a tag or commit, a
   manifest or a release folder; text, Markdown for PR comments, or JSON; `--fail-on-breaking`, exit
   code 6) and the platform's **Changes** page (any two versions, by default since the last release;
@@ -68,23 +86,6 @@ versions follow [SemVer](https://semver.org).
   pinned instances use different versions and makes an `auto` instance detected on another version
   unavailable; more instances than `instances.max` stop startup.
 
-### Fixed
-- stdio: answers finishing at the same moment could be dropped (the MCP Java SDK's stdio transport
-  hands each message over in a single attempt, which fails when another is being handed over), so a
-  client sending parallel tool calls never got some of the answers. Messages now go out one at a time.
-- Parameters: cookie values are encoded (a `;` could add a cookie), and a header value with a line
-  break is refused with `INPUT_VALIDATION` instead of an internal error.
-- Settings the docs described but nothing did are now refused, naming each one, instead of being
-  ignored: in the definition `generation.mode: codegen`/`both`, `schemas.input: lean`,
-  `apis[].pagination`, `build.jarSigning`, `build.image.registry`/`push`/`tar` (the compiler's
-  `NOT_SUPPORTED_YET`); in the runtime config `server.tls` with a certificate, `server.trustProxy`
-  and `server.outboundProxy` (at startup). The specs mark them "not supported yet"; the roadmap no
-  longer lists codegen as done.
-- Activity searches read the whole log when few entries matched, and agent quotas read it on every
-  save or build: searches now go to the store as a query (PostgreSQL filters in SQL, with indexes on
-  target and actor) and stop at their time bound. The cache cleanup deletes in one batch.
-
-### Added
 - Passwords in the web UI: Change password on the Account page (the name in the sidebar); Set
   password and Unlock on a person in API & agents, for admins. An admin's password can be temporary
   (`mustChange`): the person replaces it at the next sign-in, and the platform answers
@@ -101,6 +102,22 @@ versions follow [SemVer](https://semver.org).
   path, to accept or edit (saved as a rule per operation), or to make the server's rule
   (`naming.collisions: method-path`, new); the Naming page sets the rule too. The compiler's error
   suggests the name.
+
+### Fixed
+- stdio: answers finishing at the same moment could be dropped (the MCP Java SDK's stdio transport
+  hands each message over in a single attempt, which fails when another is being handed over), so a
+  client sending parallel tool calls never got some of the answers. Messages now go out one at a time.
+- Parameters: cookie values are encoded (a `;` could add a cookie), and a header value with a line
+  break is refused with `INPUT_VALIDATION` instead of an internal error.
+- Settings the docs described but nothing did are now refused, naming each one, instead of being
+  ignored: in the definition `generation.mode: codegen`/`both`, `schemas.input: lean`,
+  `apis[].pagination`, `build.jarSigning`, `build.image.registry`/`push`/`tar` (the compiler's
+  `NOT_SUPPORTED_YET`); in the runtime config `server.tls` with a certificate, `server.trustProxy`
+  and `server.outboundProxy` (at startup). The specs mark them "not supported yet"; the roadmap no
+  longer lists codegen as done.
+- Activity searches read the whole log when few entries matched, and agent quotas read it on every
+  save or build: searches now go to the store as a query (PostgreSQL filters in SQL, with indexes on
+  target and actor) and stop at their time bound. The cache cleanup deletes in one batch.
 
 ## 0.2.7 — 2026-10-13
 

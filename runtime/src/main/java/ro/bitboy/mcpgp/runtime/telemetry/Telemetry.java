@@ -50,6 +50,8 @@ public final class Telemetry implements AutoCloseable {
     static final AttributeKey<String> CONTRACT = AttributeKey.stringKey("mcpgp.contract");
     static final AttributeKey<String> OUTCOME = AttributeKey.stringKey("mcpgp.outcome");
     static final AttributeKey<String> CODE = AttributeKey.stringKey("mcpgp.code");
+    static final AttributeKey<String> TRANSPORT = AttributeKey.stringKey("mcpgp.transport");
+    static final AttributeKey<Long> PROGRESS_SENT = AttributeKey.longKey("mcpgp.progress.sent");
 
     private static final Logger LOG = LoggerFactory.getLogger(Telemetry.class);
     private static final Telemetry OFF = new Telemetry();
@@ -205,6 +207,8 @@ public final class Telemetry implements AutoCloseable {
         private String contract;
         private String outcome = "ok";
         private String code;
+        private String transport;
+        private int progressSent = -1;
         private final long started = System.nanoTime();
 
         private Call(Span span, Scope scope, Telemetry telemetry, String tool, String api) {
@@ -225,10 +229,19 @@ public final class Telemetry implements AutoCloseable {
             this.code = code;
         }
 
+        /** The protocol side of the call: the transport, and how many progress notifications went out (-1: none asked for). */
+        public void mcp(String transport, int progressSent) {
+            this.transport = transport;
+            this.progressSent = progressSent;
+        }
+
         @Override
         public void close() {
             if (telemetry.calls != null) {
                 AttributesBuilder attributes = Attributes.builder().put(TOOL, tool).put(OUTCOME, outcome);
+                if (transport != null) {
+                    attributes.put(TRANSPORT, transport);
+                }
                 if (api != null) {
                     attributes.put(API, api);
                 }
@@ -250,6 +263,12 @@ public final class Telemetry implements AutoCloseable {
                     span.setAttribute(CONTRACT, contract);
                 }
                 span.setAttribute(OUTCOME, outcome);
+                if (transport != null) {
+                    span.setAttribute(TRANSPORT, transport);
+                }
+                if (progressSent >= 0) {
+                    span.setAttribute(PROGRESS_SENT, (long) progressSent);
+                }
                 if (code != null) {
                     span.setAttribute(CODE, code);
                 }

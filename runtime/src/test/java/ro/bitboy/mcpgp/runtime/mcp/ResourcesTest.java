@@ -191,6 +191,45 @@ class ResourcesTest {
         assertThat(read.at("/result/contents/0/text").asText()).contains("c-1");
     }
 
+    @Test
+    void templateVariablesWithListedValuesCompleteLikePromptArguments() throws Exception {
+        target = new MockTarget();
+        int port;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            port = socket.getLocalPort();
+        }
+        Path config = dir.resolve("http.yaml");
+        Files.writeString(config, "server: { transport: http, port: %d }\ninstance: { baseUrl: \"%s\" }\n".formatted(port, target.address()));
+        Startup startup = Startup.load(new String[] {"--manifest", manifest("single").toString(), "--config", config.toString(),
+                "--storage.root", dir.resolve("data").toString()}, Map.of(), dir);
+        context = McpgpServer.start(startup, new McpgpServer.Stdio(System.in, System.out, () -> { }));
+        HttpResponse<String> init = post(port, null, Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params",
+                Map.of("protocolVersion", "2025-11-25", "capabilities", Map.of(), "clientInfo", Map.of("name", "t", "version", "1"))));
+        assertThat(ro.bitboy.mcpgp.runtime.http.HttpServerTestAccess.message(init).at("/result/capabilities").has("completions")).isTrue();
+        String session = init.headers().firstValue("Mcp-Session-Id").orElseThrow();
+        post(port, session, Map.of("jsonrpc", "2.0", "method", "notifications/initialized"));
+
+        // every value, then only those that start with what was typed
+        JsonNode all = complete(port, session, "api://customers/{id}{?expand}", "expand", "");
+        List<String> values = new java.util.ArrayList<>();
+        all.at("/result/completion/values").forEach(v -> values.add(v.asText()));
+        assertThat(values).containsExactly("accounts", "orders");
+        List<String> typed = new java.util.ArrayList<>();
+        complete(port, session, "api://customers/{id}{?expand}", "expand", "OR").at("/result/completion/values").forEach(v -> typed.add(v.asText()));
+        assertThat(typed).containsExactly("orders");
+
+        // a variable with nothing to offer completes to nothing (not an error)
+        JsonNode none = complete(port, session, "api://customers/{id}{?expand}", "id", "c-");
+        assertThat(none.has("error")).isFalse();
+        assertThat(none.at("/result/completion/values")).isEmpty();
+    }
+
+    static JsonNode complete(int port, String session, String template, String argument, String value) throws Exception {
+        return ro.bitboy.mcpgp.runtime.http.HttpServerTestAccess.message(post(port, session, Map.of("jsonrpc", "2.0", "id", (int) (Math.random() * 1000 + 10),
+                "method", "completion/complete", "params", Map.of("ref", Map.of("type", "ref/resource", "uri", template),
+                        "argument", Map.of("name", argument, "value", value)))));
+    }
+
     static HttpResponse<String> post(int port, String session, Object body) throws Exception {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/mcp")).header("Content-Type", "application/json")
                 .header("Accept", "application/json, text/event-stream").POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)));

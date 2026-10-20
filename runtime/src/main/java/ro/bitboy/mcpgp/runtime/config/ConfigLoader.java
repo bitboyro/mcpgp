@@ -296,8 +296,9 @@ public final class ConfigLoader {
         if (management != null && management == port) {
             problems.add("/server/management/port: must differ from server.port");
         }
+        int pageSize = server.path("pageSize").asInt(0);
         return new RuntimeConfig.Server(transport, host, port, basePath,
-                server.path("publicUrl").asText(null), authMode, server.path("auth"), allowInsecure, List.copyOf(origins), management);
+                server.path("publicUrl").asText(null), authMode, server.path("auth"), allowInsecure, List.copyOf(origins), management, pageSize);
     }
 
     private static Map<String, List<RuntimeConfig.Instance>> instances(Manifest manifest, JsonNode doc, Path baseDir,

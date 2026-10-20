@@ -153,6 +153,7 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `server.tls` | none | `proxy`: TLS ends at a reverse proxy. `{ cert, key }` (HTTPS by the server itself): **Not supported yet:** refused at startup. |
 | `server.trustProxy` | `[]` | **Not supported yet:** refused at startup. Planned: addresses whose `X-Forwarded-*` headers are trusted |
 | `server.allowedOrigins` | `[]` | Origin check for browser clients (DNS rebinding protection) |
+| `server.pageSize` | `0` | List operations (`tools/list`, `resources/list`, `resources/templates/list`, `prompts/list`) answer this many items per page with an opaque `nextCursor` (MCP pagination); `0`: everything at once. A cursor from before the list changed is refused as invalid params. Set at start |
 | `server.outboundProxy` | none | **Not supported yet:** refused at startup. Planned: HTTP proxy for calls to instances |
 | `server.management.port` | none | health + metrics on a separate port |
 | `server.auth.mode` | `none` | `none` · `static` · `oauth`, within the build's `allowed` list |

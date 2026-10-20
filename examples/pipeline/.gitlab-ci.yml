@@ -1,4 +1,4 @@
-image: docker.io/example/mcpgp-cli:0.2.7   # the CLI image; pin by digest in real use
+image: docker.io/example/mcpgp-cli:0.3.0   # the CLI image; pin by digest in real use
 
 stages: [check, build, release]
 
@@ -9,7 +9,7 @@ check:
   stage: check
   script:
     - mcpgp validate --all
-    # TODO (not yet): mcpgp diff --all --against last-release --format md
+    - mcpgp diff --all --against last-release --format md
 
 build:
   stage: build

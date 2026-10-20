@@ -25,4 +25,10 @@ public final class CallRecord {
     /** The redacted upstream body of a failed call, kept for troubleshooting (runtime-config §4.5). */
     public String errorBody;
     public final List<File> files = new ArrayList<>();
+    /** The client sent a {@code progressToken} and the call could report progress. */
+    public volatile boolean progressRequested;
+    /** {@code notifications/progress} sent for this call. */
+    public final java.util.concurrent.atomic.AtomicInteger progressSent = new java.util.concurrent.atomic.AtomicInteger();
+    /** Why the client cancelled the call ({@code notifications/cancelled}), when it did and said. */
+    public String cancelReason;
 }

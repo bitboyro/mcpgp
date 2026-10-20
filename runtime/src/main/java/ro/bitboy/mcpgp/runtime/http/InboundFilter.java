@@ -211,9 +211,13 @@ final class InboundFilter extends HttpFilter {
                 allowed.add(ro.bitboy.mcpgp.runtime.mcp.ToolCatalog.toMcp(tool));
             }
         }
-        ObjectNode answer = JSON.createObjectNode().put("jsonrpc", "2.0");
-        answer.set("id", message.get("id"));
-        answer.putObject("result").set("tools", JSON.valueToTree(allowed));
+        JsonNode answer = JSON.createObjectNode().put("jsonrpc", "2.0");
+        ((ObjectNode) answer).set("id", message.get("id"));
+        ((ObjectNode) answer).putObject("result").set("tools", JSON.valueToTree(allowed));
+        if (server.pageSize() > 0) {
+            answer = ro.bitboy.mcpgp.runtime.mcp.ListPager.answer(
+                    new ro.bitboy.mcpgp.runtime.mcp.ListPager.Pending("tools/list", message.at("/params/cursor").asText("")), answer, server.pageSize());
+        }
         response.setStatus(200);
         response.setContentType("application/json");
         response.getOutputStream().write(JSON.writeValueAsBytes(answer));

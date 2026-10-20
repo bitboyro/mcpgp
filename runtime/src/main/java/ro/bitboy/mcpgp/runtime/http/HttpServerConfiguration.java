@@ -53,6 +53,10 @@ public class HttpServerConfiguration {
                     if (client != null) {
                         context.put(McpServerFactory.CLIENT_KEY, client);
                     }
+                    String revision = request.getHeader("Mcp-Protocol-Version");
+                    if (revision != null) {
+                        context.put(McpServerFactory.REVISION_KEY, revision);
+                    }
                     // only the headers instances are configured to read, and only for this request (auth.md §2.4)
                     Map<String, String> credentials = new HashMap<>();
                     for (String header : credentialHeaders(reloader.getObject().current().config())) {
@@ -129,6 +133,26 @@ public class HttpServerConfiguration {
         registration.addUrlPatterns(config.server().basePath());
         registration.setAsyncSupported(true);
         registration.setOrder(1);
+        return registration;
+    }
+
+    /** After sign-in: requests that can be cancelled are registered, and {@code notifications/cancelled} stops them. */
+    @Bean
+    FilterRegistrationBean<CancellationFilter> cancellationFilter(RuntimeConfig config) {
+        FilterRegistrationBean<CancellationFilter> registration = new FilterRegistrationBean<>(new CancellationFilter());
+        registration.addUrlPatterns(config.server().basePath());
+        registration.setAsyncSupported(true);
+        registration.setOrder(2);
+        return registration;
+    }
+
+    /** {@code server.pageSize}: the list operations answer one page at a time. */
+    @Bean
+    FilterRegistrationBean<PagingFilter> pagingFilter(RuntimeConfig config) {
+        FilterRegistrationBean<PagingFilter> registration = new FilterRegistrationBean<>(new PagingFilter(config.server().pageSize()));
+        registration.addUrlPatterns(config.server().basePath());
+        registration.setAsyncSupported(true);
+        registration.setOrder(3);
         return registration;
     }
 
