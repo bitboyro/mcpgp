@@ -30,9 +30,16 @@ import java.util.concurrent.ConcurrentHashMap;
  * Sends requests to instances: one HTTP client per instance with its own TLS context, downstream
  * credentials added here (never from tool input), redirects not followed (credentials must not travel
  * to another host). The only repeats are the ones the specs allow: once after a {@code 401} with a
- * fresh OAuth token (auth.md §2.1), once after a TLS failure when certificate files changed (§5.4).
+ * fresh OAuth token (auth.md §2.1), once after a TLS failure when certificate files changed (§5.4),
+ * and the JDK client's own: a GET or HEAD is sent a second time, once, when the target closed the
+ * connection without answering (tools-contract §6; it can't be turned off). Its retry after a refused
+ * connection is turned off.
  */
 final class Upstream {
+
+    static {
+        HttpRetries.noConnectRetry();
+    }
 
     private static final Logger LOG = LoggerFactory.getLogger(Upstream.class);
     /** Headers the agent may never set; the runtime owns them. */

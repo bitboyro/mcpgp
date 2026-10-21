@@ -36,6 +36,7 @@ public class McpgpServer {
     }
 
     public static void main(String[] args) {
+        ro.bitboy.mcpgp.runtime.call.HttpRetries.noConnectRetry();   // before any HTTP client is used
         if (args.length > 0 && ServerCommands.COMMANDS.contains(args[0])) {
             System.exit(new ServerCommands(System.getenv(), Path.of("").toAbsolutePath(), System.in, System.out).run(args));
             return;

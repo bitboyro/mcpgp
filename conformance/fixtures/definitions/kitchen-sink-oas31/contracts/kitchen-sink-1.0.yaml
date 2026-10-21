@@ -1,0 +1,319 @@
+openapi: 3.1.0
+info:
+  title: Kitchen sink
+  version: "1.0"
+  description: >
+    A made-up API for the release gate (docs/process/release-gate.md): every method and many kinds of
+    parameters, bodies and answers, so generated calls exercise them all.
+servers:
+  - url: https://kitchen.example/api
+security:
+  - apiKey: []
+tags:
+  - name: items
+  - name: files
+  - name: reports
+  - name: system
+paths:
+  /items:
+    get:
+      operationId: listItems
+      tags: [items]
+      summary: List items
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - name: tag
+          in: query
+          description: Only items with all of these tags
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string, pattern: "^[a-z]{1,12}$" }, maxItems: 5 }
+        - { name: sort, in: query, schema: { type: string, enum: [name, -name, created, -created] } }
+        - { name: q, in: query, schema: { type: string, maxLength: 64 } }
+        - { name: X-Request-Tag, in: header, schema: { type: string, maxLength: 32 } }
+      responses:
+        "200":
+          description: Items
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Item" } }
+                  next: { type: [string, "null"] }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: createItem
+      tags: [items]
+      summary: Create an item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewItem" }
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /items/{itemId}:
+    parameters:
+      - { name: itemId, in: path, required: true, schema: { type: string, pattern: "^[a-z0-9-]{1,36}$" } }
+    get:
+      operationId: getItem
+      tags: [items]
+      summary: Get an item
+      parameters:
+        - { name: view, in: cookie, schema: { type: string, enum: [short, full] } }
+      responses:
+        "200":
+          description: The item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+    put:
+      operationId: replaceItem
+      tags: [items]
+      summary: Replace an item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewItem" }
+      responses:
+        "200":
+          description: Replaced
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+        "404": { $ref: "#/components/responses/Problem" }
+    patch:
+      operationId: updateItem
+      tags: [items]
+      summary: Change some fields of an item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 80 }
+                tags: { type: array, items: { type: string }, maxItems: 5 }
+                archived: { type: boolean }
+      responses:
+        "200":
+          description: Changed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+    delete:
+      operationId: deleteItem
+      tags: [items]
+      summary: Delete an item
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/Problem" }
+  /items/{itemId}/versions/{version}:
+    get:
+      operationId: getItemVersion
+      tags: [items]
+      summary: One version of an item
+      parameters:
+        - { name: itemId, in: path, required: true, schema: { type: string, pattern: "^[a-z0-9-]{1,36}$" } }
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: The version
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /items/{itemId}/attachments:
+    post:
+      operationId: addAttachment
+      tags: [files]
+      summary: Attach a file to an item
+      parameters:
+        - { name: itemId, in: path, required: true, schema: { type: string, pattern: "^[a-z0-9-]{1,36}$" } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                caption: { type: string, maxLength: 120 }
+                meta:
+                  type: object
+                  properties:
+                    source: { type: string }
+            encoding:
+              meta: { contentType: application/json }
+      responses:
+        "201":
+          description: Attached
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  size: { type: integer }
+        "413": { $ref: "#/components/responses/Problem" }
+  /items/{itemId}/content:
+    parameters:
+      - { name: itemId, in: path, required: true, schema: { type: string, pattern: "^[a-z0-9-]{1,36}$" } }
+    get:
+      operationId: downloadContent
+      tags: [files]
+      summary: Download an item's content
+      responses:
+        "200":
+          description: The content
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Problem" }
+    put:
+      operationId: uploadContent
+      tags: [files]
+      summary: Upload an item's content
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "204": { description: Stored }
+        "413": { $ref: "#/components/responses/Problem" }
+  /reports/items:
+    get:
+      operationId: itemsReport
+      tags: [reports]
+      summary: Items as CSV
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: The report
+          content:
+            text/csv:
+              schema: { type: string }
+  /search:
+    post:
+      operationId: searchItems
+      tags: [items]
+      summary: Search items with a form
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string, minLength: 1, maxLength: 64 }
+                page: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Matches
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Item" } }
+  /status:
+    get:
+      operationId: getStatus
+      tags: [system]
+      summary: Service status
+      security: []
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [up, degraded] }
+components:
+  securitySchemes:
+    apiKey: { type: apiKey, in: header, name: X-Api-Key }
+  responses:
+    Problem:
+      description: A problem
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+    Owner:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+    Shape:
+      oneOf:
+        - type: object
+          required: [kind, radius]
+          properties:
+            kind: { const: circle }
+            radius: { type: number, exclusiveMinimum: 0 }
+          additionalProperties: false
+        - type: object
+          required: [kind, side]
+          properties:
+            kind: { const: square }
+            side: { type: number, exclusiveMinimum: 0 }
+          additionalProperties: false
+    NewItem:
+      type: object
+      required: [name, kind]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        kind: { type: string, enum: [tool, part, kit] }
+        tags: { type: array, items: { type: string }, maxItems: 5 }
+        price: { type: [number, "null"], minimum: 0 }
+        owner: { $ref: "#/components/schemas/Owner" }
+        attributes: { type: object, additionalProperties: { type: string } }
+        shape: { $ref: "#/components/schemas/Shape" }
+        children:
+          type: array
+          maxItems: 3
+          items: { $ref: "#/components/schemas/NewItem" }
+    Item:
+      allOf:
+        - $ref: "#/components/schemas/NewItem"
+        - type: object
+          required: [id, created]
+          properties:
+            id: { type: string }
+            created: { type: string, format: date-time }

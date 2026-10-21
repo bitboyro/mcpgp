@@ -5,9 +5,16 @@ versions follow [SemVer](https://semver.org).
 
 ## Unreleased
 
-From a stakeholder's run of the platform's MCP server and the CLI on a 570-operation API.
-
 ### Added
+- The release gate, first milestone (G1): `conformance/runner/ts` builds packages with `mcpgp build`,
+  starts each server jar as a customer would, and drives it with the official TypeScript MCP SDK over
+  stdio and Streamable HTTP on every claimed MCP revision, against a mock that checks every request
+  against the contract. Suites: package start-up, the conformance cases, and calls generated for every
+  tool of a kitchen-sink fixture (valid, invalid, every documented answer, faults), plus a self-check
+  of the mock. `gate.yml` runs it with the Java tests for every version tag, before anything is
+  published (a failure publishes nothing), and when started by hand; a release candidate tag
+  (`vX.Y.Z-rcN`) runs only the gate. The release carries its report (`gate-report.html`,
+  `gate-report.json`).
 - `mcpgp init --from-spec` for big APIs: `--tag`, `--path` (a glob) and `--access` start with part of
   the API (written as `select`), and `--collisions` (default `method-path`) names operations that
   would get the same tool name from their method and path instead of stopping the build; `--collisions error`
@@ -29,6 +36,11 @@ From a stakeholder's run of the platform's MCP server and the CLI on a 570-opera
   this version.
 
 ### Fixed
+- Retries of upstream calls, as the release gate found them: a `GET` or `HEAD` is sent a second time
+  when the target closes the connection without answering. That is the JDK HTTP client's own retry,
+  allowed by HTTP for those methods and impossible to turn off; the spec now says so (tools-contract
+  §6, requirements §7). Other methods are still sent once. The client's retry after a refused
+  connection is now turned off (`jdk.httpclient.disableRetryConnect`, unless the operator sets it).
 - `client add` failed with "This server isn't running from a jar" for the packaged server, even with
   `--print`: the jar is now found from the class path or the Spring Boot jar's location, and `--print`
   writes a placeholder to replace when it can't be found.

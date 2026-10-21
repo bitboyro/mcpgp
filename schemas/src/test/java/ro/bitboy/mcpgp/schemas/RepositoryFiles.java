@@ -34,6 +34,9 @@ final class RepositoryFiles {
     static Classification classify(String relative) {
         String name = relative.substring(relative.lastIndexOf('/') + 1);
 
+        if (relative.startsWith("conformance/runner/")) {
+            return Classification.skip("a conformance runner's code (and, locally, its dependencies)");
+        }
         if (name.endsWith(".md") || name.equals(".DS_Store")) {
             return Classification.skip("documentation");
         }
