@@ -144,10 +144,23 @@ class OrdersManifestTest {
         JsonNode description = tool("orders_customer_get").at("/provenance/description/0");
         assertThat(description.path("file").asText()).isEqualTo("contracts/orders-2.0.yaml");
         assertThat(manifest.path("diagnostics")).filteredOn(d -> d.path("code").asText().equals("OPERATION_EXCLUDED"))
-                .extracting(d -> d.path("operation").asText())
-                .contains("orders:DELETE:/customers/{id}");
+                .isEmpty();
+        assertThat(orders.diagnostics()).anyMatch(d -> d.code().equals("OPERATION_EXCLUDED"));
         assertThat(manifest.path("diagnostics")).filteredOn(d -> d.path("level").asText().equals("warning"))
                 .extracting(d -> d.path("code").asText()).containsExactly("PACK_UNKNOWN", "RULE_MATCHES_NOTHING");
+    }
+
+    @Test
+    void exclusionDiagnosticsCanBeIncludedWithoutChangingToolsOrOtherDiagnostics() {
+        Compiler.Result detailed = compiler.compile(PLATFORM.resolve("orders/orders.mcpgp.yaml"),
+                new Compiler.Options(workspace, false, BUILD, null, true));
+        ObjectNode full = detailed.manifest().orElseThrow();
+        assertThat(full.path("diagnostics")).filteredOn(d -> d.path("code").asText().equals("OPERATION_EXCLUDED"))
+                .extracting(d -> d.path("operation").asText()).contains("orders:DELETE:/customers/{id}");
+        assertThat(full.path("tools")).isEqualTo(manifest.path("tools"));
+        assertThat(detailed.diagnostics()).isEqualTo(orders.diagnostics());
+        assertThat(full.path("diagnostics")).filteredOn(d -> !d.path("code").asText().equals("OPERATION_EXCLUDED"))
+                .containsExactlyElementsOf(manifest.path("diagnostics"));
     }
 
     @Test

@@ -6,6 +6,8 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- `mcpgp build --include-excluded-diagnostics` opts into exclusion details in the manifest. By default,
+  `OPERATION_EXCLUDED` entries stay in compiler/CLI diagnostics only; other manifest diagnostics remain.
 - The release gate, first milestone (G1): `conformance/runner/ts` builds packages with `mcpgp build`,
   starts each server jar as a customer would, and drives it with the official TypeScript MCP SDK over
   stdio and Streamable HTTP on every claimed MCP revision, against a mock that checks every request
