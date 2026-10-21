@@ -113,7 +113,8 @@ public class BuildsApi {
     /** An artifact (the zip or the manifest), or with {@code ?file=} one file of the package. */
     @GetMapping("/builds/{build}/artifacts/{name}")
     public ResponseEntity<byte[]> download(HttpServletRequest request, @PathVariable String build, @PathVariable String name,
-                                           @RequestParam(required = false) String file) {
+                                           @RequestParam(required = false) String file, @RequestParam(required = false) Long offset,
+                                           @RequestParam(required = false) Long limit) {
         Access.Principal who = ServersApi.who(request);
         who.require("servers:read");
         Model.Build b = find(build);
@@ -130,8 +131,16 @@ public class BuildsApi {
         }
         store.append(new Model.Activity(Instant.now().toString(), who.identity().name(), who.identity().kind(), "artifact.download", build,
                 "ok", Map.of("artifact", downloaded)));
+        long total = content.length;
+        if (offset != null || limit != null) {
+            // a part of a big file: bytes offset … offset + limit (the whole size is in X-Total-Size)
+            int from = (int) Math.min(Math.max(offset == null ? 0 : offset, 0), total);
+            int to = (int) Math.min(limit == null ? total : from + Math.max(limit, 0), total);
+            content = java.util.Arrays.copyOfRange(content, from, to);
+        }
         return ResponseEntity.ok().header("Content-Disposition", "attachment; filename=\"" + filename.replace("\"", "") + "\"")
-                .contentType(filename.endsWith(".json") ? MediaType.APPLICATION_JSON : MediaType.APPLICATION_OCTET_STREAM).body(content);
+                .header("X-Total-Size", Long.toString(total))
+                .contentType(filename.endsWith(".json") && content.length == total ? MediaType.APPLICATION_JSON : MediaType.APPLICATION_OCTET_STREAM).body(content);
     }
 
     @PostMapping("/builds/{build}/release")

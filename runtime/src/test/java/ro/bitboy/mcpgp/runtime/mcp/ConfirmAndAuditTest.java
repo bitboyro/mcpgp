@@ -180,6 +180,42 @@ class ConfirmAndAuditTest {
     }
 
     @Test
+    void cancellingWhileTheUserIsBeingAskedStopsTheCall() throws Exception {
+        notes();
+        McpSyncServerExchange exchange = mock(McpSyncServerExchange.class);
+        when(exchange.getClientCapabilities()).thenReturn(new McpSchema.ClientCapabilities(null, null, null,
+                new McpSchema.ClientCapabilities.Elicitation(null, null)));
+        when(exchange.getClientInfo()).thenReturn(new McpSchema.Implementation("desk", "1"));
+        when(exchange.createElicitation(any())).thenAnswer(invocation -> {
+            Thread.sleep(10_000);            // the user is thinking
+            return new McpSchema.ElicitResult(McpSchema.ElicitResult.Action.ACCEPT, Map.of("confirm", true), null);
+        });
+        com.fasterxml.jackson.databind.node.ObjectNode message = JSON.createObjectNode().put("jsonrpc", "2.0").put("id", 5).put("method", "tools/call");
+        message.putObject("params").put("name", "notes_note_delete");
+        String key = Inflight.accept("test-scope", message);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> meta = JSON.convertValue(message.at("/params/_meta"), Map.class);
+
+        long start = System.nanoTime();
+        java.util.concurrent.CompletableFuture<McpSchema.CallToolResult> running = java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> server.call(exchange, new McpSchema.CallToolRequest("notes_note_delete", delete("a", "n-1"), meta)));
+        org.mockito.Mockito.verify(exchange, org.mockito.Mockito.timeout(5000)).createElicitation(any());
+        Inflight.accept("test-scope", JSON.readTree("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":5,\"reason\":\"stop\"}}"));
+
+        McpSchema.CallToolResult result = running.get(3, java.util.concurrent.TimeUnit.SECONDS);
+        Inflight.end(key);
+        assertThat(java.util.concurrent.TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - start)).isLessThan(8);
+        assertThat(result.isError()).isTrue();
+        assertThat(structured(result).path("code").asText()).isEqualTo("CANCELLED");
+        assertThat(target.received).isEmpty();
+        assertThat(auditEvents()).filteredOn(e -> e.path("type").asText().equals("tool.call"))
+                .last().satisfies(e -> {
+                    assertThat(e.path("outcome").asText()).isEqualTo("cancelled");
+                    assertThat(e.at("/mcp/cancelled/reason").asText()).isEqualTo("stop");
+                });
+    }
+
+    @Test
     void everyCallIsAuditedWithoutSecretsOrContents() throws IOException {
         start(ORDERS, "instances:\n  - { id: prod-eu, baseUrl: \"%s\", auth: { type: basic, username: svc, password: \"${env:PASS}\" } }\n",
                 "", Map.of("PASS", "pa55word-secret"));

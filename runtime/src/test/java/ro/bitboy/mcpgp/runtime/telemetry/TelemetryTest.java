@@ -92,7 +92,7 @@ class TelemetryTest {
         String metrics = new String(Telemetry.current().scrape().orElseThrow(), StandardCharsets.UTF_8);
         assertThat(metrics).contains("mcpgp_tool_calls_total{").contains("mcpgp_tool=\"orders_customer_get\"").contains("mcpgp_outcome=\"ok\"")
                 .contains("mcpgp_outcome=\"error\"").contains("mcpgp_tool_duration_seconds_bucket").contains("mcpgp_instance_up{")
-                .contains("mcpgp_instance=\"prod-eu\"").contains("service_name=\"orders-mcp\"");
+                .contains("mcpgp_instance=\"prod-eu\"").contains("service_name=\"orders-mcp\"").contains("mcpgp_transport=\"stdio\"");
         assertThat(metrics).doesNotContain(SECRET_ARGUMENT);
         assertThat(Telemetry.scrapeContentType()).startsWith("text/plain");
     }

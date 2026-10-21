@@ -217,6 +217,8 @@ public final class McpServerFactory {
     /** Transport-context key with the authenticated client's key name (HTTP, static mode). */
     public static final String CLIENT_KEY = "mcpgp.client";
     /** The request's credential headers for the API (auth.md §2.4), by lower-case name: for this request only, never kept. */
+    /** The MCP revision the client named in its {@code Mcp-Protocol-Version} header (HTTP). */
+    public static final String REVISION_KEY = "mcpgp.revision";
     public static final String CREDENTIALS_KEY = "mcpgp.credentials";
     /** The signed-in user's access token (inbound oauth, already checked), for tokenExchange (auth.md §2.5): this request only. */
     public static final String SUBJECT_TOKEN_KEY = "mcpgp.subjectToken";
@@ -243,6 +245,7 @@ public final class McpServerFactory {
             specs.add(spec(tool));
         }
         McpSchema.ServerCapabilities.Builder capabilities = McpSchema.ServerCapabilities.builder().tools(true).logging();
+        List<McpServerFeatures.SyncCompletionSpecification> completions = new ArrayList<>();
         if (resources.any()) {
             capabilities.resources(false, false);
             List<McpServerFeatures.SyncResourceSpecification> plain = new ArrayList<>();
@@ -257,6 +260,10 @@ public final class McpServerFactory {
                 }
             }
             builder.uriTemplateManagerFactory(UriTemplate::new).resources(plain).resourceTemplates(templates);
+            for (String uri : resources.completable()) {
+                completions.add(new McpServerFeatures.SyncCompletionSpecification(new McpSchema.ResourceReference(uri),
+                        (exchange, request) -> current.get().resources.complete(request)));
+            }
         }
         if (prompts.any()) {
             capabilities.prompts(false);
@@ -265,15 +272,14 @@ public final class McpServerFactory {
                 promptSpecs.add(new McpServerFeatures.SyncPromptSpecification(prompt, (exchange, request) -> current.get().prompts.get(request)));
             }
             builder.prompts(promptSpecs);
-            if (!prompts.completable().isEmpty()) {
-                capabilities.completions();
-                List<McpServerFeatures.SyncCompletionSpecification> completions = new ArrayList<>();
-                for (String name : prompts.completable()) {
-                    completions.add(new McpServerFeatures.SyncCompletionSpecification(new McpSchema.PromptReference(name),
-                            (exchange, request) -> current.get().prompts.complete(request)));
-                }
-                builder.completions(completions);
+            for (String name : prompts.completable()) {
+                completions.add(new McpServerFeatures.SyncCompletionSpecification(new McpSchema.PromptReference(name),
+                        (exchange, request) -> current.get().prompts.complete(request)));
             }
+        }
+        if (!completions.isEmpty()) {
+            capabilities.completions();
+            builder.completions(completions);
         }
         builder
                 .serverInfo(new McpSchema.Implementation(manifest.serverName(), manifest.serverTitle(), manifest.serverVersion()))
@@ -347,9 +353,13 @@ public final class McpServerFactory {
         // the recording pack captures the upstream calls of this session (a discovery call's inner call keeps it)
         String outerSession = ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.get();
         ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(exchange != null ? exchange.sessionId() : outerSession);
+        Inflight.Handle outerInflight = Inflight.bind(Inflight.of(request.meta()));
         try {
             if (tool == null) {
                 throw new ToolError("INPUT_VALIDATION", "Unknown tool " + name);
+            }
+            if (Inflight.current() != null && Inflight.current().cancelled()) {
+                throw new ToolError("CANCELLED", "The client cancelled this call before it started");
             }
             inputLimits.check(tool, arguments);
             if (toolsets != null && tool.path("kind").asText().equals("api")) {
@@ -370,7 +380,7 @@ public final class McpServerFactory {
                 } else if (token != null) {
                     args.put("confirm", token);       // not a confirmation tool: let validation reject it
                 }
-                java.util.concurrent.ScheduledFuture<?> ticker = progress(exchange, request, tool);
+                java.util.concurrent.ScheduledFuture<?> ticker = progress(exchange, request, tool, record);
                 try {
                     return handler.call(exchange, tool, args, record);
                 } finally {
@@ -394,8 +404,12 @@ public final class McpServerFactory {
                 result = Results.ok(value, null);
             }
         } catch (ToolError e) {
-            outcome = e.code().equals("CONFIRMATION_REQUIRED") || e.code().equals("NOT_AVAILABLE_ON_INSTANCE") ? "denied" : "error";
+            outcome = e.code().equals("CONFIRMATION_REQUIRED") || e.code().equals("NOT_AVAILABLE_ON_INSTANCE") ? "denied"
+                    : e.code().equals("CANCELLED") ? "cancelled" : "error";
             code = e.code();
+            if (e.code().startsWith("UPSTREAM_") || e.code().equals("AUTH_DOWNSTREAM") || e.code().equals("RATE_LIMITED")) {
+                notifyClient(exchange, McpSchema.LoggingLevel.WARNING, name + ": " + e.code() + ": " + e.getMessage());
+            }
             result = Results.error(e, e.meta());
         } catch (RuntimeException e) {
             LOG.error("Tool {} failed", name, e);
@@ -403,9 +417,14 @@ public final class McpServerFactory {
             code = "INTERNAL";
             result = Results.error(new ToolError("INTERNAL", "The tool failed unexpectedly; see the server log"), null);
         } finally {
+            if (Inflight.current() != null && Inflight.current().cancelled()) {
+                record.cancelReason = Inflight.current().reason();
+            }
+            Inflight.restore(outerInflight);
             MDC.remove("cid");
             ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(outerSession);
             traced.result(record.api, record.instance, record.contract, outcome, code);
+            traced.mcp(config.server().transport(), record.progressRequested ? record.progressSent.get() : -1);
             traced.close();
         }
         result = withCorrelation(result, cid);
@@ -417,18 +436,25 @@ public final class McpServerFactory {
      * While an API tool's upstream call runs, {@code notifications/progress} every second to a client that
      * sent a {@code progressToken} (tools-contract §14.3); null when there is nothing to report.
      */
-    private java.util.concurrent.ScheduledFuture<?> progress(McpSyncServerExchange exchange, McpSchema.CallToolRequest request, JsonNode tool) {
+    private java.util.concurrent.ScheduledFuture<?> progress(McpSyncServerExchange exchange, McpSchema.CallToolRequest request, JsonNode tool, CallRecord record) {
         Object token = request.meta() == null ? null : request.meta().get("progressToken");
         if (token == null || exchange == null || !tool.path("kind").asText().equals("api")) {
             return null;
         }
+        record.progressRequested = true;
         long started = System.nanoTime();
         String api = tool.path("api").asText();
+        Object chosen = request.arguments() == null ? null : request.arguments().get("instance");
+        // the call fails after the instance's timeout, so that is the most the wait can come to
+        double total = config.allInstances().stream().filter(i -> i.api().equals(api) && (chosen == null || i.id().equals(chosen.toString())))
+                .mapToInt(RuntimeConfig.Instance::timeoutSeconds).max().orElse(0);
+        String where = chosen == null ? api : api + " on " + chosen;
         return PROGRESS.scheduleAtFixedRate(() -> {
             try {
-                double seconds = (System.nanoTime() - started) / 1e9;
-                exchange.progressNotification(new McpSchema.ProgressNotification(token, Math.floor(seconds), null,
-                        "Waiting for " + api + " (" + Math.round(seconds) + " s)"));
+                double seconds = Math.round((System.nanoTime() - started) / 1e8) / 10.0;      // always larger than the last (a second apart)
+                exchange.progressNotification(new McpSchema.ProgressNotification(token, seconds, total > 0 ? Math.max(total, seconds) : null,
+                        "Waiting for " + where + " (" + Math.round(seconds) + (total > 0 ? " of " + Math.round(total) : "") + " s)"));
+                record.progressSent.incrementAndGet();
             } catch (RuntimeException e) {
                 LOG.debug("Progress for {} couldn't be sent: {}", tool.path("name").asText(), e.getMessage());
             }
@@ -455,10 +481,14 @@ public final class McpServerFactory {
                 .call(name, resource.path("api").asText(null));
         String outerSession = ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.get();
         ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(exchange != null ? exchange.sessionId() : outerSession);
+        Inflight.Handle outerInflight = Inflight.bind(Inflight.of(request.meta()));
         try {
+            if (Inflight.current() != null && Inflight.current().cancelled()) {
+                throw new ToolError("CANCELLED", "The client cancelled this read before it started");
+            }
             return Resources.contents(request.uri(), resource, apiTools.call(exchange, resource, new LinkedHashMap<>(arguments), record));
         } catch (ToolError e) {
-            outcome = "error";
+            outcome = e.code().equals("CANCELLED") ? "cancelled" : "error";
             code = e.code();
             int jsonRpc = e.code().equals("INPUT_VALIDATION") ? McpSchema.ErrorCodes.INVALID_PARAMS : McpSchema.ErrorCodes.INTERNAL_ERROR;
             throw io.modelcontextprotocol.spec.McpError.builder(jsonRpc).message(e.code() + ": " + e.getMessage()).build();
@@ -468,9 +498,14 @@ public final class McpServerFactory {
             code = "INTERNAL";
             throw io.modelcontextprotocol.spec.McpError.builder(McpSchema.ErrorCodes.INTERNAL_ERROR).message("The read failed; see the server log").build();
         } finally {
+            if (Inflight.current() != null && Inflight.current().cancelled()) {
+                record.cancelReason = Inflight.current().reason();
+            }
+            Inflight.restore(outerInflight);
             MDC.remove("cid");
             ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(outerSession);
             traced.result(record.api, record.instance, record.contract, outcome, code);
+            traced.mcp(config.server().transport(), record.progressRequested ? record.progressSent.get() : -1);
             traced.close();
             auditCall("resource.read", name, resource, arguments, record, outcome, code, cid, (System.nanoTime() - started) / 1_000_000, exchange);
         }
@@ -501,6 +536,7 @@ public final class McpServerFactory {
             putIfSet(upstream, "body", record.errorBody);
         }
         event.put("latencyMs", latencyMs);
+        mcpDetails(event, record, outcome, exchange);
         boolean sensitive = tool != null && tool.path("sensitive").asBoolean(false);
         event.set("args", Arguments.render(arguments, sensitive && audit.argumentsMode().equals("hashed") ? "redacted" : audit.argumentsMode()));
         if (!record.files.isEmpty()) {
@@ -508,6 +544,48 @@ public final class McpServerFactory {
             record.files.forEach(f -> files.addObject().put("name", f.name()).put("sizeBytes", f.sizeBytes()).put("sha256", f.sha256()));
         }
         audit.write(event);
+    }
+
+    /**
+     * An MCP log message to the client ({@code notifications/message}); the SDK sends it only when the
+     * level is at or above what the client set with {@code logging/setLevel}. Never fails the call.
+     */
+    private static void notifyClient(McpSyncServerExchange exchange, McpSchema.LoggingLevel level, String message) {
+        if (exchange == null) {
+            return;
+        }
+        try {
+            exchange.loggingNotification(McpSchema.LoggingMessageNotification.builder().level(level).logger("mcpgp").data(message).build());
+        } catch (RuntimeException e) {
+            LOG.debug("MCP log message couldn't be sent: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * What the protocol side of the call did: the transport and the revision the client named (HTTP), progress
+     * (asked for, and how many notifications went out), and why a cancelled call was cancelled. Also one log
+     * line: INFO when the call was cancelled or refused, DEBUG otherwise.
+     */
+    private void mcpDetails(ObjectNode event, CallRecord record, String outcome, McpSyncServerExchange exchange) {
+        ObjectNode mcp = event.putObject("mcp").put("transport", config.server().transport());
+        Object revision = exchange == null || exchange.transportContext() == null ? null : exchange.transportContext().get(REVISION_KEY);
+        putIfSet(mcp, "revision", revision == null ? null : revision.toString());
+        if (record.progressRequested) {
+            mcp.putObject("progress").put("requested", true).put("sent", record.progressSent.get());
+        }
+        if (outcome.equals("cancelled")) {
+            mcp.putObject("cancelled").put("reason", record.cancelReason == null ? "" : record.cancelReason);
+        }
+        String line = "{} {} (transport {}{}{}{})";
+        Object[] arguments = {event.path("type").asText(), outcome, config.server().transport(),
+                revision == null ? "" : ", revision " + revision,
+                record.progressRequested ? ", progress " + record.progressSent.get() + " sent" : "",
+                outcome.equals("cancelled") ? ", cancelled" + (record.cancelReason == null ? "" : ": " + record.cancelReason) : ""};
+        if (outcome.equals("cancelled") || outcome.equals("denied")) {
+            LOG.info(line, arguments);
+        } else {
+            LOG.debug(line, arguments);
+        }
     }
 
     private void auditConfirm(JsonNode tool, Map<String, Object> arguments, String state, String cid, McpSyncServerExchange exchange) {

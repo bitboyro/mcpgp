@@ -83,10 +83,19 @@ class HttpServerTest {
     static JsonNode message(HttpResponse<String> response) throws IOException {
         String body = response.body();
         if (response.headers().firstValue("Content-Type").orElse("").startsWith("text/event-stream")) {
+            // notifications (progress, log messages) may come first; the answer has a result or an error
+            JsonNode first = null;
             for (String line : body.split("\n")) {
                 if (line.startsWith("data:")) {
-                    return JSON.readTree(line.substring(5).strip());
+                    JsonNode data = JSON.readTree(line.substring(5).strip());
+                    if (data.has("result") || data.has("error")) {
+                        return data;
+                    }
+                    first = first == null ? data : first;
                 }
+            }
+            if (first != null) {
+                return first;
             }
         }
         return JSON.readTree(body);

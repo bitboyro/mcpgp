@@ -28,13 +28,14 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 /**
  * Customer commands of a delivered server (runtime-config §8), run without starting the server:
  * {@code doctor [--quick]}, {@code instance list}, {@code instance test <id>},
- * {@code instance trust <id> [--base64] [--yes]}. Exit codes: 0 ok, 1 a check failed, 2 usage.
+ * {@code instance trust <id> [--base64] [--yes | --fingerprint <sha256>]}. Exit codes: 0 ok, 1 a check failed, 2 usage.
  */
 public final class ServerCommands {
 
@@ -62,6 +63,7 @@ public final class ServerCommands {
         boolean quick = false;
         boolean base64 = false;
         boolean yes = false;
+        String fingerprint = null;
         boolean print = false;
         boolean dryRun = false;
         String api = null;
@@ -72,6 +74,7 @@ public final class ServerCommands {
                 case "--quick" -> quick = true;
                 case "--base64" -> base64 = true;
                 case "--yes" -> yes = true;
+                case "--fingerprint" -> fingerprint = i + 1 < args.length ? args[++i] : null;
                 case "--print" -> print = true;
                 case "--dry-run" -> dryRun = true;
                 case "--api" -> api = i + 1 < args.length ? args[++i] : null;
@@ -110,7 +113,7 @@ public final class ServerCommands {
                 case "reload" -> reload(startup.config());
                 case "instance list" -> list(startup.config());
                 case "instance test" -> words.size() == 3 ? test(instance(startup.config(), words.get(2))) : usage();
-                case "instance trust" -> words.size() == 3 ? trust(startup.config(), instance(startup.config(), words.get(2)), base64, yes) : usage();
+                case "instance trust" -> words.size() == 3 ? trust(startup.config(), instance(startup.config(), words.get(2)), base64, yes, fingerprint) : usage();
                 case "instance add" -> words.size() == 3 ? setup(startup.manifest(), rest).add(startup.config(), words.get(2), api) : usage();
                 case "instance remove" -> words.size() == 3 ? setup(startup.manifest(), rest).remove(startup.config(), words.get(2), api) : usage();
                 case "client add" -> words.size() == 3
@@ -160,7 +163,7 @@ public final class ServerCommands {
 
     private int usage() {
         out.println("Usage: init | doctor [--quick] | reload | instance list | instance test|add|remove|trust <id> | client add <client>");
-        out.println("       instance trust: [--base64] [--yes]   instance add/remove: [--api <id>]");
+        out.println("       instance trust: [--base64] [--yes | --fingerprint <sha256>]   instance add/remove: [--api <id>]");
         out.println("       client add claude-code|claude-desktop|cursor|vscode [--print] [--dry-run] [--file <path>] [--name <entry>]");
         out.println("       (plus --config <file> and --<key> <value> as when starting the server)");
         return 2;
@@ -294,7 +297,7 @@ public final class ServerCommands {
      * operator confirms, saves it as {@code certs/<id>.pem} next to the config (or prints it as base64),
      * tests the connection with it, and prints the lines to add. Configured material is never replaced.
      */
-    private int trust(RuntimeConfig config, RuntimeConfig.Instance instance, boolean base64, boolean yes) {
+    private int trust(RuntimeConfig config, RuntimeConfig.Instance instance, boolean base64, boolean yes, String fingerprint) {
         if (instance.tls().has("ca")) {
             out.println("✗ instance " + instance.id() + " already has tls.ca; remove it first to fetch a new certificate");
             return 1;
@@ -321,9 +324,26 @@ public final class ServerCommands {
         if (fetched.get("warning") != null) {
             out.println("! " + fetched.get("warning"));
         }
-        if (!yes && !confirm("Trust this certificate for instance " + instance.id() + "? [y/N] ")) {
-            out.println("Nothing saved.");
-            return 1;
+        if (fingerprint != null) {
+            // non-interactive: trust the chain only if it holds the certificate the operator pinned
+            String wanted = fingerprint.replace(":", "").strip().toLowerCase(Locale.ROOT);
+            boolean pinned = chain.stream().anyMatch(item -> String.valueOf(((Map<?, ?>) item).get("sha256"))
+                    .replace(":", "").toLowerCase(Locale.ROOT).equals(wanted));
+            if (!pinned) {
+                out.println("✗ none of the certificates above has the SHA-256 " + fingerprint + "; nothing saved.");
+                return 1;
+            }
+        } else if (!yes) {
+            Boolean answer = confirm("Trust this certificate for instance " + instance.id() + "? [y/N] ");
+            if (answer == null) {
+                out.println("No answer (no terminal?): nothing saved. Run it again with --yes, or with --fingerprint <sha256> "
+                        + "of the certificate shown above.");
+                return 1;
+            }
+            if (!answer) {
+                out.println("Nothing saved.");
+                return 1;
+            }
         }
 
         Path baseDir = config.source().map(p -> p.toAbsolutePath().getParent()).orElse(workingDir.toAbsolutePath());
@@ -364,14 +384,15 @@ public final class ServerCommands {
         return 0;
     }
 
-    private boolean confirm(String question) {
+    /** The operator's answer; null when there is none (the input ended). */
+    private Boolean confirm(String question) {
         out.print(question);
         out.flush();
         try {
             String answer = in.readLine();
-            return answer != null && (answer.strip().equalsIgnoreCase("y") || answer.strip().equalsIgnoreCase("yes"));
+            return answer == null ? null : answer.strip().equalsIgnoreCase("y") || answer.strip().equalsIgnoreCase("yes");
         } catch (IOException e) {
-            return false;
+            return null;
         }
     }
 

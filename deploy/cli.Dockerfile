@@ -20,6 +20,10 @@ RUN apt-get update -q && apt-get install -y -q --no-install-recommends git \
  && git config --system --add safe.directory '*'
 COPY --from=build /mcpgp-cli.jar /opt/mcpgp/lib/mcpgp-cli.jar
 COPY cli/src/dist/bin/mcpgp /opt/mcpgp/bin/mcpgp
+# the specs and guides that messages and generated files refer to, at /opt/mcpgp/docs
+COPY docs/spec /opt/mcpgp/docs/spec
+COPY docs/guides /opt/mcpgp/docs/guides
+COPY docs/concepts.md docs/security.md docs/deployment.md /opt/mcpgp/docs/
 RUN chmod 755 /opt/mcpgp/bin/mcpgp && ln -s /opt/mcpgp/bin/mcpgp /usr/local/bin/mcpgp
 # CI runners mount the checkout and run steps as root; locally, pass --user "$(id -u):$(id -g)"
 WORKDIR /work

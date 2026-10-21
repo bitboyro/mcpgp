@@ -228,6 +228,19 @@ public final class Main {
         @Option(names = "--out", paramLabel = "<dir>", defaultValue = ".", description = "Project directory (default: the current one).")
         Path out;
 
+        @Option(names = "--tag", paramLabel = "<tag>", split = ",", description = "Only operations with this tag (repeatable, or comma-separated); for a big API.")
+        List<String> tags = List.of();
+
+        @Option(names = "--path", paramLabel = "<glob>", split = ",", description = "Only operations whose path matches, e.g. '/messages/**' (repeatable).")
+        List<String> paths = List.of();
+
+        @Option(names = "--access", paramLabel = "<read-only|read-write|all>", description = "Which methods become tools (the definition's default when not given).")
+        String access;
+
+        @Option(names = "--collisions", paramLabel = "<error|method-path|suffix-number|suffix-contract>", defaultValue = "method-path",
+                description = "Two operations that would get the same tool name: default ${DEFAULT-VALUE} (named from method and path), error stops the build.")
+        String collisions;
+
         @Override
         public Integer call() throws IOException {
             PrintWriter err = spec.commandLine().getErr();
@@ -273,7 +286,13 @@ public final class Main {
                 Files.createDirectories(target.getParent());
                 Files.write(target, file.getValue());
             }
-            Files.writeString(definition, Scaffold.definition(server, title, api, source == null ? "1.0" : source.version(), contractFile));
+            if (access != null && !List.of("read-only", "read-write", "all").contains(access)
+                    || !List.of("error", "method-path", "suffix-number", "suffix-contract").contains(collisions)) {
+                err.println("error: --access is read-only, read-write or all; --collisions is error, method-path, suffix-number or suffix-contract");
+                return USAGE;
+            }
+            Files.writeString(definition, Scaffold.definition(server, title, api, source == null ? "1.0" : source.version(), contractFile,
+                    tags, paths, access, source == null || collisions.equals("error") ? null : collisions));
             PrintWriter writer = spec.commandLine().getOut();
             writer.println("wrote " + definition + (source != null ? " and " + out.resolve(contractFile)
                     + (contracts.size() > 1 ? " with the " + (contracts.size() - 1) + " file" + (contracts.size() == 2 ? "" : "s") + " it refers to" : "") : ""));
@@ -291,8 +310,13 @@ public final class Main {
                 }
                 writer.println(result.manifest().get().path("tools").size() + " tools; next: mcpgp test " + definition);
             } else {
-                result.diagnostics().stream().filter(d -> d.level() == Diagnostic.Level.ERROR).forEach(d -> writer.println(definition + ": " + d));
-                writer.println("the definition needs changes before it builds; see the errors above");
+                List<Diagnostic> errors = result.diagnostics().stream().filter(d -> d.level() == Diagnostic.Level.ERROR).toList();
+                errors.stream().limit(20).forEach(d -> writer.println(definition + ": " + d));
+                if (errors.size() > 20) {
+                    writer.println("… and " + (errors.size() - 20) + " more errors");
+                }
+                writer.println("the definition needs changes before it builds; see the errors above"
+                        + (errors.size() > 20 ? " (for a big API, start smaller: --tag, --path or --access)" : ""));
             }
             return OK;
         }

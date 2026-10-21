@@ -24,6 +24,10 @@ RUN groupadd --system --gid 10001 mcpgp \
  && chown mcpgp:mcpgp /var/lib/mcpgp
 COPY --from=build /mcpgp-platform.jar /opt/mcpgp/mcpgp-platform.jar
 COPY deploy/platform.default.yaml /etc/mcpgp/platform.yaml
+# the specs and guides that messages and generated files refer to, at /opt/mcpgp/docs
+COPY docs/spec /opt/mcpgp/docs/spec
+COPY docs/guides /opt/mcpgp/docs/guides
+COPY docs/concepts.md docs/security.md docs/deployment.md /opt/mcpgp/docs/
 # listen on every interface inside the container; the data directory is the volume
 ENV MCPGP_PLATFORM_IMAGE=$MCPGP_IMAGE \
     MCPGP_PLATFORM_CONFIG=/etc/mcpgp/platform.yaml \
