@@ -185,7 +185,7 @@ Rules:
   `security: []`): the runtime sends no credentials for it. Absent means none was declared.
 - `kind: builtin` (e.g. `instances_list`, `search_tools`) and `kind: pack` tools have no `variants`;
   they carry `handler: "<builtin id>"` or `pack: "<pack id>"`.
-- Hidden tools are not in the manifest. Excluded operations are listed only in `diagnostics` (info).
+- Hidden tools are not in the manifest. Excluded operations are omitted by default; `--include-excluded-diagnostics` lists them only in `diagnostics` (info).
 
 ## 6. Packs
 
@@ -226,6 +226,10 @@ Pack tool definitions appear in `tools` like any other tool, with `kind: "pack"`
 ]
 ```
 
+`OPERATION_EXCLUDED` entries are omitted by default. `mcpgp build --include-excluded-diagnostics`
+includes them as shown above. Compiler results and CLI diagnostic output retain all exclusion reasons;
+warnings and other informational diagnostics remain in the manifest.
+
 Errors never reach a manifest: a build with errors produces no manifest.
 
 ## 9. Determinism and integrity
@@ -248,4 +252,4 @@ Errors never reach a manifest: a build with errors produces no manifest.
    (runtime-config §4.1).
 2. Each tool's `inputSchema` is self-contained (its own `$defs`); packages are compressed.
 3. Pack tool definitions are included in the manifest, so they are reviewed and diffed like API tools.
-4. Excluded operations appear only in `diagnostics` (info), not as tool stubs.
+4. Excluded operations are omitted by default and, when requested, appear only in `diagnostics` (info), not as tool stubs.

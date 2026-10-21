@@ -72,46 +72,6 @@
   },
   "diagnostics": [
     {
-      "code": "OPERATION_EXCLUDED",
-      "level": "info",
-      "location": {
-        "file": "orders.mcpgp.yaml"
-      },
-      "message": "orders:DELETE:/customers/{id} excluded: access: read-write",
-      "operation": "orders:DELETE:/customers/{id}",
-      "reason": "access: read-write"
-    },
-    {
-      "code": "OPERATION_EXCLUDED",
-      "level": "info",
-      "location": {
-        "file": "orders.mcpgp.yaml"
-      },
-      "message": "orders:GET:/internal/metrics excluded: excluded by select.exclude",
-      "operation": "orders:GET:/internal/metrics",
-      "reason": "excluded by select.exclude"
-    },
-    {
-      "code": "OPERATION_EXCLUDED",
-      "level": "info",
-      "location": {
-        "file": "orders.mcpgp.yaml"
-      },
-      "message": "orders:GET:/users excluded: excluded by select.exclude",
-      "operation": "orders:GET:/users",
-      "reason": "excluded by select.exclude"
-    },
-    {
-      "code": "OPERATION_EXCLUDED",
-      "level": "info",
-      "location": {
-        "file": "orders.mcpgp.yaml"
-      },
-      "message": "orders:GET:/version excluded: excluded by select.exclude",
-      "operation": "orders:GET:/version",
-      "reason": "excluded by select.exclude"
-    },
-    {
       "code": "PACK_UNKNOWN",
       "level": "warning",
       "location": {

@@ -43,7 +43,7 @@ Every configurable thing, grouped by concern.
 ## 4. Tools: selection, naming, shape
 | Requirement | Set by | Prio |
 |---|---|---|
-| Include/exclude by tag, path, method, operationId; hide deprecated | B | P0 |
+| Include/exclude by tag, path, method, operationId; hide deprecated; opt-in manifest exclusion diagnostics (`--include-excluded-diagnostics`) | B | P0 |
 | Access presets: read only, read & write (no delete), everything | B | P0 |
 | Naming pipeline (source, normalize, shape, vocabulary, rules, explicit, namespace, limits, collisions) | B | P0 |
 | Override rules: `set`, `prepend`, `append` on name/title/description/params/annotations | B | P0 |
