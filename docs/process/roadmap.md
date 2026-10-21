@@ -70,6 +70,20 @@ Releases happen when they're asked for; these land on `main` first.
 | Per-user identity by token exchange | `tokenExchange`: RFC 8693 or Entra on-behalf-of, for a shared server whose users sign in with OAuth (auth.md §2.5) | on `main` |
 | Store performance at scale | Activity searches filtered by the store (SQL and indexes on PostgreSQL) and bounded in time; the cache cleanup batched | on `main` |
 
+### Backlog: stakeholder feedback (2026-10-20)
+
+From an agent that built a server for a 570-operation API with the platform's MCP server and the CLI.
+Fixed on `main` (Unreleased): `client add` in the packaged server, `instance trust` without a terminal
+(`--fingerprint`), big answers in parts (`validate`, manifest, artifacts), `init --from-spec` on big
+specs, the docs shipped with the CLI and the images, the MCP-native manifest (`tools-list`), the platform's read-only annotations. Not yet:
+
+| # | Item | What | Notes |
+|---|---|---|---|
+| 2 | `instance trust` writes the config | It saves `certs/<id>.pem` but never sets `tls.ca.path` (by design, runtime-config §8: the file isn't edited); a `--write` that adds it the way `instance add` edits YAML | |
+| 3 | Hot reload, said clearly | Which config keys reload live and which need a restart (`baseUrl` does, `files.path` doesn't); the `FILE_FORM_DISABLED` error names the keys (`files.allowPath`, …) that control it | docs: runtime-config §4.6; error: `FileInputs` |
+| 6 | Output schema from a component | A rule that attaches a component schema to an operation's response when the spec has none (output schemas themselves: 0.3.0) | |
+| — | Platform tool results | The manifest's `tools` is the last key; a response limit that leaves the useful part first | `fields` helps; consider keeping whole tools when over the limit |
+
 Done from this list: credentials from the MCP client (0.2.6); per-operation security enforced, tool-name suffix and per-tool rename, audit defaults on Overview, `init --from-spec` with referenced files, broken schema references as errors, Try warm-up (0.2.7).
 
 ## Main priorities

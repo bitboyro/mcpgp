@@ -53,7 +53,7 @@ sign:
 
 | Command | Does |
 |---|---|
-| `mcpgp init [--from-spec <file\|url>] [--name <n>] [--out <dir>]` | Scaffold a definition project: the definition, the spec under `contracts/`, and `tests/smoke.yaml` with cases for read tools that need no arguments (§3.1) |
+| `mcpgp init [--from-spec <file\|url>] [--name <n>] [--out <dir>] [--tag <t>] [--path <glob>] [--access <a>] [--collisions <c>]` | Scaffold a definition project: the definition, the spec under `contracts/`, and `tests/smoke.yaml` with cases for read tools that need no arguments (§3.1) |
 | `mcpgp validate <def…\|--all>` | Schema + compiler checks; no output files |
 | `mcpgp preview <def> [--tools] [--customer] [--format md\|json]` | What the agent gets (the tools, listed or found by search, what they do, their inputs) and what the customer configures (the example config) (§3.6) |
 | `mcpgp explain <def> <tool>` | Provenance of a tool's name, title, description |
@@ -77,7 +77,12 @@ no colour in the output, which has none so far.
 `--from-spec` takes a file or an `https` URL (plain `http` only for localhost) of an OpenAPI 3.x or
 Swagger 2.0 document. The API id comes from the spec's title ("Orders API" → `orders`), the server
 name adds `-mcp` (or `--name`), the contract version is `info.version`, and instances start in
-`single` mode. Existing files are never overwritten. Without `--from-spec`, the definition points at
+`single` mode. For a big API, `--tag` and `--path` (a glob; both repeatable or comma-separated) keep
+only those operations and `--access` (`read-only`, `read-write`, `all`) sets which methods become
+tools; they are written as the API's `select`. Operations that would get the same tool name are named
+from their method and path (`--collisions method-path`, the default); `--collisions error` stops the
+build instead, `suffix-number` and `suffix-contract` are the other `naming.collisions` values.
+Existing files are never overwritten. Without `--from-spec`, the definition points at
 `contracts/openapi.yaml` for the developer to fill in.
 
 A local spec that refers to other files (`$ref: paths/entries.json`) brings them along: `init` follows
@@ -169,7 +174,10 @@ Changes page.
 
 The tools in the build's exposure mode (listed, or found by search), with their title, read-only
 or destructive, and their inputs (`*` required); and the example config the customer starts from.
-`--tools` or `--customer` for one of the two; `--format md` (default) or `json`.
+`--tools` or `--customer` for one of the two; `--format md` (default) or `json`. `--format tools-list`
+prints the result of MCP `tools/list` for the build, in its exposure mode (name, title, description,
+`inputSchema`, `outputSchema`, annotations: what a client receives), so a server can be audited without
+starting it; the `instance` input of a multi-instance build has no `enum` (the customer's instances fill it in).
 
 ### 3.7 `try`
 

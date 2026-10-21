@@ -105,6 +105,30 @@ class TestCommandTest {
     }
 
     @Test
+    void initCopesWithABigApiWithClashingNamesAndCanStartSmaller(@TempDir Path dir) throws Exception {
+        // two operations with the same operationId, as big specs have: named from method and path, not an error
+        Path spec = Files.writeString(dir.resolve("api.json"), """
+                { "openapi": "3.0.3", "info": { "title": "Messages", "version": "1.0" },
+                  "paths": {
+                    "/messages": { "get": { "operationId": "list", "tags": ["messages"], "responses": { "200": { "description": "ok" } } } },
+                    "/partners": { "get": { "operationId": "list", "tags": ["partners"], "responses": { "200": { "description": "ok" } } } } } }""");
+        assertThat(run("init", "--from-spec", spec.toString(), "--out", dir.resolve("all").toString())).as(err.toString()).isZero();
+        assertThat(out.toString()).contains("2 tools");
+        assertThat(Files.readString(dir.resolve("all/messages-mcp.mcpgp.yaml"))).contains("collisions: method-path");
+
+        // --collisions error keeps the old behaviour: the clash is reported
+        assertThat(run("init", "--from-spec", spec.toString(), "--out", dir.resolve("strict").toString(), "--collisions", "error")).isZero();
+        assertThat(out.toString()).contains("the definition needs changes");
+
+        // only a part of the API
+        assertThat(run("init", "--from-spec", spec.toString(), "--out", dir.resolve("part").toString(), "--tag", "messages", "--access", "read-only")).as(err.toString()).isZero();
+        assertThat(Files.readString(dir.resolve("part/messages-mcp.mcpgp.yaml"))).contains("select: { access: read-only, include: [ { tag: [\"messages\"] } ] }");
+        assertThat(out.toString()).contains("1 tools");
+
+        assertThat(run("init", "--from-spec", spec.toString(), "--out", dir.resolve("bad").toString(), "--access", "everything")).isEqualTo(2);
+    }
+
+    @Test
     void initRefusesWhatIsNotASpec(@TempDir Path dir) throws Exception {
         Path notes = Files.writeString(dir.resolve("notes.yaml"), "hello: world\n");
         assertThat(run("init", "--from-spec", notes.toString(), "--out", dir.resolve("p").toString())).isEqualTo(1);

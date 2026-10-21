@@ -9,7 +9,6 @@ import ro.bitboy.mcpgp.runtime.manifest.Manifest;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -66,7 +65,7 @@ final class ClientRegistration {
         }
         ObjectNode entry;
         try {
-            entry = http ? httpEntry(client) : stdioEntry(client);
+            entry = http ? httpEntry(client) : stdioEntry(client, print);
         } catch (IllegalStateException e) {
             out.println("✗ " + e.getMessage());
             return 1;
@@ -135,14 +134,14 @@ final class ClientRegistration {
         return home.resolve(".config/Claude/claude_desktop_config.json");
     }
 
-    private ObjectNode stdioEntry(Client client) {
+    private ObjectNode stdioEntry(Client client, boolean print) {
         ObjectNode entry = JSON.createObjectNode();
         if (client.id().equals("vscode") || client.id().equals("claude-code")) {
             entry.put("type", "stdio");
         }
         entry.put("command", Path.of(System.getProperty("java.home"), "bin", "java").toString());
         var args = entry.putArray("args");
-        args.add("-jar").add((jarOverride != null ? jarOverride : jar()).toString());
+        args.add("-jar").add(jarPath(print));
         config.source().ifPresent(source -> args.add("--config").add(source.toAbsolutePath().toString()));
         return entry;
     }
@@ -165,14 +164,64 @@ final class ClientRegistration {
 
     /** The jar this server runs from. */
     private static Path jar() {
+        Path found = locateJar(System.getProperty("java.class.path"), codeSource());
+        if (found == null) {
+            throw new IllegalStateException("This server isn't running from a jar; use --print and adjust the path");
+        }
+        return found;
+    }
+
+    private static String codeSource() {
         try {
-            Path location = Path.of(ClientRegistration.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-            if (!location.toString().endsWith(".jar")) {
-                throw new IllegalStateException("This server isn't running from a jar (" + location + "); use --print and adjust the path");
+            var source = ClientRegistration.class.getProtectionDomain().getCodeSource();
+            return source == null ? null : source.getLocation().toString();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * The jar a server was started from: {@code java -jar x.jar} makes it the whole class path; otherwise
+     * the code source, which in a Spring Boot jar looks like {@code jar:nested:/dir/x.jar/!BOOT-INF/classes/!/}
+     * or {@code jar:file:/dir/x.jar!/BOOT-INF/classes!/}.
+     */
+    static Path locateJar(String classPath, String codeSource) {
+        if (classPath != null && classPath.endsWith(".jar") && !classPath.contains(java.io.File.pathSeparator)) {
+            Path path = Path.of(classPath).toAbsolutePath();
+            if (Files.isRegularFile(path)) {
+                return path;
             }
-            return location;
-        } catch (URISyntaxException e) {
-            throw new IllegalStateException("The server's jar can't be located");
+        }
+        if (codeSource != null) {
+            String text = codeSource.replaceFirst("^jar:", "").replaceFirst("^nested:", "").replaceFirst("^file:", "");
+            int end = text.indexOf(".jar");
+            if (end > 0) {
+                try {
+                    Path path = Path.of(java.net.URLDecoder.decode(text.substring(0, end + 4), java.nio.charset.StandardCharsets.UTF_8));
+                    if (Files.isRegularFile(path)) {
+                        return path;
+                    }
+                } catch (RuntimeException e) {
+                    // not a path: the jar can't be located
+                }
+            }
+        }
+        return null;
+    }
+
+    /** With {@code --print} a jar that can't be located is a placeholder to replace, not an error. */
+    private String jarPath(boolean print) {
+        if (jarOverride != null) {
+            return jarOverride.toString();
+        }
+        try {
+            return jar().toString();
+        } catch (IllegalStateException e) {
+            if (!print) {
+                throw e;
+            }
+            out.println("! the server's jar couldn't be located: replace <path to the server jar> below");
+            return "<path to the server jar>";
         }
     }
 

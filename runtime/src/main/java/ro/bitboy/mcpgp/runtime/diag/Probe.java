@@ -145,7 +145,7 @@ public final class Probe {
             } catch (IOException | GeneralSecurityException e) {
                 steps.put("tls", "failed: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
                 result.put("ok", false);
-                result.put("hint", "Use tls_certificate_fetch to see the certificate the host presents");
+                result.put("hint", "See the certificate the host presents with `instance trust <id>`, or with the tls_certificate_fetch tool when the diagnostics pack is enabled");
                 return result;
             }
         }

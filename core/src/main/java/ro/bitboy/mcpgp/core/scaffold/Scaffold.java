@@ -15,6 +15,9 @@ public final class Scaffold {
 
     private static final Set<String> FILLER = Set.of("api", "apis", "the", "service", "rest", "openapi", "swagger", "v1", "v2", "v3");
 
+    /** Where this version's specs and guides are online (the CLI and the platform image also carry them under docs/). */
+    private static final String DOCS = "https://github.com/bitboyro/mcpgp/blob/v" + ro.bitboy.mcpgp.core.Compiler.VERSION;
+
     private Scaffold() {
     }
 
@@ -37,8 +40,18 @@ public final class Scaffold {
     }
 
     public static String definition(String name, String title, String api, String version, String contract) {
-        return """
-                # The definition of %1$s (docs/spec/definition-format.md). Check it with: mcpgp validate %1$s.mcpgp.yaml
+        return definition(name, title, api, version, contract, List.of(), List.of(), null, null);
+    }
+
+    /**
+     * The same with a smaller server: only operations with one of {@code tags} or a path matching one of
+     * {@code paths} (globs), at most {@code access} ({@code read-only}, {@code read-write}, {@code all}), and
+     * a rule for tools that would get the same name ({@code collisions}); each is left out when empty or null.
+     */
+    public static String definition(String name, String title, String api, String version, String contract,
+                                    List<String> tags, List<String> paths, String access, String collisions) {
+        String base = """
+                # The definition of %1$s (%6$s/docs/spec/definition-format.md). Check it with: mcpgp validate %1$s.mcpgp.yaml
                 apiVersion: mcpgp/v1
                 kind: McpServer
                 metadata:
@@ -59,7 +72,28 @@ public final class Scaffold {
 
                 # names, descriptions, hidden parameters: overrides: { include: overrides/*.yaml }
                 # safety: { confirmDestructive: true }
-                """.formatted(name, yamlString(title), api, yamlString(version), contract);
+                """.formatted(name, yamlString(title), api, yamlString(version), contract, DOCS);
+        StringBuilder select = new StringBuilder();
+        if (access != null) {
+            select.append("access: ").append(access);
+        }
+        List<String> include = new ArrayList<>();
+        if (!tags.isEmpty()) {
+            include.add("{ tag: [" + String.join(", ", tags.stream().map(Scaffold::yamlString).toList()) + "] }");
+        }
+        if (!paths.isEmpty()) {
+            include.add("{ path: [" + String.join(", ", paths.stream().map(Scaffold::yamlString).toList()) + "] }");
+        }
+        if (!include.isEmpty()) {
+            select.append(select.isEmpty() ? "" : ", ").append("include: [ ").append(String.join(", ", include)).append(" ]");
+        }
+        if (!select.isEmpty()) {
+            base = base.replace("    # to leave operations out:", "    select: { " + select + " }\n    # to leave operations out:");
+        }
+        if (collisions != null) {
+            base = base + "\nnaming:\n  # two operations that would get the same tool name: " + collisions + "\n  collisions: " + collisions + "\n";
+        }
+        return base;
     }
 
     /** Test cases for up to three read tools that need no arguments; a commented example otherwise. */
@@ -83,10 +117,10 @@ public final class Scaffold {
             }
         }
         String header = """
-                # Run by `mcpgp test` against a mock made from the spec's examples (docs/guides/ci-pipeline.md §5).
+                # Run by `mcpgp test` against a mock made from the spec's examples (@DOCS@/docs/guides/ci-pipeline.md §5).
                 # A case: name, tool, args, and expect: { ok: true } (optionally with structured: {...}) or { code: ERROR_CODE }.
                 # In multi-instance builds, pass instance: mock.
-                """;
+                """.replace("@DOCS@", DOCS);
         if (count == 0) {
             return header + """
                     cases: []

@@ -230,7 +230,8 @@ final class Inspect {
         @Option(names = "--customer", description = "Only what the customer configures.")
         boolean customer;
 
-        @Option(names = "--format", paramLabel = "md|json", defaultValue = "md", description = "md (default) or json.")
+        @Option(names = "--format", paramLabel = "md|json|tools-list", defaultValue = "md",
+                description = "md (default), json, or tools-list: the result of MCP tools/list (what a client receives), for audits.")
         String format;
 
         @Override
@@ -242,6 +243,10 @@ final class Inspect {
             JsonNode manifest = result.get().manifest().get();
             boolean both = !tools && !customer;
             PrintWriter out = common.out();
+            if (format.equals("tools-list")) {
+                out.println(CanonicalJson.pretty(ro.bitboy.mcpgp.core.manifest.ToolsList.of(manifest)));
+                return Main.OK;
+            }
             if (format.equals("json")) {
                 ObjectNode json = JSON.createObjectNode().put("server", manifest.at("/server/name").asText());
                 if (both || tools) {
@@ -254,7 +259,7 @@ final class Inspect {
                 return Main.OK;
             }
             if (!format.equals("md")) {
-                common.spec.commandLine().getErr().println("error: --format is md or json");
+                common.spec.commandLine().getErr().println("error: --format is md, json or tools-list");
                 return Main.USAGE;
             }
             StringBuilder md = new StringBuilder("# ").append(manifest.at("/server/title").asText(manifest.at("/server/name").asText()))

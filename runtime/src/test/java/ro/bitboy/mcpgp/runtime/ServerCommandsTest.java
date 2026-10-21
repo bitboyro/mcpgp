@@ -127,6 +127,28 @@ class ServerCommandsTest {
     }
 
     @Test
+    void trustWithoutATerminalSaysSoAndCanPinAFingerprint() throws Exception {
+        https = MockTarget.https(CERTS.serverP12, null);
+        String config = "instances:\n  - { id: secure, baseUrl: \"" + https.address() + "\" }\n";
+        assertThat(run("", config, "instance", "trust", "secure")).isEqualTo(1);
+        assertThat(out()).contains("No answer (no terminal?)").contains("--fingerprint");
+        assertThat(dir.resolve("certs/secure.pem")).doesNotExist();
+
+        java.util.regex.Matcher shown = java.util.regex.Pattern.compile("sha256\\s+(\\S+)").matcher(out());
+        assertThat(shown.find()).isTrue();
+        String sha256 = shown.group(1);
+
+        output.reset();
+        assertThat(run("", config, "instance", "trust", "secure", "--fingerprint", "00" + sha256.substring(2))).isEqualTo(1);
+        assertThat(out()).contains("none of the certificates above has the SHA-256");
+        assertThat(dir.resolve("certs/secure.pem")).doesNotExist();
+
+        output.reset();
+        assertThat(run("", config, "instance", "trust", "secure", "--fingerprint", sha256.toUpperCase())).isZero();
+        assertThat(dir.resolve("certs/secure.pem")).exists();
+    }
+
+    @Test
     void usageAndUnknownInstances() throws IOException {
         assertThat(run("", "instances: [ { id: a, baseUrl: a.example } ]\n", "instance", "frobnicate")).isEqualTo(2);
         assertThat(run("", "instances: [ { id: a, baseUrl: a.example } ]\n", "instance", "test", "zzz")).isEqualTo(1);

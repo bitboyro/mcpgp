@@ -36,6 +36,9 @@ overrides:
     # these take things away from people (a server, a build, a token) or decide for them: confirm first
     - match: { operationId: "~^(archiveServer|archiveBuild|revokeToken|rejectRequest)$" }
       annotations: { destructiveHint: true }
+    # POSTs that only compile or run against a mock and change nothing the platform keeps
+    - match: { operationId: "~^(validateVersion|tryTool)$" }
+      annotations: { readOnlyHint: true, idempotentHint: true }
 
 safety:
   confirmDestructive: true           # deletes and the operations above ask first
