@@ -34,5 +34,19 @@ class OwnOpenApiTest {
                         "platform_server_duplicate", "platform_variant_create", "platform_library_item_create",
                         "platform_request_approve", "platform_server_edit", "platform_mcp_package_get")
                 .doesNotContain("platform_sign_in", "platform_store_export");
+        // validating and trying change nothing; adding a version does
+        java.util.Map<String, Boolean> readOnly = new java.util.HashMap<>();
+        for (var tool : result.manifest().orElseThrow().path("tools")) {
+            String operation = tool.at("/operation/key").asText();
+            if (operation.endsWith(":POST:/servers/{id}/versions/{version}/validate")) {
+                readOnly.put("validate", tool.at("/annotations/readOnlyHint").asBoolean());
+            } else if (operation.endsWith(":POST:/servers/{id}/try")
+                    || operation.endsWith(":POST:/servers/{id}/versions/{version}/try")) {
+                readOnly.put("try", tool.at("/annotations/readOnlyHint").asBoolean());
+            } else if (operation.endsWith(":POST:/servers/{id}/versions")) {
+                readOnly.put("add", tool.at("/annotations/readOnlyHint").asBoolean());
+            }
+        }
+        assertThat(readOnly).containsEntry("validate", true).containsEntry("try", true).containsEntry("add", false);
     }
 }

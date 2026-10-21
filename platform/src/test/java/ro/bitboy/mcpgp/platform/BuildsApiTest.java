@@ -170,6 +170,18 @@ class BuildsApiTest {
     }
 
     @Test
+    void aBigArtifactCanBeReadInParts() throws Exception {
+        JsonNode build = build("orders", Map.of());
+        String id = build.path("id").asText();
+        String name = build.path("artifacts").findValuesAsText("name").stream().filter(n -> n.endsWith(".manifest.json")).findFirst().orElseThrow();
+        HttpResponse<byte[]> whole = call("GET", "/builds/" + id + "/artifacts/" + name, admin, null, null);
+        HttpResponse<byte[]> part = call("GET", "/builds/" + id + "/artifacts/" + name + "?offset=10&limit=25", admin, null, null);
+        assertThat(part.body()).isEqualTo(java.util.Arrays.copyOfRange(whole.body(), 10, 35));
+        assertThat(part.headers().firstValue("X-Total-Size")).contains(Integer.toString(whole.body().length));
+        assertThat(call("GET", "/builds/" + id + "/artifacts/" + name + "?offset=999999999", admin, null, null).body()).isEmpty();
+    }
+
+    @Test
     void buildsASignedPackage() throws Exception {
         JsonNode build = build("orders", Map.of());
         assertThat(build.path("status").asText()).as(new String(call("GET", "/builds/" + build.path("id").asText() + "/log", admin, null, null).body()))

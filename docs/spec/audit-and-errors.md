@@ -20,11 +20,12 @@ JSON Lines, one event per line, UTF-8. Written to `audit.file.path`. **Never to 
 | `server`, `build` | yes | from the manifest |
 | `actor` | when known | `{ kind: user\|client\|system, id, auth }` |
 | `tool`, `api`, `instance`, `contract` | for tool events | |
-| `outcome` | yes | `ok` · `error` · `denied` (`CONFIRMATION_REQUIRED`, `NOT_AVAILABLE_ON_INSTANCE`) |
+| `outcome` | yes | `ok` · `error` · `denied` (`CONFIRMATION_REQUIRED`, `NOT_AVAILABLE_ON_INSTANCE`) · `cancelled` (the client sent `notifications/cancelled`; code `CANCELLED`) |
 | `code` | when not ok | §3 |
 | `upstream` | for tool events | method, **templated** path, status, and `auth`: the credential type the call used (`fromRequest`, `bearer`, …), never its value |
 | `latencyMs` | for calls | |
 | `args` | for tool events | `"none"`; redacted (default): the arguments' keys with every value replaced by `"***"` (only `instance` is kept); or `{ "sha256": … }` of the canonical arguments |
+| `mcp` | for tool and resource calls | the protocol side: `transport` (`stdio`, `http`), `revision` (the `Mcp-Protocol-Version` the client sent; HTTP), `progress` `{ requested, sent }` when the client sent a `progressToken` (sent = notifications written), `cancelled` `{ reason }` when the client cancelled. Cancelled and refused calls are also logged at INFO, other calls at DEBUG |
 | `files` | for calls that send files | `[{ name, sizeBytes, sha256 }]`, never contents |
 | `upstream.body` | for failed calls | the redacted upstream error body (up to 64 KB), whatever `errors.detail` says |
 | `cid` | yes | correlation id, also in result `_meta` and outbound `traceparent` |
@@ -70,6 +71,7 @@ build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `auth
 | `INPUT_TOO_LARGE` | the arguments, or one text value, are over `safety.inputLimits`; nothing was sent | `isError` |
 | `RATE_LIMITED` | over `safety.rateLimits` for that target (calls per minute, or no free slot within 30 s); nothing was sent | `isError`, `_meta.mcpgp/retryAfterSeconds` |
 | `CONFIG_INVALID` | startup/reload config error | startup failure |
+| `CANCELLED` | the client cancelled the call (`notifications/cancelled`); the request to the API was aborted and, for a write, may already have taken effect there | `isError` (the client has stopped listening for it) |
 | `INTERNAL` | anything else | `isError`, no internals leaked |
 
 Messages to the model are short, actionable, and never contain stack traces, credentials or full
@@ -85,9 +87,9 @@ upstream bodies.
   only). Telemetry is set when the server starts; a config reload doesn't change it.
 - Traces: one span per tool call (`tool <name>`, kind server), a child span per upstream request
   (the HTTP method, kind client, `http.response.status_code`); attributes `mcpgp.tool`, `mcpgp.api`,
-  `mcpgp.instance`, `mcpgp.contract`, `mcpgp.outcome`, `mcpgp.code`. A discovery call's inner call is
+  `mcpgp.instance`, `mcpgp.contract`, `mcpgp.outcome` (`ok`, `error`, `denied`, `cancelled`), `mcpgp.code`, `mcpgp.transport`, and `mcpgp.progress.sent` when the client asked for progress. A discovery call's inner call is
   a child of its span.
-- Metrics: `mcpgp.tool.calls` (counter), `mcpgp.tool.duration` (histogram, seconds), both by tool, API,
+- Metrics: `mcpgp.tool.calls` (counter), `mcpgp.tool.duration` (histogram, seconds), both by tool, API, transport,
   instance, outcome and code; `mcpgp.instance.up` (gauge: 1 when the instance's last upstream
   request got an answer, 0 when it couldn't be reached).
 - **Never** arguments, bodies or credentials.

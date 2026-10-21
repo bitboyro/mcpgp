@@ -24,6 +24,13 @@ import java.util.function.Consumer;
  */
 final class Confirmations {
 
+    /** Questions to the user run here, so that a cancelled call needn't wait for the answer. */
+    private static final java.util.concurrent.ExecutorService ASKING = java.util.concurrent.Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "mcpgp-ask");
+        t.setDaemon(true);
+        return t;
+    });
+
     static final Duration LIFETIME = Duration.ofMinutes(5);
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -74,7 +81,7 @@ final class Confirmations {
 
         if (supportsElicitation(exchange)) {
             audit.accept("asked");
-            McpSchema.ElicitResult answer = exchange.createElicitation(new McpSchema.ElicitFormRequest(summary + " Confirm to go ahead.",
+            McpSchema.ElicitResult answer = ask(exchange, new McpSchema.ElicitFormRequest(summary + " Confirm to go ahead.",
                     Map.of("type", "object",
                             "properties", Map.of("confirm", Map.of("type", "boolean", "title", "Go ahead",
                                     "description", "Run " + name + (instance.isEmpty() ? "" : " on " + instance))),
@@ -90,6 +97,33 @@ final class Confirmations {
 
         audit.accept("asked");
         throw required(issue(name, instance, hash, session), summary, null);
+    }
+
+    /**
+     * Asks the user, and stops waiting when the client cancels the call meanwhile
+     * ({@code notifications/cancelled}): the question is left to expire on its own.
+     */
+    private static McpSchema.ElicitResult ask(McpSyncServerExchange exchange, McpSchema.ElicitRequest request) {
+        Inflight.Handle inflight = Inflight.current();
+        if (inflight == null) {
+            return exchange.createElicitation(request);
+        }
+        java.util.concurrent.CompletableFuture<McpSchema.ElicitResult> pending = java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> exchange.createElicitation(request), ASKING);
+        Runnable stop = () -> pending.cancel(true);
+        inflight.onCancel(stop);
+        try {
+            return pending.get();
+        } catch (java.util.concurrent.CancellationException e) {
+            throw new ToolError("CANCELLED", "The client cancelled this call while the user was being asked; nothing was done");
+        } catch (java.util.concurrent.ExecutionException e) {
+            throw e.getCause() instanceof RuntimeException runtime ? runtime : new IllegalStateException(e.getCause());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ToolError("INTERNAL", "the call was interrupted");
+        } finally {
+            inflight.forget(stop);
+        }
     }
 
     private String issue(String tool, String instance, String hash, String session) {

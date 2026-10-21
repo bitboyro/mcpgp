@@ -141,6 +141,7 @@
         "port": { "$ref": "#/$defs/port" },
         "publicUrl": { "type": "string", "pattern": "^https?://" },
         "basePath": { "type": "string", "pattern": "^/" },
+        "pageSize": { "description": "List operations (tools/list, resources/list, resources/templates/list, prompts/list) answer this many items at a time, with an opaque nextCursor; 0 or absent: everything at once", "type": "integer", "minimum": 0 },
         "tls": {
           "description": "proxy: TLS is terminated in front of the server. Serving HTTPS itself (cert, key) is not supported yet: refused at startup",
           "oneOf": [

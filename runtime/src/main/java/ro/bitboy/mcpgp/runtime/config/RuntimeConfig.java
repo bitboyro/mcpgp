@@ -38,10 +38,12 @@ public record RuntimeConfig(
 
     /**
      * @param authMode inbound auth: {@code none}, {@code static}, {@code oauth}
+     * @param pageSize the list operations (tools, resources, templates, prompts) answer this many items per page;
+     *                 0 = everything at once
      */
     public record Server(String transport, String host, int port, String basePath, String publicUrl,
                          String authMode, JsonNode auth, boolean allowInsecure, List<String> allowedOrigins,
-                         Integer managementPort) {
+                         Integer managementPort, int pageSize) {
     }
 
     /**

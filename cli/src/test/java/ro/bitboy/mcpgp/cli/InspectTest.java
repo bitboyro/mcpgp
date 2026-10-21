@@ -109,6 +109,13 @@ class InspectTest {
                 .contains("instances:");
         assertThat(run("preview", "--workspace", WORKSPACE, "--tools", "--format", "json", ORDERS.toString())).isZero();
         assertThat(JSON.readTree(out.toString()).path("tools").findValuesAsText("name")).contains("orders_customer_get");
+        // the result of MCP tools/list, for audits without starting the server
+        assertThat(run("preview", "--workspace", WORKSPACE, "--format", "tools-list", ORDERS.toString())).isZero();
+        JsonNode listed = JSON.readTree(out.toString());
+        assertThat(listed.path("tools").findValuesAsText("name")).contains("orders_customer_get");
+        assertThat(listed.at("/tools/0/inputSchema/type").asText()).isEqualTo("object");
+        assertThat(listed.at("/tools/0/annotations").has("openWorldHint")).isTrue();
+        assertThat(run("preview", "--workspace", WORKSPACE, "--format", "xml", ORDERS.toString())).isEqualTo(2);
 
         assertThat(run("try", "--workspace", WORKSPACE, "--mock", "--tool", "orders_order_refund", "--args",
                 "{\"path\": {\"id\": \"o-1\"}, \"body\": {\"amount\": 5}}", ORDERS.toString())).as(out + "\n" + err).isZero();

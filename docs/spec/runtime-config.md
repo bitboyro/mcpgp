@@ -153,6 +153,7 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `server.tls` | none | `proxy`: TLS ends at a reverse proxy. `{ cert, key }` (HTTPS by the server itself): **Not supported yet:** refused at startup. |
 | `server.trustProxy` | `[]` | **Not supported yet:** refused at startup. Planned: addresses whose `X-Forwarded-*` headers are trusted |
 | `server.allowedOrigins` | `[]` | Origin check for browser clients (DNS rebinding protection) |
+| `server.pageSize` | `0` | List operations (`tools/list`, `resources/list`, `resources/templates/list`, `prompts/list`) answer this many items per page with an opaque `nextCursor` (MCP pagination); `0`: everything at once. A cursor from before the list changed is refused as invalid params. Set at start |
 | `server.outboundProxy` | none | **Not supported yet:** refused at startup. Planned: HTTP proxy for calls to instances |
 | `server.management.port` | none | health + metrics on a separate port |
 | `server.auth.mode` | `none` | `none` · `static` · `oauth`, within the build's `allowed` list |
@@ -415,7 +416,7 @@ The server refuses to start, with a message naming the key, when:
 | `<server> reload` | Reload the config now (§4.6) |
 | `<server> doctor [--quick]` | Validates config, tests instances, port, public URL (`--quick`: config + liveness only, for health checks) |
 | `<server> instance add/test/remove <id>` | Manage instances without editing YAML; `add` offers trust on first use (§5.5) |
-| `<server> instance trust <id> [--base64] [--yes]` | Fetch, show and save the certificate an instance presents |
+| `<server> instance trust <id> [--base64] [--yes \| --fingerprint <sha256>]` | Fetch, show and save the certificate an instance presents; `--fingerprint` trusts it without asking when the chain holds the certificate with that SHA-256 (for scripts) |
 | `<server> client add <claude-code\|claude-desktop\|cursor\|vscode> [--print]` | Register with an MCP client |
 
 Commands run without starting the server, take the same `--config` and `--<key> <value>` options,

@@ -77,6 +77,38 @@ final class Resources {
                 r.path("description").asText(null), r.path("mimeType").asText(null), null, null);
     }
 
+    /** What a template variable can be completed with: the values its parameter lists, or true and false. */
+    private static List<String> candidates(Entry entry, String variable) {
+        JsonNode schema = schema(parameters(entry.resource()), variable);
+        List<String> values = new ArrayList<>();
+        schema.path("enum").forEach(v -> values.add(v.asText()));
+        if (values.isEmpty() && schema.path("type").asText().equals("boolean")) {
+            values.addAll(List.of("true", "false"));
+        }
+        return values;
+    }
+
+    /** Templates with a variable that completion can help with: their URI templates. */
+    List<String> completable() {
+        List<String> uris = new ArrayList<>();
+        for (Entry entry : entries) {
+            if (entry.isTemplate() && entry.template().getVariableNames().stream().anyMatch(v -> !candidates(entry, v).isEmpty())) {
+                uris.add(entry.uri());
+            }
+        }
+        return uris;
+    }
+
+    /** {@code completion/complete} for a template variable (a {@code ref/resource} naming the template). */
+    McpSchema.CompleteResult complete(McpSchema.CompleteRequest request) {
+        List<String> values = new ArrayList<>();
+        if (request.ref() instanceof McpSchema.ResourceReference ref && request.argument() != null) {
+            entries.stream().filter(e -> e.uri().equals(ref.uri())).findFirst()
+                    .ifPresent(e -> values.addAll(candidates(e, request.argument().name())));
+        }
+        return Prompts.result(values, request.argument() == null ? null : request.argument().value());
+    }
+
     /** The entry a URI reads, and the operation's arguments for it. */
     Optional<Map.Entry<Entry, Map<String, Object>>> resolve(String uri) {
         for (Entry entry : entries) {
