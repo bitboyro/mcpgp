@@ -22,6 +22,24 @@ function page() {
 }
 
 describe('security and safety', () => {
+  it('saves batching and retention independently', async () => {
+    const { calls } = fakeApi({
+      'GET /me': ME, 'GET /settings': SETTINGS, 'GET /servers/orders-mcp': SERVER,
+      'GET /servers/orders-mcp/versions/latest/manifest': manifest({}),
+      'POST /servers/orders-mcp/edits': SERVER,
+    })
+    page()
+    await userEvent.click(await screen.findByLabelText('Enable batch calls'))
+    await userEvent.selectOptions(screen.getByLabelText('Result delivery'), 'auto')
+    await userEvent.click(screen.getByRole('button', { name: 'Save as the next version' }))
+    await waitFor(() => expect(calls.some((c) => c.path.endsWith('/edits'))).toBe(true))
+    const saved = calls.find((c) => c.path.endsWith('/edits'))!
+    expect(saved.body).toMatchObject({ changes: [
+      { op: 'set', path: '/batch/enabled', value: true },
+      { op: 'set', path: '/results/mode', value: 'auto' },
+    ] })
+  })
+
   it('shows everything on by default, and saves only what changed', async () => {
     const { calls } = fakeApi({
       'GET /me': ME, 'GET /settings': SETTINGS, 'GET /servers/orders-mcp': SERVER,

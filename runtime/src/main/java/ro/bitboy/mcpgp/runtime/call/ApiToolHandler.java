@@ -27,6 +27,7 @@ public final class ApiToolHandler implements ToolHandler {
     private static final Logger LOG = LoggerFactory.getLogger(ApiToolHandler.class);
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    private final ro.bitboy.mcpgp.runtime.mcp.RetainedResults retained;
     private final Manifest manifest;
     private final RuntimeConfig config;
     private final InputValidator validator = new InputValidator();
@@ -42,6 +43,7 @@ public final class ApiToolHandler implements ToolHandler {
 
     public ApiToolHandler(Manifest manifest, RuntimeConfig config) {
         this.manifest = manifest;
+        this.retained = new ro.bitboy.mcpgp.runtime.mcp.RetainedResults(manifest.policies(), java.time.Clock.systemUTC());
         this.config = config;
         this.requests = new RequestBuilder(new FileInputs(config.files()));
         Map<String, JsonNode> apiKeys = new LinkedHashMap<>();
@@ -53,14 +55,40 @@ public final class ApiToolHandler implements ToolHandler {
         });
         this.redactor = new Redactor(config.secrets());
         int responseLimit = manifest.policies().path("responseLimitKb").asInt(256) * 1024;
+        if (retained.enabled()) responseLimit = manifest.policies().at("/results/captureLimitKb").asInt(4096) * 1024;
         // a little more than the limit is read, so a JSON answer can be cut at whole items; never more than this
-        this.upstream = new Upstream(apiKeys, redactor, Math.max(4 * responseLimit, 1024 * 1024));
+        this.upstream = new Upstream(apiKeys, redactor, retained.enabled() ? responseLimit : Math.max(4 * responseLimit, 1024 * 1024));
         this.contracts = new Contracts(manifest, config.allInstances(), upstream, java.time.Clock.systemUTC());
         this.rateLimits = new RateLimits(manifest, java.time.Clock.systemUTC());
         this.recordings = recordings(manifest, config, apiKeys);
-        this.responses = new ResponseMapper(manifest.policies().path("responseLimitKb").asInt(256),
+        this.responses = new ResponseMapper(responseLimit / 1024,
                 config.errorDetail(), redactor, manifest.policies().path("cleanTruncation").asBoolean(true),
                 manifest.policies().at("/rateLimits/retryAfter").asBoolean(true));
+    }
+
+    public ro.bitboy.mcpgp.runtime.mcp.RetainedResults resultStore() { return retained; }
+
+    /** Preflight performs no operation request and consumes no confirmation token. */
+    public void preflight(McpSyncServerExchange exchange, JsonNode tool, Map<String, Object> arguments) {
+        Map<String, Object> routed = new LinkedHashMap<>(arguments);
+        if (tool.has("x-mcpgp-instance")) routed.put("instance", tool.path("x-mcpgp-instance").asText());
+        Object sent = exchange == null || exchange.transportContext() == null ? null : exchange.transportContext().get(ro.bitboy.mcpgp.runtime.mcp.McpServerFactory.CREDENTIALS_KEY);
+        Map<String, String> credentials = new java.util.HashMap<>();
+        if (sent instanceof Map<?, ?> map) map.forEach((k, v) -> credentials.put(k.toString(), v.toString()));
+        Object subject = exchange == null || exchange.transportContext() == null ? null : exchange.transportContext().get(ro.bitboy.mcpgp.runtime.mcp.McpServerFactory.SUBJECT_TOKEN_KEY);
+        if (subject instanceof String token) credentials.put(Upstream.SUBJECT, token);
+        Manifest.Api api = manifest.apis().get(tool.path("api").asText());
+        RuntimeConfig.Instance instance = instance(api, routed);
+        Contracts.Choice choice = contracts.forCall(instance, credentials);
+        if (!choice.available()) throw new ToolError("INSTANCE_UNAVAILABLE", instance.id() + " is unavailable");
+        String contract = choice.contract();
+        JsonNode variant = tool.path("variants").get(contract);
+        if (variant == null || instance.readOnly() && !tool.at("/annotations/readOnlyHint").asBoolean(false))
+            throw new ToolError("NOT_AVAILABLE_ON_INSTANCE", "Operation is unavailable on " + instance.id());
+        boolean publicOperation = variant.path("security").isArray() && variant.path("security").isEmpty();
+        Upstream.credential(instance, credentials, publicOperation, variant.get("security"), api.node().path("downstreamAuth").path("schemes"));
+        validator.validate(tool, JSON.valueToTree(arguments), contract, instance.id());
+        requests.build(variant, JSON.valueToTree(arguments), BaseUrl.resolve(instance.baseUrl(), api.contracts().get(contract).basePath()), new CallRecord());
     }
 
     /** Which contract each instance uses (runtime-config §4.4). */
@@ -178,8 +206,13 @@ public final class ApiToolHandler implements ToolHandler {
                         : "The target answered without the JSON this tool's output schema describes",
                         cut ? "Narrow the query (filters, a smaller page)" : "The answer starts: " + line(output.text(), false)).withMeta(meta);
             }
-            return output;
+            return retained.format(exchange, output);
         } catch (ToolError e) {
+            if (!tool.at("/annotations/readOnlyHint").asBoolean(false) && record.status != null && record.status >= 200 && record.status < 300) {
+                e = new ToolError(e.code(), e.getMessage(), "The target returned HTTP " + record.status
+                        + ". The operation was accepted; do not repeat it to recover output. " + (e.hint() == null ? "" : e.hint()))
+                        .withDetails(e.details()).withMeta(e.meta());
+            }
             if (e.meta().isEmpty()) {
                 throw e.withMeta(meta);
             }

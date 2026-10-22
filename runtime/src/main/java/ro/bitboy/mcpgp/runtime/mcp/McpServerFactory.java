@@ -43,6 +43,8 @@ public final class McpServerFactory {
     private final Confirmations confirmations;
     /** Caps on the arguments agents send (safety.inputLimits). */
     private final InputLimits inputLimits;
+    private final RetainedResults batchResults;
+    private final ThreadLocal<Boolean> batchApproved = ThreadLocal.withInitial(() -> false);
     private final Clock clock;
     /** GET operations exposed as resources (tools-contract §14.1). */
     private final Resources resources;
@@ -74,9 +76,12 @@ public final class McpServerFactory {
         this.inputLimits = InputLimits.of(manifest, config);
         this.catalog = new ToolCatalog(manifest, config);
         this.apiTools = new ApiToolHandler(manifest, config);
+        this.batchResults = apiTools.resultStore();
         ro.bitboy.mcpgp.runtime.call.Contracts contracts = apiTools.contracts();
         contracts.onResult(this::contractChosen);
         contracts.start();
+        builtins.put("result_get", (exchange, tool, args, record) -> batchResults.get(exchange, args));
+        builtins.put("batch_call", (exchange, tool, args, record) -> batch(exchange, tool, args));
         builtins.put("instances_list", new InstancesList(manifest, config, contracts));
         builtins.putAll(new Discovery(manifest, config, catalog, contracts, this::call).handlers());
         this.toolsets = Toolsets.active(manifest) ? Toolsets.of(manifest) : null;
@@ -333,10 +338,97 @@ public final class McpServerFactory {
         return changed;
     }
 
-    /**
-     * Dispatches a call by tool kind, after confirmation when the tool needs it; every failure becomes
-     * an {@code isError} result, and every call is audited.
-     */
+    /** Preflights the entire plan, confirms it once, then dispatches each entry normally. */
+    @SuppressWarnings("unchecked")
+    private Object batch(McpSyncServerExchange exchange, JsonNode batchTool, Map<String, Object> args) {
+        if (!java.util.Set.of("calls", "execution", "confirm").containsAll(args.keySet()))
+            throw new ToolError("INPUT_VALIDATION", "Unknown batch argument");
+        if (args.containsKey("confirm") && !(args.get("confirm") instanceof String))
+            throw new ToolError("INPUT_VALIDATION", "Confirmation token must be a string");
+        JsonNode policy = manifest.policies().path("batch");
+        if (!(args.get("calls") instanceof List<?> calls) || calls.isEmpty() || calls.size() > policy.path("maxCalls").asInt(20))
+            throw new ToolError("INPUT_VALIDATION", "Batch must contain 1 to " + policy.path("maxCalls").asInt(20) + " calls");
+        String execution = String.valueOf(args.getOrDefault("execution", "sequential"));
+        if (!execution.equals("sequential") && !execution.equals("parallel")) throw new ToolError("INPUT_VALIDATION", "Unknown execution policy");
+        List<Map<String, Object>> plan = new ArrayList<>();
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        boolean needsConfirmation = false;
+        for (Object item : calls) {
+            if (!(item instanceof Map<?, ?> c) || !(c.get("id") instanceof String id) || id.isBlank() || id.length() > 128 || !ids.add(id)
+                    || !(c.get("tool") instanceof String name) || !(c.get("arguments") instanceof Map<?, ?>))
+                throw new ToolError("INPUT_VALIDATION", "Each call needs a unique id, tool, and arguments");
+            if (!java.util.Set.of("id", "tool", "arguments").containsAll(c.keySet()))
+                throw new ToolError("INPUT_VALIDATION", "Unknown batch entry field");
+            JsonNode tool = catalog.tool(name).orElseThrow(() -> new ToolError("INPUT_VALIDATION", "Unknown tool " + name));
+            if (!tool.path("kind").asText().equals("api")) throw new ToolError("INPUT_VALIDATION", "Only API operations can be batched");
+            boolean read = tool.at("/annotations/readOnlyHint").asBoolean(false);
+            if (!read && (!policy.path("allowWrites").asBoolean(false) || execution.equals("parallel")))
+                throw new ToolError("INPUT_VALIDATION", "Writes require allowWrites and sequential execution");
+            Map<String, Object> arguments = new LinkedHashMap<>((Map<String, Object>) c.get("arguments"));
+            if (arguments.containsKey("confirm")) throw new ToolError("INPUT_VALIDATION", "Confirm the batch rather than individual entries");
+            inputLimits.check(tool, arguments);
+            if (toolsets != null && toolsets.blocked(tool.path("x-mcpgp-original").asText(name), Toolsets.session(exchange)).isPresent())
+                throw new ToolError("TOOLSET_DISABLED", "Enable the toolset for " + name);
+            apiTools.preflight(exchange, tool, arguments);
+            needsConfirmation |= tool.path("confirm").asBoolean(false);
+            plan.add(Map.of("id", id, "tool", name, "arguments", (Map<String, Object>) c.get("arguments"), "readOnly", read));
+        }
+        Map<String, Object> confirmed = new LinkedHashMap<>(args); Object token = confirmed.remove("confirm");
+        if (needsConfirmation) confirmations.check(exchange, batchTool, confirmed, token == null ? null : token.toString(),
+                state -> auditConfirm(batchTool, confirmed, state, Ids.correlation(), exchange));
+        List<Map<String, Object>> results = new ArrayList<>();
+        Inflight.Handle batchInflight = Inflight.current();
+        String batchSession = ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.get();
+        java.util.function.Function<Map<String, Object>, Map<String, Object>> run = entry -> {
+            Inflight.Handle previous = Inflight.bind(batchInflight);
+            String previousSession = ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.get();
+            ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(batchSession);
+            batchApproved.set(true);
+            try {
+                McpSchema.CallToolResult result = call(exchange, new McpSchema.CallToolRequest((String) entry.get("tool"), (Map<String, Object>) entry.get("arguments"), null));
+                String code = result.structuredContent() instanceof Map<?, ?> m ? String.valueOf(m.get("code")) : "";
+                boolean unknown = !Boolean.TRUE.equals(entry.get("readOnly")) && (code.equals("UPSTREAM_TIMEOUT") || code.equals("UPSTREAM_UNREACHABLE") || code.equals("CANCELLED") || code.equals("INTERNAL"));
+                Object statusValue = result.meta() == null ? null : result.meta().get("mcpgp/status");
+                boolean upstreamSucceeded = statusValue instanceof Number status && status.intValue() >= 200 && status.intValue() < 300;
+                Map<String, Object> row = new LinkedHashMap<>(); row.put("id", entry.get("id"));
+                row.put("state", upstreamSucceeded ? "succeeded" : unknown ? "outcome_unknown" : Boolean.TRUE.equals(result.isError()) ? "failed" : "succeeded");
+                if (upstreamSucceeded && Boolean.TRUE.equals(result.isError())) row.put("outputError", true);
+                row.put("result", result.structuredContent() != null ? result.structuredContent() : result.content());
+                if (result.meta() != null) row.put("metadata", result.meta());
+                return row;
+            } finally {
+                batchApproved.remove(); Inflight.restore(previous);
+                ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(previousSession);
+            }
+        };
+        if (execution.equals("parallel")) {
+            try (var pool = java.util.concurrent.Executors.newFixedThreadPool(policy.path("concurrency").asInt(4))) {
+                var futures = plan.stream().map(entry -> pool.submit(() -> run.apply(entry))).toList();
+                for (var future : futures) { try { results.add(future.get()); } catch (Exception e) { throw new ToolError("INTERNAL", "Batch execution interrupted"); } }
+            }
+        } else {
+            boolean stopped = false;
+            for (var entry : plan) {
+                if (stopped) { results.add(Map.of("id", entry.get("id"), "state", "not_started")); continue; }
+                var row = run.apply(entry); results.add(row); stopped = !row.get("state").equals("succeeded") || Boolean.TRUE.equals(row.get("outputError"));
+            }
+        }
+        if (!batchResults.enabled() && Results.json(results).getBytes(java.nio.charset.StandardCharsets.UTF_8).length > manifest.policies().path("responseLimitKb").asInt(256) * 1024) {
+            results = results.stream().map(row -> {
+                Map<String, Object> summary = new LinkedHashMap<String, Object>();
+                summary.put("id", row.get("id")); summary.put("state", row.get("state")); summary.put("outputOmitted", true);
+                return summary;
+            }).toList();
+        }
+        if (!batchResults.enabled() && Results.json(results).getBytes(java.nio.charset.StandardCharsets.UTF_8).length > manifest.policies().path("responseLimitKb").asInt(256) * 1024 - 256) {
+            Map<String, Long> counts = results.stream().collect(java.util.stream.Collectors.groupingBy(row -> row.get("state").toString(), java.util.stream.Collectors.counting()));
+            return Map.of("counts", counts, "outputOmitted", true, "hint", "Enable retained results or submit a smaller batch to inspect individual outputs");
+        }
+        ToolOutput output = new ToolOutput(Map.of("batchId", "b_" + java.util.UUID.randomUUID(), "results", results), null, Map.of());
+        return new Discovery.Passthrough(Results.ok(batchResults.format(exchange, output), null));
+    }
+
+    /** Dispatches a call after confirmation; every failure becomes an audited error result. */
     public McpSchema.CallToolResult call(McpSyncServerExchange exchange, McpSchema.CallToolRequest request) {
         String name = request.name();
         Map<String, Object> arguments = new LinkedHashMap<>(request.arguments() == null ? Map.of() : request.arguments());
@@ -353,7 +445,7 @@ public final class McpServerFactory {
         // the recording pack captures the upstream calls of this session (a discovery call's inner call keeps it)
         String outerSession = ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.get();
         ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(exchange != null ? exchange.sessionId() : outerSession);
-        Inflight.Handle outerInflight = Inflight.bind(Inflight.of(request.meta()));
+        Inflight.Handle outerInflight = Inflight.bind(Inflight.of(request.meta()) != null ? Inflight.of(request.meta()) : Inflight.current());
         try {
             if (tool == null) {
                 throw new ToolError("INPUT_VALIDATION", "Unknown tool " + name);
@@ -371,10 +463,10 @@ public final class McpServerFactory {
                 }
             }
             ToolHandler handler = handlers.get(name);
-            Object token = arguments.remove("confirm");
+            Object token = tool.path("handler").asText().equals("batch_call") ? null : arguments.remove("confirm");
             // call filters run around the rest of the call; they never see the confirmation token (extensions.md §3)
             java.util.function.Function<Map<String, Object>, Object> rest = args -> {
-                if (tool.path("confirm").asBoolean(false)) {
+                if (tool.path("confirm").asBoolean(false) && !batchApproved.get()) {
                     confirmations.check(exchange, tool, args, token == null ? null : token.toString(),
                             state -> auditConfirm(tool, args, state, cid, exchange));
                 } else if (token != null) {
@@ -481,7 +573,7 @@ public final class McpServerFactory {
                 .call(name, resource.path("api").asText(null));
         String outerSession = ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.get();
         ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.set(exchange != null ? exchange.sessionId() : outerSession);
-        Inflight.Handle outerInflight = Inflight.bind(Inflight.of(request.meta()));
+        Inflight.Handle outerInflight = Inflight.bind(Inflight.of(request.meta()) != null ? Inflight.of(request.meta()) : Inflight.current());
         try {
             if (Inflight.current() != null && Inflight.current().cancelled()) {
                 throw new ToolError("CANCELLED", "The client cancelled this read before it started");

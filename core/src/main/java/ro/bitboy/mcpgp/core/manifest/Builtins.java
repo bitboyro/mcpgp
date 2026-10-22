@@ -106,6 +106,31 @@ final class Builtins {
                 "describe_tool");
     }
 
+    static List<Spec> execution(com.fasterxml.jackson.databind.JsonNode doc) {
+        List<Spec> tools = new ArrayList<>();
+        if (doc.at("/batch/enabled").asBoolean(false)) {
+            ObjectNode call = object(List.of("id", "tool", "arguments"),
+                    prop("id", string("Unique identifier within this batch.")),
+                    prop("tool", string("API tool name, including names found through discovery.")),
+                    prop("arguments", NODES.objectNode().put("type", "object")));
+            tools.add(builtin("batch_call", "Call a batch", "Runs independent API calls. Sequential writes stop on failure; no rollback or automatic retry. Parallel execution is read-only. Confirmation covers the exact batch.",
+                    invoke(), object(List.of("calls"),
+                            prop("calls", NODES.objectNode().put("type", "array").put("minItems", 1)
+                                    .put("maxItems", doc.at("/batch/maxCalls").asInt(20)).set("items", call)),
+                            prop("execution", NODES.objectNode().put("type", "string").set("enum", NODES.arrayNode().add("sequential").add("parallel"))),
+                            prop("confirm", string("Confirmation token for this exact batch."))), "batch_call"));
+        }
+        if (!doc.at("/results/mode").asText("inline").equals("inline")) {
+            tools.add(builtin("result_get", "Read a retained result", "Reads a bounded page of a saved response without repeating the upstream operation. Results expire and are private to this session. Complete means one upstream response, not all API pages.",
+                    readOnly(false), object(List.of("resultId"),
+                            prop("resultId", string("Result identifier returned by a call.")),
+                            prop("pointer", string("JSON pointer to read; defaults to the full saved result.")),
+                            prop("offset", NODES.objectNode().put("type", "integer").put("minimum", 0)),
+                            prop("limit", NODES.objectNode().put("type", "integer").put("minimum", 1).put("maximum", 200))), "result_get"));
+        }
+        return tools;
+    }
+
     // ---------------------------------------------------------------------- packs
 
     /** The P0 packs; null for a pack this version doesn't provide. */
