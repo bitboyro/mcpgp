@@ -21,8 +21,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * The stdio transport, offering only the MCP revisions the manifest supports. When the client closes
@@ -39,6 +41,9 @@ final class StdioTransport extends StdioServerTransportProvider {
     private final String scope;
     private final int pageSize;
     private final Pending pending;
+    private final Map<String, Boolean> toolLists;
+    private volatile Supplier<List<io.modelcontextprotocol.spec.McpSchema.Tool>> toolList = List::of;
+    private volatile String session;
 
     /** @param pageSize list operations answer this many items at a time ({@code server.pageSize}); 0 = all at once */
     StdioTransport(McpJsonMapper mapper, InputStream in, OutputStream out, List<String> revisions,
@@ -53,12 +58,32 @@ final class StdioTransport extends StdioServerTransportProvider {
 
     private StdioTransport(McpJsonMapper mapper, Pending pending, String scope, InputStream in, OutputStream out, List<String> revisions,
                            Duration drainTimeout, Runnable onClose, int pageSize) {
-        super(mapper, new TappedInput(new Tagging(in, scope, pageSize), pending::inbound, () -> pending.drain(drainTimeout), onClose),
+        this(mapper, pending, scope, in, out, revisions, drainTimeout, onClose, pageSize, new ConcurrentHashMap<>());
+    }
+
+    private StdioTransport(McpJsonMapper mapper, Pending pending, String scope, InputStream in, OutputStream out, List<String> revisions,
+                           Duration drainTimeout, Runnable onClose, int pageSize, Map<String, Boolean> toolLists) {
+        super(mapper, new TappedInput(new Tagging(in, scope, pageSize, toolLists), pending::inbound, () -> pending.drain(drainTimeout), onClose),
                 new TappedOutput(out, pending::outbound));
         this.revisions = List.copyOf(revisions);
         this.scope = scope;
         this.pageSize = pageSize;
         this.pending = pending;
+        this.toolLists = toolLists;
+    }
+
+    /** Supplies the session-specific result for {@code tools/list}; all tools stay registered for dispatch. */
+    void toolList(Supplier<List<io.modelcontextprotocol.spec.McpSchema.Tool>> supplier) {
+        this.toolList = supplier;
+    }
+
+    /** The one stdio session, learned when a session-scoped handler changes its tool list. */
+    void session(String session) {
+        this.session = session;
+    }
+
+    String session() {
+        return session;
     }
 
     @Override
@@ -69,7 +94,7 @@ final class StdioTransport extends StdioServerTransportProvider {
     /** Every session's messages go out one at a time ({@link SerialSends}). */
     @Override
     public void setSessionFactory(io.modelcontextprotocol.spec.McpServerSession.Factory factory) {
-        super.setSessionFactory(transport -> factory.create(new SerialSends(transport, scope, pageSize, pending)));
+        super.setSessionFactory(transport -> factory.create(new SerialSends(transport, scope, pageSize, pending, toolLists, () -> toolList.get())));
     }
 
     /**
@@ -84,12 +109,17 @@ final class StdioTransport extends StdioServerTransportProvider {
         private final String scope;
         private final int pageSize;
         private final Pending pending;
+        private final Map<String, Boolean> toolLists;
+        private final Supplier<List<io.modelcontextprotocol.spec.McpSchema.Tool>> toolList;
 
-        SerialSends(io.modelcontextprotocol.spec.McpServerTransport delegate, String scope, int pageSize, Pending pending) {
+        SerialSends(io.modelcontextprotocol.spec.McpServerTransport delegate, String scope, int pageSize, Pending pending,
+                    Map<String, Boolean> toolLists, Supplier<List<io.modelcontextprotocol.spec.McpSchema.Tool>> toolList) {
             this.delegate = delegate;
             this.scope = scope;
             this.pageSize = pageSize;
             this.pending = pending;
+            this.toolLists = toolLists;
+            this.toolList = toolList;
         }
 
         /** The client cancelled this request: the spec says not to answer it. */
@@ -107,17 +137,29 @@ final class StdioTransport extends StdioServerTransportProvider {
 
         /** A list answer is cut to one page ({@link ListPager}) before it goes out. */
         private io.modelcontextprotocol.spec.McpSchema.JSONRPCMessage paged(io.modelcontextprotocol.spec.McpSchema.JSONRPCMessage message) {
-            if (pageSize <= 0 || !(message instanceof io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse response)
+            if (!(message instanceof io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse response)
                     || response.id() == null || response.result() == null) {
                 return message;
             }
+            JsonNode id = JSON.valueToTree(response.id());
+            Object result = response.result();
+            if (toolLists.remove(Inflight.key(scope, id)) != null) {
+                Map<String, Object> filtered = new java.util.LinkedHashMap<>(JSON.convertValue(result, Map.class));
+                filtered.put("tools", toolList.get());
+                result = filtered;
+            }
+            if (pageSize <= 0) {
+                return result == response.result() ? message
+                        : new io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse("2.0", response.id(), result, null);
+            }
             ListPager.Pending pending = ListPager.take(Inflight.key(scope, JSON.valueToTree(response.id())));
             if (pending == null) {
-                return message;
+                return result == response.result() ? message
+                        : new io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse("2.0", response.id(), result, null);
             }
             JsonNode answered = ListPager.answer(pending, JSON.createObjectNode().put("jsonrpc", "2.0")
                     .<com.fasterxml.jackson.databind.node.ObjectNode>set("id", JSON.valueToTree(response.id()))
-                    .<com.fasterxml.jackson.databind.node.ObjectNode>set("result", JSON.valueToTree(response.result())), pageSize);
+                    .<com.fasterxml.jackson.databind.node.ObjectNode>set("result", JSON.valueToTree(result)), pageSize);
             if (answered.has("error")) {
                 return new io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse("2.0", response.id(), null,
                         new io.modelcontextprotocol.spec.McpSchema.JSONRPCResponse.JSONRPCError(answered.at("/error/code").asInt(),
@@ -240,11 +282,13 @@ final class StdioTransport extends StdioServerTransportProvider {
         private int position;
 
         private final int pageSize;
+        private final Map<String, Boolean> toolLists;
 
-        Tagging(InputStream in, String scope, int pageSize) {
+        Tagging(InputStream in, String scope, int pageSize, Map<String, Boolean> toolLists) {
             this.in = new java.io.BufferedInputStream(in);
             this.scope = scope;
             this.pageSize = pageSize;
+            this.toolLists = toolLists;
         }
 
         @Override
@@ -292,6 +336,9 @@ final class StdioTransport extends StdioServerTransportProvider {
                 return raw;
             }
             ListPager.accept(scope, message, pageSize);       // noted only; the line goes on unchanged
+            if (message.path("method").asText().equals("tools/list") && message.hasNonNull("id")) {
+                toolLists.put(Inflight.key(scope, message.get("id")), Boolean.TRUE);
+            }
             if (Inflight.accept(scope, message) == null) {
                 return raw;
             }

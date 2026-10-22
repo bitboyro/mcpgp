@@ -59,7 +59,6 @@ public final class McpServerFactory {
     /** {@code toolsets} exposure: the toolsets sessions enable (null in other modes). */
     private final Toolsets toolsets;
     /** stdio, toolsets mode: the API tools currently registered on the server. */
-    private final java.util.Set<String> shown = java.util.concurrent.ConcurrentHashMap.newKeySet();
     /** Who handles calls of the registered tools: this factory, or its replacement after a config reload. */
     private volatile java.util.function.Supplier<McpServerFactory> current = () -> this;
 
@@ -194,29 +193,10 @@ public final class McpServerFactory {
         return java.util.Optional.ofNullable(toolsets);
     }
 
-    /**
-     * stdio, toolsets mode: registers the tools of the session's enabled toolsets and removes the others;
-     * the SDK tells the client its tool list changed.
-     */
+    /** Toolsets change the one stdio session's visible list. The tools stay registered so a disabled
+     * tool can return {@code TOOLSET_DISABLED}, rather than being rejected by the SDK as unknown. */
     public void showToolsets(McpSyncServer server, String session) {
-        // namespaced: a toolset's tool stands for its copy on every instance
-        java.util.Set<String> wanted = new java.util.LinkedHashSet<>();
-        for (String name : toolsets.visible(session)) {
-            catalog.servedAs(name).forEach(t -> wanted.add(t.path("name").asText()));
-        }
-        for (String name : wanted) {
-            catalog.tool(name).ifPresent(tool -> {
-                if (shown.add(name)) {
-                    server.addTool(spec(tool));
-                }
-            });
-        }
-        for (String name : java.util.List.copyOf(shown)) {
-            if (!wanted.contains(name)) {
-                server.removeTool(name);
-                shown.remove(name);
-            }
-        }
+        server.notifyToolsListChanged();
     }
 
     /** Transport-context key with the authenticated client's key name (HTTP, static mode). */
@@ -246,7 +226,9 @@ public final class McpServerFactory {
 
     private McpSyncServer configure(McpServer.SyncSpecification<?> builder) {
         List<McpServerFeatures.SyncToolSpecification> specs = new ArrayList<>();
-        for (JsonNode tool : catalog.listed()) {
+        // In toolsets mode API tools remain registered for dispatch; each transport tailors tools/list
+        // to its session's enabled sets.
+        for (JsonNode tool : toolsets == null ? catalog.listed() : catalog.all().values()) {
             specs.add(spec(tool));
         }
         McpSchema.ServerCapabilities.Builder capabilities = McpSchema.ServerCapabilities.builder().tools(true).logging();
