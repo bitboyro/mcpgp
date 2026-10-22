@@ -1,0 +1,18 @@
+# The kitchen sink in exposure mode plain (tools-contract §15), for the gate's S2.
+apiVersion: mcpgp/v1
+kind: McpServer
+metadata:
+  name: kitchen-sink-plain-search
+  title: Kitchen sink (plain-search)
+apis:
+  - id: kitchen
+    toolPrefix: kitchen
+    contracts:
+      - { version: "1.0", spec: contracts/kitchen-sink-1.0.yaml, default: true }
+    select:
+      access: all
+instances:
+  mode: single
+exposure:
+  mode: plain
+  plainSearch: true

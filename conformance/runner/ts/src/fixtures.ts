@@ -19,9 +19,15 @@ export function contractsOf(definition: string): ContractFile[] {
   );
 }
 
+export type Exposure = "plain" | "plain-search" | "search" | "catalog" | "toolsets" | "hybrid";
+
 export interface Fixture {
   id: string;
   definition: string;
+  /** How its tools are offered (tools-contract §15); S2 checks the mode's behaviour. */
+  exposure: Exposure;
+  /** Whether S3 generates calls for its tools (directly listed API tools only, so far). */
+  s3: boolean;
   workspace?: string;
   /** The operator's config with every instance pointed at the mock. */
   config(mockUrl: string): Record<string, unknown>;
@@ -31,16 +37,19 @@ const API_KEY = "gate-not-a-secret";
 
 /** The fixtures of release-gate.md §6.1 that exist so far. */
 export function fixtures(): Fixture[] {
+  const kitchen = (file: string) => join(FIXTURES, "definitions", "kitchen-sink-oas31", file);
+  const config = (mockUrl: string) => ({
+    // a dummy credential, inline because the gate runs without an environment
+    allowInlineSecrets: true,
+    instance: { baseUrl: mockUrl, auth: { type: "apiKey", value: API_KEY } },
+  });
   return [
-    {
-      id: "kitchen-sink-oas31",
-      definition: join(FIXTURES, "definitions", "kitchen-sink-oas31", "kitchen-sink.mcpgp.yaml"),
-      config: (mockUrl) => ({
-        // a dummy credential, inline because the gate runs without an environment
-        allowInlineSecrets: true,
-        instance: { baseUrl: mockUrl, auth: { type: "apiKey", value: API_KEY } },
-      }),
-    },
+    { id: "kitchen-sink-oas31", definition: kitchen("kitchen-sink.mcpgp.yaml"), exposure: "plain", s3: true, config },
+    { id: "kitchen-sink-plain-search", definition: kitchen("kitchen-sink-plain-search.mcpgp.yaml"), exposure: "plain-search", s3: false, config },
+    { id: "kitchen-sink-search", definition: kitchen("kitchen-sink-search.mcpgp.yaml"), exposure: "search", s3: false, config },
+    { id: "kitchen-sink-catalog", definition: kitchen("kitchen-sink-catalog.mcpgp.yaml"), exposure: "catalog", s3: false, config },
+    { id: "kitchen-sink-toolsets", definition: kitchen("kitchen-sink-toolsets.mcpgp.yaml"), exposure: "toolsets", s3: false, config },
+    { id: "kitchen-sink-hybrid", definition: kitchen("kitchen-sink-hybrid.mcpgp.yaml"), exposure: "hybrid", s3: false, config },
   ];
 }
 

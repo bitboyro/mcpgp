@@ -37,6 +37,9 @@ final class RepositoryFiles {
         if (relative.startsWith("conformance/runner/")) {
             return Classification.skip("a conformance runner's code (and, locally, its dependencies)");
         }
+        if (relative.startsWith("conformance/fixtures/golden/")) {
+            return Classification.skip("a golden surface, checked by the release gate (S2)");
+        }
         if (name.endsWith(".md") || name.equals(".DS_Store")) {
             return Classification.skip("documentation");
         }

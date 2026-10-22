@@ -3,7 +3,8 @@ import { contractsOf, fixtures } from "../src/fixtures.js";
 import { callConfirmed, expectedCode, mutations, validArguments, type Tool } from "../src/generate.js";
 import { Mock } from "../src/mock.js";
 import { codeOf, documentedCodes, text, type ToolResult } from "../src/results.js";
-import { CLAIMED_REVISIONS, revisions, startServer, transports, type Running } from "../src/server.js";
+import { combinations } from "../src/matrix.js";
+import { CLAIMED_REVISIONS, startServer, type Running } from "../src/server.js";
 import { checkResult } from "../src/traffic.js";
 
 /**
@@ -17,7 +18,7 @@ const packages = inject("packages");
 const seed = Number(process.env.GATE_SEED ?? 0);
 const CODES = documentedCodes();
 
-for (const fixture of fixtures()) {
+for (const fixture of fixtures().filter((f) => f.s3)) {
   const pkg = packages[fixture.definition];
   const specs = contractsOf(fixture.definition).map((c) => c.spec);
 
@@ -28,16 +29,16 @@ for (const fixture of fixtures()) {
   await probe.close();
   await probeMock.stop();
 
-  for (const transport of transports()) {
-    for (const revision of revisions()) {
-      describe(`S3 ${fixture.id} · jar · ${transport} · ${revision}`, () => {
+  for (const { format, transport, revision, label } of combinations(pkg)) {
+    {
+      describe(`S3 ${fixture.id} · ${label}`, () => {
         let mock: Mock;
         let server: Running;
         const operationOf = new Map<string, string>();
 
         beforeAll(async () => {
           mock = await Mock.start(specs);
-          server = await startServer({ pkg, transport, revision, config: fixture.config(mock.url) });
+          server = await startServer({ pkg, format, transport, revision, config: fixture.config(mock.url) });
         });
         afterAll(async () => {
           await server?.close();

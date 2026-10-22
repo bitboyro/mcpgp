@@ -16,7 +16,9 @@ versions follow [SemVer](https://semver.org).
   of the mock. `gate.yml` runs it with the Java tests for every version tag, before anything is
   published (a failure publishes nothing), and when started by hand; a release candidate tag
   (`vX.Y.Z-rcN`) runs only the gate. The release carries its report (`gate-report.html`,
-  `gate-report.json`).
+  `gate-report.json`). G2 so far: every package format as the customer runs it (the jar, the desktop
+  bundle through its manifest, the Docker image from its Dockerfile), golden surfaces of what each
+  package lists, and a fixture per exposure mode checked against the plain build.
 - `mcpgp init --from-spec` for big APIs: `--tag`, `--path` (a glob) and `--access` start with part of
   the API (written as `select`), and `--collisions` (default `method-path`) names operations that
   would get the same tool name from their method and path instead of stopping the build; `--collisions error`

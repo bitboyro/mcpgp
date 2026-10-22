@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, inject, test } from "vitest";
 import { contractsOf, pointAtMock, trafficCases } from "../src/fixtures.js";
 import { Mock } from "../src/mock.js";
-import { revisions, startServer, transports, type Running } from "../src/server.js";
+import { combinations } from "../src/matrix.js";
+import { startServer, type Running } from "../src/server.js";
 import { runStep } from "../src/traffic.js";
 
 /**
@@ -11,15 +12,15 @@ import { runStep } from "../src/traffic.js";
 const packages = inject("packages");
 
 for (const c of trafficCases()) {
-  const caseRevisions = revisions().filter((r) => !c.revisions || c.revisions.includes(r));
-  for (const transport of transports()) {
-    for (const revision of caseRevisions) {
-      describe(`conformance/${c.id} · jar · ${transport} · ${revision}`, () => {
+  const pkg = packages[c.definition];
+  for (const { format, transport, revision, label } of combinations(pkg, c.revisions)) {
+    {
+      describe(`conformance/${c.id} · ${label}`, () => {
         let mock: Mock;
         let server: Running;
         beforeAll(async () => {
           mock = await Mock.start(contractsOf(c.definition).map((x) => x.spec));
-          server = await startServer({ pkg: packages[c.definition], transport, revision, config: pointAtMock(c.runtime, mock.url) });
+          server = await startServer({ pkg, format, transport, revision, config: pointAtMock(c.runtime, mock.url) });
         });
         afterAll(async () => {
           await server?.close();

@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, inject, test } from "vitest";
 import { contractsOf, fixtures, pointAtMock, trafficCases } from "../src/fixtures.js";
 import { Mock } from "../src/mock.js";
-import { revisions, startServer, transports, type Running } from "../src/server.js";
+import { combinations } from "../src/matrix.js";
+import { startServer, type Running } from "../src/server.js";
 
 /**
  * S0 · Package (release-gate.md §6): every package starts as the customer runs it, on every transport
@@ -15,14 +16,15 @@ const targets = [
 ];
 
 for (const target of targets) {
-  for (const transport of transports()) {
-    for (const revision of revisions()) {
-      describe(`S0 ${target.id} · jar · ${transport} · ${revision}`, () => {
+  const pkg = packages[target.definition];
+  for (const { format, transport, revision, label } of combinations(pkg)) {
+    {
+      describe(`S0 ${target.id} · ${label}`, () => {
         let mock: Mock;
         let server: Running;
         beforeAll(async () => {
           mock = await Mock.start(contractsOf(target.definition).map((c) => c.spec));
-          server = await startServer({ pkg: packages[target.definition], transport, revision, config: target.config(mock.url) });
+          server = await startServer({ pkg, format, transport, revision, config: target.config(mock.url) });
         });
         afterAll(async () => {
           await server?.close();

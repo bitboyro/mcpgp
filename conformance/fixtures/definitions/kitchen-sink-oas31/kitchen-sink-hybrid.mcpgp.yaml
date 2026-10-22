@@ -1,0 +1,19 @@
+# The kitchen sink in exposure mode hybrid (search style) (tools-contract §15), for the gate's S2.
+apiVersion: mcpgp/v1
+kind: McpServer
+metadata:
+  name: kitchen-sink-hybrid
+  title: Kitchen sink (hybrid)
+apis:
+  - id: kitchen
+    toolPrefix: kitchen
+    contracts:
+      - { version: "1.0", spec: contracts/kitchen-sink-1.0.yaml, default: true }
+    select:
+      access: all
+instances:
+  mode: single
+exposure:
+  mode: hybrid
+  discoveryStyle: search
+  pinned: [kitchen_item_get, kitchen_item_list]

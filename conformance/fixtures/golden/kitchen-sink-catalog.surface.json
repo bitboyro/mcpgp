@@ -1,0 +1,86 @@
+{
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Returns the input schema and a response summary of one operation from list_operations.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Operation name from list_operations.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "get_operation_schema",
+      "title": "Get operation schema"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Calls an operation by name with its arguments. The same validation, confirmation and auth apply as for a directly listed tool.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "arguments": {
+            "description": "The operation's arguments, as described by get_operation_schema.",
+            "type": "object"
+          },
+          "name": {
+            "description": "Operation name from list_operations.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "type": "object"
+      },
+      "name": "invoke_operation",
+      "title": "Invoke operation"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Lists the available operations, one line each (name, method, path, summary), optionally filtered by tag or text. Paged.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "Cursor from the previous page.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Text to look for in names and summaries.",
+            "type": "string"
+          },
+          "tag": {
+            "description": "Only operations with this tag.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_operations",
+      "title": "List operations"
+    }
+  ]
+}

@@ -161,7 +161,17 @@ public class McpgpServer {
                 manifest.mcpRevisions(), Duration.ofSeconds(longest + 10L), stdio.onClose(), config.server().pageSize());
         McpSyncServer server = factory.create(transport);
         // toolsets: the one session's enabled toolsets become the server's tool list
-        factory.toolsets().ifPresent(toolsets -> toolsets.onListChanged(session -> factory.showToolsets(server, session)));
+        factory.toolsets().ifPresent(toolsets -> toolsets.onListChanged(session -> {
+            transport.session(session);
+            factory.showToolsets(server, session);
+        }));
+        factory.toolsets().ifPresent(toolsets -> transport.toolList(() -> {
+            java.util.List<io.modelcontextprotocol.spec.McpSchema.Tool> tools = new java.util.ArrayList<>();
+            factory.catalog().listed().forEach(tool -> tools.add(ro.bitboy.mcpgp.runtime.mcp.ToolCatalog.toMcp(tool)));
+            toolsets.visible(transport.session()).forEach(name -> factory.catalog().tool(name)
+                    .ifPresent(tool -> tools.add(ro.bitboy.mcpgp.runtime.mcp.ToolCatalog.toMcp(tool))));
+            return tools;
+        }));
         return server;
     }
 }

@@ -1,0 +1,2455 @@
+{
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Returns a tool's full definition: description, input schema and annotations.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Tool name from search_tools.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "describe_tool",
+      "title": "Describe tool"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Attach a file to an item",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "additionalProperties": false,
+            "description": "Request body, sent as multipart/form-data.",
+            "properties": {
+              "caption": {
+                "maxLength": 120,
+                "type": "string"
+              },
+              "file": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "base64": {
+                        "contentEncoding": "base64",
+                        "type": "string"
+                      },
+                      "contentType": {
+                        "enum": [
+                          "application/octet-stream"
+                        ],
+                        "type": "string"
+                      },
+                      "filename": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "base64"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "path": {
+                        "description": "Path of the file, relative to the server's file root.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "meta": {
+                "description": "(sent as an application/json part)",
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "file"
+            ],
+            "type": "object"
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "itemId": {
+                "pattern": "^[a-z0-9-]{1,36}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "itemId"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "path",
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "kitchen_attachment_add",
+      "outputSchema": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "title": "Attach a file to an item"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "Download an item's content",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "itemId": {
+                "pattern": "^[a-z0-9-]{1,36}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "itemId"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "name": "kitchen_content_download",
+      "title": "Download an item's content"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Upload an item's content",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "File sent as the request body (application/octet-stream).",
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "base64": {
+                    "contentEncoding": "base64",
+                    "type": "string"
+                  },
+                  "contentType": {
+                    "enum": [
+                      "application/octet-stream"
+                    ],
+                    "type": "string"
+                  },
+                  "filename": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "base64"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "description": "Path of the file, relative to the server's file root.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "itemId": {
+                "pattern": "^[a-z0-9-]{1,36}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "itemId"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "path",
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "kitchen_content_upload",
+      "title": "Upload an item's content"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Create an item",
+      "inputSchema": {
+        "$defs": {
+          "NewItem": {
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "children": {
+                "items": {
+                  "$ref": "#/$defs/NewItem"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "tool",
+                  "part",
+                  "kit"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              },
+              "price": {
+                "minimum": 0,
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shape": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "circle"
+                      },
+                      "radius": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "radius"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "square"
+                      },
+                      "side": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "side"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "required": [
+              "name",
+              "kind"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "Request body, sent as application/json.",
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "children": {
+                "items": {
+                  "$ref": "#/$defs/NewItem"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "tool",
+                  "part",
+                  "kit"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              },
+              "price": {
+                "minimum": 0,
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shape": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "circle"
+                      },
+                      "radius": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "radius"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "square"
+                      },
+                      "side": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "side"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "required": [
+              "name",
+              "kind"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "kitchen_item_create",
+      "outputSchema": {
+        "$defs": {
+          "NewItem": {
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "children": {
+                "items": {
+                  "$ref": "#/$defs/NewItem"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "tool",
+                  "part",
+                  "kit"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "price": {
+                "minimum": 0,
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shape": {
+                "oneOf": [
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "circle"
+                      },
+                      "radius": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "square"
+                      },
+                      "side": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ]
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "properties": {
+          "value": {
+            "allOf": [
+              {
+                "properties": {
+                  "attributes": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "children": {
+                    "items": {
+                      "$ref": "#/$defs/NewItem"
+                    },
+                    "maxItems": 3,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": [
+                      "tool",
+                      "part",
+                      "kit"
+                    ],
+                    "type": "string"
+                  },
+                  "name": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "owner": {
+                    "properties": {
+                      "email": {
+                        "format": "email",
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "price": {
+                    "minimum": 0,
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "circle"
+                          },
+                          "radius": {
+                            "exclusiveMinimum": 0,
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "square"
+                          },
+                          "side": {
+                            "exclusiveMinimum": 0,
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "created": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "title": "Create an item"
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Delete an item",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm": {
+            "description": "Confirmation token from a CONFIRMATION_REQUIRED result. Only send it after the user agreed.",
+            "type": "string"
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "itemId": {
+                "pattern": "^[a-z0-9-]{1,36}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "itemId"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "name": "kitchen_item_delete",
+      "title": "Delete an item"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "Get an item",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cookie": {
+            "additionalProperties": false,
+            "description": "Values sent as cookies.",
+            "properties": {
+              "view": {
+                "enum": [
+                  "short",
+                  "full"
+                ],
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "itemId": {
+                "pattern": "^[a-z0-9-]{1,36}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "itemId"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "name": "kitchen_item_get",
+      "outputSchema": {
+        "$defs": {
+          "NewItem": {
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "children": {
+                "items": {
+                  "$ref": "#/$defs/NewItem"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "tool",
+                  "part",
+                  "kit"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "price": {
+                "minimum": 0,
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shape": {
+                "oneOf": [
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "circle"
+                      },
+                      "radius": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "square"
+                      },
+                      "side": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ]
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "properties": {
+          "value": {
+            "allOf": [
+              {
+                "properties": {
+                  "attributes": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "children": {
+                    "items": {
+                      "$ref": "#/$defs/NewItem"
+                    },
+                    "maxItems": 3,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": [
+                      "tool",
+                      "part",
+                      "kit"
+                    ],
+                    "type": "string"
+                  },
+                  "name": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "owner": {
+                    "properties": {
+                      "email": {
+                        "format": "email",
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "price": {
+                    "minimum": 0,
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "circle"
+                          },
+                          "radius": {
+                            "exclusiveMinimum": 0,
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "square"
+                          },
+                          "side": {
+                            "exclusiveMinimum": 0,
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "created": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "title": "Get an item"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "List items",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "header": {
+            "additionalProperties": false,
+            "description": "Values sent as HTTP headers.",
+            "properties": {
+              "X-Request-Tag": {
+                "maxLength": 32,
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "query": {
+            "additionalProperties": false,
+            "description": "Values sent in the URL query string.",
+            "properties": {
+              "limit": {
+                "default": 20,
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "q": {
+                "maxLength": 64,
+                "type": "string"
+              },
+              "sort": {
+                "enum": [
+                  "name",
+                  "-name",
+                  "created",
+                  "-created"
+                ],
+                "type": "string"
+              },
+              "tag": {
+                "description": "Only items with all of these tags",
+                "items": {
+                  "pattern": "^[a-z]{1,12}$",
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "name": "kitchen_item_list",
+      "outputSchema": {
+        "$defs": {
+          "NewItem": {
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "children": {
+                "items": {
+                  "$ref": "#/$defs/NewItem"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "tool",
+                  "part",
+                  "kit"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "price": {
+                "minimum": 0,
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shape": {
+                "oneOf": [
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "circle"
+                      },
+                      "radius": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "square"
+                      },
+                      "side": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ]
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "allOf": [
+                {
+                  "properties": {
+                    "attributes": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "children": {
+                      "items": {
+                        "$ref": "#/$defs/NewItem"
+                      },
+                      "maxItems": 3,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "tool",
+                        "part",
+                        "kit"
+                      ],
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 80,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "owner": {
+                      "properties": {
+                        "email": {
+                          "format": "email",
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "price": {
+                      "minimum": 0,
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "shape": {
+                      "oneOf": [
+                        {
+                          "properties": {
+                            "kind": {
+                              "const": "circle"
+                            },
+                            "radius": {
+                              "exclusiveMinimum": 0,
+                              "type": "number"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "kind": {
+                              "const": "square"
+                            },
+                            "side": {
+                              "exclusiveMinimum": 0,
+                              "type": "number"
+                            }
+                          },
+                          "type": "object"
+                        }
+                      ]
+                    },
+                    "tags": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 5,
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "created": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "title": "List items"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Replace an item",
+      "inputSchema": {
+        "$defs": {
+          "NewItem": {
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "children": {
+                "items": {
+                  "$ref": "#/$defs/NewItem"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "tool",
+                  "part",
+                  "kit"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              },
+              "price": {
+                "minimum": 0,
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shape": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "circle"
+                      },
+                      "radius": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "radius"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "square"
+                      },
+                      "side": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "side"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "required": [
+              "name",
+              "kind"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "Request body, sent as application/json.",
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "children": {
+                "items": {
+                  "$ref": "#/$defs/NewItem"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "tool",
+                  "part",
+                  "kit"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              },
+              "price": {
+                "minimum": 0,
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shape": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "circle"
+                      },
+                      "radius": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "radius"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "square"
+                      },
+                      "side": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "side"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "required": [
+              "name",
+              "kind"
+            ],
+            "type": "object"
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "itemId": {
+                "pattern": "^[a-z0-9-]{1,36}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "itemId"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "path",
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "kitchen_item_replace",
+      "outputSchema": {
+        "$defs": {
+          "NewItem": {
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "children": {
+                "items": {
+                  "$ref": "#/$defs/NewItem"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "tool",
+                  "part",
+                  "kit"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "price": {
+                "minimum": 0,
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shape": {
+                "oneOf": [
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "circle"
+                      },
+                      "radius": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "square"
+                      },
+                      "side": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ]
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "properties": {
+          "value": {
+            "allOf": [
+              {
+                "properties": {
+                  "attributes": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "children": {
+                    "items": {
+                      "$ref": "#/$defs/NewItem"
+                    },
+                    "maxItems": 3,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": [
+                      "tool",
+                      "part",
+                      "kit"
+                    ],
+                    "type": "string"
+                  },
+                  "name": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "owner": {
+                    "properties": {
+                      "email": {
+                        "format": "email",
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "price": {
+                    "minimum": 0,
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "circle"
+                          },
+                          "radius": {
+                            "exclusiveMinimum": 0,
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "square"
+                          },
+                          "side": {
+                            "exclusiveMinimum": 0,
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "created": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "title": "Replace an item"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "Items as CSV",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "additionalProperties": false,
+            "description": "Values sent in the URL query string.",
+            "properties": {
+              "from": {
+                "format": "date",
+                "type": "string"
+              }
+            },
+            "required": [
+              "from"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "name": "kitchen_item_report",
+      "title": "Items as CSV"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Search items with a form",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "additionalProperties": false,
+            "description": "Request body, sent as application/x-www-form-urlencoded.",
+            "properties": {
+              "page": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "query": {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "kitchen_item_search",
+      "outputSchema": {
+        "$defs": {
+          "NewItem": {
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "children": {
+                "items": {
+                  "$ref": "#/$defs/NewItem"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "tool",
+                  "part",
+                  "kit"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "price": {
+                "minimum": 0,
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shape": {
+                "oneOf": [
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "circle"
+                      },
+                      "radius": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "square"
+                      },
+                      "side": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ]
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "allOf": [
+                {
+                  "properties": {
+                    "attributes": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "children": {
+                      "items": {
+                        "$ref": "#/$defs/NewItem"
+                      },
+                      "maxItems": 3,
+                      "type": "array"
+                    },
+                    "kind": {
+                      "enum": [
+                        "tool",
+                        "part",
+                        "kit"
+                      ],
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 80,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "owner": {
+                      "properties": {
+                        "email": {
+                          "format": "email",
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "price": {
+                      "minimum": 0,
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "shape": {
+                      "oneOf": [
+                        {
+                          "properties": {
+                            "kind": {
+                              "const": "circle"
+                            },
+                            "radius": {
+                              "exclusiveMinimum": 0,
+                              "type": "number"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "kind": {
+                              "const": "square"
+                            },
+                            "side": {
+                              "exclusiveMinimum": 0,
+                              "type": "number"
+                            }
+                          },
+                          "type": "object"
+                        }
+                      ]
+                    },
+                    "tags": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 5,
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "created": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              ]
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "title": "Search items with a form"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Change some fields of an item",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "additionalProperties": false,
+            "description": "Request body, sent as application/json.",
+            "minProperties": 1,
+            "properties": {
+              "archived": {
+                "type": "boolean"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "itemId": {
+                "pattern": "^[a-z0-9-]{1,36}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "itemId"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "path",
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "kitchen_item_update",
+      "outputSchema": {
+        "$defs": {
+          "NewItem": {
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "children": {
+                "items": {
+                  "$ref": "#/$defs/NewItem"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "tool",
+                  "part",
+                  "kit"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "price": {
+                "minimum": 0,
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shape": {
+                "oneOf": [
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "circle"
+                      },
+                      "radius": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "square"
+                      },
+                      "side": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ]
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "properties": {
+          "value": {
+            "allOf": [
+              {
+                "properties": {
+                  "attributes": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "children": {
+                    "items": {
+                      "$ref": "#/$defs/NewItem"
+                    },
+                    "maxItems": 3,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": [
+                      "tool",
+                      "part",
+                      "kit"
+                    ],
+                    "type": "string"
+                  },
+                  "name": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "owner": {
+                    "properties": {
+                      "email": {
+                        "format": "email",
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "price": {
+                    "minimum": 0,
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "circle"
+                          },
+                          "radius": {
+                            "exclusiveMinimum": 0,
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "square"
+                          },
+                          "side": {
+                            "exclusiveMinimum": 0,
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "created": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "title": "Change some fields of an item"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "One version of an item",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "additionalProperties": false,
+            "description": "Values placed in the URL path.",
+            "properties": {
+              "itemId": {
+                "pattern": "^[a-z0-9-]{1,36}$",
+                "type": "string"
+              },
+              "version": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "itemId",
+              "version"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "name": "kitchen_item_version_get",
+      "outputSchema": {
+        "$defs": {
+          "NewItem": {
+            "properties": {
+              "attributes": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "children": {
+                "items": {
+                  "$ref": "#/$defs/NewItem"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "tool",
+                  "part",
+                  "kit"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "price": {
+                "minimum": 0,
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shape": {
+                "oneOf": [
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "circle"
+                      },
+                      "radius": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "square"
+                      },
+                      "side": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ]
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "properties": {
+          "value": {
+            "allOf": [
+              {
+                "properties": {
+                  "attributes": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "children": {
+                    "items": {
+                      "$ref": "#/$defs/NewItem"
+                    },
+                    "maxItems": 3,
+                    "type": "array"
+                  },
+                  "kind": {
+                    "enum": [
+                      "tool",
+                      "part",
+                      "kit"
+                    ],
+                    "type": "string"
+                  },
+                  "name": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "owner": {
+                    "properties": {
+                      "email": {
+                        "format": "email",
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "price": {
+                    "minimum": 0,
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "circle"
+                          },
+                          "radius": {
+                            "exclusiveMinimum": 0,
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "square"
+                          },
+                          "side": {
+                            "exclusiveMinimum": 0,
+                            "type": "number"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "created": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "title": "One version of an item"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "Service status",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "name": "kitchen_status_get",
+      "outputSchema": {
+        "properties": {
+          "status": {
+            "enum": [
+              "up",
+              "degraded"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "title": "Service status"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Finds tools by what they do. Returns one line per tool (name, title, summary, read-only), best matches first.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 10,
+            "description": "Maximum number of results.",
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "query": {
+            "description": "What you want to do, in a few words.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "name": "search_tools",
+      "title": "Search tools"
+    }
+  ]
+}
