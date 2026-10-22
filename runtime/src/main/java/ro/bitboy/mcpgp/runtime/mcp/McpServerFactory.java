@@ -185,7 +185,7 @@ public final class McpServerFactory {
     }
 
     public ToolCatalog catalog() {
-        return catalog;
+        return current.get().catalog;
     }
 
     /** The toolsets, in {@code toolsets} exposure; empty otherwise. */

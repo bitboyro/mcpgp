@@ -159,18 +159,18 @@ public class McpgpServer {
         int longest = config.allInstances().stream().mapToInt(RuntimeConfig.Instance::timeoutSeconds).max().orElse(30);
         StdioTransport transport = new StdioTransport(new JacksonMcpJsonMapper(new ObjectMapper()), stdio.in(), stdio.out(),
                 manifest.mcpRevisions(), Duration.ofSeconds(longest + 10L), stdio.onClose(), config.server().pageSize());
-        transport.toolList(() -> {
-            java.util.List<io.modelcontextprotocol.spec.McpSchema.Tool> tools = new java.util.ArrayList<>();
-            factory.catalog().listed().forEach(tool -> tools.add(ro.bitboy.mcpgp.runtime.mcp.ToolCatalog.toMcp(tool)));
-            factory.toolsets().ifPresent(sets -> sets.visible(transport.session()).forEach(name -> factory.catalog().tool(name)
-                    .ifPresent(tool -> tools.add(ro.bitboy.mcpgp.runtime.mcp.ToolCatalog.toMcp(tool)))));
-            return tools;
-        });
         McpSyncServer server = factory.create(transport);
         // toolsets: the one session's enabled toolsets become the server's tool list
         factory.toolsets().ifPresent(toolsets -> toolsets.onListChanged(session -> {
             transport.session(session);
             factory.showToolsets(server, session);
+        }));
+        factory.toolsets().ifPresent(toolsets -> transport.toolList(() -> {
+            java.util.List<io.modelcontextprotocol.spec.McpSchema.Tool> tools = new java.util.ArrayList<>();
+            factory.catalog().listed().forEach(tool -> tools.add(ro.bitboy.mcpgp.runtime.mcp.ToolCatalog.toMcp(tool)));
+            toolsets.visible(transport.session()).forEach(name -> factory.catalog().tool(name)
+                    .ifPresent(tool -> tools.add(ro.bitboy.mcpgp.runtime.mcp.ToolCatalog.toMcp(tool))));
+            return tools;
         }));
         return server;
     }

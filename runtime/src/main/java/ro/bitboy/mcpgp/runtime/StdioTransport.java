@@ -42,7 +42,7 @@ final class StdioTransport extends StdioServerTransportProvider {
     private final int pageSize;
     private final Pending pending;
     private final Map<String, Boolean> toolLists;
-    private volatile Supplier<List<io.modelcontextprotocol.spec.McpSchema.Tool>> toolList = List::of;
+    private volatile Supplier<List<io.modelcontextprotocol.spec.McpSchema.Tool>> toolList;
     private volatile String session;
 
     /** @param pageSize list operations answer this many items at a time ({@code server.pageSize}); 0 = all at once */
@@ -94,7 +94,8 @@ final class StdioTransport extends StdioServerTransportProvider {
     /** Every session's messages go out one at a time ({@link SerialSends}). */
     @Override
     public void setSessionFactory(io.modelcontextprotocol.spec.McpServerSession.Factory factory) {
-        super.setSessionFactory(transport -> factory.create(new SerialSends(transport, scope, pageSize, pending, toolLists, () -> toolList.get())));
+        super.setSessionFactory(transport -> factory.create(new SerialSends(transport, scope, pageSize, pending, toolLists,
+                () -> toolList == null ? null : toolList.get())));
     }
 
     /**
@@ -144,9 +145,12 @@ final class StdioTransport extends StdioServerTransportProvider {
             JsonNode id = JSON.valueToTree(response.id());
             Object result = response.result();
             if (toolLists.remove(Inflight.key(scope, id)) != null) {
-                Map<String, Object> filtered = new java.util.LinkedHashMap<>(JSON.convertValue(result, Map.class));
-                filtered.put("tools", toolList.get());
-                result = filtered;
+                List<io.modelcontextprotocol.spec.McpSchema.Tool> tools = toolList.get();
+                if (tools != null) {
+                    Map<String, Object> filtered = new java.util.LinkedHashMap<>(JSON.convertValue(result, Map.class));
+                    filtered.put("tools", tools);
+                    result = filtered;
+                }
             }
             if (pageSize <= 0) {
                 return result == response.result() ? message
