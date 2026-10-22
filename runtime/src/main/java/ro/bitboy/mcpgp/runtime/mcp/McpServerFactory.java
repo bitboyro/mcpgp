@@ -91,7 +91,7 @@ public final class McpServerFactory {
         builtins.putAll(new Discovery(manifest, config, catalog, contracts, this::call).handlers());
         this.toolsets = Toolsets.active(manifest) ? Toolsets.of(manifest) : null;
         if (toolsets != null) {
-            builtins.putAll(toolsets.handlers());
+            builtins.putAll(toolsets.handlers(catalog));
         }
         this.extensions = Extensions.load(manifest);
         if (!extensions.enrichers().isEmpty()) {
@@ -306,9 +306,8 @@ public final class McpServerFactory {
      * @return true when the tool list changed (clients were notified by the SDK, once per changed tool)
      */
     public boolean handOver(McpServerFactory next, McpSyncServer server) {
-        java.util.function.Supplier<McpServerFactory> target = () -> next;
-        this.current = target;
-        next.current = target;
+        this.current.set(next);
+        next.current.set(next);
         boolean changed = false;
         Map<String, JsonNode> before = new HashMap<>();
         catalog.listed().forEach(t -> before.put(t.path("name").asText(), t));
