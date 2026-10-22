@@ -24,6 +24,8 @@ interface Settings {
   batchConcurrency: number
   batchAllowWrites: boolean
   batchDeduplicateRequests: boolean
+  requestReceiptTtlSeconds: number
+  maxStoredReceipts: number
   resultMode: 'inline' | 'auto' | 'reference'
   captureLimitKb: number
   resultTtl: number
@@ -48,6 +50,8 @@ function current(p: Manifest['policies']): Settings {
     batchConcurrency: p.batch?.concurrency ?? 4,
     batchAllowWrites: p.batch?.allowWrites ?? false,
     batchDeduplicateRequests: p.batch?.deduplicateRequests ?? false,
+    requestReceiptTtlSeconds: p.batch?.requestReceiptTtlSeconds ?? 604800,
+    maxStoredReceipts: p.batch?.maxStoredReceipts ?? 100000,
     resultMode: p.results?.mode ?? 'inline',
     captureLimitKb: p.results?.captureLimitKb ?? 4096,
     resultTtl: p.results?.ttlSeconds ?? 900,
@@ -72,6 +76,8 @@ const PATHS: Record<keyof Settings, string> = {
   batchConcurrency: '/batch/concurrency',
   batchAllowWrites: '/batch/allowWrites',
   batchDeduplicateRequests: '/batch/deduplicateRequests',
+  requestReceiptTtlSeconds: '/batch/requestReceiptTtlSeconds',
+  maxStoredReceipts: '/batch/maxStoredReceipts',
   resultMode: '/results/mode',
   captureLimitKb: '/results/captureLimitKb',
   resultTtl: '/results/ttlSeconds',
@@ -114,8 +120,8 @@ function SafetyForm({ id, saved }: { id: string; saved: Settings }) {
   useEffect(() => setS(saved), [JSON.stringify(saved)]) // eslint-disable-line react-hooks/exhaustive-deps
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setS((old) => ({ ...old, [key]: value }))
   const changed = (Object.keys(PATHS) as (keyof Settings)[]).filter((k) => s[k] !== saved[k])
-  const invalid = (['responseLimitKb', 'requestKb', 'stringMaxLength', 'concurrent', 'perMinute', 'batchMaxCalls', 'batchConcurrency', 'captureLimitKb', 'resultTtl', 'maxStoredKb'] as const)
-    .find((k) => !Number.isInteger(s[k]) || s[k] < 1 || s[k] > (({ batchMaxCalls: 100, batchConcurrency: 16, captureLimitKb: 65536, resultTtl: 86400, maxStoredKb: 262144 } as Record<string, number>)[k] ?? Number.MAX_SAFE_INTEGER))
+  const invalid = (['responseLimitKb', 'requestKb', 'stringMaxLength', 'concurrent', 'perMinute', 'batchMaxCalls', 'batchConcurrency', 'requestReceiptTtlSeconds', 'maxStoredReceipts', 'captureLimitKb', 'resultTtl', 'maxStoredKb'] as const)
+    .find((k) => !Number.isInteger(s[k]) || s[k] < (({ requestReceiptTtlSeconds: 60 } as Record<string, number>)[k] ?? 1) || s[k] > (({ batchMaxCalls: 100, batchConcurrency: 16, requestReceiptTtlSeconds: 2592000, maxStoredReceipts: 1000000, captureLimitKb: 65536, resultTtl: 86400, maxStoredKb: 262144 } as Record<string, number>)[k] ?? Number.MAX_SAFE_INTEGER))
   const save = useMutation({
     mutationFn: () => api.saveEdit(id, server.data?.latestVersion ?? 0,
       changed.map((k) => ({ op: 'set' as const, path: PATHS[k], value: s[k] })), 'Security & safety: ' + changed.join(', ')),
@@ -151,6 +157,8 @@ function SafetyForm({ id, saved }: { id: string; saved: Settings }) {
           hint="POST, PUT, PATCH and DELETE retain their validation and confirmation requirements. Earlier writes remain committed after a failure. No automatic retries or rollback." />
         <Toggle label="Deduplicate retried batches" checked={s.batchDeduplicateRequests} disabled={off || !s.batchEnabled} onChange={(v) => set('batchDeduplicateRequests', v)}
           hint="A caller can reuse a requestId to recover a recorded batch outcome without sending it upstream again. An interrupted batch reports an unknown outcome so writes are not replayed." />
+        <NumberField label="Request receipt lifetime (seconds)" value={s.requestReceiptTtlSeconds} disabled={off || !s.batchEnabled || !s.batchDeduplicateRequests} onChange={(v) => set('requestReceiptTtlSeconds', v)} hint="60 seconds to 30 days; completed receipts expire after this time. Unfinished receipts stay protected as unknown outcomes." />
+        <NumberField label="Maximum stored request receipts" value={s.maxStoredReceipts} disabled={off || !s.batchEnabled || !s.batchDeduplicateRequests} onChange={(v) => set('maxStoredReceipts', v)} hint="1–1,000,000 receipts. Expired completed receipts are removed before new receipts are accepted." />
       </div>
 
       <div className="card">

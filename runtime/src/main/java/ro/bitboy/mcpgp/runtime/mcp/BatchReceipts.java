@@ -13,6 +13,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Clock;
+import java.time.Instant;
+import java.util.stream.Stream;
 import java.util.Map;
 
 /**
@@ -31,10 +33,14 @@ final class BatchReceipts {
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() { };
     private final Path root;
     private final Clock clock;
+    private final long completedTtlSeconds;
+    private final int maxStoredReceipts;
 
-    BatchReceipts(Path storageRoot, Clock clock) {
+    BatchReceipts(Path storageRoot, Clock clock, long completedTtlSeconds, int maxStoredReceipts) {
         this.root = storageRoot.resolve("batches").toAbsolutePath().normalize();
         this.clock = clock;
+        this.completedTtlSeconds = completedTtlSeconds;
+        this.maxStoredReceipts = maxStoredReceipts;
     }
 
     synchronized Claim existing(McpSyncServerExchange exchange, String requestId, Map<String, Object> arguments) {
@@ -43,8 +49,9 @@ final class BatchReceipts {
         String owner = owner(exchange);
         String hash = Arguments.sha256(Arguments.canonical(JSON.valueToTree(arguments)));
         Path file = root.resolve(Arguments.sha256(owner + "\u0000" + requestId) + ".json");
-        if (!Files.exists(file)) return null;
         try {
+            purgeExpired();
+            if (!Files.exists(file)) return null;
             return read(file, owner, requestId, hash);
         } catch (IOException e) {
             throw new ToolError("BATCH_RECEIPT_UNAVAILABLE", "Could not read requestId " + requestId,
@@ -59,8 +66,13 @@ final class BatchReceipts {
         Path file = root.resolve(Arguments.sha256(owner + "\u0000" + requestId) + ".json");
         try {
             Files.createDirectories(root);
+            purgeExpired();
             if (Files.exists(file)) {
                 return read(file, owner, requestId, hash);
+            }
+            if (receiptCount() >= maxStoredReceipts) {
+                throw new ToolError("BATCH_RECEIPT_STORAGE_FULL", "The request receipt storage limit has been reached",
+                        "No operation was sent; wait for completed receipts to expire or increase maxStoredReceipts");
             }
             ObjectNode created = JSON.createObjectNode();
             created.put("requestId", requestId);
@@ -96,6 +108,29 @@ final class BatchReceipts {
         throw new ToolError("BATCH_OUTCOME_UNKNOWN", "A previous call with this requestId did not record a final result",
                 "Do not replay the batch; inspect the target system before deciding how to recover")
                 .withDetails(Map.of("requestId", requestId));
+    }
+
+    /** Removes only completed receipts. An unfinished receipt must remain to prevent unsafe replay. */
+    private void purgeExpired() throws IOException {
+        if (!Files.isDirectory(root)) return;
+        try (Stream<Path> files = Files.list(root)) {
+            for (Path file : files.filter(path -> path.getFileName().toString().endsWith(".json")).toList()) {
+                JsonNode node = JSON.readTree(Files.readString(file));
+                if (!"complete".equals(node.path("state").asText())) continue;
+                try {
+                    Instant completed = Instant.parse(node.path("completed").asText());
+                    if (!completed.plusSeconds(completedTtlSeconds).isAfter(clock.instant())) Files.deleteIfExists(file);
+                } catch (java.time.format.DateTimeParseException ignored) {
+                    // A malformed completion timestamp is retained conservatively for operator inspection.
+                }
+            }
+        }
+    }
+
+    private long receiptCount() throws IOException {
+        try (Stream<Path> files = Files.list(root)) {
+            return files.filter(path -> path.getFileName().toString().endsWith(".json")).count();
+        }
     }
 
     synchronized boolean complete(Claim claim, Map<String, Object> result) {

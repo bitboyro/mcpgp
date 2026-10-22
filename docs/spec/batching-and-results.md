@@ -12,6 +12,8 @@ batch:
   concurrency: 4            # 1–16 concurrent reads
   allowWrites: false        # opt in to sequential writes
   deduplicateRequests: false # opt in to durable requestId receipts
+  requestReceiptTtlSeconds: 604800 # 60–2592000; completed receipts only
+  maxStoredReceipts: 100000 # 1–1000000
 results:
   mode: auto                # inline (default), auto, reference
   captureLimitKb: 4096       # 1–65536; maximum downloaded body
@@ -55,8 +57,12 @@ batch after a lost response returns the recorded outcome with `deduplicated: tru
 the target again. Reusing an id with different arguments returns `BATCH_REQUEST_ID_REUSE`. If a
 server stops after recording the start but before recording the result, it returns
 `BATCH_OUTCOME_UNKNOWN`; the caller must inspect the target rather than replaying writes. Receipts
-survive process restarts under `storage.root/batches`. They retain the batch outcome only; the
-separate in-memory `result_get` snapshots retain their normal TTL and restart behavior.
+survive process restarts under `storage.root/batches`. Completed receipts expire after
+`requestReceiptTtlSeconds` (seven days by default); expired receipts are removed on receipt access
+and before new receipts are recorded. Unfinished receipts never expire automatically, since their
+outcome could be an already-applied write. `maxStoredReceipts` prevents unbounded growth; once full,
+the server rejects a new batch before any operation is sent. Receipts retain the batch outcome only;
+the separate in-memory `result_get` snapshots retain their normal TTL and restart behavior.
 
 When any entry needs confirmation, one confirmation binds the exact ordered batch and execution
 policy to the MCP session. Supply its `confirm` token at the batch level; individual entry tokens

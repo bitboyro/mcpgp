@@ -77,7 +77,10 @@ public final class McpServerFactory {
         this.catalog = new ToolCatalog(manifest, config);
         this.apiTools = new ApiToolHandler(manifest, config);
         this.batchResults = apiTools.resultStore();
-        this.batchReceipts = new BatchReceipts(config.storageRoot(), clock);
+        JsonNode batchPolicy = manifest.policies().path("batch");
+        this.batchReceipts = new BatchReceipts(config.storageRoot(), clock,
+                batchPolicy.path("requestReceiptTtlSeconds").asLong(604800),
+                batchPolicy.path("maxStoredReceipts").asInt(100000));
         ro.bitboy.mcpgp.runtime.call.Contracts contracts = apiTools.contracts();
         contracts.onResult(this::contractChosen);
         contracts.start();

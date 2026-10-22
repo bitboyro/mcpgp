@@ -140,7 +140,7 @@
       "type": "object",
       "properties": {
         "confirmDestructive": { "type": "boolean" },
-        "batch": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "maxCalls": {"type": "integer", "minimum": 1, "maximum": 100}, "concurrency": {"type": "integer", "minimum": 1, "maximum": 16}, "allowWrites": {"type": "boolean"}, "deduplicateRequests": {"type": "boolean"}}, "additionalProperties": false},
+        "batch": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "maxCalls": {"type": "integer", "minimum": 1, "maximum": 100}, "concurrency": {"type": "integer", "minimum": 1, "maximum": 16}, "allowWrites": {"type": "boolean"}, "deduplicateRequests": {"type": "boolean"}, "requestReceiptTtlSeconds": {"type": "integer", "minimum": 60, "maximum": 2592000}, "maxStoredReceipts": {"type": "integer", "minimum": 1, "maximum": 1000000}}, "additionalProperties": false},
         "results": {"type": "object", "properties": {"mode": {"enum": ["inline", "auto", "reference"]}, "captureLimitKb": {"type": "integer", "minimum": 1, "maximum": 65536}, "ttlSeconds": {"type": "integer", "minimum": 1, "maximum": 86400}, "maxStoredKb": {"type": "integer", "minimum": 1, "maximum": 262144}}, "additionalProperties": false},
         "responseLimitKb": { "type": "integer" },
         "cleanTruncation": { "type": "boolean" },
