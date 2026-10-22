@@ -261,7 +261,7 @@ export interface Manifest {
   packs: { id: string; version: string; tools: string[] }[]
   policies: {
     confirmDestructive?: boolean; responseLimitKb?: number; redaction?: { fields: string[] }
-    batch?: { enabled?: boolean; maxCalls?: number; concurrency?: number; allowWrites?: boolean }
+    batch?: { enabled?: boolean; maxCalls?: number; concurrency?: number; allowWrites?: boolean; deduplicateRequests?: boolean }
     results?: { mode?: 'inline' | 'auto' | 'reference'; captureLimitKb?: number; ttlSeconds?: number; maxStoredKb?: number }
     cleanTruncation?: boolean
     outputSchemas?: boolean

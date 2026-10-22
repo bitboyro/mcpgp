@@ -23,6 +23,7 @@ interface Settings {
   batchMaxCalls: number
   batchConcurrency: number
   batchAllowWrites: boolean
+  batchDeduplicateRequests: boolean
   resultMode: 'inline' | 'auto' | 'reference'
   captureLimitKb: number
   resultTtl: number
@@ -46,6 +47,7 @@ function current(p: Manifest['policies']): Settings {
     batchMaxCalls: p.batch?.maxCalls ?? 20,
     batchConcurrency: p.batch?.concurrency ?? 4,
     batchAllowWrites: p.batch?.allowWrites ?? false,
+    batchDeduplicateRequests: p.batch?.deduplicateRequests ?? false,
     resultMode: p.results?.mode ?? 'inline',
     captureLimitKb: p.results?.captureLimitKb ?? 4096,
     resultTtl: p.results?.ttlSeconds ?? 900,
@@ -69,6 +71,7 @@ const PATHS: Record<keyof Settings, string> = {
   batchMaxCalls: '/batch/maxCalls',
   batchConcurrency: '/batch/concurrency',
   batchAllowWrites: '/batch/allowWrites',
+  batchDeduplicateRequests: '/batch/deduplicateRequests',
   resultMode: '/results/mode',
   captureLimitKb: '/results/captureLimitKb',
   resultTtl: '/results/ttlSeconds',
@@ -146,6 +149,8 @@ function SafetyForm({ id, saved }: { id: string; saved: Settings }) {
         <NumberField label="Parallel read operations" value={s.batchConcurrency} disabled={off || !s.batchEnabled} onChange={(v) => set('batchConcurrency', v)} hint="1–16 concurrent reads. Existing per-instance rate limits also apply." />
         <Toggle label="Allow writes in sequential batches" checked={s.batchAllowWrites} disabled={off || !s.batchEnabled} onChange={(v) => set('batchAllowWrites', v)}
           hint="POST, PUT, PATCH and DELETE retain their validation and confirmation requirements. Earlier writes remain committed after a failure. No automatic retries or rollback." />
+        <Toggle label="Deduplicate retried batches" checked={s.batchDeduplicateRequests} disabled={off || !s.batchEnabled} onChange={(v) => set('batchDeduplicateRequests', v)}
+          hint="A caller can reuse a requestId to recover a recorded batch outcome without sending it upstream again. An interrupted batch reports an unknown outcome so writes are not replayed." />
       </div>
 
       <div className="card">

@@ -44,6 +44,7 @@ public final class McpServerFactory {
     /** Caps on the arguments agents send (safety.inputLimits). */
     private final InputLimits inputLimits;
     private final RetainedResults batchResults;
+    private final BatchReceipts batchReceipts;
     private final ThreadLocal<Boolean> batchApproved = ThreadLocal.withInitial(() -> false);
     private final Clock clock;
     /** GET operations exposed as resources (tools-contract §14.1). */
@@ -76,6 +77,7 @@ public final class McpServerFactory {
         this.catalog = new ToolCatalog(manifest, config);
         this.apiTools = new ApiToolHandler(manifest, config);
         this.batchResults = apiTools.resultStore();
+        this.batchReceipts = new BatchReceipts(config.storageRoot(), clock);
         ro.bitboy.mcpgp.runtime.call.Contracts contracts = apiTools.contracts();
         contracts.onResult(this::contractChosen);
         contracts.start();
@@ -323,11 +325,19 @@ public final class McpServerFactory {
     /** Preflights the entire plan, confirms it once, then dispatches each entry normally. */
     @SuppressWarnings("unchecked")
     private Object batch(McpSyncServerExchange exchange, JsonNode batchTool, Map<String, Object> args) {
-        if (!java.util.Set.of("calls", "execution", "confirm").containsAll(args.keySet()))
+        if (!java.util.Set.of("calls", "execution", "confirm", "requestId").containsAll(args.keySet()))
             throw new ToolError("INPUT_VALIDATION", "Unknown batch argument");
         if (args.containsKey("confirm") && !(args.get("confirm") instanceof String))
             throw new ToolError("INPUT_VALIDATION", "Confirmation token must be a string");
         JsonNode policy = manifest.policies().path("batch");
+        String requestId = args.get("requestId") instanceof String id ? id : null;
+        if (args.containsKey("requestId") && requestId == null)
+            throw new ToolError("INPUT_VALIDATION", "requestId must be a string");
+        Map<String, Object> receiptArguments = new LinkedHashMap<>(args);
+        receiptArguments.remove("confirm");
+        BatchReceipts.Claim existing = policy.path("deduplicateRequests").asBoolean(false)
+                ? batchReceipts.existing(exchange, requestId, receiptArguments) : null;
+        if (existing != null && existing.replay()) return replayBatch(exchange, existing.completed(), requestId);
         if (!(args.get("calls") instanceof List<?> calls) || calls.isEmpty() || calls.size() > policy.path("maxCalls").asInt(20))
             throw new ToolError("INPUT_VALIDATION", "Batch must contain 1 to " + policy.path("maxCalls").asInt(20) + " calls");
         String execution = String.valueOf(args.getOrDefault("execution", "sequential"));
@@ -358,6 +368,9 @@ public final class McpServerFactory {
         Map<String, Object> confirmed = new LinkedHashMap<>(args); Object token = confirmed.remove("confirm");
         if (needsConfirmation) confirmations.check(exchange, batchTool, confirmed, token == null ? null : token.toString(),
                 state -> auditConfirm(batchTool, confirmed, state, Ids.correlation(), exchange));
+        BatchReceipts.Claim receipt = policy.path("deduplicateRequests").asBoolean(false) && requestId != null
+                ? batchReceipts.claim(exchange, requestId, receiptArguments) : null;
+        if (receipt != null && receipt.replay()) return replayBatch(exchange, receipt.completed(), requestId);
         List<Map<String, Object>> results = new ArrayList<>();
         Inflight.Handle batchInflight = Inflight.current();
         String batchSession = ro.bitboy.mcpgp.runtime.call.Recordings.SESSION.get();
@@ -404,10 +417,35 @@ public final class McpServerFactory {
         }
         if (!batchResults.enabled() && Results.json(results).getBytes(java.nio.charset.StandardCharsets.UTF_8).length > manifest.policies().path("responseLimitKb").asInt(256) * 1024 - 256) {
             Map<String, Long> counts = results.stream().collect(java.util.stream.Collectors.groupingBy(row -> row.get("state").toString(), java.util.stream.Collectors.counting()));
-            return Map.of("counts", counts, "outputOmitted", true, "hint", "Enable retained results or submit a smaller batch to inspect individual outputs");
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("counts", counts);
+            payload.put("outputOmitted", true);
+            payload.put("hint", "Enable retained results or submit a smaller batch to inspect individual outputs");
+            if (requestId != null) payload.put("requestId", requestId);
+            recordReceipt(receipt, payload);
+            return payload;
         }
-        ToolOutput output = new ToolOutput(Map.of("batchId", "b_" + java.util.UUID.randomUUID(), "results", results), null, Map.of());
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("batchId", "b_" + java.util.UUID.randomUUID());
+        payload.put("results", results);
+        if (requestId != null) payload.put("requestId", requestId);
+        recordReceipt(receipt, payload);
+        ToolOutput output = new ToolOutput(payload, null, Map.of());
         return new Discovery.Passthrough(Results.ok(batchResults.format(exchange, output), null));
+    }
+
+    private Object replayBatch(McpSyncServerExchange exchange, Map<String, Object> completed, String requestId) {
+        Map<String, Object> payload = new LinkedHashMap<>(completed);
+        payload.put("requestId", requestId);
+        payload.put("deduplicated", true);
+        return new Discovery.Passthrough(Results.ok(batchResults.format(exchange, new ToolOutput(payload, null, Map.of())), null));
+    }
+
+    private void recordReceipt(BatchReceipts.Claim receipt, Map<String, Object> payload) {
+        if (receipt != null && !batchReceipts.complete(receipt, payload)) {
+            payload.put("deduplication", Map.of("recorded", false, "code", "BATCH_RECEIPT_UNAVAILABLE",
+                    "message", "Execution completed but its retry receipt could not be saved; do not replay writes."));
+        }
     }
 
     /** Dispatches a call after confirmation; every failure becomes an audited error result. */
