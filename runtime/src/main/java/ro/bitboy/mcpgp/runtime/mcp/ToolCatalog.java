@@ -130,12 +130,15 @@ public final class ToolCatalog {
 
     /** A tool by name, whether listed or reachable through discovery. */
     public Optional<JsonNode> tool(String name) {
-        return Optional.ofNullable(view(tools.get(name)));
+        JsonNode tool = tools.get(name);
+        return tool == null || !CallerAccess.visible(config, manifest, tool) ? Optional.empty() : Optional.of(tool);
     }
 
     /** Adds a tool (a namespaced instance's copy). */
     void add(JsonNode tool) {
-        tools.put(tool.path("name").asText(), tool);
+        if (new ro.bitboy.mcpgp.runtime.config.ToolPolicy(manifest, config).visible(tool)) {
+            tools.put(tool.path("name").asText(), tool);
+        }
     }
 
     /** The tools made from {@code name} for each instance (namespaced), or the tool itself. */
