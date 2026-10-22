@@ -29,6 +29,23 @@ class MainTest {
         return Main.run(new PrintWriter(out, true), new PrintWriter(err, true), args);
     }
 
+    @Test
+    void buildIncludesExclusionDiagnosticsOnlyWhenRequested(@TempDir Path dir) throws IOException {
+        for (boolean include : new boolean[]{false, true}) {
+            Path target = dir.resolve(Boolean.toString(include));
+            java.util.List<String> args = new java.util.ArrayList<>(java.util.List.of(
+                    "build", ORDERS, "--workspace", WORKSPACE, "--manifest-only", "--out", target.toString()));
+            if (include) args.add("--include-excluded-diagnostics");
+            assertThat(run(args.toArray(String[]::new))).as(err.toString()).isZero();
+            try (var files = Files.list(target)) {
+                JsonNode manifest = new ObjectMapper().readTree(Files.readString(files.findFirst().orElseThrow()));
+                assertThat(manifest.path("diagnostics").findValuesAsText("code").contains("OPERATION_EXCLUDED"))
+                        .isEqualTo(include);
+            }
+        }
+        assertThat(out.toString()).contains("OPERATION_EXCLUDED");
+    }
+
     @AfterEach
     void resetEnv() {
         Main.env = System.getenv();

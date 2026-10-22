@@ -21,3 +21,4 @@ Accepted ADRs are not edited except to change status; write a new ADR to change 
 | [0013](0013-protocol-support-window.md) | Protocol support window and adapter layers | Accepted |
 | [0014](0014-platform-self-hosted.md) | The platform is self-hosted, single-tenant (for now) | Accepted |
 | [0015](0015-postgres-store.md) | A PostgreSQL store next to the file store | Accepted |
+| [0016](0016-optional-exclusion-diagnostics.md) | Optional exclusion diagnostics in manifests | Accepted |

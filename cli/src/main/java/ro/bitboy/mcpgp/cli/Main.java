@@ -494,6 +494,9 @@ public final class Main {
         @Option(names = "--no-output-schemas", description = "Build without tools' output schemas, whatever schemas.output says.")
         boolean noOutputSchemas;
 
+        @Option(names = "--include-excluded-diagnostics", description = "Include excluded-operation diagnostics in the manifest.")
+        boolean includeExcludedDiagnostics;
+
         @Override
         public Integer call() throws IOException {
             List<Path> chosen = definitions(common, all, definitions);
@@ -513,7 +516,7 @@ public final class Main {
             Workspace workspace = common.workspace(workspaceDiagnostics);
             ManifestWriter.Build build = new ManifestWriter.Build(createdAt(definition), Compiler.VERSION, version, buildNumber, source);
             Compiler.Result result = new Compiler(common.schemas).compile(definition,
-                    new Compiler.Options(workspace, frozenLock, build, noOutputSchemas ? Boolean.FALSE : null));
+                    new Compiler.Options(workspace, frozenLock, build, noOutputSchemas ? Boolean.FALSE : null, includeExcludedDiagnostics));
             List<Diagnostic> all = new ArrayList<>(workspaceDiagnostics.all());
             all.addAll(result.diagnostics());
             int code = common.report(definition, all);

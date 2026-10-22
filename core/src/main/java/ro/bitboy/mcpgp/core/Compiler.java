@@ -34,9 +34,15 @@ public final class Compiler {
     /**
      * @param frozenLock fail instead of warning when a tool name would differ from the lock file
      * @param build      build inputs that don't come from the definition (time, version, source)
+     * @param outputSchemas instead of the definition's schemas.output (the CLI's --no-output-schemas); null to follow it
+     * @param includeExcludedDiagnostics include OPERATION_EXCLUDED entries in the manifest; compiler diagnostics always retain them
      */
-    /** @param outputSchemas instead of the definition's schemas.output (the CLI's --no-output-schemas); null to follow it */
-    public record Options(Workspace workspace, boolean frozenLock, ManifestWriter.Build build, Boolean outputSchemas) {
+    public record Options(Workspace workspace, boolean frozenLock, ManifestWriter.Build build, Boolean outputSchemas,
+                          boolean includeExcludedDiagnostics) {
+        public Options(Workspace workspace, boolean frozenLock, ManifestWriter.Build build, Boolean outputSchemas) {
+            this(workspace, frozenLock, build, outputSchemas, false);
+        }
+
         public Options(Workspace workspace, boolean frozenLock, ManifestWriter.Build build) {
             this(workspace, frozenLock, build, null);
         }
@@ -98,10 +104,12 @@ public final class Compiler {
         if (!diagnostics.hasErrors() && collected.stream().noneMatch(d -> d.level() == Diagnostic.Level.ERROR)) {
             ManifestWriter writer = new ManifestWriter(diagnostics);
             manifest = writer.write(definition, contracts, tools, options.build());
-            // the manifest records every warning and info, including the ones the writer reported
+            // Preserve all compiler diagnostics; exclusion details in the manifest are opt-in.
             List<Diagnostic> all = new ArrayList<>(collected);
             all.addAll(diagnostics.all());
-            manifest = writer.withDiagnostics(manifest, sorted(all));
+            manifest = writer.withDiagnostics(manifest, sorted(all).stream()
+                    .filter(d -> options.includeExcludedDiagnostics() || !d.code().equals(Codes.OPERATION_EXCLUDED))
+                    .toList());
             for (Schemas.Problem problem : schemas.problems(SchemaKind.MANIFEST, manifest)) {
                 diagnostics.error(Codes.MANIFEST_INVALID, problem.toString(), null);
             }

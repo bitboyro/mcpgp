@@ -161,13 +161,20 @@ final class InboundFilter extends HttpFilter {
         ro.bitboy.mcpgp.runtime.mcp.ToolCatalog tools = catalog.get();
         if (method.equals("tools/call") && tools != null) {
             String name = message.at("/params/name").asText();
-            String target = name.equals("call_tool") ? message.at("/params/arguments/name").asText(name) : name;
-            JsonNode tool = tools.tool(target).orElse(null);
-            if (tool != null && !policy.allows(tool, grant.scopes())) {
-                String needed = String.join(" ", policy.needed(tool));
-                deny(response, 403, "Bearer error=\"insufficient_scope\", scope=\"" + needed + "\", resource_metadata=\"" + metadata + "\"",
-                        "scope for " + target, request);
-                return null;
+            JsonNode outer = tools.tool(name).orElse(null);
+            String handler = outer == null ? "" : outer.path("handler").asText();
+            List<String> targets = new ArrayList<>();
+            if (!handler.equals("call_tool") && !handler.equals("invoke_operation") && !handler.equals("batch_call")) targets.add(name);
+            if (handler.equals("call_tool") || handler.equals("invoke_operation")) targets.add(message.at("/params/arguments/name").asText(name));
+            if (handler.equals("batch_call")) message.at("/params/arguments/calls").forEach(c -> targets.add(c.path("tool").asText()));
+            for (String target : targets) {
+                JsonNode tool = tools.tool(target).orElse(null);
+                if (tool != null && !policy.allows(tool, grant.scopes())) {
+                    String needed = String.join(" ", policy.needed(tool));
+                    deny(response, 403, "Bearer error=\"insufficient_scope\", scope=\"" + needed + "\", resource_metadata=\"" + metadata + "\"",
+                            "scope for " + target, request);
+                    return null;
+                }
             }
         } else if (method.equals("tools/list") && tools != null && message.has("id")) {
             answerToolList(request, response, message, tools, grant.scopes());

@@ -23,6 +23,9 @@ orders/
 
 See [examples/platform/orders](../../examples/platform/orders) for a complete project.
 
+Batch execution (`batch`) and large-result delivery (`results`) are independent root sections;
+see [batching and retained results](batching-and-results.md) for their settings and limits.
+
 ## 2. Root document
 
 ```yaml
