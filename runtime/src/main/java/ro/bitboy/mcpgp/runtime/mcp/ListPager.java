@@ -115,12 +115,12 @@ public final class ListPager {
         }
     }
 
-    /** What identifies the list: its items' names or URIs, in order. */
+    /** What identifies the list: its full definitions, including allowed instance enums, in order. */
     private static String fingerprint(ArrayNode items) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             for (JsonNode item : items) {
-                String id = item.has("name") ? item.get("name").asText() : item.path("uriTemplate").asText(item.path("uri").asText());
+                String id = item.toString();
                 digest.update(id.getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
             }

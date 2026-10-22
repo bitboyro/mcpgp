@@ -44,13 +44,16 @@ public class ServersApi {
     private final Edits edits;
     private final ro.bitboy.mcpgp.platform.service.Trials trials;
     private final ro.bitboy.mcpgp.platform.service.FromSpec fromSpec;
+    private final ro.bitboy.mcpgp.platform.service.ConfigurationTemplates templates;
 
     private final SpecFetch specFetch;
 
     public ServersApi(Store store, Servers servers, Compilation compilation, ro.bitboy.mcpgp.platform.PlatformConfig config,
                       ro.bitboy.mcpgp.platform.service.Guardrails guardrails, Edits edits, ro.bitboy.mcpgp.platform.service.Trials trials,
-                      ro.bitboy.mcpgp.platform.service.FromSpec fromSpec) {
+                      ro.bitboy.mcpgp.platform.service.FromSpec fromSpec,
+                      ro.bitboy.mcpgp.platform.service.ConfigurationTemplates templates) {
         this.fromSpec = fromSpec;
+        this.templates = templates;
         this.specFetch = new SpecFetch(config.specHosts(), System.getenv());
         this.edits = edits;
         this.trials = trials;
@@ -59,6 +62,12 @@ public class ServersApi {
         this.compilation = compilation;
         this.config = config;
         this.guardrails = guardrails;
+    }
+
+    @GetMapping("/configuration-templates")
+    public ResponseEntity<byte[]> configurationTemplates(HttpServletRequest request) {
+        who(request).require("servers:read");
+        return Json.ok(Map.of("items", templates.all()));
     }
 
     static Access.Principal who(HttpServletRequest request) {
@@ -104,6 +113,8 @@ public class ServersApi {
                                                  @RequestParam(defaultValue = "false") boolean dryRun,
                                                  @RequestParam(required = false) String collisions,
                                                  @RequestParam(required = false) String renames,
+                                                 @RequestParam(required = false) String template,
+                                                 @RequestParam(required = false) String acceptTemplate,
                                                  @RequestHeader(value = "Content-Type", required = false) String contentType,
                                                  @RequestBody(required = false) byte[] body) {
         Access.Principal who = who(request);
@@ -118,6 +129,16 @@ public class ServersApi {
         }
         var upload = fromSpec.read(body == null ? new byte[0] : body, contentType, main);
         var plan = fromSpec.plan(upload, id, title, version, collisions == null || collisions.isBlank() ? null : collisions, chosen);
+        if (template != null && !template.isBlank()) {
+            var t = templates.get(template);
+            Map<String, byte[]> project = new java.util.LinkedHashMap<>(plan.project());
+            String definition = project.keySet().stream().filter(p -> p.endsWith(".mcpgp.yaml")).findFirst().orElseThrow();
+            project.put(definition, templates.apply(project.get(definition), t.id()));
+            plan = new ro.bitboy.mcpgp.platform.service.FromSpec.Plan(plan.id(), plan.title(), plan.api(), plan.version(), project, plan.tools(), plan.diagnostics());
+            if (!dryRun && !templates.acceptance(t).equals(acceptTemplate)) {
+                throw ApiException.validation("template: preview and explicitly accept " + templates.acceptance(t) + " before creating");
+            }
+        }
         if (dryRun) {
             Map<String, Object> answer = new java.util.LinkedHashMap<>();
             answer.put("id", plan.id());
@@ -131,10 +152,40 @@ public class ServersApi {
             answer.put("tools", plan.tools());
             answer.put("exists", store.server(plan.id()).isPresent());
             answer.put("diagnostics", diagnostics(plan.diagnostics()));
+            if (template != null && !template.isBlank()) {
+                var selected = templates.get(template);
+                answer.put("template", selected);
+                answer.put("acceptTemplate", templates.acceptance(selected));
+            }
             return Json.ok(answer);
         }
         guardrails.quota(who, "versions");
         Model.Server server = fromSpec.create(plan, message, who);
+        return withEtag(Json.status(201, detail(server)), server);
+    }
+
+    /** Preview or explicitly apply a versioned configuration template to the latest editable server version. */
+    @PostMapping("/{id}/configuration-template")
+    public ResponseEntity<byte[]> applyConfigurationTemplate(HttpServletRequest request, @PathVariable String id, @RequestParam int base,
+                                                              @RequestParam String template, @RequestParam(required = false) String acceptTemplate,
+                                                              @RequestParam(defaultValue = "false") boolean dryRun) {
+        Access.Principal who = who(request);
+        who.require("servers:write");
+        var selected = templates.get(template);
+        var change = new ro.bitboy.mcpgp.platform.service.YamlEdit.Change("set", "/runtimeDefaults/configuration",
+                Json.MAPPER.valueToTree(selected.defaults()));
+        var preview = edits.preview(id, base, List.of(change));
+        Map<String, Object> answer = new LinkedHashMap<>();
+        answer.put("template", selected);
+        answer.put("acceptTemplate", templates.acceptance(selected));
+        answer.put("base", base);
+        answer.put("compiles", preview.compiles());
+        if (dryRun) return Json.ok(answer);
+        if (!templates.acceptance(selected).equals(acceptTemplate)) {
+            throw ApiException.validation("template: preview and explicitly accept " + templates.acceptance(selected) + " before applying");
+        }
+        if (!preview.compiles()) throw new ApiException(422, "VALIDATION", "the template does not compile", Map.of("diagnostics", diagnostics(preview.preview().result().diagnostics())));
+        Model.Server server = edits.save(id, base, List.of(change), "Apply configuration template " + selected.id(), who);
         return withEtag(Json.status(201, detail(server)), server);
     }
 

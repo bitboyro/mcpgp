@@ -78,31 +78,35 @@ public final class Toolsets {
         return sets.stream().anyMatch(on::contains) ? Optional.empty() : Optional.of(List.copyOf(sets));
     }
 
-    Map<String, ToolHandler> handlers() {
+    Map<String, ToolHandler> handlers(ToolCatalog catalog) {
         Map<String, ToolHandler> handlers = new LinkedHashMap<>();
-        handlers.put("toolsets_list", (exchange, tool, args, record) -> list(session(exchange)));
-        handlers.put("toolset_enable", (exchange, tool, args, record) -> change(session(exchange), args, true));
-        handlers.put("toolset_disable", (exchange, tool, args, record) -> change(session(exchange), args, false));
+        handlers.put("toolsets_list", (exchange, tool, args, record) -> list(session(exchange), catalog));
+        handlers.put("toolset_enable", (exchange, tool, args, record) -> change(session(exchange), args, true, catalog));
+        handlers.put("toolset_disable", (exchange, tool, args, record) -> change(session(exchange), args, false, catalog));
         return handlers;
     }
 
-    private Object list(String session) {
+    private Object list(String session, ToolCatalog catalog) {
         Set<String> on = enabled(session);
         List<Map<String, Object>> sets = new ArrayList<>();
         members.forEach((name, tools) -> {
+            long count = tools.stream().filter(t -> !catalog.servedAs(t).isEmpty()).count();
+            if (count == 0) {
+                return;
+            }
             Map<String, Object> line = new LinkedHashMap<>();
             line.put("name", name);
             line.put("description", descriptions.get(name));
-            line.put("tools", tools.size());
+            line.put("tools", count);
             line.put("enabled", on.contains(name));
             sets.add(line);
         });
         return Map.of("toolsets", sets);
     }
 
-    private Object change(String session, Map<String, Object> args, boolean on) {
+    private Object change(String session, Map<String, Object> args, boolean on, ToolCatalog catalog) {
         String name = String.valueOf(args.getOrDefault("name", ""));
-        if (!members.containsKey(name)) {
+        if (!members.containsKey(name) || members.get(name).stream().noneMatch(t -> !catalog.servedAs(t).isEmpty())) {
             throw new ToolError("INPUT_VALIDATION", "No toolset named '" + name + "'", "Use toolsets_list to see them");
         }
         Set<String> sets = enabled.computeIfAbsent(key(session), k -> ConcurrentHashMap.newKeySet());
@@ -110,7 +114,7 @@ public final class Toolsets {
         if (changed) {
             listChanged.accept(session);
         }
-        return Map.of("toolset", name, "enabled", on, "tools", members.get(name).size());
+        return Map.of("toolset", name, "enabled", on, "tools", members.get(name).stream().filter(t -> !catalog.servedAs(t).isEmpty()).count());
     }
 
     /** A session's end: forget what it enabled. */

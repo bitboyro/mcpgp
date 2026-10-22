@@ -161,6 +161,15 @@ final class Docs {
             md.append("| `").append(row[0]).append("` | ").append(row[1]).append(" | `").append(row[2]).append("` | ").append(row[3]).append(" |\n");
         }
         md.append("\nExample: `").append(server).append(".example.yaml`.\n");
+        md.append("\n## Tool policy\n\n`tools.allow` and `tools.deny` select shipped API/custom tools by exact name or `*` glob. ")
+                .append("Missing allow inherits; `allow: []` permits none. Deployment, API and instance policies intersect; deny wins. ")
+                .append("Use `instances[].tools` (or `instance.tools`) for one target; multi-API builds also accept `apis.<id>.tools`. ")
+                .append("Unknown exact names fail validation. Policies reload live; blocked calls never reach upstream operations. ")
+                .append("`policy` explains the file/environment/flags configuration without starting the server.\n")
+                .append("\nHTTP operators can opt in to `/management/policy` with `server.management.enabled: true` and separate ")
+                .append("`server.management.keys` secret references (at least 24 characters). GET inspects policy; POST `/preview` validates ")
+                .append("revision-bound edits; POST `/apply` persists a previously accepted preview before activation. ")
+                .append("MCP credentials cannot administer this API. Activation/key changes need restart. Preview discloses YAML formatting loss.\n");
         fromRequest(md);
         tokenExchange(md);
         apiVersions(md);
@@ -403,6 +412,7 @@ final class Docs {
         md.append("\n## Commands\n\n| Command | Does |\n|---|---|\n");
         md.append("| `doctor [--quick]` | checks the config and each instance (DNS, TCP, TLS) |\n");
         md.append("| `reload` | applies config changes to the running server (it also watches its files) |\n");
+        md.append("| `policy` | explains configured tool allow/deny decisions and sources without starting the server |\n");
         md.append("| `instance list` / `test <id>` / `add <id>` / `remove <id>` | manage instances |\n");
         md.append("| `instance trust <id>` | fetch, show and save the certificate an instance presents |\n");
         md.append("| `client add <client>` | register with an MCP client |\n\n");

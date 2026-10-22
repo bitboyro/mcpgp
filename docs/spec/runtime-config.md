@@ -2,6 +2,10 @@
 
 Status: **draft v1** · Owner: runtime
 
+[Layered runtime policy and templates](layered-runtime-policy.md) defines the complete design.
+Deployment and API/instance tool policies are implemented below (§4.7), with an opt-in management
+API (§4.8). Organization policy, identity/session extensions and import templates remain planned.
+
 The operator's config for a delivered server, in **YAML or JSON**: `<server>.yaml`, `<server>.yml` or
 `<server>.json` next to the jar (or mounted into the container), or any file given with `--config`;
 the format follows the file extension. Secrets go in `.env` or a keychain. The two formats are
@@ -79,7 +83,7 @@ The generated config schema marks these fields as secret (`"x-mcpgp-secret": tru
 |---|---|
 | `auth.password`, `auth.token`, `auth.value` (API key), `auth.clientSecret` | instances |
 | `tls.password`, `tls.clientKey.base64`, `tls.clientCert.base64` | instances |
-| `server.auth.keys[].value` | server |
+| `server.auth.keys[].value`, `server.management.keys[].value` | server |
 | tokens and passwords in pack config (issue tracker token, …) | packs |
 | `telemetry.otlp.headers` values | telemetry |
 
@@ -155,7 +159,9 @@ In multi-API servers, instances are grouped by API: `apis: { orders: { instances
 | `server.allowedOrigins` | `[]` | Origin check for browser clients (DNS rebinding protection) |
 | `server.pageSize` | `0` | List operations (`tools/list`, `resources/list`, `resources/templates/list`, `prompts/list`) answer this many items per page with an opaque `nextCursor` (MCP pagination); `0`: everything at once. A cursor from before the list changed is refused as invalid params. Set at start |
 | `server.outboundProxy` | none | **Not supported yet:** refused at startup. Planned: HTTP proxy for calls to instances |
-| `server.management.port` | none | health + metrics on a separate port |
+| `server.management.port` | none | health, metrics and the opt-in policy API on a separate port |
+| `server.management.enabled` | false | Enable administrator-only policy inspection/preview/apply; HTTP and a config file required; restart required |
+| `server.management.keys[]` | none | Separate named administrator keys (`name`, secret `value`); minimum 24 characters, no whitespace; restart required |
 | `server.auth.mode` | `none` | `none` · `static` · `oauth`, within the build's `allowed` list |
 | `server.auth.keys[]` | — | `static` mode: `{ name, value }` per client key; `value` is a secret field |
 | `server.auth.issuer` | — | `oauth` mode: authorization server (see [auth.md](auth.md) §1.1); needs `server.publicUrl` |
@@ -298,7 +304,7 @@ The server watches its config file (and `.env`, and `path` certificate material)
 
 | Changes live | Needs a restart |
 |---|---|
-| instances (add, remove, change), credentials, TLS material, contract selection, `errors`, `files`, `audit` retention, log level | transport, host, port, inbound auth mode, storage root |
+| tool policies (§4.7), instances (add, remove, change), credentials, TLS material, contract selection, `errors`, `files`, `audit` retention, log level | transport, host, port, inbound auth mode, management activation/keys, storage root |
 
 A reload that fails validation is rejected as a whole; the running config stays in effect and the
 error is logged and audited. `<server> reload` leaves a request file (`reload.request`) in the
@@ -306,6 +312,101 @@ storage root, which the running server picks up; this works on every platform (`
 Unix-like systems). Calls already running finish with the old config. Changes that need a restart
 are logged as such and take effect at the next start. Added or removed instances update the `instance` enum and send
 `notifications/tools/list_changed` to connected clients.
+
+### 4.7 Tool policy at startup and during reload
+
+`tools.allow` and `tools.deny` restrict the API and custom tools shipped in a build, including API
+operations exposed as resources. Configure them at the deployment root, under `apis.<id>.tools`
+for multi-API builds, and under each `instance.tools` or `instances[].tools`. In a single-API build,
+the root policy covers the API; the `apis` wrapper remains exclusive to multi-API builds.
+
+```yaml
+tools:
+  allow: ["orders_customer_*", "orders_order_search"]
+  deny: ["orders_customer_create"]
+instances:
+  - id: production
+    baseUrl: https://orders.example.com
+    contract: "2.0"
+    tools:
+      allow: ["orders_customer_get"]
+  - id: staging
+    baseUrl: https://staging.orders.example.com
+    contract: "2.0"
+```
+
+- Missing `allow` inherits; `allow: []` permits no API/custom tools.
+- Entries within a list are alternatives. All applicable levels' allowlists intersect; a matching
+  denial at any level wins. A child cannot enable a tool blocked by a parent or absent from the build.
+- Names are case-sensitive final tool names; `*` is the only wildcard. In `mixedContracts: namespaced`,
+  use final names such as `production__orders_customer_get` (or a glob matching them).
+- Unknown exact names fail startup/reload. A glob matching no shipped capability warns and grants
+  nothing. API/instance policies validate names within their own API/instance.
+- Listing, discovery and resource URIs omit blocked capabilities. Tool instance enums list only
+  instances permitted by this policy. Calls check the selected instance before upstream access,
+  even through discovery helpers. Toolset activation cannot enable a policy-blocked tool.
+- Built-in control and support-pack tools remain available; allowlists select API/custom tools.
+  Discovery and introspection helpers use the filtered catalog. This is capability restriction,
+  not a replacement for inbound authentication or administrator control of audit/support tools.
+- Existing `readOnly` settings still block writes at call time and affect instance tool counts;
+  this addition preserves their existing tool-list behavior.
+
+These policies reload live using §4.6, with rejected updates leaving the old catalog and permissions
+intact. Calls already admitted finish with their captured configuration. New calls use the new
+snapshot. Clients receive tool-list change notifications, including discovery-only changes;
+resource registrations also update on reload. MCP list cursors are invalidated when their catalog
+content changes. `list_operations` cursors are tied to the configuration hash.
+
+Environment and CLI overrides follow §1.1. Indexed string entries work as usual; full arrays may
+also be supplied as JSON, allowing an explicit empty allowlist:
+
+```bash
+ORDERS_MCP_TOOLS__ALLOW_0=orders_customer_get
+ORDERS_MCP_INSTANCES_0__TOOLS__DENY_0=orders_customer_create
+# An alternative to indexed entries:
+ORDERS_MCP_TOOLS__ALLOW='[]'
+java -jar orders-mcp.jar --tools.allow '["orders_customer_get"]'
+```
+
+Do not mix whole-array and indexed assignments for the same list in one source.
+`<server> policy` explains configured allow/deny decisions per tool and instance, with their source
+and config hash. It reads the file/environment/flags, does not inspect a running process, and does
+not test credentials or connectivity. Call audit events include the configuration hash used.
+
+### 4.8 Administrator policy API
+
+See [runtime-policy-management.md](runtime-policy-management.md) for request shapes, revision and
+persistence behavior, limits and errors. This API edits only the tool policies of §4.7.
+
+```yaml
+server:
+  transport: http
+  port: 8080
+  management:
+    enabled: true
+    port: 9090
+    keys:
+      - name: operators
+        value: "${env:ORDERS_ADMIN_KEY}"
+```
+
+Use a separate administrator secret of at least 24 characters. MCP client credentials do not grant
+administration. Enabling management requires file audit logging; keys are secret fields and are
+never returned. The API rejects browser Origin requests and requires `Authorization: Bearer …`.
+Activation/key changes require restart. When configured, the management port exclusively serves
+`/management/*` alongside health and metrics; the MCP port returns 404 for those endpoints.
+
+1. `GET /management/policy` returns the source revision, active/desired configuration hashes, pending
+   restart settings and policy decisions without secrets or upstream addresses.
+2. `POST /management/policy/preview` submits an expected revision and replacements/removals of local
+   policy objects. It validates with startup precedence without writing or probing upstreams.
+3. `POST /management/policy/apply` submits that same revision and preview id. Previews expire after
+   ten minutes and belong to the administrator who created them. Stale or masked edits are rejected.
+
+Apply persists the unresolved source configuration atomically before publishing the new snapshot.
+The first API writer serializes YAML, losing comments/formatting; preview explicitly discloses this.
+JSON is formatted on write. Secret references stay references. A read-only mount causes apply to
+fail without changing active policy. Avoid simultaneous edits by unmanaged file writers.
 
 ## 5. TLS and certificate material
 
@@ -413,6 +514,7 @@ The server refuses to start, with a message naming the key, when:
 | Command | Does |
 |---|---|
 | `<server> init` | Guided setup; writes config and `.env`; tests each instance |
+| `<server> policy` | Explain configured tool-policy decisions and their sources (§4.7), without starting the server |
 | `<server> reload` | Reload the config now (§4.6) |
 | `<server> doctor [--quick]` | Validates config, tests instances, port, public URL (`--quick`: config + liveness only, for health checks) |
 | `<server> instance add/test/remove <id>` | Manage instances without editing YAML; `add` offers trust on first use (§5.5) |

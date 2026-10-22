@@ -36,7 +36,11 @@ public final class ConfigLoader {
      * @param workingDir where default config file names and {@code .env} are looked for
      * @param flags      {@code --a.b.c value} flags, by dotted key
      */
-    public record Options(Optional<Path> configFile, Path workingDir, Map<String, String> env, Map<String, String> flags) {
+    public record Options(Optional<Path> configFile, Path workingDir, Map<String, String> env, Map<String, String> flags,
+                          Optional<Path> organizationPolicy, Optional<Path> identityPolicy) {
+        public Options(Optional<Path> file, Path dir, Map<String, String> env, Map<String, String> flags) {
+            this(file, dir, env, flags, Optional.empty(), Optional.empty());
+        }
     }
 
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
@@ -56,14 +60,23 @@ public final class ConfigLoader {
     }
 
     public RuntimeConfig load(Manifest manifest, Options options) {
+        return loadDocument(manifest, options, null);
+    }
+
+    /** Validate a candidate file document through exactly the startup precedence and secret rules. */
+    public RuntimeConfig loadDocument(Manifest manifest, Options options, ObjectNode candidate) {
         List<String> problems = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         String name = manifest.serverName();
+        ObjectNode organization = TrustedPolicies.load(options.organizationPolicy(), SchemaKind.ORGANIZATION_POLICY, schemas, problems);
+        ObjectNode identity = TrustedPolicies.load(options.identityPolicy(), SchemaKind.IDENTITY_POLICY, schemas, problems);
 
         // 1. the file
         Optional<Path> file = locate(name, options, problems);
         ObjectNode fromFile = JsonNodeFactory.instance.objectNode();
-        if (file.isPresent()) {
+        if (candidate != null) {
+            fromFile = candidate.deepCopy();
+        } else if (file.isPresent()) {
             fromFile = read(file.get(), problems);
         }
         if (!problems.isEmpty()) {
@@ -77,6 +90,7 @@ public final class ConfigLoader {
 
         // 3. build defaults < file < environment < flags
         ObjectNode document = buildDefaults(manifest);
+        if (organization.path("defaults") instanceof ObjectNode defaults) { mergeInto(document, defaults); }
         mergeInto(document, fromFile);
         EnvOverrides overrides = new EnvOverrides(nav);
         EnvOverrides.Result withEnv = overrides.apply(document, env, EnvOverrides.prefix(name));
@@ -119,13 +133,26 @@ public final class ConfigLoader {
                         + ": a secret must be a reference (${env:NAME} or ${file:path}) or an environment variable, not a plain value"));
             }
         }
-        JsonNode resolved = secrets.config();
+        ObjectNode resolved = secrets.config().deepCopy();
+        resolved.set("_environment", JSON.valueToTree(withEnv.fromEnv()));
+        resolved.set("_flags", JSON.valueToTree(withFlags.fromEnv()));
+        if (options.organizationPolicy().isPresent()) {
+            resolved.set("_organization", organization);
+            resolved.put("_organizationFile", options.organizationPolicy().get().toAbsolutePath().toString());
+        }
+        if (options.identityPolicy().isPresent()) {
+            resolved.set("_identities", identity);
+            resolved.put("_identityFile", options.identityPolicy().get().toAbsolutePath().toString());
+        }
 
         // 6. what the build allows
         RuntimeConfig.Server server = server(manifest, resolved.path("server"), problems);
         Path storage = storageRoot(name, resolved);
         Map<String, List<RuntimeConfig.Instance>> instances = instances(manifest, resolved, baseDir, problems, warnings);
         credentialHeaders(instances, server, problems, warnings);
+        ToolPolicy.validate(manifest, resolved, instances, problems, warnings);
+        management(resolved, server, file, problems);
+        TrustedPolicies.enforce(organization, server, instances, resolved, manifest.policies().path("rateLimits"), problems);
         RuntimeConfig.Files files = files(manifest, resolved.path("files"), storage, baseDir, problems);
         if (resolved.path("telemetry").path("enabled").asBoolean(false) && resolved.at("/telemetry/exporter").asText("otlp").equals("prometheus")
                 && !server.transport().equals("http")) {
@@ -146,7 +173,47 @@ public final class ConfigLoader {
                 resolved.path("logging").path("level").asText("info"),
                 resolved.path("telemetry"), resolved.path("packs"),
                 Set.copyOf(secrets.secrets()), allowInline && !secrets.inline().isEmpty(), List.copyOf(warnings),
-                configHash(document, secrets.inline()));
+                policyHash(configHash(document, secrets.inline()), organization, identity));
+    }
+
+    private static void management(JsonNode document, RuntimeConfig.Server server, Optional<Path> file, List<String> problems) {
+        JsonNode management = document.at("/server/management");
+        if (!management.path("enabled").asBoolean(false)) {
+            return;
+        }
+        if (!server.transport().equals("http")) {
+            problems.add("/server/management/enabled: policy management requires HTTP transport");
+        }
+        if (file.isEmpty()) {
+            problems.add("/server/management/enabled: policy management requires a configuration file");
+        }
+        if (!document.at("/audit/file/enabled").asBoolean(true)) {
+            problems.add("/audit/file/enabled: policy management requires file audit logging");
+        }
+        if (server.basePath().equals("/management") || server.basePath().startsWith("/management/")) {
+            problems.add("/server/basePath: conflicts with the policy management API");
+        }
+        Set<String> names = new HashSet<>();
+        Set<String> values = new HashSet<>();
+        if (management.path("keys").isEmpty()) {
+            problems.add("/server/management/keys: policy management requires separate administrator keys");
+        }
+        int index = 0;
+        for (JsonNode key : management.path("keys")) {
+            String at = "/server/management/keys/" + index++;
+            String value = key.path("value").asText();
+            if (value.length() < 24 || value.chars().anyMatch(Character::isWhitespace)) {
+                problems.add(at + "/value: administrator keys need at least 24 characters and no whitespace");
+            }
+            if (!names.add(key.path("name").asText()) || !values.add(value)) {
+                problems.add(at + ": administrator names and key values must be unique");
+            }
+            for (JsonNode client : server.auth().path("keys")) {
+                if (value.equals(client.path("value").asText())) {
+                    problems.add(at + "/value: administrator keys must differ from MCP client keys");
+                }
+            }
+        }
     }
 
     // ---------------------------------------------------------------------- sources
@@ -243,6 +310,9 @@ public final class ConfigLoader {
             if (runtimeDefaults.has(key)) {
                 defaults.set(key, runtimeDefaults.get(key).deepCopy());
             }
+        }
+        if (runtimeDefaults.path("configuration") instanceof ObjectNode configuration) {
+            mergeInto(defaults, configuration);
         }
         return defaults;
     }
@@ -349,6 +419,11 @@ public final class ConfigLoader {
             for (int i = 0; i < configured.size(); i++) {
                 JsonNode node = configured.get(i);
                 String where = at + (multi ? "/instances/" + i : "/instance");
+                ObjectNode inherited = JsonNodeFactory.instance.objectNode();
+                if (doc.path("settings") instanceof ObjectNode defaults) { mergeInto(inherited, defaults); }
+                if (multiApi && scope.path("settings") instanceof ObjectNode defaults) { mergeInto(inherited, defaults); }
+                if (node instanceof ObjectNode own) { mergeInto(inherited, own); }
+                node = inherited;
                 String id = multi ? node.path("id").asText("") : "default";
                 if (multi && id.isEmpty()) {
                     problems.add(where + "/id: every instance needs an id (the value agents pass as `instance`)");
@@ -592,6 +667,11 @@ public final class ConfigLoader {
      * The hash of the config before references are resolved. Plain secret values (allowed only with
      * allowInlineSecrets) are masked first, so the hash never depends on a secret.
      */
+    public static String policyHash(String base, JsonNode... policies) {
+        if (java.util.Arrays.stream(policies).allMatch(JsonNode::isEmpty)) { return base; }
+        return "sha256:" + TlsBuilder.sha256((base + JSON.valueToTree(java.util.Arrays.asList(policies))).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     private static String configHash(ObjectNode document, List<String> inline) {
         ObjectNode copy = document.deepCopy();
         for (String pointer : inline) {

@@ -172,6 +172,7 @@ public class McpgpServer {
                     .ifPresent(tool -> tools.add(ro.bitboy.mcpgp.runtime.mcp.ToolCatalog.toMcp(tool))));
             return tools;
         }));
+        ro.bitboy.mcpgp.runtime.mcp.CallerAccess.onChanged(manifest, session -> server.notifyToolsListChanged());
         return server;
     }
 }

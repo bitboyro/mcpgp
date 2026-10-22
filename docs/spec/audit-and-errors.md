@@ -28,6 +28,8 @@ JSON Lines, one event per line, UTF-8. Written to `audit.file.path`. **Never to 
 | `mcp` | for tool and resource calls | the protocol side: `transport` (`stdio`, `http`), `revision` (the `Mcp-Protocol-Version` the client sent; HTTP), `progress` `{ requested, sent }` when the client sent a `progressToken` (sent = notifications written), `cancelled` `{ reason }` when the client cancelled. Cancelled and refused calls are also logged at INFO, other calls at DEBUG |
 | `files` | for calls that send files | `[{ name, sizeBytes, sha256 }]`, never contents |
 | `upstream.body` | for failed calls | the redacted upstream error body (up to 64 KB), whatever `errors.detail` says |
+| `configHash` | for calls, reloads and management | Hash of the configuration snapshot used; no resolved secret values |
+| `management` | for `config.management` | `action` (`read`, `preview`, `apply`, `authentication`), accepted `oldRevision`/`newRevision` and changed `paths` when available; never request bodies or key values |
 | `cid` | yes | correlation id, also in result `_meta` and outbound `traceparent` |
 
 ### Redaction
@@ -48,6 +50,7 @@ build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `auth
 | `instance.health` | instance status change (healthy, degraded, unreachable) |
 | `instance.contract` | an `auto` instance's contract: detected, or the default and why (`detection`: `selection`, `reported`, `reason`); `error` with `INSTANCE_UNAVAILABLE` when refused (runtime-config §4.4) |
 | `config.reload` | runtime config or instances reloaded |
+| `config.management` | Administrator policy read/preview/apply, including rejections and refused authentication/origin requests; actor auth is `management`, independent of MCP auth |
 | `pack.<id>.<action>` | pack-specific (e.g. `pack.recording.start`) |
 
 ## 3. Error codes

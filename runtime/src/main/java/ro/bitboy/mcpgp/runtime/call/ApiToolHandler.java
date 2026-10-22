@@ -30,6 +30,7 @@ public final class ApiToolHandler implements ToolHandler {
     private final ro.bitboy.mcpgp.runtime.mcp.RetainedResults retained;
     private final Manifest manifest;
     private final RuntimeConfig config;
+    private final ro.bitboy.mcpgp.runtime.config.ToolPolicy policy;
     private final InputValidator validator = new InputValidator();
     private final RequestBuilder requests;
     private final Upstream upstream;
@@ -45,6 +46,7 @@ public final class ApiToolHandler implements ToolHandler {
         this.manifest = manifest;
         this.retained = new ro.bitboy.mcpgp.runtime.mcp.RetainedResults(manifest.policies(), java.time.Clock.systemUTC());
         this.config = config;
+        this.policy = new ro.bitboy.mcpgp.runtime.config.ToolPolicy(manifest, config);
         this.requests = new RequestBuilder(new FileInputs(config.files()));
         Map<String, JsonNode> apiKeys = new LinkedHashMap<>();
         manifest.apis().forEach((id, api) -> {
@@ -140,6 +142,11 @@ public final class ApiToolHandler implements ToolHandler {
         record.api = api.id();
         RuntimeConfig.Instance instance = instance(api, arguments);
         record.instance = instance.id();
+        ro.bitboy.mcpgp.runtime.mcp.CallerAccess.require(config, manifest, tool, instance);
+        policy.deniedBy(tool, instance).ifPresent(source -> {
+            throw new ToolError("NOT_AVAILABLE_ON_INSTANCE", "Tool " + tool.path("name").asText()
+                    + " is blocked on " + instance.id() + " by " + source);
+        });
         Contracts.Choice choice = contracts.forCall(instance, credentials);
         if (!choice.available()) {
             throw new ToolError("INSTANCE_UNAVAILABLE", instance.id() + " is unavailable: " + (choice.selection().equals("detected") ? choice.reason()

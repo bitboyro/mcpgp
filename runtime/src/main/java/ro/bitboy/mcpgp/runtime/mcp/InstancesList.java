@@ -18,11 +18,13 @@ final class InstancesList implements ToolHandler {
 
     private final Manifest manifest;
     private final RuntimeConfig config;
+    private final ro.bitboy.mcpgp.runtime.config.ToolPolicy policy;
     private final ro.bitboy.mcpgp.runtime.call.Contracts contracts;
 
     InstancesList(Manifest manifest, RuntimeConfig config, ro.bitboy.mcpgp.runtime.call.Contracts contracts) {
         this.manifest = manifest;
         this.config = config;
+        this.policy = new ro.bitboy.mcpgp.runtime.config.ToolPolicy(manifest, config);
         this.contracts = contracts;
     }
 
@@ -36,6 +38,10 @@ final class InstancesList implements ToolHandler {
                 continue;
             }
             for (RuntimeConfig.Instance instance : config.instances().getOrDefault(api.id(), List.of())) {
+                if (manifest.tools().values().stream().noneMatch(t -> t.path("kind").asText().equals("api")
+                        && api.id().equals(t.path("api").asText()) && policy.allows(t, instance) && CallerAccess.allows(config, manifest, t, instance))) {
+                    continue;
+                }
                 ro.bitboy.mcpgp.runtime.call.Contracts.Choice choice = contracts.of(instance);
                 String contract = choice.contract();
                 Map<String, Object> entry = new LinkedHashMap<>();
@@ -55,18 +61,19 @@ final class InstancesList implements ToolHandler {
                 }
                 entry.put("readOnly", instance.readOnly());
                 entry.put("status", choice.available() ? "configured" : "unavailable");
-                entry.put("tools", contract == null ? 0 : toolsOn(api.id(), contract, instance.readOnly()));
+                entry.put("tools", contract == null ? 0 : toolsOn(api.id(), contract, instance));
                 instances.add(entry);
             }
         }
         return Map.of("instances", instances);
     }
 
-    private long toolsOn(String api, String contract, boolean readOnly) {
+    private long toolsOn(String api, String contract, RuntimeConfig.Instance instance) {
         return manifest.tools().values().stream()
                 .filter(t -> api.equals(t.path("api").asText()))
                 .filter(t -> t.path("variants").has(contract))
-                .filter(t -> !readOnly || t.at("/annotations/readOnlyHint").asBoolean(false))
+                .filter(t -> policy.allows(t, instance) && CallerAccess.allows(config, manifest, t, instance))
+                .filter(t -> !instance.readOnly() || t.at("/annotations/readOnlyHint").asBoolean(false))
                 .count();
     }
 }

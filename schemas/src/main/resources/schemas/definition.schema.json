@@ -469,6 +469,7 @@
           "additionalProperties": false
         },
         "telemetry": { "type": "object" }
+        ,"configuration": { "$ref": "runtime-config.schema.json" }
       },
       "additionalProperties": false
     },

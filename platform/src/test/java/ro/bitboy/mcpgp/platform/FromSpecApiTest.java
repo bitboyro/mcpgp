@@ -26,6 +26,48 @@ class FromSpecApiTest extends PlatformTestBase {
             """;
     static final String ENTRY = "{ \"Entry\": { \"type\": \"object\", \"properties\": { \"id\": { \"type\": \"string\" } } } }";
 
+    @Test
+    void templatesArePreviewedAndMustBeAcceptedBeforeImport() throws Exception {
+        Map<String, String> files = Map.of("api.json", SWAGGER, "paths/entries.json", ENTRIES, "definitions/entry.json", ENTRY);
+        JsonNode list = json(send(bearer("GET", "/api/v1/servers/configuration-templates", null)));
+        assertThat(list.path("items").findValuesAsText("id")).contains("blank", "default", "personal-use", "enterprise-grade");
+
+        JsonNode preview = json(send(post("/api/v1/servers/from-spec?dryRun=true&id=blank-mcp&template=blank", files)));
+        assertThat(preview.at("/template/id").asText()).isEqualTo("blank");
+        assertThat(preview.path("acceptTemplate").asText()).isEqualTo("blank@1");
+        assertThat(send(post("/api/v1/servers/from-spec?id=blank-mcp&template=blank", files)).statusCode()).isEqualTo(422);
+        assertThat(send(post("/api/v1/servers/from-spec?id=blank-mcp&template=blank&acceptTemplate=blank@1", files)).statusCode()).isEqualTo(201);
+        String definition = new String(send(bearer("GET", "/api/v1/servers/blank-mcp/versions/latest/files/blank-mcp.mcpgp.yaml", null)).body(), StandardCharsets.UTF_8);
+        assertThat(definition).contains("runtimeDefaults").contains("configuration").contains("allow");
+    }
+
+    @Test
+    void aVersionedLibraryTemplateIsAvailableToImport() throws Exception {
+        String template = """
+                title: Workspace safe defaults
+                description: Local policy
+                configuration:
+                  tools: { allow: [] }
+                requiredInputs: [tool selection]
+                """;
+        assertThat(send(bearer("POST", "/api/v1/library/templates?name=workspace-safe",
+                JSON.writeValueAsBytes(Map.of("files", Map.of("workspace-safe.yaml", template))))).statusCode()).isEqualTo(201);
+        Map<String, String> files = Map.of("api.json", SWAGGER, "paths/entries.json", ENTRIES, "definitions/entry.json", ENTRY);
+        JsonNode preview = json(send(post("/api/v1/servers/from-spec?dryRun=true&id=library-template-mcp&template=library/workspace-safe@1", files)));
+        assertThat(preview.at("/template/id").asText()).isEqualTo("library/workspace-safe@1");
+        assertThat(preview.path("acceptTemplate").asText()).isEqualTo("library/workspace-safe@1");
+    }
+
+    @Test
+    void anExistingServerPreviewsAndExplicitlyAppliesATemplate() throws Exception {
+        Map<String, String> files = Map.of("api.json", SWAGGER, "paths/entries.json", ENTRIES, "definitions/entry.json", ENTRY);
+        assertThat(send(post("/api/v1/servers/from-spec?id=upgrade-template-mcp", files)).statusCode()).isEqualTo(201);
+        JsonNode preview = json(send(bearer("POST", "/api/v1/servers/upgrade-template-mcp/configuration-template?base=1&template=blank&dryRun=true", null)));
+        assertThat(preview.path("acceptTemplate").asText()).isEqualTo("blank@1");
+        assertThat(send(bearer("POST", "/api/v1/servers/upgrade-template-mcp/configuration-template?base=1&template=blank", null)).statusCode()).isEqualTo(422);
+        assertThat(send(bearer("POST", "/api/v1/servers/upgrade-template-mcp/configuration-template?base=1&template=blank&acceptTemplate=blank@1", null)).statusCode()).isEqualTo(201);
+    }
+
     static HttpRequest.Builder post(String path, Object files) throws Exception {
         return bearer("POST", path, JSON.writeValueAsBytes(Map.of("files", files)));
     }

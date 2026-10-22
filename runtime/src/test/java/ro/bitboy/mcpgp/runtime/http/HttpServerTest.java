@@ -133,6 +133,34 @@ class HttpServerTest {
     }
 
     @Test
+    void anExistingHttpSessionHonorsLivePolicyRevocationAndRestoration() throws Exception {
+        start("");
+        String session = session(Map.of());
+        Map<String, String> headers = Map.of("Mcp-Session-Id", session, "Mcp-Protocol-Version", "2025-11-25");
+        Path file = dir.resolve("orders-mcp.yaml");
+        String yaml = "server: {transport: http, port: " + port + "}\ninstances: [{id: prod-eu, baseUrl: '" + target.address() + "', contract: '2.0'}]\n";
+        Files.writeString(file, yaml + "tools: {allow: []}\n");
+        assertThat(context.getBean(ro.bitboy.mcpgp.runtime.Reloader.class).reload("test")).isTrue();
+        target.received.clear();
+        JsonNode tools = message(post("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}", headers));
+        assertThat(tools.at("/result/tools").findValuesAsText("name")).doesNotContain("orders_customer_get");
+        JsonNode denied = message(post("""
+                {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"call_tool",
+                 "arguments":{"name":"orders_customer_get","instance":"prod-eu","arguments":{"path":{"id":"c-1"}}}}}
+                """, headers));
+        assertThat(denied.at("/result/isError").asBoolean()).isTrue();
+        assertThat(target.received).isEmpty();
+        Files.writeString(file, yaml);
+        assertThat(context.getBean(ro.bitboy.mcpgp.runtime.Reloader.class).reload("test")).isTrue();
+        JsonNode allowed = message(post("""
+                {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"orders_customer_get",
+                 "arguments":{"instance":"prod-eu","path":{"id":"c-1"}}}}
+                """, headers));
+        assertThat(allowed.at("/result/isError").asBoolean()).isFalse();
+        assertThat(target.received).hasSize(1);
+    }
+
+    @Test
     void staticKeysAreRequiredAndNamedInTheAudit() throws Exception {
         start("auth: { mode: static, keys: [ { name: team-a, value: \"${env:KEY}\" } ] }");
         HttpResponse<String> none = post(INITIALIZE, Map.of());

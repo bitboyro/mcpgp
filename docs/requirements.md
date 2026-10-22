@@ -78,6 +78,9 @@ Every configurable thing, grouped by concern.
 | `auto` contract detection with `onFailure: useDefault \| refuse` | B→R | P1 |
 | Error detail `full` (default) or `summary`; full body always in audit | R | P0 |
 | Config reload without restart for instances, credentials, TLS | R | P1 |
+| Tool allow/deny at deployment, API and instance levels; startup overrides, live reload, configured-policy explanations | R | P1 |
+| Administrator-only runtime policy inspection, preview/apply, revisions and durable source persistence | R | P1 |
+| Organization constraints, identity/session policy extensions and accepted versioned import templates | B→R | P1 (planned; ADR 0017) |
 | Extension SPI: custom tools, request enrichers, call filters (Java) | B | P1 |
 
 ## 6. Security

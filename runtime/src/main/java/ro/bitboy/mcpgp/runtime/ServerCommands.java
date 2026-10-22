@@ -39,7 +39,7 @@ import java.util.Set;
  */
 public final class ServerCommands {
 
-    static final Set<String> COMMANDS = Set.of("doctor", "instance", "init", "client", "reload");
+    static final Set<String> COMMANDS = Set.of("doctor", "instance", "init", "client", "reload", "policy");
 
     private final Map<String, String> env;
     private final Path workingDir;
@@ -110,6 +110,7 @@ public final class ServerCommands {
         try {
             return switch (command) {
                 case "doctor" -> doctor(startup, quick);
+                case "policy" -> policy(startup);
                 case "reload" -> reload(startup.config());
                 case "instance list" -> list(startup.config());
                 case "instance test" -> words.size() == 3 ? test(instance(startup.config(), words.get(2))) : usage();
@@ -162,11 +163,33 @@ public final class ServerCommands {
     }
 
     private int usage() {
-        out.println("Usage: init | doctor [--quick] | reload | instance list | instance test|add|remove|trust <id> | client add <client>");
+        out.println("Usage: policy | init | doctor [--quick] | reload | instance list | instance test|add|remove|trust <id> | client add <client>");
         out.println("       instance trust: [--base64] [--yes | --fingerprint <sha256>]   instance add/remove: [--api <id>]");
         out.println("       client add claude-code|claude-desktop|cursor|vscode [--print] [--dry-run] [--file <path>] [--name <entry>]");
         out.println("       (plus --config <file> and --<key> <value> as when starting the server)");
         return 2;
+    }
+
+    /** Explains the policy loaded from disk/env/flags; does not claim to inspect a running process. */
+    private int policy(Startup startup) {
+        var policy = new ro.bitboy.mcpgp.runtime.config.ToolPolicy(startup.manifest(), startup.config());
+        out.println("Configured tool policy (configHash " + startup.config().configHash() + ")");
+        for (var tool : startup.manifest().tools().values()) {
+            if (java.util.Set.of("builtin", "pack").contains(tool.path("kind").asText())) {
+                continue;
+            }
+            if (tool.has("api")) {
+                for (var instance : startup.config().instances().getOrDefault(tool.path("api").asText(), List.of())) {
+                    out.println(policy.name(tool, instance) + " [" + instance.api() + "/" + instance.id() + "]: "
+                            + policy.deniedBy(tool, instance).map(source -> "denied by " + source).orElse("allowed")
+                            + (instance.readOnly() && !tool.at("/annotations/readOnlyHint").asBoolean(false) ? "; instance is read-only" : ""));
+                }
+            } else {
+                out.println(tool.path("name").asText() + ": "
+                        + policy.deniedBy(tool, null).map(source -> "denied by " + source).orElse("allowed"));
+            }
+        }
+        return 0;
     }
 
     // ---------------------------------------------------------------------- doctor

@@ -82,6 +82,12 @@ class ServerCommandsTest {
     }
 
     @Test
+    void policyExplainsConfiguredRestrictionsWithoutConnecting() throws Exception {
+        assertThat(run("", "tools: {deny: [orders_customer_get]}\ninstances: [{id: prod, baseUrl: https://unreachable.invalid, contract: '2.0'}]\n", "policy")).isZero();
+        assertThat(out()).contains("Configured tool policy (configHash ", "orders_customer_get [orders/prod]: denied by /tools");
+    }
+
+    @Test
     void doctorReportsConfigProblemsAndInlineSecrets() throws IOException {
         assertThat(run("", "instances: [ { id: a, baseUrl: \"ftp://x\" } ]\n", "doctor")).isEqualTo(1);
         assertThat(out()).contains("✗ config").contains("/instances/0/baseUrl: only http and https");

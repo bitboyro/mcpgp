@@ -31,22 +31,29 @@ final class Resources {
     }
 
     private final List<Entry> entries = new ArrayList<>();
+    private final Manifest manifest;
+    private final RuntimeConfig config;
 
     Resources(Manifest manifest, RuntimeConfig config) {
+        this.manifest = manifest; this.config = config;
+        var policy = new ro.bitboy.mcpgp.runtime.config.ToolPolicy(manifest, config);
         JsonNode section = manifest.root().path("resources");
         String scheme = section.path("uriScheme").asText("api");
         for (JsonNode item : section.path("items")) {
+            if (!policy.visible(item)) {
+                continue;
+            }
             // as for tools (ToolCatalog): the instance parameter offers the configured instances of its API
             com.fasterxml.jackson.databind.node.ObjectNode resource = item.deepCopy();
             JsonNode instanceParam = resource.at("/inputSchema/properties/instance");
             if (instanceParam instanceof com.fasterxml.jackson.databind.node.ObjectNode property && property.path("x-mcpgp-instanceEnum").asBoolean(false)) {
                 var ids = property.putArray("enum");
-                config.instances().getOrDefault(resource.path("api").asText(), List.of()).forEach(i -> ids.add(i.id()));
+                policy.allowedInstances(resource).forEach(i -> ids.add(i.id()));
                 property.remove("x-mcpgp-instanceEnum");
             }
             String template = resource.path("uriTemplate").asText();
             if (manifest.multiInstance()) {
-                for (RuntimeConfig.Instance instance : config.instances().getOrDefault(resource.path("api").asText(), List.of())) {
+                for (RuntimeConfig.Instance instance : policy.allowedInstances(resource)) {
                     String uri = scheme + "://" + instance.id() + "/" + template;
                     entries.add(new Entry(resource, instance.id(), uri, new UriTemplate(uri)));
                 }
@@ -58,7 +65,8 @@ final class Resources {
     }
 
     List<Entry> entries() {
-        return entries;
+        return entries.stream().filter(e -> config.instances().getOrDefault(e.resource().path("api").asText(), List.of()).stream()
+                .anyMatch(i -> (e.instance() == null || e.instance().equals(i.id())) && CallerAccess.allows(config, manifest, e.resource(), i))).toList();
     }
 
     boolean any() {
@@ -91,7 +99,7 @@ final class Resources {
     /** Templates with a variable that completion can help with: their URI templates. */
     List<String> completable() {
         List<String> uris = new ArrayList<>();
-        for (Entry entry : entries) {
+        for (Entry entry : entries()) {
             if (entry.isTemplate() && entry.template().getVariableNames().stream().anyMatch(v -> !candidates(entry, v).isEmpty())) {
                 uris.add(entry.uri());
             }
@@ -103,7 +111,7 @@ final class Resources {
     McpSchema.CompleteResult complete(McpSchema.CompleteRequest request) {
         List<String> values = new ArrayList<>();
         if (request.ref() instanceof McpSchema.ResourceReference ref && request.argument() != null) {
-            entries.stream().filter(e -> e.uri().equals(ref.uri())).findFirst()
+            entries().stream().filter(e -> e.uri().equals(ref.uri())).findFirst()
                     .ifPresent(e -> values.addAll(candidates(e, request.argument().name())));
         }
         return Prompts.result(values, request.argument() == null ? null : request.argument().value());
@@ -111,7 +119,7 @@ final class Resources {
 
     /** The entry a URI reads, and the operation's arguments for it. */
     Optional<Map.Entry<Entry, Map<String, Object>>> resolve(String uri) {
-        for (Entry entry : entries) {
+        for (Entry entry : entries()) {
             if (!entry.template().matches(uri)) {
                 continue;
             }

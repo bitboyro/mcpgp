@@ -53,6 +53,8 @@ public class HttpServerConfiguration {
                     if (client != null) {
                         context.put(McpServerFactory.CLIENT_KEY, client);
                     }
+                    Object scopes = request.getAttribute(InboundFilter.SCOPES);
+                    if (scopes != null) { context.put(ro.bitboy.mcpgp.runtime.mcp.CallerAccess.SCOPES, scopes); }
                     String revision = request.getHeader("Mcp-Protocol-Version");
                     if (revision != null) {
                         context.put(McpServerFactory.REVISION_KEY, revision);
@@ -96,6 +98,8 @@ public class HttpServerConfiguration {
                 .notifyClient(session, io.modelcontextprotocol.spec.McpSchema.METHOD_NOTIFICATION_TOOLS_LIST_CHANGED, null)
                 .subscribe(done -> { }, e -> org.slf4j.LoggerFactory.getLogger(HttpServerConfiguration.class)
                         .debug("No tools/list_changed for session {}: {}", session, e.getMessage()))));
+        ro.bitboy.mcpgp.runtime.mcp.CallerAccess.onChanged(manifest, session -> servlet
+                .notifyClient(session, io.modelcontextprotocol.spec.McpSchema.METHOD_NOTIFICATION_TOOLS_LIST_CHANGED, null).subscribe(done -> { }, e -> { }));
         return server;
     }
 
@@ -219,6 +223,14 @@ public class HttpServerConfiguration {
         return registration;
     }
 
+    @Bean
+    ServletRegistrationBean<PolicyManagementServlet> policyManagement(RuntimeConfig config, ro.bitboy.mcpgp.runtime.Reloader reloader) {
+        ServletRegistrationBean<PolicyManagementServlet> registration = new ServletRegistrationBean<>(
+                new PolicyManagementServlet(config, reloader), "/management/policy/*");
+        registration.setName("policy-management");
+        return registration;
+    }
+
     /** With a management port, health and metrics answer only there and the MCP endpoint only on the main port. */
     @Bean
     FilterRegistrationBean<HttpFilter> portSeparation(RuntimeConfig config) {
@@ -230,7 +242,7 @@ public class HttpServerConfiguration {
                 if (management != null) {
                     boolean onManagement = request.getLocalPort() == management;
                     String uri = request.getRequestURI();
-                    boolean operational = uri.startsWith("/health/") || uri.equals("/metrics");
+                    boolean operational = uri.startsWith("/health/") || uri.equals("/metrics") || uri.startsWith("/management/");
                     if (onManagement != operational) {
                         response.setStatus(404);
                         return;

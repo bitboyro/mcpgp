@@ -27,21 +27,27 @@ public final class ToolCatalog {
     };
 
     private final Manifest manifest;
+    private final RuntimeConfig config;
     /** Every callable tool, by name, as served (instance enum filled). */
     private final Map<String, JsonNode> tools = new LinkedHashMap<>();
 
     public ToolCatalog(Manifest manifest, RuntimeConfig config) {
         this.manifest = manifest;
+        this.config = config;
         Set<String> allIds = new LinkedHashSet<>();
         config.allInstances().forEach(i -> allIds.add(i.id()));
+        var policy = new ro.bitboy.mcpgp.runtime.config.ToolPolicy(manifest, config);
         for (JsonNode tool : manifest.tools().values()) {
+            if (!policy.visible(tool)) {
+                continue;
+            }
             ObjectNode served = tool.deepCopy();
             JsonNode instance = served.at("/inputSchema/properties/instance");
             if (instance instanceof ObjectNode property && property.path("x-mcpgp-instanceEnum").asBoolean(false)) {
                 ArrayNode ids = property.putArray("enum");
                 String api = tool.path("api").asText(null);
                 if (api != null) {
-                    config.instances().getOrDefault(api, List.of()).forEach(i -> ids.add(i.id()));
+                    policy.allowedInstances(tool).forEach(i -> ids.add(i.id()));
                 } else {
                     allIds.forEach(ids::add);
                 }
@@ -60,6 +66,10 @@ public final class ToolCatalog {
             tools.put(served.path("name").asText(), served);
         }
         hideUnsatisfied(config);
+        if (config.document().at("/sessions/enabled").asBoolean(false)) {
+            if (tools.containsKey("session_policy")) { throw new IllegalArgumentException("session_policy is reserved when sessions.enabled is true"); }
+            tools.put("session_policy", CallerAccess.tool());
+        }
     }
 
     /**
@@ -69,6 +79,7 @@ public final class ToolCatalog {
      */
     private void hideUnsatisfied(RuntimeConfig config) {
         Map<String, List<String>> hidden = new java.util.TreeMap<>();
+        var policy = new ro.bitboy.mcpgp.runtime.config.ToolPolicy(manifest, config);
         for (Map.Entry<String, JsonNode> e : List.copyOf(tools.entrySet())) {
             JsonNode tool = e.getValue();
             Manifest.Api api = tool.path("kind").asText().equals("api") ? manifest.apis().get(tool.path("api").asText()) : null;
@@ -78,7 +89,7 @@ public final class ToolCatalog {
             JsonNode kinds = api.node().path("downstreamAuth").path("schemes");
             List<String> reasons = new ArrayList<>();
             boolean usable = false;
-            for (RuntimeConfig.Instance instance : config.instances().getOrDefault(api.id(), List.of())) {
+            for (RuntimeConfig.Instance instance : policy.allowedInstances(tool)) {
                 // an auto instance may run any shipped contract (detection decides): a tool usable in one of them stays
                 for (String contract : instance.contract().equals("auto") ? api.contracts().keySet() : List.of(instance.contract())) {
                     JsonNode variant = tool.path("variants").get(contract);
@@ -119,7 +130,7 @@ public final class ToolCatalog {
 
     /** A tool by name, whether listed or reachable through discovery. */
     public Optional<JsonNode> tool(String name) {
-        return Optional.ofNullable(tools.get(name));
+        return Optional.ofNullable(view(tools.get(name)));
     }
 
     /** Adds a tool (a namespaced instance's copy). */
@@ -129,11 +140,11 @@ public final class ToolCatalog {
 
     /** The tools made from {@code name} for each instance (namespaced), or the tool itself. */
     public List<JsonNode> servedAs(String name) {
-        JsonNode own = tools.get(name);
+        JsonNode own = view(tools.get(name));
         if (own != null) {
             return List.of(own);
         }
-        return tools.values().stream().filter(t -> name.equals(t.path("x-mcpgp-original").asText(null))).toList();
+        return tools.values().stream().map(this::view).filter(java.util.Objects::nonNull).filter(t -> name.equals(t.path("x-mcpgp-original").asText(null))).toList();
     }
 
     private static final java.util.regex.Pattern ONLY = java.util.regex.Pattern.compile(" ?\\([0-9][^)]* only\\)");
@@ -208,8 +219,39 @@ public final class ToolCatalog {
         names.forEach(tools::remove);
     }
 
+    Map<String, JsonNode> raw() { return tools; }
+
     public Map<String, JsonNode> all() {
-        return tools;
+        Map<String, JsonNode> visible = new LinkedHashMap<>();
+        tools.forEach((name, tool) -> { JsonNode served = view(tool); if (served != null) { visible.put(name, served); } });
+        return visible;
+    }
+
+    private JsonNode view(JsonNode tool) {
+        if (tool == null || !CallerAccess.visible(config, manifest, tool)) { return null; }
+        ObjectNode copy = tool.deepCopy();
+        JsonNode property = copy.at("/inputSchema/properties/instance");
+        if (tool.has("api") && property.path("enum") instanceof ArrayNode ids) {
+            for (int i = ids.size() - 1; i >= 0; i--) {
+                String id = ids.get(i).asText();
+                var target = config.instances().getOrDefault(tool.path("api").asText(), List.of()).stream().filter(t -> t.id().equals(id)).findFirst();
+                if (target.isEmpty() || !CallerAccess.allows(config, manifest, tool, target.get())) { ids.remove(i); }
+            }
+        }
+        return copy;
+    }
+
+    public CallerAccess.Binding bind(String principal, java.util.Set<String> scopes, String session) {
+        return CallerAccess.bind(principal, scopes, session, manifest);
+    }
+    public void forget(String principal, String session) { CallerAccess.forget(manifest, principal, session); }
+    public List<JsonNode> resourceList(boolean templates) {
+        Resources resources = new Resources(manifest, config);
+        List<JsonNode> result = new ArrayList<>();
+        for (Resources.Entry entry : resources.entries()) {
+            if (entry.isTemplate() == templates) { result.add(Results.JSON.valueToTree(templates ? resources.template(entry) : resources.resource(entry))); }
+        }
+        return result;
     }
 
     /** The tools {@code tools/list} returns in this build's exposure mode. */
@@ -218,7 +260,9 @@ public final class ToolCatalog {
         Set<String> pinned = new LinkedHashSet<>();
         manifest.exposure().path("pinned").forEach(p -> pinned.add(p.asText()));
         List<JsonNode> result = new ArrayList<>();
-        for (JsonNode tool : tools.values()) {
+        for (JsonNode raw : tools.values()) {
+            JsonNode tool = view(raw);
+            if (tool == null) { continue; }
             boolean api = tool.path("kind").asText().equals("api");
             boolean show = switch (mode) {
                 case "hybrid" -> !api || pinned.contains(tool.path("x-mcpgp-original").asText(tool.path("name").asText()));

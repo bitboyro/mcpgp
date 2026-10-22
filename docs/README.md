@@ -11,6 +11,8 @@
 | [spec/conformance.md](spec/conformance.md) | You add test cases or build a runtime. |
 | [spec/naming.md](spec/naming.md) | You touch tool names, titles or descriptions. |
 | [spec/runtime-config.md](spec/runtime-config.md) | You write or parse the customer's runtime config. |
+| [spec/layered-runtime-policy.md](spec/layered-runtime-policy.md) | You implement layered tool restrictions, live policy updates or configuration templates (implementation status and remaining stages). |
+| [spec/runtime-policy-management.md](spec/runtime-policy-management.md) | You administer runtime tool policies through authenticated preview/apply transactions. |
 | [spec/auth.md](spec/auth.md) | You touch inbound or downstream authentication. |
 | [spec/tools-contract.md](spec/tools-contract.md) | You need to know exactly what an agent receives. |
 | [spec/audit-and-errors.md](spec/audit-and-errors.md) | You emit audit events, errors or telemetry. |

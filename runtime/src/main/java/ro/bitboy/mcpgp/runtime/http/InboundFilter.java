@@ -46,6 +46,7 @@ final class InboundFilter extends HttpFilter {
     private final AuditLog audit;
     private final OAuthTokens tokens;
     private final ScopePolicy policy;
+    private final java.util.concurrent.ConcurrentMap<String, String> sessionOwners = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.function.Supplier<ro.bitboy.mcpgp.runtime.mcp.ToolCatalog> catalog;
 
     private final ro.bitboy.mcpgp.runtime.mcp.Toolsets toolsets;
@@ -98,19 +99,28 @@ final class InboundFilter extends HttpFilter {
             if (request == null) {
                 return;
             }
-        } else if (toolsets != null && request.getMethod().equals("POST")) {
-            request = toolList(request, response, null);
-            if (request == null) {
-                return;
-            }
         }
         String session = request.getHeader("Mcp-Session-Id");
+        String principal = principal(request);
+        if (session != null && sessionOwners.containsKey(session) && !sessionOwners.get(session).equals(principal)) {
+            deny(response, 403, null, "session belongs to another principal", request);
+            return;
+        }
+        if (request.getMethod().equals("POST") && session != null && sessionOwners.containsKey(session)) {
+            @SuppressWarnings("unchecked") Set<String> grants = request.getAttribute(SCOPES) instanceof Set<?> values ? (Set<String>) values : Set.of();
+            request = toolList(request, response, grants);
+            if (request == null) { return; }
+        }
         chain.doFilter(request, response);
         // session.start when the server hands out a session id; session.end when the client ends it
         String issued = response.getHeader("Mcp-Session-Id");
         if (session == null && issued != null && response.getStatus() < 300) {
+            sessionOwners.put(issued, principal);
             sessionEvent("session.start", request);
         } else if (session != null && request.getMethod().equals("DELETE") && response.getStatus() < 300) {
+            sessionOwners.remove(session);
+            var tools = catalog.get();
+            if (tools != null) { tools.forget(principal, session); }
             sessionEvent("session.end", request);
             if (toolsets != null) {
                 toolsets.forget(session);
@@ -176,9 +186,6 @@ final class InboundFilter extends HttpFilter {
                     return null;
                 }
             }
-        } else if (method.equals("tools/list") && tools != null && message.has("id")) {
-            answerToolList(request, response, message, tools, grant.scopes());
-            return null;
         }
         return body;
     }
@@ -193,9 +200,21 @@ final class InboundFilter extends HttpFilter {
             return body;
         }
         ro.bitboy.mcpgp.runtime.mcp.ToolCatalog tools = catalog.get();
-        if (message != null && message.isObject() && message.path("method").asText().equals("tools/list") && message.has("id") && tools != null) {
-            answerToolList(request, response, message, tools, scopes);
-            return null;
+        if (message != null && message.isObject() && message.has("id") && tools != null) {
+            String method = message.path("method").asText();
+            if (method.equals("tools/list")) {
+                answerToolList(request, response, message, tools, scopes);
+                return null;
+            }
+            if (method.equals("resources/list") || method.equals("resources/templates/list")) {
+                try (var ignored = tools.bind(principal(request), scopes == null ? Set.of() : scopes, request.getHeader("Mcp-Session-Id"))) {
+                    ObjectNode answer = JSON.createObjectNode().put("jsonrpc", "2.0"); answer.set("id", message.get("id"));
+                    answer.putObject("result").set(method.equals("resources/list") ? "resources" : "resourceTemplates", JSON.valueToTree(tools.resourceList(method.equals("resources/templates/list"))));
+                    JsonNode paged = server.pageSize() > 0 ? ro.bitboy.mcpgp.runtime.mcp.ListPager.answer(new ro.bitboy.mcpgp.runtime.mcp.ListPager.Pending(method, message.at("/params/cursor").asText("")), answer, server.pageSize()) : answer;
+                    response.setContentType("application/json"); JSON.writeValue(response.getOutputStream(), paged);
+                    return null;
+                }
+            }
         }
         return body;
     }
@@ -206,10 +225,11 @@ final class InboundFilter extends HttpFilter {
      */
     private void answerToolList(HttpServletRequest request, HttpServletResponse response, JsonNode message,
                                 ro.bitboy.mcpgp.runtime.mcp.ToolCatalog tools, Set<String> scopes) throws IOException {
+        try (var ignored = tools.bind(principal(request), scopes == null ? Set.of() : scopes, request.getHeader("Mcp-Session-Id"))) {
         List<JsonNode> candidates = new ArrayList<>(tools.listed());
         if (toolsets != null) {
             for (String name : toolsets.visible(request.getHeader("Mcp-Session-Id"))) {
-                tools.tool(name).ifPresent(candidates::add);
+                candidates.addAll(tools.servedAs(name));
             }
         }
         List<io.modelcontextprotocol.spec.McpSchema.Tool> allowed = new ArrayList<>();
@@ -228,6 +248,12 @@ final class InboundFilter extends HttpFilter {
         response.setStatus(200);
         response.setContentType("application/json");
         response.getOutputStream().write(JSON.writeValueAsBytes(answer));
+        }
+    }
+
+    private String principal(HttpServletRequest request) {
+        Object client = request.getAttribute(CLIENT);
+        return client == null ? "anonymous" : server.authMode() + ":" + client;
     }
 
     /** RFC 9728 §3: {@code /.well-known/oauth-protected-resource} inserted before the resource's path. */

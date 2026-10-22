@@ -124,6 +124,17 @@ final class EnvOverrides {
 
     private static JsonNode typed(String raw, String type) {
         return switch (type) {
+            case "array" -> {
+                try {
+                    JsonNode value = new com.fasterxml.jackson.databind.ObjectMapper().readTree(raw);
+                    if (value == null || !value.isArray()) {
+                        throw new IllegalArgumentException("expected a JSON array");
+                    }
+                    yield value;
+                } catch (java.io.IOException e) {
+                    throw new IllegalArgumentException("expected a JSON array");
+                }
+            }
             case "integer" -> {
                 try {
                     yield NODES.numberNode(Long.parseLong(raw.strip()));

@@ -22,3 +22,5 @@ Accepted ADRs are not edited except to change status; write a new ADR to change 
 | [0014](0014-platform-self-hosted.md) | The platform is self-hosted, single-tenant (for now) | Accepted |
 | [0015](0015-postgres-store.md) | A PostgreSQL store next to the file store | Accepted |
 | [0016](0016-optional-exclusion-diagnostics.md) | Optional exclusion diagnostics in manifests | Accepted |
+| [0017](0017-layered-runtime-policy.md) | Layered runtime policy and configuration templates | Accepted |
+| [0018](0018-policy-management-transactions.md) | Policy administration uses separate credentials and previewed file transactions | Accepted |

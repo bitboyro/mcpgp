@@ -285,6 +285,11 @@ public class PlatformServer {
     }
 
     @Bean
+    ro.bitboy.mcpgp.platform.service.ConfigurationTemplates configurationTemplates(Store store) {
+        return new ro.bitboy.mcpgp.platform.service.ConfigurationTemplates(store);
+    }
+
+    @Bean
     Library library(Store store) {
         return new Library(store);
     }
