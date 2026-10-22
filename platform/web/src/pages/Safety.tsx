@@ -19,6 +19,14 @@ interface Settings {
   concurrent: number
   perMinute: number
   retryAfter: boolean
+  batchEnabled: boolean
+  batchMaxCalls: number
+  batchConcurrency: number
+  batchAllowWrites: boolean
+  resultMode: 'inline' | 'auto' | 'reference'
+  captureLimitKb: number
+  resultTtl: number
+  maxStoredKb: number
   outputSchemas: boolean
 }
 
@@ -34,6 +42,14 @@ function current(p: Manifest['policies']): Settings {
     concurrent: p.rateLimits?.concurrent ?? 8,
     perMinute: p.rateLimits?.perMinute ?? 120,
     retryAfter: p.rateLimits?.retryAfter !== false,
+    batchEnabled: p.batch?.enabled ?? false,
+    batchMaxCalls: p.batch?.maxCalls ?? 20,
+    batchConcurrency: p.batch?.concurrency ?? 4,
+    batchAllowWrites: p.batch?.allowWrites ?? false,
+    resultMode: p.results?.mode ?? 'inline',
+    captureLimitKb: p.results?.captureLimitKb ?? 4096,
+    resultTtl: p.results?.ttlSeconds ?? 900,
+    maxStoredKb: p.results?.maxStoredKb ?? 65536,
     outputSchemas: p.outputSchemas !== false,
   }
 }
@@ -49,6 +65,14 @@ const PATHS: Record<keyof Settings, string> = {
   concurrent: '/safety/rateLimits/concurrent',
   perMinute: '/safety/rateLimits/perMinute',
   retryAfter: '/safety/rateLimits/retryAfter',
+  batchEnabled: '/batch/enabled',
+  batchMaxCalls: '/batch/maxCalls',
+  batchConcurrency: '/batch/concurrency',
+  batchAllowWrites: '/batch/allowWrites',
+  resultMode: '/results/mode',
+  captureLimitKb: '/results/captureLimitKb',
+  resultTtl: '/results/ttlSeconds',
+  maxStoredKb: '/results/maxStoredKb',
   outputSchemas: '/schemas/output',
 }
 
@@ -61,7 +85,7 @@ export function SafetyPage() {
   const manifest = useManifest(id)
   return (
     <>
-      <PageHead title="Security & safety" sub="What the server protects by default. Everything is on unless you turn it off here.">
+      <PageHead title="Security & safety" sub="Configure safeguards, batching, and large results. These work with every discovery mode.">
         <BuildButton id={id} />
       </PageHead>
       <div className="body">
@@ -87,8 +111,8 @@ function SafetyForm({ id, saved }: { id: string; saved: Settings }) {
   useEffect(() => setS(saved), [JSON.stringify(saved)]) // eslint-disable-line react-hooks/exhaustive-deps
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setS((old) => ({ ...old, [key]: value }))
   const changed = (Object.keys(PATHS) as (keyof Settings)[]).filter((k) => s[k] !== saved[k])
-  const invalid = (['responseLimitKb', 'requestKb', 'stringMaxLength', 'concurrent', 'perMinute'] as const)
-    .find((k) => !Number.isInteger(s[k]) || s[k] < 1)
+  const invalid = (['responseLimitKb', 'requestKb', 'stringMaxLength', 'concurrent', 'perMinute', 'batchMaxCalls', 'batchConcurrency', 'captureLimitKb', 'resultTtl', 'maxStoredKb'] as const)
+    .find((k) => !Number.isInteger(s[k]) || s[k] < 1 || s[k] > (({ batchMaxCalls: 100, batchConcurrency: 16, captureLimitKb: 65536, resultTtl: 86400, maxStoredKb: 262144 } as Record<string, number>)[k] ?? Number.MAX_SAFE_INTEGER))
   const save = useMutation({
     mutationFn: () => api.saveEdit(id, server.data?.latestVersion ?? 0,
       changed.map((k) => ({ op: 'set' as const, path: PATHS[k], value: s[k] })), 'Security & safety: ' + changed.join(', ')),
@@ -109,9 +133,34 @@ function SafetyForm({ id, saved }: { id: string; saved: Settings }) {
       <div className="card">
         <h2>Large answers</h2>
         <NumberField label="Largest answer an agent gets (KB)" value={s.responseLimitKb} disabled={off} onChange={(v) => set('responseLimitKb', v)}
-          hint="Above this the answer is cut, with a note to narrow the query. The server never downloads more than 4 times this (at least 1 MB), so a huge answer can't exhaust its memory." />
+          hint="The inline output budget. Retention can save larger responses for retrieval; otherwise long answers are cut." />
         <Toggle label="Cut long lists at whole items" checked={s.cleanTruncation} disabled={off} onChange={(v) => set('cleanTruncation', v)}
           hint="The agent keeps valid data (as many items as fit) and is told how many were left out, instead of JSON cut in the middle." />
+      </div>
+
+      <div className="card">
+        <h2>Batch execution</h2>
+        <Toggle label="Enable batch calls" checked={s.batchEnabled} disabled={off} onChange={(v) => set('batchEnabled', v)}
+          hint="Adds batch_call alongside direct and discovery tools. Calls are independent; sequential execution stops on failure." />
+        <NumberField label="Maximum operations per batch" value={s.batchMaxCalls} disabled={off || !s.batchEnabled} onChange={(v) => set('batchMaxCalls', v)} hint="1–100 operations." />
+        <NumberField label="Parallel read operations" value={s.batchConcurrency} disabled={off || !s.batchEnabled} onChange={(v) => set('batchConcurrency', v)} hint="1–16 concurrent reads. Existing per-instance rate limits also apply." />
+        <Toggle label="Allow writes in sequential batches" checked={s.batchAllowWrites} disabled={off || !s.batchEnabled} onChange={(v) => set('batchAllowWrites', v)}
+          hint="POST, PUT, PATCH and DELETE retain their validation and confirmation requirements. Earlier writes remain committed after a failure. No automatic retries or rollback." />
+      </div>
+
+      <div className="card">
+        <h2>Retained results</h2>
+        <label className="field"><span>Result delivery</span>
+          <select className="input" value={s.resultMode} disabled={off} onChange={(e) => set('resultMode', e.target.value as Settings['resultMode'])}>
+            <option value="inline">Inline (existing truncation)</option>
+            <option value="auto">Save large results automatically</option>
+            <option value="reference">Always return a result reference</option>
+          </select>
+        </label>
+        <p className="hint">Independent of batching and discovery. Adds result_get to read saved responses without repeating the operation. Results live in server memory, are private to a session, and expire or disappear on restart or reload. Full means one response, not every upstream page.</p>
+        <NumberField label="Maximum captured response (KB)" value={s.captureLimitKb} disabled={off || s.resultMode === 'inline'} onChange={(v) => set('captureLimitKb', v)} hint="1–65536 KB. Responses beyond this limit are reported as incomplete." />
+        <NumberField label="Result lifetime (seconds)" value={s.resultTtl} disabled={off || s.resultMode === 'inline'} onChange={(v) => set('resultTtl', v)} hint="1–86400 seconds." />
+        <NumberField label="Result storage budget (KB)" value={s.maxStoredKb} disabled={off || s.resultMode === 'inline'} onChange={(v) => set('maxStoredKb', v)} hint="1–262144 KB. Shared by API responses and batch responses." />
       </div>
 
       <div className="card">

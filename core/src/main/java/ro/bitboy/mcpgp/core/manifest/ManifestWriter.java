@@ -161,6 +161,9 @@ public final class ManifestWriter {
         for (Builtins.Spec spec : exposureTools) {
             builtinTools.add(named(names.name(spec.base(), null), spec.tool()));
         }
+        for (Builtins.Spec spec : Builtins.execution(doc)) {
+            builtinTools.add(named(names.name(spec.base(), null), spec.tool()));
+        }
         tools.addAll(builtinTools);
 
         // packs: in single-API servers, pack tools carry the API prefix like API tools
@@ -412,6 +415,14 @@ public final class ManifestWriter {
                 .put("cleanTruncation", safety.path("cleanTruncation").asBoolean(true))
                 .put("outputSchemas", doc.at("/schemas/output").asBoolean(true));
         // on by default; the definition can tune or turn them off (definition-format §2, safety)
+        if (doc.has("batch")) policies.putObject("batch").put("enabled", doc.at("/batch/enabled").asBoolean(false))
+                .put("maxCalls", doc.at("/batch/maxCalls").asInt(20))
+                .put("concurrency", doc.at("/batch/concurrency").asInt(4))
+                .put("allowWrites", doc.at("/batch/allowWrites").asBoolean(false));
+        if (doc.has("results")) policies.putObject("results").put("mode", doc.at("/results/mode").asText("inline"))
+                .put("captureLimitKb", doc.at("/results/captureLimitKb").asInt(4096))
+                .put("ttlSeconds", doc.at("/results/ttlSeconds").asInt(900))
+                .put("maxStoredKb", doc.at("/results/maxStoredKb").asInt(65536));
         JsonNode inputs = safety.path("inputLimits");
         policies.putObject("inputLimits").put("enabled", inputs.path("enabled").asBoolean(true))
                 .put("requestKb", inputs.path("requestKb").asInt(1024)).put("stringMaxLength", inputs.path("stringMaxLength").asInt(65536));

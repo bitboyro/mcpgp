@@ -108,6 +108,10 @@ All tools: `openWorldHint: true`. Rules may override (`annotations` in a rule).
 
 ## 6. Results
 
+Optional [batch execution and retained results](batching-and-results.md) work with every exposure
+mode. Retained-result modes add a reference alternative to served output schemas and preserve
+bounded snapshots for `result_get`; the default inline mode below remains unchanged.
+
 Success:
 
 ```json

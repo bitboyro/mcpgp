@@ -101,7 +101,12 @@ class OAuthTest {
                 instances:
                   - { id: prod-eu, baseUrl: "http://127.0.0.1:1" }
                 """.formatted(port, issuer));
-        Startup startup = Startup.load(new String[] {"--manifest", REPO.resolve("examples/manifest/orders-mcp.manifest.json").toString(),
+        var manifest = (com.fasterxml.jackson.databind.node.ObjectNode)JSON.readTree(REPO.resolve("examples/manifest/orders-mcp.manifest.json").toFile());
+        manifest.withObject("/policies/batch").put("enabled", true).put("allowWrites", true);
+        manifest.withArray("tools").addObject().put("name", "batch_call").put("kind", "builtin").put("handler", "batch_call").putObject("inputSchema").put("type", "object");
+        Path manifestFile = dir.resolve("manifest.json");
+        Files.writeString(manifestFile, manifest.toString());
+        Startup startup = Startup.load(new String[] {"--manifest", manifestFile.toString(),
                 "--config", config.toString(), "--storage.root", dir.resolve("data").toString()}, Map.of("INTROSPECT_SECRET", "introspect-secret"), dir);
         context = McpgpServer.start(startup, new McpgpServer.Stdio(System.in, System.out, () -> { }));
     }
@@ -212,6 +217,8 @@ class OAuthTest {
         HttpResponse<String> indirect = post(call("call_tool", Map.of("instance", "prod-eu", "name", "orders_order_refund", "arguments", Map.of())),
                 reader, session);
         assertThat(indirect.statusCode()).isEqualTo(403);
+        HttpResponse<String> batch = post(call("batch_call", Map.of("calls", List.of(Map.of("id", "write", "tool", "orders_order_refund", "arguments", Map.of("instance", "prod-eu"))))), reader, session);
+        assertThat(batch.statusCode()).isEqualTo(403);
 
         String writer = token(Map.of("scope", "orders.read orders.write"));
         String second = session(writer);
