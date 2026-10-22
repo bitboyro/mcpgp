@@ -11,6 +11,7 @@ batch:
   maxCalls: 20               # 1–100
   concurrency: 4            # 1–16 concurrent reads
   allowWrites: false        # opt in to sequential writes
+  deduplicateRequests: false # opt in to durable requestId receipts
 results:
   mode: auto                # inline (default), auto, reference
   captureLimitKb: 4096       # 1–65536; maximum downloaded body
@@ -46,6 +47,16 @@ availability, toolsets, instance access, selected contract, input schema, reques
 credential availability. HTTP OAuth scopes are checked for every target, including namespaced
 support-tool names. Contract detection may perform its normal read-only version checks.
 Only API tools may be batched; recursive batches and pack calls are rejected.
+
+When `deduplicateRequests` is enabled, a caller may add a `requestId` to a batch. The server writes a
+durable receipt before dispatching any operation, bound to that caller and to the canonical batch
+(calls and execution policy, excluding its confirmation token). Retrying the same request id and
+batch after a lost response returns the recorded outcome with `deduplicated: true`, without calling
+the target again. Reusing an id with different arguments returns `BATCH_REQUEST_ID_REUSE`. If a
+server stops after recording the start but before recording the result, it returns
+`BATCH_OUTCOME_UNKNOWN`; the caller must inspect the target rather than replaying writes. Receipts
+survive process restarts under `storage.root/batches`. They retain the batch outcome only; the
+separate in-memory `result_get` snapshots retain their normal TTL and restart behavior.
 
 When any entry needs confirmation, one confirmation binds the exact ordered batch and execution
 policy to the MCP session. Supply its `confirm` token at the batch level; individual entry tokens

@@ -113,11 +113,13 @@ final class Builtins {
                     prop("id", string("Unique identifier within this batch.")),
                     prop("tool", string("API tool name, including names found through discovery.")),
                     prop("arguments", NODES.objectNode().put("type", "object")));
-            tools.add(builtin("batch_call", "Call a batch", "Runs independent API calls. Sequential writes stop on failure; no rollback or automatic retry. Parallel execution is read-only. Confirmation covers the exact batch.",
+            tools.add(builtin("batch_call", "Call a batch", "Runs independent API calls. Sequential writes stop on failure; no rollback or automatic retry. Parallel execution is read-only. Confirmation covers the exact batch. When request deduplication is enabled, reuse a requestId to recover a completed batch without running it again.",
                     invoke(), object(List.of("calls"),
                             prop("calls", NODES.objectNode().put("type", "array").put("minItems", 1)
                                     .put("maxItems", doc.at("/batch/maxCalls").asInt(20)).set("items", call)),
                             prop("execution", NODES.objectNode().put("type", "string").set("enum", NODES.arrayNode().add("sequential").add("parallel"))),
+                            prop("requestId", NODES.objectNode().put("type", "string").put("minLength", 1).put("maxLength", 128)
+                                    .put("description", "Caller-generated idempotency key for this exact batch, when enabled.")),
                             prop("confirm", string("Confirmation token for this exact batch."))), "batch_call"));
         }
         if (!doc.at("/results/mode").asText("inline").equals("inline")) {

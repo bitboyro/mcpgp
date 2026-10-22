@@ -418,7 +418,8 @@ public final class ManifestWriter {
         if (doc.has("batch")) policies.putObject("batch").put("enabled", doc.at("/batch/enabled").asBoolean(false))
                 .put("maxCalls", doc.at("/batch/maxCalls").asInt(20))
                 .put("concurrency", doc.at("/batch/concurrency").asInt(4))
-                .put("allowWrites", doc.at("/batch/allowWrites").asBoolean(false));
+                .put("allowWrites", doc.at("/batch/allowWrites").asBoolean(false))
+                .put("deduplicateRequests", doc.at("/batch/deduplicateRequests").asBoolean(false));
         if (doc.has("results")) policies.putObject("results").put("mode", doc.at("/results/mode").asText("inline"))
                 .put("captureLimitKb", doc.at("/results/captureLimitKb").asInt(4096))
                 .put("ttlSeconds", doc.at("/results/ttlSeconds").asInt(900))

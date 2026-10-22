@@ -18,11 +18,13 @@ class BatchResultsTest {
     @TempDir Path dir;
     MockTarget target;
     McpServerFactory server;
+    Manifest manifest;
+    RuntimeConfig runtime;
     @BeforeEach void start() throws Exception {
         target = new MockTarget();
         ObjectNode root = (ObjectNode) JSON.readTree(Path.of("../examples/manifest/orders-mcp.manifest.json").toFile());
         root.withObject("/policies").put("responseLimitKb", 1);
-        root.withObject("/policies/batch").put("enabled", true).put("allowWrites", true).put("maxCalls", 10).put("concurrency", 2);
+        root.withObject("/policies/batch").put("enabled", true).put("allowWrites", true).put("maxCalls", 10).put("concurrency", 2).put("deduplicateRequests", true);
         root.withObject("/policies/results").put("mode", "auto").put("captureLimitKb", 8).put("maxStoredKb", 64);
         for (String name : List.of("batch_call", "result_get")) {
             root.withArray("tools").addObject().put("name", name).put("kind", "builtin").put("handler", name)
@@ -30,8 +32,8 @@ class BatchResultsTest {
         }
         Path config = dir.resolve("server.yaml");
         Files.writeString(config, "instances:\n  - { id: prod, baseUrl: \"" + target.address() + "\", contract: \"2.0\" }\n");
-        Manifest manifest = Manifest.of(root);
-        RuntimeConfig runtime = new ConfigLoader(new Schemas()).load(manifest, new ConfigLoader.Options(Optional.of(config), dir,
+        manifest = Manifest.of(root);
+        runtime = new ConfigLoader(new Schemas()).load(manifest, new ConfigLoader.Options(Optional.of(config), dir,
                 Map.of(), Map.of("storage.root", dir.resolve("data").toString())));
         server = new McpServerFactory(manifest, runtime);
     }
@@ -115,6 +117,25 @@ class BatchResultsTest {
         var result = call("orders_customer_get", Map.of("instance", "prod", "path", Map.of("id", "c-1")));
         assertThat(tree(result).has("resultId")).isFalse();
         assertThat(ResultsSize(result)).isLessThan(1024);
+    }
+    @Test void requestIdSurvivesRestartAndPreventsARepeatedWrite() {
+        var create = Map.of("id", "create", "tool", "orders_customer_create", "arguments", Map.of("instance", "prod", "body", Map.of("name", "Acme", "accountId", "a-1")));
+        target.respond(MockTarget.Response.json(201, "{\"id\":\"new\"}"));
+        var args = Map.<String, Object>of("requestId", "write-1", "calls", List.of(create));
+        var first = call("batch_call", args);
+        assertThat(tree(first).path("requestId").asText()).isEqualTo("write-1");
+        server = new McpServerFactory(manifest, runtime);
+        var replay = call("batch_call", args);
+        assertThat(tree(replay).path("deduplicated").asBoolean()).isTrue();
+        assertThat(target.received).hasSize(1);
+        assertThat(target.last().method()).isEqualTo("POST");
+    }
+    @Test void reusedRequestIdWithDifferentBatchIsRejectedWithoutCallingTheTarget() {
+        target.respond(MockTarget.Response.json(200, "{}"));
+        call("batch_call", Map.of("requestId", "read-1", "calls", List.of(get("one"))));
+        var result = call("batch_call", Map.of("requestId", "read-1", "calls", List.of(get("two"))));
+        assertThat(tree(result).path("code").asText()).isEqualTo("BATCH_REQUEST_ID_REUSE");
+        assertThat(target.received).hasSize(1);
     }
     private int ResultsSize(McpSchema.CallToolResult result) { return ((McpSchema.TextContent)result.content().getFirst()).text().length(); }
 }

@@ -30,12 +30,14 @@ describe('security and safety', () => {
     })
     page()
     await userEvent.click(await screen.findByLabelText('Enable batch calls'))
+    await userEvent.click(screen.getByLabelText('Deduplicate retried batches'))
     await userEvent.selectOptions(screen.getByLabelText('Result delivery'), 'auto')
     await userEvent.click(screen.getByRole('button', { name: 'Save as the next version' }))
     await waitFor(() => expect(calls.some((c) => c.path.endsWith('/edits'))).toBe(true))
     const saved = calls.find((c) => c.path.endsWith('/edits'))!
     expect(saved.body).toMatchObject({ changes: [
       { op: 'set', path: '/batch/enabled', value: true },
+      { op: 'set', path: '/batch/deduplicateRequests', value: true },
       { op: 'set', path: '/results/mode', value: 'auto' },
     ] })
   })
