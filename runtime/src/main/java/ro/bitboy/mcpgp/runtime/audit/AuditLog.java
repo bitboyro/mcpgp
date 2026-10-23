@@ -35,7 +35,7 @@ public final class AuditLog {
     private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH").withZone(ZoneOffset.UTC);
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HHmmss").withZone(ZoneOffset.UTC);
 
-    private final RuntimeConfig.Audit config;
+    private volatile RuntimeConfig.Audit config;
     private final String server;
     private final String build;
     private final Clock clock;
@@ -57,6 +57,11 @@ public final class AuditLog {
                 throw new IllegalStateException("The audit directory " + config.file().getParent() + " cannot be created: " + e.getMessage());
             }
         }
+    }
+
+    public synchronized void reconfigure(RuntimeConfig.Audit next) {
+        // File destinations remain process-owned; retention/enabled/argument policy may change live.
+        config = new RuntimeConfig.Audit(next.enabled(), config.file(), next.rotate(), next.retainDays(), next.arguments());
     }
 
     public String argumentsMode() {

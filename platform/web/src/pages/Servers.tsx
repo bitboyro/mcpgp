@@ -197,17 +197,20 @@ function NewFromSpec() {
   // what the user chose for clashing tool names: names per operation, or the server's rule
   const [renames, setRenames] = useState<Record<string, string> | null>(null)
   const [rule, setRule] = useState(false)
+  const [template, setTemplate] = useState('default')
+  const [acceptedTemplate, setAcceptedTemplate] = useState<string | null>(null)
   const naming = { collisions: rule ? 'method-path' : undefined, renames: renames ? JSON.stringify(renames) : undefined }
   const plan = useQuery({
-    queryKey: ['from-spec', rev, main, naming.collisions, naming.renames],
-    queryFn: () => api.fromSpecPlan(files!, { main: main || undefined, ...naming }),
+    queryKey: ['from-spec', rev, main, naming.collisions, naming.renames, template],
+    queryFn: () => api.fromSpecPlan(files!, { main: main || undefined, template: template === 'default' ? undefined : template, ...naming }),
     enabled: files !== null,
     retry: false,
   })
   const problems = specProblems(plan.error)
   const clashes = nameClashes(plan.error)
   const create = useMutation({
-    mutationFn: () => api.createFromSpec(files!, { main: main || undefined, id: id ?? undefined, title: title ?? undefined, version: version ?? undefined, ...naming }),
+    mutationFn: () => api.createFromSpec(files!, { main: main || undefined, id: id ?? undefined, title: title ?? undefined, version: version ?? undefined,
+      template: template === 'default' ? undefined : template, acceptTemplate: acceptedTemplate ?? undefined, ...naming }),
     onSuccess: async (server) => {
       await queryClient.invalidateQueries({ queryKey: ['servers'] })
       navigate(`/servers/${server.id}`)
@@ -218,7 +221,7 @@ function NewFromSpec() {
     <form className="list" style={{ gap: 14 }} onSubmit={(e) => { e.preventDefault(); if (plan.data && shownId) create.mutate() }}>
       <p className="hint">The platform makes the server's definition from the spec: one tool per operation, named from the spec, ready to adjust
         on its Overview. Nothing is created until you press Create.</p>
-      <SpecPicker files={files} onFiles={(f) => { setFiles(f); setRev((r) => r + 1); setRenames(null); setRule(false); create.reset() }} />
+      <SpecPicker files={files} onFiles={(f) => { setFiles(f); setRev((r) => r + 1); setRenames(null); setRule(false); setAcceptedTemplate(null); create.reset() }} />
       {plan.isFetching && <p className="hint">Reading the spec…</p>}
       {problems && <SpecProblemsView problems={problems} main={main} onMain={setMain} />}
       {clashes && clashes.length > 0 && (
@@ -237,6 +240,15 @@ function NewFromSpec() {
               <span className="hint">Put where the spec refers to them: {plan.data.moved.map((m) => `${m.from} → ${m.to}`).join(', ')}</span>
             )}
           </div>
+          <label className="field">Configuration template
+            <select className="input input-stage" value={template} onChange={(e) => { setTemplate(e.target.value); setAcceptedTemplate(null) }}>
+              <option value="blank">Blank</option><option value="default">Default</option><option value="personal-use">Personal use</option><option value="enterprise-grade">Enterprise grade</option>
+            </select>
+          </label>
+          {plan.data.template && <div className="stage-card"><b>{plan.data.template.title}</b><span className="hint">{plan.data.template.description}</span>
+            {plan.data.template.requiredInputs.length > 0 && <span className="hint">Before deployment: {plan.data.template.requiredInputs.join(' · ')}</span>}
+            <label className="check"><input type="checkbox" checked={acceptedTemplate === plan.data.acceptTemplate}
+              onChange={(e) => setAcceptedTemplate(e.target.checked ? plan.data.acceptTemplate ?? null : null)} /> I reviewed and accept this template</label></div>}
           <label className="field">Server id (in addresses and references; lowercase, digits, -)
             <input className="input input-stage" value={shownId} onChange={(e) => setId(slug(e.target.value))} required pattern="[a-z0-9][a-z0-9-]{1,62}" />
           </label>
@@ -250,7 +262,7 @@ function NewFromSpec() {
           {(rule || renames) && <p className="hint">{rule ? 'Clashing tools are named from their method and path (naming.collisions: method-path).'
             : `Renamed: ${Object.values(renames!).join(', ')}.`} <button type="button" className="btn btn-sm" onClick={() => { setRule(false); setRenames(null) }}>Change</button></p>}
           <ErrorBox error={create.error} />
-          <button type="submit" className="btn btn-primary" disabled={!shownId || create.isPending}>{create.isPending ? 'Creating…' : 'Create server'}</button>
+          <button type="submit" className="btn btn-primary" disabled={!shownId || create.isPending || (template !== 'default' && acceptedTemplate !== plan.data.acceptTemplate)}>{create.isPending ? 'Creating…' : 'Create server'}</button>
         </>
       )}
     </form>

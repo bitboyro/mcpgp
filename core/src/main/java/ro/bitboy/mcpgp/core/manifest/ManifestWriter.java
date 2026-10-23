@@ -440,7 +440,7 @@ public final class ManifestWriter {
                 : NODES.objectNode().set("fields", NODES.arrayNode()));
         policies.set("baseUrlAllowlist", defaults.has("baseUrlAllowlist") ? defaults.get("baseUrlAllowlist").deepCopy() : NODES.arrayNode());
         ObjectNode runtimeDefaults = NODES.objectNode();
-        for (String key : List.of("timeouts", "audit", "telemetry")) {
+        for (String key : List.of("timeouts", "audit", "telemetry", "configuration")) {
             if (defaults.has(key)) {
                 runtimeDefaults.set(key, defaults.get(key).deepCopy());
             }

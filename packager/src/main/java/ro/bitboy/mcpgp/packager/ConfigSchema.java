@@ -100,7 +100,10 @@ final class ConfigSchema {
             for (JsonNode api : apis) {
                 String id = api.path("id").asText();
                 ObjectNode entry = apiProperties.putObject(id).put("type", "object");
-                entry.putObject("properties").set(key, reference(id, multi));
+                ObjectNode entryProperties = entry.putObject("properties");
+                entryProperties.putObject("tools").put("$ref", "#/$defs/toolPolicy");
+                entryProperties.putObject("settings").put("$ref", "#/$defs/inheritedSettings");
+                entryProperties.set(key, reference(id, multi));
                 entry.putArray("required").add(key);
                 entry.put("additionalProperties", false);
             }

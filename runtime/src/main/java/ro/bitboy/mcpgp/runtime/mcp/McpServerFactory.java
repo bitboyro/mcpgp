@@ -61,7 +61,7 @@ public final class McpServerFactory {
     private final Toolsets toolsets;
     /** stdio, toolsets mode: the API tools currently registered on the server. */
     /** Who handles calls of the registered tools: this factory, or its replacement after a config reload. */
-    private volatile java.util.function.Supplier<McpServerFactory> current = () -> this;
+    private final java.util.concurrent.atomic.AtomicReference<McpServerFactory> current = new java.util.concurrent.atomic.AtomicReference<>(this);
 
     public McpServerFactory(Manifest manifest, RuntimeConfig config) {
         this(manifest, config, new AuditLog(config.audit(), manifest.serverName(), manifest.serverVersion(), Clock.systemUTC()), Clock.systemUTC());
@@ -86,11 +86,12 @@ public final class McpServerFactory {
         contracts.start();
         builtins.put("result_get", (exchange, tool, args, record) -> batchResults.get(exchange, args));
         builtins.put("batch_call", (exchange, tool, args, record) -> batch(exchange, tool, args));
+        builtins.put("session_policy", (exchange, tool, args, record) -> CallerAccess.change(manifest, config, args));
         builtins.put("instances_list", new InstancesList(manifest, config, contracts));
         builtins.putAll(new Discovery(manifest, config, catalog, contracts, this::call).handlers());
         this.toolsets = Toolsets.active(manifest) ? Toolsets.of(manifest) : null;
         if (toolsets != null) {
-            builtins.putAll(toolsets.handlers());
+            builtins.putAll(toolsets.handlers(catalog));
         }
         this.extensions = Extensions.load(manifest);
         if (!extensions.enrichers().isEmpty()) {
@@ -305,9 +306,8 @@ public final class McpServerFactory {
      * @return true when the tool list changed (clients were notified by the SDK, once per changed tool)
      */
     public boolean handOver(McpServerFactory next, McpSyncServer server) {
-        java.util.function.Supplier<McpServerFactory> target = () -> next;
-        this.current = target;
-        next.current = target;
+        this.current.set(next);
+        next.current.set(next);
         boolean changed = false;
         Map<String, JsonNode> before = new HashMap<>();
         catalog.listed().forEach(t -> before.put(t.path("name").asText(), t));
@@ -453,6 +453,10 @@ public final class McpServerFactory {
 
     /** Dispatches a call after confirmation; every failure becomes an audited error result. */
     public McpSchema.CallToolResult call(McpSyncServerExchange exchange, McpSchema.CallToolRequest request) {
+        try (var ignored = CallerAccess.enter(exchange, config, manifest)) { return callCaptured(exchange, request); }
+    }
+
+    private McpSchema.CallToolResult callCaptured(McpSyncServerExchange exchange, McpSchema.CallToolRequest request) {
         String name = request.name();
         Map<String, Object> arguments = new LinkedHashMap<>(request.arguments() == null ? Map.of() : request.arguments());
         JsonNode tool = catalog.tool(name).orElse(null);
@@ -581,6 +585,10 @@ public final class McpServerFactory {
      * the way of a tool call; audited as {@code resource.read}.
      */
     public McpSchema.ReadResourceResult read(McpSyncServerExchange exchange, McpSchema.ReadResourceRequest request) {
+        try (var ignored = CallerAccess.enter(exchange, config, manifest)) { return readCaptured(exchange, request); }
+    }
+
+    private McpSchema.ReadResourceResult readCaptured(McpSyncServerExchange exchange, McpSchema.ReadResourceRequest request) {
         var resolved = resources.resolve(request.uri())
                 .orElseThrow(() -> io.modelcontextprotocol.spec.McpError.RESOURCE_NOT_FOUND.apply(request.uri()));
         JsonNode resource = resolved.getKey().resource();

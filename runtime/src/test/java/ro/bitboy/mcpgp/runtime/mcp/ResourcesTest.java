@@ -146,6 +146,23 @@ class ResourcesTest {
     }
 
     @Test
+    void resourcePoliciesUseTheSameNamesAndBlockReadsBeforeUpstreamAccess() throws Exception {
+        target = new MockTarget();
+        McpServerFactory server = server(manifest("multi"), """
+                tools: {allow: [orders_account_list]}
+                instances:
+                  - {id: production, baseUrl: "%s", tools: {allow: []}}
+                  - {id: staging, baseUrl: "%s"}
+                """.formatted(target.address(), target.address()));
+        assertThatThrownBy(() -> server.read(null, new McpSchema.ReadResourceRequest("api://production/accounts")))
+                .isInstanceOf(McpError.class);
+        assertThat(target.received).isEmpty();
+        target.respond(MockTarget.Response.json(200, "[]"));
+        server.read(null, new McpSchema.ReadResourceRequest("api://staging/accounts"));
+        assertThat(target.received).hasSize(1);
+    }
+
+    @Test
     void multiInstanceUrisNameTheInstance() throws Exception {
         target = new MockTarget();
         McpServerFactory server = server(manifest("multi"), """
@@ -189,6 +206,21 @@ class ResourcesTest {
         JsonNode read = ro.bitboy.mcpgp.runtime.http.HttpServerTestAccess.message(post(port, session, Map.of("jsonrpc", "2.0", "id", 4,
                 "method", "resources/read", "params", Map.of("uri", "api://customers/c-1"))));
         assertThat(read.at("/result/contents/0/text").asText()).contains("c-1");
+        String initial = Files.readString(config);
+        Files.writeString(config, initial + "tools: {allow: []}\n");
+        assertThat(context.getBean(ro.bitboy.mcpgp.runtime.Reloader.class).reload("test")).isTrue();
+        JsonNode hidden = ro.bitboy.mcpgp.runtime.http.HttpServerTestAccess.message(post(port, session,
+                Map.of("jsonrpc", "2.0", "id", 5, "method", "resources/list", "params", Map.of())));
+        assertThat(hidden.at("/result/resources")).isEmpty();
+        JsonNode blocked = ro.bitboy.mcpgp.runtime.http.HttpServerTestAccess.message(post(port, session,
+                Map.of("jsonrpc", "2.0", "id", 6, "method", "resources/read", "params", Map.of("uri", "api://customers/c-1"))));
+        assertThat(blocked.has("error")).isTrue();
+        Files.writeString(config, initial);
+        assertThat(context.getBean(ro.bitboy.mcpgp.runtime.Reloader.class).reload("test")).isTrue();
+        JsonNode restored = ro.bitboy.mcpgp.runtime.http.HttpServerTestAccess.message(post(port, session,
+                Map.of("jsonrpc", "2.0", "id", 7, "method", "resources/list", "params", Map.of())));
+        assertThat(restored.at("/result/resources").findValuesAsText("uri")).containsExactly("api://accounts");
+
     }
 
     @Test

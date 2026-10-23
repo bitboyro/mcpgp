@@ -6,6 +6,8 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- Opt-in runtime policy management endpoints with separate administrator keys, previewed and audited
+  atomic configuration updates, and layered allow/deny tool policies across deployment, API and instance.
 - `mcpgp build --include-excluded-diagnostics` opts into exclusion details in the manifest. By default,
   `OPERATION_EXCLUDED` entries stay in compiler/CLI diagnostics only; other manifest diagnostics remain.
 - The release gate, first milestone (G1): `conformance/runner/ts` builds packages with `mcpgp build`,

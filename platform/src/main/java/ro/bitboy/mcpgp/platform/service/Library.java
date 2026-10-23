@@ -66,18 +66,19 @@ public final class Library {
 
     /** Shared notices must match their schema (servers would fail to compile otherwise); other kinds are checked where they're used. */
     private void checkContent(String kind, Model.Version version) {
-        if (!kind.equals("notices")) {
+        if (!kind.equals("notices") && !kind.equals("templates")) {
             return;
         }
         List<String> problems = problems(kind, new String(store.blob(version.files().get(version.root())), java.nio.charset.StandardCharsets.UTF_8));
         if (!problems.isEmpty()) {
-            throw new ApiException(422, "VALIDATION", "not a valid set of notices: " + String.join("; ", problems));
+            throw new ApiException(422, "VALIDATION", "not a valid " + (kind.equals("templates") ? "configuration template" : "set of notices") + ": " + String.join("; ", problems));
         }
     }
 
     /** The schema's problems with an item's root file (naming policies and shared notices). */
     private List<String> problems(String kind, String text) {
         List<String> problems = new ArrayList<>();
+        if (kind.equals("templates")) return ConfigurationTemplates.validate(text);
         try {
             com.fasterxml.jackson.databind.JsonNode doc = new com.fasterxml.jackson.databind.ObjectMapper(
                     new com.fasterxml.jackson.dataformat.yaml.YAMLFactory()).readTree(text);

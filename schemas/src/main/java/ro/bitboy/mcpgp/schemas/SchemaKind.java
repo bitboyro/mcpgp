@@ -8,6 +8,8 @@ public enum SchemaKind {
     NAMES_LOCK("names-lock.schema.json"),
     WORKSPACE("workspace.schema.json"),
     RUNTIME_CONFIG("runtime-config.schema.json"),
+    ORGANIZATION_POLICY("organization-policy.schema.json"),
+    IDENTITY_POLICY("identity-policy.schema.json"),
     MANIFEST("manifest.schema.json"),
     AUDIT_EVENT("audit-event.schema.json"),
     CLI_CONFIG("cli-config.schema.json"),

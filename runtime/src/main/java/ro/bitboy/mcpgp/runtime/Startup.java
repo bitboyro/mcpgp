@@ -24,8 +24,25 @@ public record Startup(Manifest manifest, RuntimeConfig config, String[] args, Ma
         Optional<Path> configFile = Optional.ofNullable(flags.remove("config")).map(Path::of);
         Manifest manifest = manifest(flags.remove("manifest"));
         RuntimeConfig config = new ConfigLoader(new Schemas())
-                .load(manifest, new ConfigLoader.Options(configFile, workingDir, env, flags));
+                .load(manifest, new ConfigLoader.Options(configFile, workingDir, env, flags,
+                        policy(flags, env, "organization-policy", "MCPGP_ORGANIZATION_POLICY"),
+                        policy(flags, env, "identity-policy", "MCPGP_IDENTITY_POLICY")));
         return new Startup(manifest, config, args.clone(), Map.copyOf(env), workingDir);
+    }
+
+    public RuntimeConfig previewConfig(com.fasterxml.jackson.databind.node.ObjectNode document) {
+        Map<String, String> overrides = flags(args);
+        overrides.remove("manifest");
+        overrides.remove("config");
+        return new ConfigLoader(new Schemas()).loadDocument(manifest,
+                new ConfigLoader.Options(config.source(), workingDir, env, overrides,
+                        policy(overrides, env, "organization-policy", "MCPGP_ORGANIZATION_POLICY"),
+                        policy(overrides, env, "identity-policy", "MCPGP_IDENTITY_POLICY")), document);
+    }
+
+    private static Optional<Path> policy(Map<String, String> flags, Map<String, String> env, String flag, String variable) {
+        String value = flags.remove(flag);
+        return Optional.ofNullable(value == null ? env.get(variable) : value).map(Path::of);
     }
 
     /** The embedded manifest, or the {@code --manifest} file in development. */

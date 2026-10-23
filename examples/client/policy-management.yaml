@@ -1,0 +1,17 @@
+# Runtime policy administration: keep the administrator key separate from MCP client credentials.
+server:
+  transport: http
+  port: 8080
+  auth:
+    mode: static
+    keys:
+      - {name: assistant, value: "${env:ORDERS_MCP_CLIENT_KEY}"}
+  management:
+    enabled: true
+    port: 9090
+    keys:
+      - {name: operators, value: "${env:ORDERS_MCP_ADMIN_KEY}"}
+instances:
+  - {id: production, baseUrl: https://orders.example.com, contract: "2.0"}
+audit:
+  file: {enabled: true}

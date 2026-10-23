@@ -43,6 +43,8 @@ feature, which is not the same as covering every value.
 | F16 | Include / exclude | D | `select.include` / `exclude` by `api`, `tag`, `method`, `path` (globs), `operationId`, `contract`, `extension`, `kind`, `tool` | Selected operations | ✅ | Selectors via examples | Every selector key, include then exclude precedence |
 | F17 | Deprecated operations | D | `select.deprecated`: `hide` · `show` · `mark` | Hidden, listed, or listed with a deprecation note | ✅ | — | All three |
 | F18 | Hidden per rule | D | `overrides.rules[].hidden` | Tool removed after naming | ✅ | — | Hidden tool unreachable directly and through discovery |
+| F19a | Layered runtime tool policy | R | `tools.allow/deny`, `apis.<id>.tools`, `instance(s).tools`; `policy` command | Intersect permissions, filter catalogs, enforce selected instance, reload live | ✅ deployment/API/instance; organization planned | ToolPolicyTest, ReloadTest | Inheritance, deny wins, no helper bypass, stale config rejected, stdio/HTTP |
+| F19b | Policy management API | R | `server.management.enabled/keys/port`; `/management/policy`, `/preview`, `/apply` | Separate administrator credentials, bounded previews, revision checks, persist-before-publication | ✅ policy-only; general settings planned | PolicyManagementTest | Separate auth, port/origin restrictions, no preview side effects, stale/competing previews, persistence failures, secret-reference recovery |
 | F19 | Unsatisfiable tools | D | `downstreamAuth.unsatisfiedTools`: `hide` · `error` | Tools no instance's credentials can call: hidden or explained | ✅ | UnsatisfiedToolsTest | Both values |
 
 ## 3. Names, descriptions and shapes

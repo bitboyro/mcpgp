@@ -151,6 +151,31 @@ class ReloadTest {
     }
 
     @Test
+    void toolPolicyCanBeRevokedAndRestoredWithoutRestart() throws Exception {
+        start("instances: [{id: a, baseUrl: localhost, contract: '2.0'}]\n");
+        String instances = "instances: [{id: a, baseUrl: '" + first.address() + "', contract: '2.0'}]\n";
+        Files.writeString(config, instances + "tools: {allow: [orders_customer_get]}\n");
+        assertThat(reloader().reload("test")).isTrue();
+        assertThat(request("tools/call", Map.of("name", "orders_customer_get", "arguments", Map.of("instance", "a", "path", Map.of("id", "1"))))
+                .at("/result/isError").asBoolean()).isFalse();
+        assertThat(first.received).hasSize(1);
+
+        Files.writeString(config, instances + "tools: {allow: []}\n");
+        assertThat(reloader().reload("test")).isTrue();
+        await(m -> m.path("method").asText().equals("notifications/tools/list_changed"), 5);
+        assertThat(request("tools/list", Map.of()).at("/result/tools").findValuesAsText("name")).doesNotContain("orders_customer_get");
+        request("tools/call", Map.of("name", "orders_customer_get", "arguments", Map.of("instance", "a", "path", Map.of("id", "1"))));
+        assertThat(first.received).hasSize(1);
+
+        Files.writeString(config, instances + "tools: {allow: [unknown_tool]}\n");
+        assertThat(reloader().reload("test")).isFalse();
+        assertThat(request("tools/list", Map.of()).at("/result/tools").findValuesAsText("name")).doesNotContain("orders_customer_get");
+        Files.writeString(config, instances);
+        assertThat(reloader().reload("test")).isTrue();
+        assertThat(instanceEnum()).containsExactly("a");
+    }
+
+    @Test
     void aConfigThatDoesNotLoadIsRejected() throws Exception {
         start("instances:\n  - { id: a, baseUrl: a.example }\n");
         Files.writeString(config, "instances:\n  - { id: a, baseUrl: \"ftp://nope\" }\n");

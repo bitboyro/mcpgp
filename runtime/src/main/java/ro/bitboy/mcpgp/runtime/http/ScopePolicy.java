@@ -16,14 +16,14 @@ import java.util.regex.Pattern;
  * token allows every tool. Built-in tools (instances, discovery) are allowed to any valid token; what
  * they reach is checked on its own.
  */
-final class ScopePolicy {
+public final class ScopePolicy {
 
     private record Selection(String access, List<Pattern> tools) {
     }
 
     private final Map<String, Selection> scopes = new LinkedHashMap<>();
 
-    ScopePolicy(JsonNode config) {
+    public ScopePolicy(JsonNode config) {
         if (config == null) {
             return;
         }
@@ -38,7 +38,7 @@ final class ScopePolicy {
         return !scopes.isEmpty();
     }
 
-    boolean allows(JsonNode tool, Set<String> granted) {
+    public boolean allows(JsonNode tool, Set<String> granted) {
         if (!restricts() || tool.path("kind").asText().equals("builtin")) {
             return true;
         }

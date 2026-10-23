@@ -36,6 +36,8 @@ final class Discovery {
     /** Runs a tool call exactly like a direct one. */
     private final BiFunction<McpSyncServerExchange, McpSchema.CallToolRequest, McpSchema.CallToolResult> dispatch;
     private final List<Doc> docs = new ArrayList<>();
+    private final ro.bitboy.mcpgp.runtime.config.ToolPolicy policy;
+    private boolean indexed;
     private final Map<String, Integer> documentFrequency = new HashMap<>();
     private double averageLength;
 
@@ -49,7 +51,14 @@ final class Discovery {
         this.catalog = catalog;
         this.contracts = contracts;
         this.dispatch = dispatch;
-        for (JsonNode tool : catalog.all().values()) {
+        this.policy = new ro.bitboy.mcpgp.runtime.config.ToolPolicy(manifest, config);
+    }
+
+    private synchronized void index() {
+        if (indexed) {
+            return;
+        }
+        for (JsonNode tool : catalog.raw().values()) {
             if (!tool.path("kind").asText().equals("api")) {
                 continue;
             }
@@ -64,6 +73,7 @@ final class Discovery {
             docs.add(new Doc(tool, terms, words.size()));
         }
         averageLength = docs.stream().mapToInt(Doc::length).average().orElse(1);
+        indexed = true;
     }
 
     Map<String, ToolHandler> handlers() {
@@ -78,6 +88,7 @@ final class Discovery {
     }
 
     private Object search(Map<String, Object> args) {
+        index();
         String query = String.valueOf(args.getOrDefault("query", ""));
         int limit = args.get("limit") instanceof Number n ? Math.max(1, Math.min(50, n.intValue())) : 10;
         // in multi-API servers an id may name an instance of several APIs: each tool is matched against its own API's
@@ -88,6 +99,9 @@ final class Discovery {
         }
         List<Hit> hits = new ArrayList<>();
         for (Doc doc : docs) {
+            if (!onInstance(doc.tool(), args.get("instance"))) {
+                continue;
+            }
             if (contracts != null) {
                 String contract = contracts.get(doc.tool().path("api").asText());
                 if (contract == null || !doc.tool().path("variants").has(contract)) {
@@ -122,6 +136,9 @@ final class Discovery {
 
     private Object describe(Map<String, Object> args) {
         JsonNode tool = apiTool(args.get("name"));
+        if (!onInstance(tool, args.get("instance"))) {
+            throw new ToolError("NOT_AVAILABLE_ON_INSTANCE", "Tool is blocked on the selected instance");
+        }
         Map<String, Object> definition = new LinkedHashMap<>();
         definition.put("name", tool.path("name").asText());
         definition.put("title", tool.path("title").asText(""));
@@ -133,6 +150,9 @@ final class Discovery {
 
     private Object invoke(McpSyncServerExchange exchange, Map<String, Object> args) {
         JsonNode tool = apiTool(args.get("name"));
+        if (!onInstance(tool, args.get("instance"))) {
+            throw new ToolError("NOT_AVAILABLE_ON_INSTANCE", "Tool is blocked on the selected instance");
+        }
         Map<String, Object> arguments = new LinkedHashMap<>();
         if (args.get("arguments") instanceof Map<?, ?> given) {
             given.forEach((k, v) -> arguments.put(String.valueOf(k), v));
@@ -145,11 +165,15 @@ final class Discovery {
     }
 
     private Object listOperations(Map<String, Object> args) {
+        index();
         String tag = args.get("tag") == null ? null : args.get("tag").toString();
         String query = args.get("query") == null ? null : args.get("query").toString().toLowerCase(Locale.ROOT);
         List<Map<String, Object>> all = new ArrayList<>();
         for (Doc doc : docs) {
             JsonNode tool = doc.tool();
+            if (!onInstance(tool, args.get("instance"))) {
+                continue;
+            }
             if (tag != null && !contains(tool.at("/operation/tags"), tag)) {
                 continue;
             }
@@ -167,11 +191,27 @@ final class Discovery {
             line.put("summary", summary(tool.path("title").asText(tool.path("description").asText(""))));
             all.add(line);
         }
-        return Paging.page(all, args.get("cursor"), PAGE);
+        Object cursor = args.get("cursor");
+        String revision = config.configHash();
+        if (cursor != null) {
+            String value = cursor.toString();
+            if (!value.startsWith(revision + ":")) {
+                throw new ToolError("INPUT_VALIDATION", "The operation list changed; start a fresh listing");
+            }
+            cursor = value.substring(revision.length() + 1);
+        }
+        Map<String, Object> page = Paging.page(all, cursor, PAGE);
+        if (page.get("nextCursor") != null) {
+            page.put("nextCursor", revision + ":" + page.get("nextCursor"));
+        }
+        return page;
     }
 
     private Object operationSchema(Map<String, Object> args) {
         JsonNode tool = apiTool(args.get("name"));
+        if (!onInstance(tool, args.get("instance"))) {
+            throw new ToolError("NOT_AVAILABLE_ON_INSTANCE", "Tool is blocked on the selected instance");
+        }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("name", tool.path("name").asText());
         result.put("inputSchema", JSON.convertValue(tool.path("inputSchema"), Map.class));
@@ -197,6 +237,12 @@ final class Discovery {
             throw new ToolError("INPUT_VALIDATION", "No tool named '" + name + "'", "Use search_tools or list_operations to find one");
         }
         return tool;
+    }
+
+    private boolean onInstance(JsonNode tool, Object id) {
+        if (catalog.tool(tool.path("name").asText()).isEmpty()) { return false; }
+        return id == null || policy.allowedInstances(tool).stream().filter(i -> CallerAccess.allows(config, manifest, tool, i)).anyMatch(i -> i.id().equals(id.toString())
+                && (!tool.has("x-mcpgp-original") || policy.name(manifest.tools().get(tool.path("x-mcpgp-original").asText()), i).equals(tool.path("name").asText())));
     }
 
     /** The contract each API's instance of this id uses (APIs without one are absent). */

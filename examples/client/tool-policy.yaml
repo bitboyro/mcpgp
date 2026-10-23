@@ -1,0 +1,14 @@
+# orders-mcp: runtime restrictions on capabilities already shipped in the package.
+# Use --config examples/client/tool-policy.yaml; edit the target addresses before running.
+tools:
+  allow: ["orders_customer_*", "orders_order_search"]
+  deny: ["orders_customer_create"]
+instances:
+  - id: production
+    baseUrl: https://orders.example.com
+    contract: "2.0"
+    tools:
+      allow: ["orders_customer_get"]
+  - id: staging
+    baseUrl: https://staging.orders.example.com
+    contract: "2.0"

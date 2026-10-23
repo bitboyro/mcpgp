@@ -52,6 +52,18 @@ class ListPagerTest {
     }
 
     @Test
+    void instancePermissionChangesInvalidateCursorEvenWhenNamesStayTheSame() {
+        ObjectNode first = result("tools", "name", 3);
+        ListPager.page("tools/list", first, "", 1);
+        String cursor = first.path("nextCursor").asText();
+        ObjectNode changed = result("tools", "name", 3);
+        ((ObjectNode) changed.path("tools").get(0)).putObject("inputSchema").putObject("properties")
+                .putObject("instance").putArray("enum").add("staging");
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> ListPager.page("tools/list", changed, cursor, 1)))
+                .isInstanceOf(ListPager.InvalidCursor.class);
+    }
+
+    @Test
     void aCursorFromAnotherListIsRefused() {
         ObjectNode first = result("tools", "name", 7);
         ListPager.page("tools/list", first, "", 3);

@@ -340,6 +340,8 @@ export interface FromSpecPlan {
   files: string[]; tools: number; exists: boolean; diagnostics: Diagnostic[]
   /** Files picked without their folders, put where the spec refers to them. */
   moved: { from: string; to: string }[]
+  template?: { id: string; title: string; description: string; version: number; requiredInputs: string[] }
+  acceptTemplate?: string
 }
 
 /** What adding a contract version would do (a dry run of POST /servers/{id}/contracts). */
@@ -440,9 +442,9 @@ export const api = {
   createServer: (id: string, files: Record<string, string> | Blob, title?: string) =>
     json<Server>('POST', '/servers' + q({ id, title }), files instanceof Blob ? files : { files }),
   /** A dry run says what would be created; problems with the upload are ApiError SPEC_PROBLEMS (see SpecProblems). */
-  fromSpecPlan: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string; collisions?: string; renames?: string }) =>
+  fromSpecPlan: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string; collisions?: string; renames?: string; template?: string }) =>
     json<FromSpecPlan>('POST', '/servers/from-spec' + q({ ...params, dryRun: true }), files instanceof Blob ? files : { files }),
-  createFromSpec: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string; collisions?: string; renames?: string }) =>
+  createFromSpec: (files: Record<string, string> | Blob, params: { id?: string; title?: string; version?: string; main?: string; collisions?: string; renames?: string; template?: string; acceptTemplate?: string }) =>
     json<Server>('POST', '/servers/from-spec' + q(params), files instanceof Blob ? files : { files }),
   contractPlan: (id: string, source: SpecSource, params: { api?: string; version?: string; main?: string; default?: boolean }) =>
     json<ContractPlan>('POST', `/servers/${enc(id)}/contracts` + q({ ...params, url: specUrl(source), dryRun: true }), specBody(source)),
