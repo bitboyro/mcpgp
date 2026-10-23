@@ -41,7 +41,7 @@ public final class ToolCatalog {
             if (!policy.visible(tool)) {
                 continue;
             }
-            ObjectNode served = tool.deepCopy();
+            ObjectNode served = ro.bitboy.mcpgp.schemas.ToolSchemas.served(tool, manifest.policies());
             JsonNode instance = served.at("/inputSchema/properties/instance");
             if (instance instanceof ObjectNode property && property.path("x-mcpgp-instanceEnum").asBoolean(false)) {
                 ArrayNode ids = property.putArray("enum");
@@ -52,16 +52,6 @@ public final class ToolCatalog {
                     allIds.forEach(ids::add);
                 }
                 property.remove("x-mcpgp-instanceEnum");
-            }
-            if (served.path("kind").asText().equals("api") && !manifest.policies().at("/results/mode").asText("inline").equals("inline")
-                    && served.path("outputSchema").isObject()) {
-                JsonNode original = served.path("outputSchema");
-                ObjectNode union = served.putObject("outputSchema");
-                union.put("type", "object");
-                if (original.has("$defs")) union.set("$defs", original.path("$defs"));
-                union.putArray("anyOf").add(original).addObject().put("type", "object").putArray("anyOf")
-                        .addObject().putArray("required").add("resultId");
-                ((ObjectNode) union.path("anyOf").get(1)).withArray("anyOf").addObject().putArray("required").add("retained").add("complete");
             }
             tools.put(served.path("name").asText(), served);
         }

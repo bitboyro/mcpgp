@@ -48,6 +48,41 @@ class ToolsListExportTest {
     }
 
     @Test
+    void retainedSchemasAndSessionHelperMatchRuntimeInEveryExposureMode() throws Exception {
+        for (String mode : new String[] {"plain", "hybrid", "discovery", "toolsets"}) {
+            for (String retention : new String[] {"inline", "auto", "reference"}) {
+                var root = (com.fasterxml.jackson.databind.node.ObjectNode) JSON.readTree(EXAMPLES.resolve("orders-mcp.manifest.json").toFile());
+                root.withObject("exposure").put("mode", mode);
+                root.withObject("policies").withObject("results").put("mode", retention);
+                root.withObject("policies").withObject("runtimeDefaults").withObject("configuration").withObject("sessions").put("enabled", true);
+                root.withObject("policies").withObject("runtimeDefaults").withObject("configuration").putArray("instances")
+                        .addObject().put("id", "test").put("baseUrl", "https://example.test").put("contract", "2.0")
+                        .putObject("auth").put("type", "basic").put("username", "test").put("password", "${env:TEST_PASSWORD}");
+                for (JsonNode tool : root.path("tools")) {
+                    if (tool.path("kind").asText().equals("api")) {
+                        ((com.fasterxml.jackson.databind.node.ObjectNode) tool).putObject("outputSchema").put("type", "object")
+                                .putObject("$defs").putObject("entry").put("type", "string");
+                    }
+                }
+                var manifest = ro.bitboy.mcpgp.runtime.manifest.Manifest.of(root);
+                var config = new ro.bitboy.mcpgp.runtime.config.ConfigLoader(new ro.bitboy.mcpgp.schemas.Schemas()).load(manifest,
+                        new ro.bitboy.mcpgp.runtime.config.ConfigLoader.Options(java.util.Optional.empty(), EXAMPLES,
+                                java.util.Map.of("TEST_PASSWORD", "test"), java.util.Map.of()));
+                var catalog = new ToolCatalog(manifest, config);
+                for (JsonNode exported : ToolsList.of(root).path("tools")) {
+                    JsonNode actual = catalog.tool(exported.path("name").asText()).orElseThrow();
+                    JsonNode sent = JSON.valueToTree(ToolCatalog.toMcp(actual));
+                    assertThat(exported.path("outputSchema")).as(mode + "/" + retention).isEqualTo(sent.path("outputSchema"));
+                    if (exported.path("name").asText().equals("session_policy")) {
+                        assertThat(exported.path("inputSchema")).isEqualTo(sent.path("inputSchema"));
+                    }
+                }
+                assertThat(ToolsList.of(root).path("tools").findValuesAsText("name")).contains("session_policy");
+            }
+        }
+    }
+
+    @Test
     void discoveryModeListsOnlyWhatTheClientSees() throws IOException {
         JsonNode manifest = JSON.readTree(EXAMPLES.resolve("orders-mcp.manifest.json").toFile());
         ((com.fasterxml.jackson.databind.node.ObjectNode) manifest.path("exposure")).put("mode", "discovery");

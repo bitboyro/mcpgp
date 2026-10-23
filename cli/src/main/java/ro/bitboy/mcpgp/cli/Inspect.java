@@ -231,7 +231,7 @@ final class Inspect {
         boolean customer;
 
         @Option(names = "--format", paramLabel = "md|json|tools-list", defaultValue = "md",
-                description = "md (default), json, or tools-list: the result of MCP tools/list (what a client receives), for audits.")
+                description = "md (default), json, or tools-list: build-default MCP surface; deployment and caller policy can change the live list.")
         String format;
 
         @Override

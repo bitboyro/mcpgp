@@ -212,7 +212,7 @@ class PackageTest {
     @Test
     void docsMatchTheBuild() throws IOException {
         String tools = new String(entry(zip, "docs/TOOLS.md"), StandardCharsets.UTF_8);
-        assertThat(tools).contains("| `orders_customer_contact_list` |").contains("| 2.0 |").contains("Every tool (except `instances_list`) takes `instance`");
+        assertThat(tools).contains("| `orders_customer_contact_list` |").contains("| 2.0 |").contains("API tools take `instance`");
         String configuration = new String(entry(zip, "docs/CONFIGURATION.md"), StandardCharsets.UTF_8);
         assertThat(configuration).contains("`instances[].baseUrl`").contains("`ORDERS_MCP_INSTANCES_<n>__BASEURL`")
                 .contains("`instances[].auth.password`").contains("**secret**")

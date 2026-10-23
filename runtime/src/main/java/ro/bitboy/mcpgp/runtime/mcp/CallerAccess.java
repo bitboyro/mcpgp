@@ -137,12 +137,6 @@ public final class CallerAccess {
         for (JsonNode name : restriction.path("instances")) { if (!name.asText().contains("*") && config.allInstances().stream().noneMatch(i -> (i.api() + "/" + i.id()).equals(name.asText()))) { throw new ToolError("INPUT_VALIDATION", "Unknown instance in caller restriction"); } }
     }
     public static ObjectNode tool() {
-        ObjectNode tool = JSON.createObjectNode().put("name", "session_policy").put("kind", "builtin").put("handler", "session_policy")
-                .put("description", "Inspect this connection's restrictions or add restrictions. Restrict can only narrow access until the session ends.");
-        ObjectNode input = tool.putObject("inputSchema").put("type", "object").put("additionalProperties", false);
-        ObjectNode properties = input.putObject("properties"); properties.putObject("action").put("type", "string").putArray("enum").add("get").add("restrict");
-        properties.putObject("tools").put("type", "object").putObject("properties").setAll((ObjectNode) JSON.valueToTree(Map.of("allow", Map.of("type", "array", "items", Map.of("type", "string")), "deny", Map.of("type", "array", "items", Map.of("type", "string")), "readOnly", Map.of("type", "boolean"))));
-        properties.putObject("instances").put("type", "array").putObject("items").put("type", "string");
-        return tool;
+        return ro.bitboy.mcpgp.schemas.ToolSchemas.sessionPolicy();
     }
 }

@@ -1,6 +1,7 @@
 package ro.bitboy.mcpgp.core.manifest;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import ro.bitboy.mcpgp.schemas.ToolSchemas;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -11,7 +12,8 @@ import java.util.Set;
 /**
  * A manifest as an MCP client sees it: the {@code tools} of a {@code tools/list} result, in the build's
  * exposure mode, each with the fields MCP defines (name, title, description, inputSchema, outputSchema,
- * annotations). It is what the runtime serves, so a server can be audited without starting it.
+ * annotations), with build-default helpers and retained-result schemas. Deployment credentials,
+ * organization, identity and session restrictions can narrow the live surface.
  * Per-instance values are not known here: the {@code instance} input of a multi-instance build has no
  * {@code enum} (the customer's instances fill it in).
  */
@@ -36,8 +38,16 @@ public final class ToolsList {
                 default -> true;
             };
             if (listed) {
-                tools.add(mcp(tool));
+                tools.add(mcp(ToolSchemas.served(tool, manifest.path("policies"))));
             }
+        }
+        if (manifest.at("/policies/runtimeDefaults/configuration/sessions/enabled").asBoolean(false)) {
+            for (JsonNode tool : manifest.path("tools")) {
+                if (tool.path("name").asText().equals("session_policy")) {
+                    throw new IllegalArgumentException("session_policy is reserved when sessions.enabled is true");
+                }
+            }
+            tools.add(mcp(ToolSchemas.sessionPolicy()));
         }
         ObjectNode result = NODES.objectNode();
         result.set("tools", tools);

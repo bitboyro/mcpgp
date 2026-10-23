@@ -87,7 +87,7 @@ the CLI (`mcpgp push`) and agents all use this API; nothing the UI does is UI-on
 - `GET /servers/{id}/versions/{version}/manifest` returns the manifest (compiled on demand, cached by
   digest): what agents will get, with provenance. This is what the UI's previews show.
   `?fields=tools,apis` returns only those top-level keys, in that order; `?format=tools-list` returns the
-  result of MCP `tools/list` for the version (what a client receives), for audits.
+  build-default MCP `tools/list` projection for audits, including retained-result alternatives and enabled session helpers. Deployment credentials, instances, runtime overrides and caller/session policy can change the live list.
 - `GET /servers/{id}/versions/{version}/operations` lists every operation of the version's contracts
   per API, with the API's `select` and, per operation, `state`: `tool` or `resource` (with its `tool`
   name), `excluded` (left out by `select`, with `exclusion: { kind, reason, index?, selector? }`:

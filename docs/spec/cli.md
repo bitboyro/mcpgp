@@ -176,7 +176,7 @@ The tools in the build's exposure mode (listed, or found by search), with their 
 or destructive, and their inputs (`*` required); and the example config the customer starts from.
 `--tools` or `--customer` for one of the two; `--format md` (default) or `json`. `--format tools-list`
 prints the result of MCP `tools/list` for the build, in its exposure mode (name, title, description,
-`inputSchema`, `outputSchema`, annotations: what a client receives), so a server can be audited without
+`inputSchema`, `outputSchema`, annotations: the build-default client surface), so a server can be audited without
 starting it; the `instance` input of a multi-instance build has no `enum` (the customer's instances fill it in).
 
 ### 3.7 `try`
@@ -230,3 +230,7 @@ dist/orders-mcp-1.4.1.report.md    human build report: tools, warnings, diff
 dist/orders-mcp-1.4.1.report.json  same, machine-readable
 dist/SHA256SUMS(.sig)
 ```
+
+The tools-list export includes retained-result output alternatives and `session_policy` when enabled
+in build defaults. Instance values, credentials, organization/identity/session policies, and runtime
+overrides are deployment-dependent and can narrow or otherwise change the live list.
