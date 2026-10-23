@@ -108,6 +108,32 @@ class PlatformMcpTest extends PlatformTestBase {
         assertThat(activity.at("/items/0/actorKind").asText()).isEqualTo("agent");
     }
 
+    static String operation(McpServerFactory server, String id) {
+        return server.catalog().all().values().stream().filter(t -> t.at("/operation/operationId").asText().equals(id))
+                .findFirst().orElseThrow().path("name").asText();
+    }
+
+    @Test
+    void agentsDiscoverTemplatesAndVersionDiffWithTheImportParameters() throws Exception {
+        McpServerFactory server = server(agent("builder"));
+        String list = operation(server, "listConfigurationTemplates");
+        assertThat(call(server, list, Map.of()).path("items").findValuesAsText("id")).contains("enterprise-grade");
+        String apply = operation(server, "applyConfigurationTemplate");
+        JsonNode preview = call(server, apply, Map.of("path", Map.of("id", "orders-mcp"), "query", Map.of("base", 1, "template", "blank", "dryRun", true)));
+        assertThat(preview.path("compiles").asBoolean()).isTrue();
+        assertThat(preview.path("acceptTemplate").asText()).isEqualTo("blank@1");
+        var refused = server.call(null, new McpSchema.CallToolRequest(apply,
+                Map.of("path", Map.of("id", "orders-mcp"), "query", Map.of("base", 1, "template", "blank"))));
+        assertThat(refused.isError()).isTrue();
+        JsonNode saved = call(server, apply, Map.of("path", Map.of("id", "orders-mcp"), "query", Map.of("base", 1, "template", "blank", "acceptTemplate", "blank@1")));
+        assertThat(saved.path("id").asText()).isEqualTo("orders-mcp");
+        JsonNode diff = call(server, operation(server, "diffServerVersions"), Map.of("path", Map.of("id", "orders-mcp"), "query", Map.of("from", "1", "to", "latest")));
+        assertThat(diff.path("from").path("version").asInt()).isEqualTo(1);
+        String importTool = operation(server, "createServerFromSpec");
+        assertThat(server.catalog().tool(importTool).orElseThrow().at("/inputSchema/properties/query/properties").fieldNames())
+                .toIterable().contains("collisions", "renames", "template", "acceptTemplate");
+    }
+
     @Test
     void thePlatformsRulesStillApply() throws Exception {
         McpServerFactory viewer = server(agent("viewer"));

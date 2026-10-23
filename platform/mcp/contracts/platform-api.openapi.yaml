@@ -106,7 +106,7 @@ paths:
         name the parts you need with fields (e.g. tools, or apis,instances), returned in that order.
       parameters:
         - { name: fields, in: query, description: "Comma-separated top-level keys to return, e.g. tools.", schema: { type: string } }
-        - { name: format, in: query, description: "tools-list: the result of MCP tools/list (what a client receives: name, title, description, inputSchema, outputSchema, annotations), to audit the server without running it.", schema: { enum: [tools-list] } }
+        - { name: format, in: query, description: "tools-list: build-default MCP tools/list projection, including retained-result schemas and enabled session helpers. Deployment credentials, instances, runtime overrides and caller/session policies can change the live list.", schema: { enum: [tools-list] } }
       responses:
         "200": { description: Manifest, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }
@@ -238,6 +238,10 @@ paths:
         - { name: main, in: query, description: The main file of the upload, schema: { type: string } }
         - { name: message, in: query, schema: { type: string } }
         - { name: dryRun, in: query, schema: { type: boolean, default: false } }
+        - { name: collisions, in: query, description: How to resolve generated name collisions, schema: { enum: [error, method-path, suffix-number, suffix-contract] } }
+        - { name: renames, in: query, description: JSON object mapping operation keys to chosen names, schema: { type: string } }
+        - { name: template, in: query, description: Built-in ID or library/name@version; preview with dryRun before saving, schema: { type: string } }
+        - { name: acceptTemplate, in: query, description: Exact acceptance token from the reviewed template preview; required when saving with a template, schema: { type: string } }
       requestBody:
         required: true
         content:
@@ -246,6 +250,47 @@ paths:
       responses:
         "200": { description: The dry run's answer (id, title, api, version, main, format, files, tools), content: { application/json: { schema: { type: object } } } }
         "201": { description: The new server, content: { application/json: { schema: { type: object } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/configuration-templates:
+    get:
+      operationId: listConfigurationTemplates
+      tags: [servers]
+      summary: List configuration templates
+      description: Built-in templates and the latest immutable version of each Library template. Required inputs describe operator work still needed; listing does not configure credentials.
+      responses:
+        "200": { description: Templates, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/ConfigurationTemplate" } } } } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/configuration-template:
+    parameters: [ { $ref: "#/components/parameters/ServerId" } ]
+    post:
+      operationId: applyConfigurationTemplate
+      tags: [servers]
+      summary: Preview or apply a configuration template
+      description: >
+        Replaces runtimeDefaults.configuration on base with the selected template defaults.
+        First use dryRun=true and review compiles and requiredInputs. To create a version, send the
+        returned acceptTemplate token with dryRun=false. Authentication keys and tool selection remain operator inputs.
+      parameters:
+        - { name: base, in: query, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: template, in: query, required: true, description: Built-in ID or library/name@version, schema: { type: string } }
+        - { name: acceptTemplate, in: query, description: Exact token from the reviewed preview; required when saving, schema: { type: string } }
+        - { name: dryRun, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200": { description: Preview, content: { application/json: { schema: { type: object, properties: { template: { $ref: "#/components/schemas/ConfigurationTemplate" }, acceptTemplate: { type: string }, base: { type: integer }, compiles: { type: boolean } } } } } }
+        "201": { description: Saved server version, content: { application/json: { schema: { $ref: "#/components/schemas/Server" } } } }
+        default: { $ref: "#/components/responses/Problem" }
+  /servers/{id}/diff:
+    parameters: [ { $ref: "#/components/parameters/ServerId" } ]
+    get:
+      operationId: diffServerVersions
+      tags: [servers]
+      summary: Compare server versions
+      description: Compare compiled manifests. Changes are classified as breaking, notable or info. Defaults from the last released build (otherwise the preceding version) to latest.
+      parameters:
+        - { name: from, in: query, description: Version number or latest or released, schema: { type: string } }
+        - { name: to, in: query, description: Version number or latest or released, schema: { type: string } }
+      responses:
+        "200": { description: Version comparison, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }
   /servers/{id}/contracts:
     parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
@@ -818,6 +863,15 @@ components:
       description: An error (RFC 9457)
       content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
   schemas:
+    ConfigurationTemplate:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        version: { type: integer }
+        defaults: { type: object }
+        requiredInputs: { type: array, items: { type: string } }
     Scope: { enum: [servers:read, servers:write, builds:run, builds:release, builds:delete, library:write, approvals:decide, admin] }
     ProjectFiles:
       type: object
