@@ -21,7 +21,7 @@ orders/
 └─ mcp-names.lock             written by builds, committed
 ```
 
-See [examples/platform/orders](../../examples/platform/orders) for a complete project.
+See [examples/platform/orders](https://github.com/bitboyro/mcpgp/tree/20a8ca16bec3577bce49dd57152143bfcb4c69ae/examples/platform/orders) for a complete project.
 
 Batch execution (`batch`) and large-result delivery (`results`) are independent root sections;
 see [batching and retained results](batching-and-results.md) for their settings and limits.

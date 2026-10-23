@@ -15,7 +15,7 @@ orders-mcp-1.4.1.zip
 ├─ orders-mcp.example.yaml            example runtime config for this build
 ├─ server.config.schema.json        runtime config schema for this build
 ├─ docs/                            README · INSTALL · CONFIGURATION · TOOLS · OPERATIONS · CHANGELOG
-├─ AGENTS.md · SKILL.md · llms.txt  if build.docs includes agents
+├─ AGENTS.md · llms.txt  if build.docs includes agents
 ├─ manifest.json                    copy of the manifest embedded in the jar, for review and diff
 ├─ SHA256SUMS · SHA256SUMS.sig
 └─ SIGNING-KEY.pub                  the builder's public key, also published by the builder elsewhere
@@ -24,7 +24,7 @@ orders-mcp-1.4.1.zip
 How it is built: the CLI carries the runtime as an executable Spring Boot jar and adds the build's
 manifest to a copy of it (at `/mcpgp/manifest.json`), so `mcpgp build` needs neither Maven nor the
 network. The zip is reproducible: entries sorted, timestamps from `build.createdAt`. Targets and
-generation modes this version can't produce yet are reported as warnings.
+generation modes this version cannot produce are refused with `NOT_SUPPORTED_YET`.
 
 `server.config.schema.json` narrows the generic runtime-config schema to the build: its transports
 and inbound auth modes, `instance` or `instances` (per API in multi-API servers), its contract
@@ -48,7 +48,8 @@ off by default.
 
 ## 3. Generated docs
 
-Generated from the manifest, so they always match the build:
+Generated from the manifest and build defaults. Deployment overrides and caller/session policies may
+narrow the served surface; these files describe the package before those runtime restrictions:
 
 | File | Audience | Content |
 |---|---|---|
@@ -59,8 +60,9 @@ Generated from the manifest, so they always match the build:
 | OPERATIONS.md | people | audit format, telemetry, health, error codes, Collector example |
 | CHANGELOG.md | people | from the manifest diff: added, renamed, removed tools |
 | AGENTS.md | agents | install, configure, verify, step by step |
-| SKILL.md | agents | how to use the tools well |
 | llms.txt | agents | index of the docs |
+
+No `SKILL.md` is generated. `AGENTS.md` is the delivered server-usage guide; an AI tool-description optimization skill is not part of this package.
 
 ## 4. Support packs
 
@@ -135,7 +137,7 @@ secrets into client configs.
   the command explains the connector settings instead.
 - Client files must be plain JSON (comments are refused rather than lost).
 
-Snippets: [examples/client/mcp-clients](../../examples/client/mcp-clients).
+Snippets: [examples/client/mcp-clients](https://github.com/bitboyro/mcpgp/tree/20a8ca16bec3577bce49dd57152143bfcb4c69ae/examples/client/mcp-clients).
 
 ## 7. Signing and images
 
@@ -200,3 +202,12 @@ chart can be added when a customer asks.
 - `manifest.json` lists every extension and its checksum.
 
 See [../security.md](../security.md).
+
+## 8. CLI and platform reference documentation
+
+The CLI release ZIP and both container images include the specs, guides, concepts, security and
+deployment notes in `docs/`. Referenced architecture decisions (`docs/decisions/`) and canonical
+JSON schemas (`schemas/src/main/resources/schemas/`) are included for offline reading. Source,
+example, changelog and roadmap links that are outside this reference set use explicit commit-pinned
+GitHub URLs and require a browser with network access. The CLI packaging CI checks local Markdown
+links after extracting the actual release ZIP, independently of links resolving in the checkout.

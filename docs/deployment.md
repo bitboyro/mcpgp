@@ -31,7 +31,7 @@ one installation per organization, run on your own infrastructure.
 
 | Part | What it is |
 |---|---|
-| **platform** | One Java process (the image `mcpgp-platform`, built from [`deploy/Dockerfile`](../deploy/Dockerfile)). It serves the web UI and the REST API on one port, compiles and packages servers (one build at a time, in the process), and runs servers against a mock for **Try it** (up to 3 at a time, as child processes on the container's loopback, stopped after 5 idle minutes). |
+| **platform** | One Java process (the image `mcpgp-platform`, built from [`deploy/Dockerfile`](https://github.com/bitboyro/mcpgp/blob/20a8ca16bec3577bce49dd57152143bfcb4c69ae/deploy/Dockerfile)). It serves the web UI and the REST API on one port, compiles and packages servers (one build at a time, in the process), and runs servers against a mock for **Try it** (up to 3 at a time, as child processes on the container's loopback, stopped after 5 idle minutes). |
 | **store** | Where everything lives: servers, versions and their files, the library, builds and their packages, identities, tokens, password hashes, approvals, the activity log. Either a directory (the **file store**) or a **PostgreSQL** database. One platform process per store. |
 | **reverse proxy** | Yours (nginx, Caddy, Traefik, an ingress, a load balancer). It terminates TLS and forwards to the platform. The platform doesn't do TLS itself. |
 | **identity provider / directory** | Optional. People sign in with a company account through OIDC, or against LDAP / Active Directory. Local accounts (name and password kept by the platform) work without either. |
@@ -160,7 +160,7 @@ The export (`GET /api/v1/export?artifacts=true`, admin) is a store-independent c
 ## 9. Upgrades
 
 - Use a tagged image (`MCPGP_IMAGE`) and move to the next tag after reading the
-  [CHANGELOG](../CHANGELOG.md). Back up first.
+  [CHANGELOG](https://github.com/bitboyro/mcpgp/blob/20a8ca16bec3577bce49dd57152143bfcb4c69ae/CHANGELOG.md). Back up first.
 - **Before 1.0.0 the store format isn't migrated.** When a release changes it, the new platform
   refuses to open the old store and says so; move the data with the old release's export and the
   new release's import (into an empty store). From 1.0.0 the store is migrated forward on start.

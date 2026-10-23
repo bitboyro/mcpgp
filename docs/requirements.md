@@ -153,7 +153,7 @@ Every configurable thing, grouped by concern.
 | Native image; other languages | B | P2 |
 | Generated config JSON Schema per variant; `--validate-config` | B | P0 |
 | Docs for people (README, INSTALL, CONFIGURATION, TOOLS) | B | P0 |
-| Docs for agents (AGENTS.md, SKILL.md, llms.txt), OPERATIONS, CHANGELOG | B | P1 |
+| Docs for agents (AGENTS.md, llms.txt), OPERATIONS, CHANGELOG | B | P1 |
 | Builds: list, download (whole or per format), archive/restore, delete (released → archive first), retention | P | P0 |
 | Package is self-contained: needs nothing from the platform, the vendor or the internet | B | P0 |
 

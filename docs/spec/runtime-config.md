@@ -536,7 +536,7 @@ after which the config doesn't load is undone. Secret variables are named `<INST
 `certs/<id>.pem` next to the config (or prints it with `--base64`), connects again with only that
 material, and prints the lines to add. An instance that already has `tls.ca` is refused.
 
-Examples: [examples/client](../../examples/client).
+Examples: [examples/client](https://github.com/bitboyro/mcpgp/tree/20a8ca16bec3577bce49dd57152143bfcb4c69ae/examples/client).
 
 ## 9. Security considerations
 

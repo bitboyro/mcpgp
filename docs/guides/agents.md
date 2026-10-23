@@ -2,7 +2,7 @@
 
 Agents build MCP servers through the same API as people, with their own identity and token. The
 easiest way in is the platform's own MCP server: mcpgp builds it from the platform's OpenAPI document
-(the project is [platform/mcp](../../platform/mcp)), and the agent runs it like any other mcpgp server.
+(the project is [platform/mcp](https://github.com/bitboyro/mcpgp/tree/20a8ca16bec3577bce49dd57152143bfcb4c69ae/platform/mcp)), and the agent runs it like any other mcpgp server.
 The platform applies the agent's scopes, quotas and approvals to every call
 ([spec/platform-api.md §3, §5](../spec/platform-api.md#3-identities-sign-in-and-scopes)).
 

@@ -45,7 +45,7 @@ mcpgp init --from-spec ./orders-2.0.yaml
 
 Get the CLI from the release (`mcpgp-cli-<version>.zip`, Java 21+), or use the CLI image
 `docker.io/<account>/mcpgp-cli:<version>` in CI ([cli.md §1](../spec/cli.md#1-installation-and-pinning)).
-Full example: [examples/pipeline](../../examples/pipeline).
+Full example: [examples/pipeline](https://github.com/bitboyro/mcpgp/tree/20a8ca16bec3577bce49dd57152143bfcb4c69ae/examples/pipeline).
 
 ## 2. Day-to-day flow
 

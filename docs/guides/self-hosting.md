@@ -232,7 +232,7 @@ docker compose run --rm platform check
 docker compose pull && docker compose up -d --wait
 ```
 
-Read the [CHANGELOG](../../CHANGELOG.md) first and back up. If the platform logs that the store
+Read the [CHANGELOG](https://github.com/bitboyro/mcpgp/blob/20a8ca16bec3577bce49dd57152143bfcb4c69ae/CHANGELOG.md) first and back up. If the platform logs that the store
 "has format …", that release changed the store format: start the old release, export
 (`GET /api/v1/export?artifacts=true` as an admin), start the new one on an empty store and import
 the zip (`POST /api/v1/import`).

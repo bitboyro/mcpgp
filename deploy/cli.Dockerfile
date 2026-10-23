@@ -23,6 +23,8 @@ COPY cli/src/dist/bin/mcpgp /opt/mcpgp/bin/mcpgp
 # the specs and guides that messages and generated files refer to, at /opt/mcpgp/docs
 COPY docs/spec /opt/mcpgp/docs/spec
 COPY docs/guides /opt/mcpgp/docs/guides
+COPY docs/decisions /opt/mcpgp/docs/decisions
+COPY schemas/src/main/resources/schemas /opt/mcpgp/schemas/src/main/resources/schemas
 COPY docs/concepts.md docs/security.md docs/deployment.md /opt/mcpgp/docs/
 RUN chmod 755 /opt/mcpgp/bin/mcpgp && ln -s /opt/mcpgp/bin/mcpgp /usr/local/bin/mcpgp
 # CI runners mount the checkout and run steps as root; locally, pass --user "$(id -u):$(id -g)"

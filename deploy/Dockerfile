@@ -27,6 +27,8 @@ COPY deploy/platform.default.yaml /etc/mcpgp/platform.yaml
 # the specs and guides that messages and generated files refer to, at /opt/mcpgp/docs
 COPY docs/spec /opt/mcpgp/docs/spec
 COPY docs/guides /opt/mcpgp/docs/guides
+COPY docs/decisions /opt/mcpgp/docs/decisions
+COPY schemas/src/main/resources/schemas /opt/mcpgp/schemas/src/main/resources/schemas
 COPY docs/concepts.md docs/security.md docs/deployment.md /opt/mcpgp/docs/
 # listen on every interface inside the container; the data directory is the volume
 ENV MCPGP_PLATFORM_IMAGE=$MCPGP_IMAGE \

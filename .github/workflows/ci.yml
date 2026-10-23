@@ -175,7 +175,15 @@ jobs:
         run: |
           mvn -B -q -pl cli -am package -DskipTests
           cli/src/dist/assemble.sh "$(python3 -c 'import xml.etree.ElementTree as E; print(E.parse("pom.xml").getroot().find("{http://maven.apache.org/POM/4.0.0}version").text)')" /tmp/release
-          cd /tmp/release && unzip -q mcpgp-cli-*.zip && mcpgp-cli-*/bin/mcpgp --version
+          mkdir -p target/cli-release-check
+          unzip -q /tmp/release/mcpgp-cli-*.zip -d target/cli-release-check
+          target/cli-release-check/mcpgp-cli-*/bin/mcpgp --version
+
+      - name: Check links in the extracted CLI distribution
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --no-progress './target/cli-release-check/**/*.md'
+          fail: true
 
   links:
     runs-on: ubuntu-latest

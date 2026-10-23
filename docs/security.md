@@ -33,7 +33,7 @@ specified. Details live in each spec's "Security considerations" section.
 | Destructive action from injected or mistaken instructions | Confirmation by default, sensitive-tool flag, access presets, read-only instances | tools-contract §8, §12; definition-format |
 | Data exfiltration to other hosts | Credentials sent only to the instance's own address; no redirects across hosts; base-URL allowlist; the server never calls hosts other than configured instances (TLS fetch limited to them) | auth §2.3; runtime-config |
 | Prompt injection via spec text | Specs are reviewed files in the definition (never fetched live from targets); description diffs in every PR; rules can rewrite descriptions | ADR-0011; ci-pipeline guide |
-| Prompt injection via responses | Responses are data: size limits, `errors.detail: summary` option; agents and clients must treat tool results as untrusted (stated in generated AGENTS.md / SKILL.md) | runtime-config §4.5; packaging |
+| Prompt injection via responses | Responses are data: size limits, `errors.detail: summary` option; agents and clients must treat tool results as untrusted (stated in generated AGENTS.md) | runtime-config §4.5; packaging |
 | Reading arbitrary host files | File inputs by path off by default; confined to a root; no traversal or symlink escape; size caps | runtime-config §6; tools-contract §9 |
 | Silent wrong requests | One content type per tool, body check before sending, wire tests | tools-contract §13 |
 | Credential leaks | Secret fields are references only; plain values rejected; redaction everywhere; never written back to disk | runtime-config §2 |

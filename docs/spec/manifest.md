@@ -13,7 +13,7 @@ manifest. A copy sits next to the jar in the package (`manifest.json`) for revie
 its checksum is in the signed `SHA256SUMS`. Other targets (desktop bundle, Docker image) contain the
 same jar.
 
-Full example: [examples/manifest/orders-mcp.manifest.json](../../examples/manifest/orders-mcp.manifest.json).
+Full example: [examples/manifest/orders-mcp.manifest.json](https://github.com/bitboyro/mcpgp/blob/20a8ca16bec3577bce49dd57152143bfcb4c69ae/examples/manifest/orders-mcp.manifest.json).
 
 ## 1. Principles
 

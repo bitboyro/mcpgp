@@ -44,7 +44,7 @@ The MCP adapter maps manifest features to what the negotiated revision supports,
 | Streamable HTTP | 2025-03-26+ | legacy HTTP+SSE transport, only if the build enables `transports.legacySse` |
 
 What the runtime does today, by protocol feature (the Java SDK it builds on stops at 2025-11-25; 2026-07-28 is
-planned, see [the roadmap](../process/roadmap.md)):
+planned, see [the roadmap](https://github.com/bitboyro/mcpgp/blob/20a8ca16bec3577bce49dd57152143bfcb4c69ae/docs/process/roadmap.md)):
 
 | Protocol feature | Support | Notes |
 |---|---|---|

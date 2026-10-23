@@ -1,10 +1,11 @@
 # Feature matrix
 
-Status: **inventory** of the generated server, the compiler and the CLI as of `0a7a7e6`. Every
-feature, where it is configured, what each setting changes, whether the code does it, which tests
-cover it today (ContractVersionsTest is on the unmerged `test/contract-versions` branch), and what the [release gate](release-gate.md) has to verify. The IDs (`F…`) are what
-gate cases declare in `covers:`; S6 fails when a feature or a setting value has no case. Which
-suites, fixtures and profiles cover each area: [release-gate.md](release-gate.md) §6.3.
+Status: **source inventory**, revalidated against `main` at `20a8ca1` (2026-10-23).
+This covers the generated server, compiler and CLI. Implementation status is based on source
+inspection; test names identify relevant suites, not proof that every setting/value was exercised.
+The final column describes required verification, not necessarily existing release-gate coverage.
+Feature IDs (`F…`) are stable inventory identifiers. The proposed S6 `covers:` completeness check
+in [release-gate.md](release-gate.md) is a design target, not an implemented completeness guarantee.
 
 The platform (web UI, REST API, platform MCP server, library, approvals) is out of scope here; it
 needs its own matrix.
@@ -12,7 +13,7 @@ needs its own matrix.
 **Set in:** **D** definition (build time, `*.mcpgp.yaml`, naming policy, rules) · **R** runtime config
 at the customer (file, env vars, flags) · **C** the MCP client or the call · **B** the build command.
 
-**Code:** ✅ implemented · ⚠️ partly · ❌ in the schema, but the code doesn't read it. Checked by
+**Code:** ✅ implemented · ⚠️ partly · ❌ unsupported/deferred (explicit refusal where listed below). Checked by
 reading the code, not by running it; "Tests today" lists the in-process Java tests that touch the
 feature, which is not the same as covering every value.
 
@@ -24,11 +25,11 @@ feature, which is not the same as covering every value.
 | F2 | Overlays | D | `contracts[].overlays[]` | Spec edited before tools are made | ✅ | examples (orders 2.0 overlay) | Overlay text reaches descriptions; broken overlay → `OVERLAY_INVALID` |
 | F3 | Several versions per API | D | `contracts[].version`, `default: true` | One package ships every version; default decides `auto` and the package version (2.0 → 2.0.0) | ✅ | ApiCallTest, ContractVersionsTest | Each version's requests use its own base path and shapes; package version follows the default |
 | F4 | Pinned contract | R | `instances[].contract: "<version>"` | Instance uses that version; no detection; unknown version stops startup | ✅ | ApiCallTest, ContractVersionsTest | Pinned and `auto` instances side by side; a version not shipped refuses to start |
-| F5 | **Contract detection** | D + R | `apis[].detect.{method GET·HEAD·POST, path, pattern, onFailure useDefault·refuse}`; `contract: auto` | Target asked at startup and reload which version it runs | ❌ manifest only; runtime treats `auto` as the default | ContractVersionsTest (7 tests, disabled) | Detected version used; fallback with `useDefault`; `refuse` disables only that instance; re-detect on reload |
+| F5 | **Contract detection** | D + R | `apis[].detect.{method GET·HEAD·POST, path, pattern, onFailure useDefault·refuse}`; `contract: auto` | Target asked at startup and reload which version it runs | ✅ runtime detection at startup/reload | ContractVersionsTest | Detected version used; fallback with `useDefault`; `refuse` disables only that instance; re-detect on reload |
 | F6 | Per-version tool availability | D | (derived from contracts) | A tool missing in an instance's contract → `NOT_AVAILABLE_ON_INSTANCE`; arguments of another version → `INPUT_VALIDATION` | ✅ | ApiCallTest, ContractVersionsTest | Every tool × every version (S3) |
-| F7 | Mixed versions across instances | D | `instances.mixedContracts`: `union` · `namespaced` · `forbid` | Union: one tool, per-version variants; namespaced: tools per version; forbid: startup refuses mixed versions | ⚠️ written to the manifest, runtime never reads it: always `union` | — | All three values |
+| F7 | Mixed versions across instances | D | `instances.mixedContracts`: `union` · `namespaced` · `forbid` | Union: one tool, per-version variants; namespaced: instance-prefixed tools; forbid: startup refuses mixed versions | ✅ all three modes | MixedContractsTest | All three values |
 | F8 | Single or multi instance | D + R | `instances.mode`: `single` · `multi`; R `instance` · `instances[]` · `apis.<api>.instance(s)` | Multi: `instance` required on every tool (enum, no default), `instances_list` | ✅ | ApiCallTest, MultiApiTest | Both modes; `INSTANCE_REQUIRED` / `INSTANCE_UNKNOWN`; `instance` sent to a single build |
-| F9 | Instance limit | D | `instances.max` | Startup refuses more instances than allowed | ❌ manifest only | — | Over the limit refuses to start |
+| F9 | Instance limit | D | `instances.max` | Startup refuses more instances than allowed | ✅ enforced by ConfigLoader | MixedContractsTest | Over the limit refuses to start |
 | F10 | Several APIs per server | D + R | `apis[]`, `apis[].toolPrefix`; R `apis.<api>.instances` | Tools prefixed per API; instances per API; `<prefix>_instances_list` | ✅ | MultiApiTest | Two APIs with instances each; a call never reaches the other API's target |
 | F11 | Target address | R | `instances[].baseUrl` | https/443, http/80 defaults; contract base path appended when the URL has no path | ✅ | ApiCallTest | With and without path; http warning |
 | F12 | Read-only instance | R | `instances[].readOnly` | Writes → `NOT_AVAILABLE_ON_INSTANCE`, nothing sent | ✅ | ApiCallTest | Every write tool on a read-only instance |
@@ -43,8 +44,8 @@ feature, which is not the same as covering every value.
 | F16 | Include / exclude | D | `select.include` / `exclude` by `api`, `tag`, `method`, `path` (globs), `operationId`, `contract`, `extension`, `kind`, `tool` | Selected operations | ✅ | Selectors via examples | Every selector key, include then exclude precedence |
 | F17 | Deprecated operations | D | `select.deprecated`: `hide` · `show` · `mark` | Hidden, listed, or listed with a deprecation note | ✅ | — | All three |
 | F18 | Hidden per rule | D | `overrides.rules[].hidden` | Tool removed after naming | ✅ | — | Hidden tool unreachable directly and through discovery |
-| F19a | Layered runtime tool policy | R | `tools.allow/deny`, `apis.<id>.tools`, `instance(s).tools`; `policy` command | Intersect permissions, filter catalogs, enforce selected instance, reload live | ✅ deployment/API/instance; organization planned | ToolPolicyTest, ReloadTest | Inheritance, deny wins, no helper bypass, stale config rejected, stdio/HTTP |
-| F19b | Policy management API | R | `server.management.enabled/keys/port`; `/management/policy`, `/preview`, `/apply` | Separate administrator credentials, bounded previews, revision checks, persist-before-publication | ✅ policy-only; general settings planned | PolicyManagementTest | Separate auth, port/origin restrictions, no preview side effects, stale/competing previews, persistence failures, secret-reference recovery |
+| F19a | Layered runtime tool policy | R | `tools.allow/deny`, `apis.<id>.tools`, `instance(s).tools`; `policy` command | Intersect permissions, filter catalogs, enforce selected instance, reload live | ✅ organization/deployment/API/instance/identity/session; see policy specs | ToolPolicyTest, ReloadTest | Inheritance, deny wins, no helper bypass, stale config rejected, stdio/HTTP |
+| F19b | Policy management API | R | `server.management.enabled/keys/port`; `/management/v1/config`, `/preview`, `/apply` | Separate administrator credentials, bounded previews, revision checks, persist-before-publication | ✅ registered policy and ordinary-setting subset; see runtime-policy-management.md | PolicyManagementTest | Separate auth, port/origin restrictions, no preview side effects, stale/competing previews, persistence failures, secret-reference recovery |
 | F19 | Unsatisfiable tools | D | `downstreamAuth.unsatisfiedTools`: `hide` · `error` | Tools no instance's credentials can call: hidden or explained | ✅ | UnsatisfiedToolsTest | Both values |
 
 ## 3. Names, descriptions and shapes
@@ -61,7 +62,7 @@ feature, which is not the same as covering every value.
 | F27 | Content type per tool | D | `requestBody.multiple` `split`·`prefer`, `prefer`, `suffixes`; rules `contentType`, `accept` | One tool per request type or one preferred; `Accept` from response types | ✅ | conformance multipart-split | `split` and `prefer`; every body type (S3) |
 | F28 | Multipart parts | D | rules `parts.<name>.{description, contentType, secret, required}` | Part schema and wire content type | ✅ | conformance multipart-split | Each key; `secret` parts redacted in audit |
 | F29 | Sensitive tools | D | rules `sensitive` | Warning in the description, masked in audit | ✅ | — | Masking in audit and recording |
-| F30 | Lean input schemas | D | `schemas.input`: `full` · `lean` | Smaller schemas | ❌ not read | — | Both values (after implementing) |
+| F30 | Lean input schemas | D | `schemas.input`: `full` · `lean` | Smaller schemas | ❌ `lean` refused with NOT_SUPPORTED_YET; `full` supported | UnsupportedSettingsTest | Refusal and full schemas |
 | F31 | Output schemas | D, C | (from response schemas); revision ≥ 2025-06-18 | `outputSchema` + `structuredContent`, or JSON as text on 2025-03-26 | ✅ | — | Each revision |
 | F32 | Response limit | D | `safety.responseLimitKb` | Truncation marker, then `RESPONSE_TOO_LARGE` | ✅ | — | Under, at, over the limit; JSON stays valid |
 
@@ -107,8 +108,8 @@ feature, which is not the same as covering every value.
 | F53 | Transport | D + R | D `runtimeDefaults.transports.{allowed, default}`; R `server.transport` `stdio`·`http` | stdio (logs on stderr) or Streamable HTTP | ✅ | StdioServerTest, StdioProcessTest, HttpServerTest | Every suite on both |
 | F54 | MCP revisions | C | client's `protocolVersion`: `2025-03-26` · `2025-06-18` · `2025-11-25` | Negotiation and feature fallbacks | ✅ | — | Every case on every revision |
 | F55 | HTTP settings | R | `server.{host, port, publicUrl, basePath, allowedOrigins, management.port}` | Where it listens, Origin check, separate health/metrics port | ✅ | HttpServerTest | Origin allowed/blocked; base path; management port |
-| F56 | Inbound HTTPS | R | `server.tls.{cert, key}` | Server speaks HTTPS | ❌ not read | — | After implementing |
-| F57 | Proxies | R | `server.trustProxy`, `server.outboundProxy` | Forwarded headers trusted; upstream through a proxy | ❌ not read | — | After implementing |
+| F56 | Inbound HTTPS | R | `server.tls.{cert, key}` | Direct TLS object refused; reverse proxy supported | ❌ direct HTTPS unsupported; see §10 | UnsupportedServerSettingsTest | Actionable refusal |
+| F57 | Proxies | R | `server.trustProxy`, `server.outboundProxy` | Reserved fields, refused when present | ❌ unsupported; see §10 | UnsupportedServerSettingsTest | Actionable refusal |
 | F58 | Inbound auth | D + R | D `runtimeDefaults.inboundAuth.{allowed, default}`; R `server.auth.mode` `none`·`static` (`keys[]`)·`oauth` (`issuer`, `jwksUri`, `introspection`, `scopes.<s>.{access, tools}`), `allowInsecure` | Who may call; scopes limit tools; no auth off-localhost refused | ✅ | OAuthTest, HttpServerTest | Every mode; scope → tool mapping; the guardrail |
 | F59 | Health | — | `/health/live`, `/health/ready` | Readiness | ✅ | HttpServerTest | Ready only when instances are |
 | F60 | Audit | D + R | `audit.file.{enabled, path, rotate daily·hourly·size:N, retainDays}`, `audit.arguments` `none`·`redacted`·`hashed` | JSON Lines events | ✅ | ConfirmAndAuditTest | Every argument mode; rotation (test clock C3) |
@@ -134,45 +135,47 @@ feature, which is not the same as covering every value.
 | ID | Feature | Set in | Settings → values | What changes | Code | Tests today | Gate must verify |
 |---|---|---|---|---|---|---|---|
 | F72 | Package formats | D | `build.targets`: `jar` · `mcpb` · `docker` (docker needs HTTP) | What the zip contains | ✅ | PackageTest, DeliveryTest | Every format launched as the customer would (S0) |
-| F73 | Generated docs | D | `build.docs`: people, agents | README, INSTALL, CONFIGURATION, TOOLS; AGENTS.md, SKILL.md, llms.txt | ✅ | PackageTest | TOOLS matches the served surface |
+| F73 | Generated docs | D | `build.docs`: people, agents | README, INSTALL, CONFIGURATION, TOOLS; AGENTS.md, llms.txt | ✅ | PackageTest | TOOLS matches the served surface |
 | F74 | Signing | D + B | `build.sign.key` (minisign) | `SHA256SUMS.minisig` | ✅ | SigningTest, SelfContainedCheckTest | Verify with the real `minisign` |
-| F75 | Jar signing | D | `build.jarSigning.{keystore, alias, password}` | Signed jar | ❌ not read | — | After implementing |
-| F76 | Docker image | D | `build.image.base`; `registry`, `push`, `tar` | Dockerfile base; push and tar only warn | ⚠️ base only | — | Image builds from the package |
-| F77 | Generation mode | D | `generation.mode` `runtime`·`codegen`·`both`; `codegen.{output, extend, classes}` | Codegen | ❌ the packager warns "not available"; the roadmap marks it ✓ | — | After implementing |
+| F75 | Jar signing | D | `build.jarSigning.{keystore, alias, password}` | Signed jar | ❌ explicitly refused; see §10 | UnsupportedSettingsTest | Actionable refusal |
+| F76 | Docker image | D | `build.image.base`; `registry`, `push`, `tar` | Dockerfile base; enabled publishing options refused | ✅ Dockerfile/base; publishing options unsupported | — | Image builds from the package |
+| F77 | Generation mode | D | `generation.mode` `runtime`·`codegen`·`both`; `codegen.{output, extend, classes}` | Codegen | ❌ `codegen`/`both` refused with NOT_SUPPORTED_YET; `runtime` supported | — | After implementing |
 | F78 | Reproducible builds | B | `SOURCE_DATE_EPOCH`, pinned CLI | Byte-identical packages | ✅ | conformance compiler | Build twice, compare (precondition) |
 | F79 | Variants and multi-file | D | `extends`, `$ref`, `include`, `$remove`, workspace references | One definition from many files | ✅ | MergerTest, ResolverSecurityTest, ExamplesResolveTest | Variant surface = base + overrides |
 | F80 | CLI | B | `init`, `validate`, `build`, `explain`, `names`, `test`, `push`, `verify`, `diff`, `preview`, `try`, `migrate` | — | ✅ | MainTest, TestCommandTest, PushTest | Gate uses `build`, `verify`, `test` |
 
-## 10. Settings the code doesn't act on
+## 10. Unsupported settings and values
 
-These pass schema validation, so a customer can set them and get no effect and no warning (except
-F76 and F77, which warn).
+Reserved format fields are not working capabilities. The compiler refuses unsupported definitions
+with `NOT_SUPPORTED_YET`; runtime startup refuses unsupported listener/proxy settings. These are
+not silently ignored. See `core/.../Unsupported.java` and `runtime/.../config/ConfigLoader.java`.
 
-| ID | Setting | Since the code ignores it |
+| ID | Setting | Current behavior / supported alternative |
 |---|---|---|
-| F5 | `apis[].detect`, `onFailure` | `auto` always uses the default contract |
-| F7 | `instances.mixedContracts: namespaced · forbid` | Behaves as `union` |
-| F9 | `instances.max` | Any number of instances |
-| F30 | `schemas.input: lean` | Full schemas |
-| — | `apis[].pagination` (all keys) | Passed into the manifest; no paging normalization (deferred in the roadmap) |
-| F56 | `server.tls` | HTTP only |
-| F57 | `server.trustProxy`, `server.outboundProxy` | Ignored |
-| F75 | `build.jarSigning` | Jar not signed |
-| F76 | `build.image.registry · push · tar` | Warning only |
-| F77 | `generation.mode: codegen · both` | Warning only; contradicts the roadmap's ✓ |
+| F30 | `schemas.input: lean` | Refused; `full` supported |
+| — | `apis[].pagination` object | Refused; use upstream API pagination parameters |
+| F56 | `server.tls` object | Refused; use a TLS reverse proxy (`tls: proxy`). Platform HTTPS is a separate supported feature |
+| F57 | `server.trustProxy`, `server.outboundProxy` | Presence refused; direct upstream calls only |
+| F75 | `build.jarSigning` object | Refused; package checksum signing via `build.sign` supported |
+| F76 | `build.image.registry`, enabled `push` / `tar` | Non-null/enabled values refused (`false` accepted); Dockerfile/base supported |
+| F77 | `generation.mode: codegen · both` | Refused; `runtime` supported |
+| — | CLI workspace `platform` configuration | Remote workspace references refused |
+| — | CLI `release.versionFrom` other than `contract` | Refused; explicit `--version` supported |
+| F1 | OpenAPI 3.2 | Refused; Swagger 2.0, OpenAPI 3.0/3.1 supported |
+| F64 | Secret providers other than `env` / `file` | Unsupported; do not treat arbitrary vault references as implemented |
 
-For each: implement it, or reject it with a diagnostic until it is implemented. A setting that is
-silently ignored is the worst of the three.
+Contract detection (F5), mixed-contract policies (F7) and instance limits (F9) are implemented;
+they no longer belong in this list. Future issue-tracker/skills/feedback packs (F70) remain deferred.
 
 ## 11. Covering "all configurations"
 
-All combinations are not testable: the settings above multiply to billions. The gate uses three
-layers instead.
+All combinations are not testable: the settings above multiply to billions. The release-gate design proposes three
+layers instead; the inventory is not evidence that those completeness checks exist today.
 
-1. **Every value once.** Each value of each setting in this matrix has at least one case where it
-   changes an observable result (the surface, a request, a response, an audit line). S6 checks this
+1. **Every value once.** Each value of each setting in this matrix should have at least one case where it
+   changes an observable result (the surface, a request, a response, an audit line). The planned S6 check would derive this
    from `covers: [F33=toolsets, …]`.
-2. **Pairs that interact.** Settings known to affect each other are tested pairwise (every value of
+2. **Pairs that interact.** Settings known to affect each other should be tested pairwise (every value of
    one with every value of the other):
 
 | Interacts | With | Why |
@@ -186,10 +189,10 @@ layers instead.
 | F63 config sources | everything in R | Same result from YAML, JSON and env only |
 | F72 formats | F53 transport | Docker is HTTP-only; `.mcpb` is stdio |
 
-3. **High-risk combinations in full.** Small sets where a bug would be expensive get every
+3. **High-risk combinations in full.** Small sets where a bug would be expensive should get every
    combination: confirmation × elicitation × revision × transport (3 × 3 × 3 × 2 = 54); credential
    types × transport × inbound auth mode.
 
-**Knowing when something breaks:** every row's "Gate must verify" becomes cases tagged with its ID.
-A change that breaks a feature fails those cases. A change that adds a setting without a row here, or
-a value without a case, fails S6. Section 10 shrinks as settings are implemented or rejected.
+**Knowing when something breaks:** every row's "Gate must verify" should become cases tagged with its ID.
+A change that breaks a feature should fail those cases. The proposed S6 check would fail a change that adds a setting without a row here, or
+a value without a case. Until implemented, reviewers must verify these gaps explicitly.

@@ -18,7 +18,9 @@ cp "$jar" "$dir/lib/mcpgp-cli.jar"
 cp LICENSE "$dir/"
 # the specs and guides the tool's messages and generated files refer to (docs/spec/..., docs/guides/...)
 mkdir -p "$dir/docs"
-cp -R docs/spec docs/guides "$dir/docs/"
+cp -R docs/spec docs/guides docs/decisions "$dir/docs/"
+mkdir -p "$dir/schemas/src/main/resources"
+cp -R schemas/src/main/resources/schemas "$dir/schemas/src/main/resources/"
 cp docs/concepts.md docs/security.md docs/deployment.md "$dir/docs/"
 cat > "$dir/README.md" <<README
 # mcpgp $version
