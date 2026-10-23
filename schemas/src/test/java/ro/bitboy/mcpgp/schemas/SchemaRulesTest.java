@@ -29,6 +29,20 @@ class SchemaRulesTest {
             """;
 
     @Test
+    void organizationDefaultsReuseRuntimeSettings() throws IOException {
+        assertThat(schemas.validate(SchemaKind.ORGANIZATION_POLICY, yaml("""
+                version: 1
+                defaults:
+                  settings:
+                    readOnly: true
+                    timeoutSeconds: 15
+                    rateLimits: { enabled: true, concurrent: 4, perMinute: 60 }
+                """))).isEmpty();
+        assertThat(schemas.validate(SchemaKind.ORGANIZATION_POLICY,
+                yaml("version: 1\ndefaults: { settings: { timeoutSeconds: 0 } }"))).isNotEmpty();
+    }
+
+    @Test
     void minimalDefinitionIsValid() throws IOException {
         assertThat(schemas.validate(SchemaKind.DEFINITION, yaml(MINIMAL_DEFINITION))).isEmpty();
     }

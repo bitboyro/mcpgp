@@ -27,8 +27,8 @@ public final class ConfigurationTemplates {
                 new Template("personal-use", "Personal use", "A local stdio configuration with read-only defaults.", 1,
                         Map.of("server", Map.of("transport", "stdio"), "tools", Map.of("readOnly", true)), List.of()),
                 new Template("enterprise-grade", "Enterprise grade", "Explicit access, authentication, audit, limits, and review.", 1,
-                        Map.of("tools", Map.of("allow", List.of()), "audit", Map.of("enabled", true, "retainDays", 90),
-                                "rateLimits", Map.of("maxConcurrent", 4, "maxPerMinute", 60), "timeoutSeconds", 15),
+                        Map.of("tools", Map.of("allow", List.of()), "audit", Map.of("file", Map.of("enabled", true, "retainDays", 90)),
+                                "settings", Map.of("rateLimits", Map.of("enabled", true, "concurrent", 4, "perMinute", 60), "timeoutSeconds", 15)),
                         List.of("tool selection", "authentication key")));
     }
 

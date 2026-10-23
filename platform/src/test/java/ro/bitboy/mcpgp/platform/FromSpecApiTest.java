@@ -27,6 +27,17 @@ class FromSpecApiTest extends PlatformTestBase {
     static final String ENTRY = "{ \"Entry\": { \"type\": \"object\", \"properties\": { \"id\": { \"type\": \"string\" } } } }";
 
     @Test
+    void everyBuiltInTemplateCreatesACompilableServer() throws Exception {
+        Map<String, String> files = Map.of("api.json", SWAGGER, "paths/entries.json", ENTRIES, "definitions/entry.json", ENTRY);
+        for (String template : new String[] {"blank", "default", "personal-use", "enterprise-grade"}) {
+            String id = "preset-" + template;
+            assertThat(send(post("/api/v1/servers/from-spec?id=" + id + "&template=" + template + "&acceptTemplate=" + template + "@1", files)).statusCode()).as(template).isEqualTo(201);
+            JsonNode validation = json(send(bearer("POST", "/api/v1/servers/" + id + "/versions/latest/validate", null)));
+            assertThat(validation.path("ok").asBoolean()).as(template + ": " + validation).isTrue();
+        }
+    }
+
+    @Test
     void templatesArePreviewedAndMustBeAcceptedBeforeImport() throws Exception {
         Map<String, String> files = Map.of("api.json", SWAGGER, "paths/entries.json", ENTRIES, "definitions/entry.json", ENTRY);
         JsonNode list = json(send(bearer("GET", "/api/v1/servers/configuration-templates", null)));

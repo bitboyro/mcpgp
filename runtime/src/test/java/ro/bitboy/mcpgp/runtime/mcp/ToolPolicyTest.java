@@ -60,6 +60,18 @@ class ToolPolicyTest {
         return server.call(null, new McpSchema.CallToolRequest(name, args));
     }
 
+    @Test void realOrganizationDefaultsLoadAndRejectInvalidSettings() throws Exception {
+        Path file = dir.resolve("server.yaml");
+        Files.writeString(file, "instances: [{ id: test, baseUrl: '" + target.address() + "', contract: '2.0' }]\n");
+        Path organization = dir.resolve("organization.yaml");
+        Files.writeString(organization, "version: 1\ndefaults: { settings: { readOnly: true, timeoutSeconds: 15 } }\n");
+        var options = new ConfigLoader.Options(Optional.of(file), dir, Map.of(), Map.of(), Optional.of(organization), Optional.empty());
+        RuntimeConfig loaded = new ConfigLoader(new Schemas()).load(ORDERS, options);
+        assertThat(loaded.document().at("/settings/readOnly").asBoolean()).isTrue();
+        Files.writeString(organization, "version: 1\ndefaults: { settings: { timeoutSeconds: 0 } }\n");
+        assertThatThrownBy(() -> new ConfigLoader(new Schemas()).load(ORDERS, options)).isInstanceOf(ConfigException.class);
+    }
+
     @Test void absentAllowInheritsButEmptyAllowDisables() throws Exception {
         McpServerFactory inherited = server("tools: { allow: [orders_customer_get] }\n", "", "    tools: { allow: [] }");
         assertThat(inherited.catalog().tool(GET)).isPresent();

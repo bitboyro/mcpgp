@@ -20,7 +20,7 @@
       "type": "object",
       "properties": {
         "settings": {
-          "$ref": "#/$defs/inheritedSettings"
+          "$ref": "runtime-config.schema.json#/$defs/inheritedSettings"
         },
         "audit": {
           "type": "object",
