@@ -49,7 +49,7 @@ class LibraryExamplesTest {
                 apis:
                   - id: tasks
                     contracts: [{version: '1.0.0', spec: api.yaml, default: true}]
-                    downstreamAuth: {supported: [bearer]}
+                    upstreamAuth: {supported: [bearer]}
                 """;
         for (var t : new ConfigurationTemplates(null).builtIns()) {
             Path root = dir.resolve("example.mcpgp.yaml");

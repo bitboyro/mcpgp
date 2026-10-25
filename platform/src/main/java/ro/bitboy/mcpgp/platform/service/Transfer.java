@@ -81,12 +81,13 @@ public final class Transfer {
     }
 
     /**
-     * Imports into a store without servers or library items (the platform's own server aside); returns
-     * counts. The export's copy of the platform's own server, with its history, replaces the fresh one;
-     * the next start brings it to this release.
+     * Imports into a store without servers or library items (the platform's own server and untouched
+     * starter examples aside); returns counts. The export's copy of the platform's own server, with its
+     * history, replaces the fresh one, and so does its copy of a starter example; the next start brings
+     * them to this release.
      */
     public Map<String, Integer> importAll(byte[] zip) {
-        if (store.servers().stream().anyMatch(s -> !s.system()) || !store.library().isEmpty()) {
+        if (store.servers().stream().anyMatch(s -> !s.system()) || store.library().stream().anyMatch(i -> !LibraryExamples.untouched(i))) {
             throw new ApiException(409, "CONFLICT", "import fills a fresh store; this one has servers or library items already");
         }
         JsonNode data = null;
@@ -132,7 +133,8 @@ public final class Transfer {
             }
             List<Model.LibraryItem> library = JSON.convertValue(data.path("library"), new TypeReference<>() {
             });
-            library.forEach(i -> store.saveLibraryItem(i, -1));
+            library.forEach(i -> store.saveLibraryItem(i, store.libraryItem(i.kind(), i.name())
+                    .filter(LibraryExamples::untouched).map(Model.LibraryItem::revision).orElse(-1L)));
             List<Model.Build> builds = JSON.convertValue(data.path("builds"), new TypeReference<>() {
             });
             for (Model.Build build : builds) {

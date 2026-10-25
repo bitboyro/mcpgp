@@ -66,7 +66,7 @@ class LdapSignInTest {
         Path secret = dir.resolve("bind-password");
         Files.writeString(secret, "service secret\n");
         int port;
-        try (ServerSocket socket = new ServerSocket(0)) {
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) {
             port = socket.getLocalPort();
         }
         Path file = dir.resolve("platform.yaml");

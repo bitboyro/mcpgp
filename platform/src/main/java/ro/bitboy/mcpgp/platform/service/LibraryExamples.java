@@ -22,6 +22,10 @@ public final class LibraryExamples {
     public static boolean example(Model.LibraryItem item) {
         return !item.versions().isEmpty() && AUTHOR.equals(item.versions().getFirst().author());
     }
+    /** A starter example nobody has edited: every version is the shipped one. */
+    public static boolean untouched(Model.LibraryItem item) {
+        return !item.versions().isEmpty() && item.versions().stream().allMatch(v -> AUTHOR.equals(v.author()));
+    }
     public static List<Example> examples() {
         var examples = new ArrayList<Example>();
         examples.add(new Example("contracts", "example-tasks-api", "Tasks API", "OpenAPI 3.1 example with bearer authentication, bounded list results and explicit response schemas.", """

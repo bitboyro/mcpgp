@@ -89,7 +89,7 @@ class TokenExchangeTest {
         });
         as.start();
         api = new MockTarget();
-        try (ServerSocket socket = new ServerSocket(0)) {
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) {
             port = socket.getLocalPort();
         }
         resource = "http://127.0.0.1:" + port + "/mcp";

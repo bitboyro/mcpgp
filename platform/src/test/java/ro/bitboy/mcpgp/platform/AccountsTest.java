@@ -63,7 +63,7 @@ class AccountsTest {
 
     static Platform start(Path store, PlatformConfig.Guardrails guardrails) throws IOException {
         int port;
-        try (ServerSocket socket = new ServerSocket(0)) {
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) {
             port = socket.getLocalPort();
         }
         PlatformConfig config = TestStores.of(new PlatformConfig(store, "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT, "local", true, guardrails));
