@@ -24,3 +24,5 @@ Accepted ADRs are not edited except to change status; write a new ADR to change 
 | [0016](0016-optional-exclusion-diagnostics.md) | Optional exclusion diagnostics in manifests | Accepted |
 | [0017](0017-layered-runtime-policy.md) | Layered runtime policy and configuration templates | Accepted |
 | [0018](0018-policy-management-transactions.md) | Policy administration uses separate credentials and previewed file transactions | Accepted |
+
+- [0019: Shared Library starter examples](0019-shared-library-starter-examples.md) — missing-only seeding, template compatibility and standards boundaries.

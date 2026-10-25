@@ -396,6 +396,7 @@ paths:
       operationId: listLibrary
       tags: [library]
       summary: List library items
+      description: Includes versioned starter examples for every category; example marks starter origin and description explains its purpose. Existing workspace entries are never overwritten at startup.
       responses:
         "200": { description: Items with their references, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }
@@ -424,6 +425,7 @@ paths:
       operationId: getLibraryItem
       tags: [library]
       summary: Get library item
+      description: Returns the versioned item, including its root filename for reading the source with the version-file API. Naming and notices additionally provide structured editor data.
       responses:
         "200": { description: The item, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }

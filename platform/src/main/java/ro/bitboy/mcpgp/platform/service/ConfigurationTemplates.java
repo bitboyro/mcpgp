@@ -20,13 +20,13 @@ public final class ConfigurationTemplates {
 
     public List<Template> builtIns() {
         return List.of(
-                new Template("blank", "Blank", "Keep the generated project, with no tools enabled by policy.", 1,
+                new Template("blank", "Bare", "Keep the generated project, with no tools enabled by policy.", 1,
                         Map.of("tools", Map.of("allow", List.of())), List.of()),
                 new Template("default", "Default", "Use the generated contract configuration.", 1,
                         Map.of(), List.of()),
-                new Template("personal-use", "Personal use", "A local stdio configuration with read-only defaults.", 1,
+                new Template("personal-use", "Basic", "A local stdio configuration with read-only defaults.", 1,
                         Map.of("server", Map.of("transport", "stdio"), "tools", Map.of("readOnly", true)), List.of()),
-                new Template("enterprise-grade", "Enterprise grade", "Explicit access, authentication, audit, limits, and review.", 1,
+                new Template("enterprise-grade", "Enterprise", "No API tools allowed until selected; audit and bounded calls. Configure authentication before shared deployment.", 1,
                         Map.of("tools", Map.of("allow", List.of()), "audit", Map.of("file", Map.of("enabled", true, "retainDays", 90)),
                                 "settings", Map.of("rateLimits", Map.of("enabled", true, "concurrent", 4, "perMinute", 60), "timeoutSeconds", 15)),
                         List.of("tool selection", "authentication key")));
@@ -36,7 +36,9 @@ public final class ConfigurationTemplates {
     public List<Template> all() {
         java.util.ArrayList<Template> result = new java.util.ArrayList<>(builtIns());
         for (Model.LibraryItem item : store.library()) {
-            if (item.kind().equals("templates") && item.latest() != null) result.add(get("library/" + item.name() + "@" + item.latest().number()));
+            if (item.kind().equals("templates") && item.latest() != null
+                    && !(LibraryExamples.example(item) && item.versions().size() == 1
+                    && builtIns().stream().anyMatch(t -> LibraryExamples.templateName(t.id()).equals(item.name())))) result.add(get("library/" + item.name() + "@" + item.latest().number()));
         }
         return List.copyOf(result);
     }

@@ -1,77 +1,76 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, type Build, type LibraryItem, type ServerSummary } from '../api'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { api, type Build, type ServerSummary } from '../api'
 import { readPicked, type PickedProject } from '../files'
 import { nameClashes, specProblems } from '../specUpload'
-import { ConnectAgent } from './ConnectAgent'
+import { BuildButton } from './Overview'
 import { NameClashesView, SpecPicker, SpecProblemsView, type SpecUpload } from './SpecUpload'
 import { useSession } from '../session'
 import { BuildChip, Chip, ErrorBox, Icon, Loading, PageHead, Segmented, slug } from '../ui'
 
-type Panel = { mode: 'copy' | 'variant'; source: ServerSummary } | { mode: 'new' } | { mode: 'connect' } | null
-
-const KIND_LABELS: Record<string, string> = {
-  contracts: 'API contracts', naming: 'Naming policies', rules: 'Rule sets', packs: 'Pack configs', templates: 'Templates',
-}
+type Panel = { mode: 'copy' | 'variant'; source: ServerSummary } | { mode: 'new' } | null
 
 export function ServersPage() {
-  const { settings, can } = useSession()
+  const { can } = useSession()
   const [search] = useSearchParams()
-  // undefined: nothing chosen yet; ?connect, or a platform with none of its own servers, starts at Connect an agent
-  const [chosen, setPanel] = useState<Panel | undefined>(search.has('connect') ? { mode: 'connect' } : undefined)
+  const [panel, setPanel] = useState<Panel>(null)
   const servers = useQuery({ queryKey: ['servers'], queryFn: () => api.servers() })
-  // the platform's own server first
+  // Keep the platform MCP server first, separate from custom server cards.
   const items = [...(servers.data?.items ?? [])].sort((a, b) => Number(!!b.system) - Number(!!a.system))
   const own = items.filter((s) => !s.system)
-  const firstRun = servers.isSuccess && own.length === 0 && items.length > 0
-  const panel = chosen === undefined ? (firstRun ? { mode: 'connect' as const } : null) : chosen
   const manifests = useQueries({
     queries: items.map((s) => ({ queryKey: ['manifest', s.id, 'latest'], queryFn: () => api.manifest(s.id), enabled: s.latestVersion != null, retry: false })),
   })
   const builds = useQueries({ queries: items.map((s) => ({ queryKey: ['builds', s.id], queryFn: () => api.builds(s.id) })) })
 
+  if (search.has('connect')) return <Navigate to="/agents?connect" replace />
+
   return (
     <>
-      <PageHead title="All servers"
-        sub={<>{own.length} MCP server{own.length === 1 ? '' : 's'} in {settings.workspace}{items.length > own.length ? ', and the platform’s own' : ''}. Duplicate one, or make a variant that stays in sync with it.</>}>
-        {can('servers:write') && <button type="button" className="btn btn-primary" onClick={() => setPanel({ mode: 'new' })}>New server</button>}
+      <PageHead title="All MCP Servers"
+        sub={own.length > 0 ? `${own.length} custom MCP server${own.length === 1 ? '' : 's'}` : undefined}>
+        {can('servers:write') && <button type="button" className="btn btn-primary" onClick={() => setPanel({ mode: 'new' })}>New MCP Server</button>}
       </PageHead>
-      <div className="body">
-        <section aria-label="Servers" className="server-grid">
+      <div className="body server-index">
+        <section aria-label="MCP servers" className="server-grid">
           {servers.isLoading && <Loading what="servers" />}
           <ErrorBox error={servers.error} />
-          {servers.isSuccess && own.length === 0 && (
-            <div className="card"><h2>No servers yet</h2><p className="hint">Start from your API's OpenAPI or Swagger file (JSON or YAML): <b>New server</b>.</p>
-              {can('servers:write') && <button type="button" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={() => setPanel({ mode: 'new' })}>New server from a spec</button>}</div>
-          )}
           {items.map((server, i) => {
             const manifest = manifests[i]?.data
             const serverBuilds: Build[] = builds[i]?.data?.items ?? []
             const last = serverBuilds[0]
             const lastGood = serverBuilds.find((b) => b.status === 'succeeded')
+            const currentBuild = serverBuilds.find((b) => b.status === 'succeeded' && !b.deleted && !b.archived && b.version === server.latestVersion)
             const variants = items.filter((s) => s.parent === server.id).length
-            const selected = panel && 'source' in panel ? panel.source.id === server.id : !!(panel?.mode === 'connect' && server.system)
+            const selected = panel && 'source' in panel ? panel.source.id === server.id : false
             return (
-              <article key={server.id} className={'server-card' + (selected ? ' selected' : '')} aria-label={server.id}>
+              <article key={server.id} className={'server-card' + (server.system ? ' system-server' : '') + (selected ? ' selected' : '')} aria-label={server.id}>
                 <div className="card-head">
                   <Link to={`/servers/${server.id}`} className="name">{server.id}</Link>
-                  {server.system ? <Chip tone="new">Made by the platform</Chip> : last ? <BuildChip build={last} /> : <Chip tone={server.latestVersion == null ? 'idle' : 'new'}>{server.latestVersion == null ? 'Draft' : 'Not built'}</Chip>}
+                  {server.system ? <Chip tone="new">Platform utility</Chip> : last ? <BuildChip build={last} /> : <Chip tone={server.latestVersion == null ? 'idle' : 'new'}>{server.latestVersion == null ? 'Draft' : 'Not built'}</Chip>}
                 </div>
                 <div>
                   <div className="sub">{manifest?.server.title ?? server.title}</div>
                   {server.parent && <div className="lineage">↳ variant of {server.parent}</div>}
-                  {server.system && <div className="lineage">The platform as tools, for your agents. Updated with every platform release.</div>}
+                  {server.system && <div className="lineage">Lets an AI assistant work with this platform. Connect and customize to your needs.</div>}
                   {manifests[i]?.error && <div className="lineage">doesn't compile yet; see Sources</div>}
                 </div>
-                <div className="stats">
+                {server.system && builds[i]?.isSuccess && !currentBuild && <div className="server-build-hint">
+                  <span className="server-build-question" aria-hidden="true">?</span>
+                  <div><b>Build it to use it</b><span>Create a package to download and connect your assistant.</span></div>
+                </div>}
+                {server.system && currentBuild && <Link className="server-build-ready" to={`/servers/${server.id}/builds?build=${currentBuild.id}`}>Package ready · View build →</Link>}
+                {!server.system && <div className="stats">
                   <span className="stat"><b>{manifest ? manifest.tools.length : '—'}</b><span>tools</span></span>
                   <span className="stat"><b>{lastGood?.serverVersion ?? '—'}</b><span>last build</span></span>
                   <span className="stat"><b>{variants}</b><span>variants</span></span>
                 </div>
+                }
                 <div className="card-actions">
-                  <Link to={`/servers/${server.id}`} className="btn btn-dark btn-sm">Open</Link>
-                  {server.system && <button type="button" className="btn btn-sm btn-primary" onClick={() => setPanel({ mode: 'connect' })}>Connect an agent</button>}
+                  <BuildButton id={server.id} disabled={server.latestVersion == null || !manifest} />
+                  <Link to={`/servers/${server.id}`} className="btn btn-dark btn-sm">{server.system ? 'View MCP server' : 'Open'}</Link>
+                  {server.system && <Link className="btn btn-sm" to="/agents?connect">Connect an agent</Link>}
                   {can('servers:write') && <>
                     {!server.system && <button type="button" className="btn btn-sm" onClick={() => setPanel({ mode: 'copy', source: server })}>Duplicate</button>}
                     <button type="button" className="btn btn-sm btn-soft" onClick={() => setPanel({ mode: 'variant', source: server })}>New variant</button>
@@ -80,41 +79,25 @@ export function ServersPage() {
               </article>
             )
           })}
+          {servers.isSuccess && own.length === 0 && (
+            <div className="server-welcome">
+              <span className="eyebrow">Your workspace</span>
+              <h2>Your first MCP server starts with an API.</h2>
+              <p>Turn an API into tools your AI assistant can use.</p>
+              <ol className="server-start-steps">
+                <li><span>1</span><div><b>Import your API</b><small>OpenAPI, Swagger or an existing mcpgp project.</small></div></li>
+                <li><span>2</span><div><b>Choose the tools</b><small>Review what your assistant can access.</small></div></li>
+                <li><span>3</span><div><b>Build your MCP server</b><small>Download a package to run in your environment.</small></div></li>
+              </ol>
+              <p className="hint">{can('servers:write') ? 'Choose New MCP Server to get started.' : 'Ask a workspace administrator to create an MCP server.'}</p>
+            </div>
+          )}
         </section>
-        <aside aria-label="Side panel" className="stage stage-narrow">
-          {panel?.mode === 'new' ? <NewServer onClose={() => setPanel(null)} />
-            : panel?.mode === 'connect' ? <ConnectAgent onClose={() => setPanel(null)} />
-            : panel ? <CopyPanel key={panel.source.id + panel.mode} mode={panel.mode} source={panel.source} onClose={() => setPanel(null)}
-              onMode={(mode) => setPanel({ mode, source: panel.source })} />
-            : <SharedLibrary />}
-        </aside>
-      </div>
-    </>
-  )
-}
-
-function SharedLibrary() {
-  const library = useQuery({ queryKey: ['library'], queryFn: api.library })
-  const byKind = new Map<string, LibraryItem[]>()
-  for (const item of library.data?.items ?? []) byKind.set(item.kind, [...(byKind.get(item.kind) ?? []), item])
-  return (
-    <>
-      <div>
-        <h2>Shared in this workspace</h2>
-        <p className="hint">Defined once, used by several servers.</p>
-      </div>
-      <div className="list">
-        {[...byKind.entries()].map(([kind, items]) => (
-          <Link key={kind} to={`/library#${kind}`} className="stage-link">
-            <span><span>{KIND_LABELS[kind] ?? kind}</span><br /><span className="meta">{items.map((i) => i.name).join(' · ')}</span></span>
-            <span className="mono">{items.length}</span>
-          </Link>
-        ))}
-        {library.isSuccess && byKind.size === 0 && <p className="empty">Nothing shared yet.</p>}
-      </div>
-      <div className="stage-card">
-        <p><b>Duplicate</b> makes an independent copy. <b>Variant</b> extends the original and keeps only your differences,
-          so fixes to the original flow into every variant.</p>
+        {panel && <aside aria-label="MCP server setup" className="stage stage-narrow server-setup-panel">
+          {panel.mode === 'new' ? <NewServer onClose={() => setPanel(null)} />
+            : <CopyPanel key={panel.source.id + panel.mode} mode={panel.mode} source={panel.source} onClose={() => setPanel(null)}
+              onMode={(mode) => setPanel({ mode, source: panel.source })} />}
+        </aside>}
       </div>
     </>
   )
@@ -172,13 +155,13 @@ function NewServer({ onClose }: { onClose: () => void }) {
     <div className="list" style={{ gap: 16 }}>
       <div className="card-head">
         <div>
-          <div className="eyebrow">New server</div>
-          <h2>{source === 'spec' ? 'From your API\u2019s spec' : 'From a definition project'}</h2>
+          <div className="eyebrow">New MCP Server</div>
+          <h2>{source === 'spec' ? 'Import an API definition' : 'Upload an existing project'}</h2>
         </div>
         <button type="button" className="btn btn-stage btn-sm" aria-label="Close" onClick={onClose}><Icon name="close" size={14} /></button>
       </div>
       <Segmented label="Start from" value={source} onChange={setSource}
-        options={[['spec', 'An OpenAPI or Swagger file'], ['project', 'A definition project']]} />
+        options={[['spec', 'API definition'], ['project', 'Existing project']]} />
       {source === 'spec' ? <NewFromSpec /> : <NewFromProject />}
     </div>
   )
@@ -242,7 +225,7 @@ function NewFromSpec() {
           </div>
           <label className="field">Configuration template
             <select className="input input-stage" value={template} onChange={(e) => { setTemplate(e.target.value); setAcceptedTemplate(null) }}>
-              <option value="blank">Blank</option><option value="default">Default</option><option value="personal-use">Personal use</option><option value="enterprise-grade">Enterprise grade</option>
+              <option value="blank">Bare</option><option value="default">Default</option><option value="personal-use">Basic</option><option value="enterprise-grade">Enterprise</option>
             </select>
           </label>
           {plan.data.template && <div className="stage-card"><b>{plan.data.template.title}</b><span className="hint">{plan.data.template.description}</span>

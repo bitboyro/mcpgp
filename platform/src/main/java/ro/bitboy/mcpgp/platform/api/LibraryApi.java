@@ -63,6 +63,7 @@ public class LibraryApi {
         ServersApi.who(request).require("servers:read");
         Model.LibraryItem item = library.get(kind, name);
         Map<String, Object> answer = item(item);
+        answer.put("root", store.version(item.latest().digest()).orElseThrow().root());
         if (kind.equals("naming") || kind.equals("notices")) {
             // the policy or the notices as data (the editors on the Library page work from it) and who uses it
             Model.Version files = store.version(item.latest().digest()).orElseThrow();
@@ -163,6 +164,11 @@ public class LibraryApi {
         m.put("kind", item.kind());
         m.put("name", item.name());
         m.put("title", item.title());
+        boolean example = ro.bitboy.mcpgp.platform.service.LibraryExamples.example(item);
+        m.put("example", example);
+        if (example) ro.bitboy.mcpgp.platform.service.LibraryExamples.examples().stream()
+                .filter(e -> e.kind().equals(item.kind()) && e.name().equals(item.name())).findFirst()
+                .ifPresent(e -> m.put("description", e.description()));
         m.put("reference", "mcpgp://" + config.workspace() + "/" + item.kind() + "/" + item.name() + "@" + item.latest().number());
         List<Map<String, Object>> versions = new ArrayList<>();
         item.versions().forEach(v -> versions.add(ServersApi.versionRef(v)));

@@ -13,50 +13,53 @@ const KINDS: [string, string, string][] = [
   ['notices', 'Shared notices', 'Company policy and disclaimers on the tools of every server that includes them.'],
   ['rules', 'Rule sets', 'Descriptions, safety and selection rules.'],
   ['packs', 'Pack configs', 'Settings for the extra tools in packages.'],
-  ['templates', 'Templates', 'Definitions others extend.'],
+  ['templates', 'Templates', 'Starting configurations: Bare, Default, Basic and Enterprise.'],
 ]
 
 export function LibraryPage() {
   const library = useQuery({ queryKey: ['library'], queryFn: api.library })
   const items = library.data?.items ?? []
-  const ws = library.data?.workspace
   const [params, setParams] = useSearchParams()
-  const open = items.find((i) => (i.kind === 'naming' && i.name === params.get('naming')) || (i.kind === 'notices' && i.name === params.get('notices')))
+  const open = items.find((i) => params.get('item') === `${i.kind}/${i.name}` || (i.kind === 'naming' && i.name === params.get('naming')) || (i.kind === 'notices' && i.name === params.get('notices')))
   return (
     <>
-      <PageHead title="Shared library"
-        sub={<>Defined once, used by several servers. Definitions reference items as <span className="mono">mcpgp://{ws ?? '…'}/&lt;kind&gt;/&lt;name&gt;@&lt;version&gt;</span>.</>} />
+      <PageHead title="Shared Library"
+        sub="Reusable examples and shared configuration for your MCP servers." />
       <div className="body">
         <section className="col col-wide" aria-label="Library">
           <ErrorBox error={library.error} />
           {library.isLoading && <Loading what="the library" />}
           {KINDS.map(([kind, title, hint]) => {
             const ofKind = items.filter((i) => i.kind === kind)
+            if (kind === 'templates') {
+              const order = ['bare', 'default', 'basic', 'enterprise']
+              ofKind.sort((a, b) => (order.includes(a.name) ? order.indexOf(a.name) : 4) - (order.includes(b.name) ? order.indexOf(b.name) : 4))
+            }
             return (
               <div key={kind} id={kind} className="card">
                 <div className="card-head"><h2>{title}</h2><span className="tag">{ofKind.length}</span></div>
                 <p className="hint">{hint}</p>
                 {ofKind.map((item) => <Item key={item.name} item={item}
-                  open={item.kind === 'naming' || item.kind === 'notices' ? () => setParams({ [item.kind]: item.name }) : undefined}
+                  open={() => setParams({ item: `${item.kind}/${item.name}` })}
                   selected={item === open} />)}
                 {kind === 'notices' && <NewNoticeSet onCreated={(name) => setParams({ notices: name })} />}
               </div>
             )
           })}
         </section>
-        <aside className="stage stage-narrow" aria-label={open ? (open.kind === 'naming' ? 'Naming policy' : 'Shared notices') : 'How to add'}>
+        <aside className="stage stage-narrow" aria-label={open ? (open.kind === 'naming' ? 'Naming policy' : open.kind === 'notices' ? 'Shared notices' : 'Configuration') : 'How to add'}>
           {open ? <>
             <button type="button" className="btn btn-sm btn-stage" style={{ alignSelf: 'flex-start' }} onClick={() => setParams({})}>Close</button>
-            {open.kind === 'naming' ? <PolicyEditor key={open.name} item={open} /> : <NoticeSetEditor key={open.name} item={open} />}
+            {open.kind === 'naming' ? <PolicyEditor key={open.name} item={open} /> : open.kind === 'notices' ? <NoticeSetEditor key={open.name} item={open} /> : <ItemPreview key={open.kind + '/' + open.name} item={open} />}
           </> : <>
-          <h2>Adding to the library</h2>
-          <p className="hint">Items are added and versioned through the API (and the CLI), so pipelines own them:</p>
-          <pre className="code code-wrap">{`POST /api/v1/library/naming?name=company-standard
-{ "files": { "company-standard.yaml": "…" } }
-
-POST /api/v1/library/naming/company-standard/versions`}</pre>
-          <p className="hint">A new version of an item recomputes the previews of every server that references it with <span className="mono">@latest</span>.
-            Naming policies and shared notices can also be changed here: open one.</p>
+          <h2>Start with an example</h2>
+          <p className="hint">Open an entry to inspect its configuration. Starter examples are available in every category and are never applied automatically.</p>
+          <div className="stage-card"><h3>Four starting points</h3>
+            <p className="hint"><b>Bare</b> starts with no API tools enabled. <b>Default</b> keeps generated settings. <b>Basic</b> is local and read-only. <b>Enterprise</b> starts with explicit tool selection, audit and bounded calls.</p>
+            <p className="hint">Enterprise is a starting configuration, not a compliance certification. Configure authentication and review access before deployment.</p>
+          </div>
+          <p className="hint">The API example follows <a href="https://spec.openapis.org/oas/v3.1.1.html" target="_blank" rel="noreferrer">OpenAPI 3.1</a>. Tool guidance follows <a href="https://modelcontextprotocol.io/specification/2025-06-18/schema" target="_blank" rel="noreferrer">MCP annotations</a>; naming and presets are mcpgp conventions.</p>
+          <p className="hint">Your changes are saved as new versions. Restarts preserve existing entries and edits.</p>
           </>}
         </aside>
       </div>
@@ -112,7 +115,8 @@ function Item({ item, open, selected }: { item: LibraryItem; open?: () => void; 
   return (
     <div className="row" style={selected ? { background: 'var(--accent-soft)' } : undefined}>
       <span style={{ minWidth: 0 }}>
-        <b>{item.title}</b><br />
+        <b>{item.title}</b> {item.example && <span className="tag">Starter example</span>}<br />
+        {item.description && <span className="hint" style={{ display: 'block', margin: '6px 0' }}>{item.description}</span>}
         <span className="meta mono" style={{ overflowWrap: 'anywhere' }}>{item.reference}</span>
       </span>
       <span className="actions">
@@ -121,4 +125,26 @@ function Item({ item, open, selected }: { item: LibraryItem; open?: () => void; 
       </span>
     </div>
   )
+}
+
+/** Read-only source view for entries without a dedicated editor. */
+function ItemPreview({ item }: { item: LibraryItem }) {
+  const detail = useQuery({ queryKey: ['library-item', item.kind, item.name], queryFn: () => api.libraryItem(item.kind, item.name) })
+  const version = item.versions.at(-1)?.number
+  const root = detail.data?.root
+  const source = useQuery({
+    queryKey: ['library-source', item.kind, item.name, version, root],
+    queryFn: () => api.libraryFile(item.kind, item.name, version!, root!),
+    enabled: version != null && !!root,
+  })
+  return <>
+    <h2>{item.title}</h2>
+    {item.description && <p className="hint">{item.description}</p>}
+    <span className="eyebrow">{root ?? 'Configuration'}</span>
+    <ErrorBox error={detail.error ?? source.error} />
+    {(detail.isLoading || source.isLoading) && <Loading what="configuration" />}
+    {source.data && <pre className="code code-wrap">{source.data}</pre>}
+    <p className="hint">{item.kind === 'templates' ? 'Choose a template when importing an API definition. Custom template versions are also available through the platform API.' : 'Use this versioned reference in your MCP server definition:'}</p>
+    <pre className="code code-wrap">{item.reference}</pre>
+  </>
 }

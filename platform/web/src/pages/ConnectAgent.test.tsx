@@ -37,7 +37,7 @@ describe('connect an agent', () => {
     expect(agentName('ana@acme.com')).toBe('ana-assistant')
   })
 
-  it('starts there on a platform with only its own server, and connects', async () => {
+  it('keeps the index focused and opens agent setup only when requested', async () => {
     let used: string | null = null
     const { calls } = fakeApi({
       ...routes(),
@@ -47,9 +47,12 @@ describe('connect an agent', () => {
     })
     renderAt('/')
     const card = await screen.findByRole('article', { name: 'mcpgp-platform' })
-    expect(within(card).getByText('Made by the platform')).toBeTruthy()
+    expect(within(card).getByText('Platform utility')).toBeTruthy()
     expect(within(card).queryByRole('button', { name: 'Duplicate' })).toBeNull()
-    expect(await screen.findByText('No servers yet')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Your first MCP server starts with an API.' })).toBeTruthy()
+    expect(screen.queryByLabelText('Connect an agent')).toBeNull()
+    expect(screen.queryByText('Shared in this workspace')).toBeNull()
+    await userEvent.click(within(card).getByRole('link', { name: 'Connect an agent' }))
 
     const panel = await screen.findByLabelText('Connect an agent')
     expect((within(panel).getByLabelText('Agent name') as HTMLInputElement).value).toBe('ana-assistant')
@@ -73,15 +76,45 @@ describe('connect an agent', () => {
     expect(within(panel).queryByRole('button', { name: 'Create the agent' })).toBeNull()
   })
 
-  it('opens the shared library, not Connect, once there are servers of your own', async () => {
+  it('keeps the platform MCP server first without unrelated side panels', async () => {
     fakeApi({ ...routes(ME, [PLATFORM, { id: 'orders-mcp', title: 'orders-mcp', archived: false, latestVersion: 1, updated: '' }]),
       'GET /servers/orders-mcp/versions/latest/manifest': { server: { name: 'orders-mcp', title: 'Orders', version: '1' }, tools: [] },
       'GET /servers/orders-mcp/builds': { items: [] } })
     renderAt('/')
-    expect(await screen.findByText('Shared in this workspace')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'All MCP Servers' })).toBeTruthy()
+    expect(screen.queryByText('Shared in this workspace')).toBeNull()
     expect(screen.queryByLabelText('Connect an agent')).toBeNull()
     const cards = await screen.findAllByRole('article')
     expect(cards[0].getAttribute('aria-label')).toBe('mcpgp-platform')
+  })
+
+  it('starts a build directly from the platform card', async () => {
+    const { calls } = fakeApi({ ...routes(),
+      'POST /servers/mcpgp-platform/builds': { id: 'build-new', server: 'mcpgp-platform', version: 1, status: 'queued', artifacts: [] },
+      'GET /servers/mcpgp-platform': { ...PLATFORM, versions: [] },
+      'GET /builds/build-new': { id: 'build-new', server: 'mcpgp-platform', version: 1, status: 'queued', artifacts: [] },
+      'GET /builds/build-new/log': '',
+    })
+    renderAt('/')
+    const card = await screen.findByRole('article', { name: 'mcpgp-platform' })
+    expect(await within(card).findByText('Build it to use it')).toBeTruthy()
+    const build = within(card).getByRole('button', { name: 'Build' })
+    await waitFor(() => expect((build as HTMLButtonElement).disabled).toBe(false))
+    await userEvent.click(build)
+    await waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === '/servers/mcpgp-platform/builds')).toBe(true))
+  })
+
+  it('offers one creation action and removes the setup panel when closed', async () => {
+    fakeApi(routes())
+    renderAt('/')
+    await screen.findByRole('article', { name: 'mcpgp-platform' })
+    expect(screen.getAllByRole('button', { name: 'New MCP Server' })).toHaveLength(1)
+    await userEvent.click(screen.getByRole('button', { name: 'New MCP Server' }))
+    const panel = screen.getByRole('complementary', { name: 'MCP server setup' })
+    expect(within(panel).getByRole('heading', { name: 'Import an API definition' })).toBeTruthy()
+    await userEvent.click(within(panel).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('complementary')).toBeNull()
+    expect(screen.queryByText('Nothing shared yet.')).toBeNull()
   })
 
   it('shows the platform’s server read-only', async () => {
@@ -93,6 +126,6 @@ describe('connect an agent', () => {
     renderAt('/servers/mcpgp-platform')
     expect(await screen.findByRole('heading', { name: 'Made by the platform' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Upload version' })).toBeNull()
-    expect(screen.getAllByRole('link', { name: 'Connect an agent' })[0].getAttribute('href')).toBe('/?connect')
+    expect(screen.getAllByRole('link', { name: 'Connect an agent' })[0].getAttribute('href')).toBe('/agents?connect')
   })
 })

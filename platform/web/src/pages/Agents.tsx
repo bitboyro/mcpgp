@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, type Identity, type Token } from '../api'
 import { useSession } from '../session'
 import { ErrorBox, Loading, PageHead, Segmented, ago } from '../ui'
@@ -16,7 +17,14 @@ export function AgentsPage() {
   const tokens = useQuery({ queryKey: ['tokens'], queryFn: api.tokens })
   const agents = useQuery({ queryKey: ['activity', 'agents'], queryFn: () => api.activity({ limit: 200 }) })
   const [issued, setIssued] = useState<Token | null>(null)
-  const [connecting, setConnecting] = useState(false)
+  const [search, setSearch] = useSearchParams()
+  const connecting = search.has('connect')
+  const setConnecting = (open: boolean) => {
+    const next = new URLSearchParams(search)
+    if (open) next.set('connect', '')
+    else next.delete('connect')
+    setSearch(next, { replace: true })
+  }
   const people = admin ? identities.data?.items ?? [] : [me]
   const agentActivity = (agents.data?.items ?? []).filter((a) => a.actorKind === 'agent' || a.actorKind === 'pipeline').slice(0, 12)
 
