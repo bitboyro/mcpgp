@@ -19,11 +19,11 @@ const DOC_LABELS: Record<string, string> = {
 }
 
 /**
- * Package & deliver (design/ui.md): what the next build of the server contains and how the customer
+ * Packaging (design/ui.md): what the next build of the server contains and how the customer
  * installs it, before anything is built: the formats, the docs as they ship, the files, and the
  * commands a pipeline runs.
  */
-export function PackagePage() {
+export function PackagingPage() {
   const { id = '' } = useParams()
   const server = useServer(id)
   const manifest = useManifest(id, 'latest', server.data?.latestVersion != null)
@@ -41,7 +41,7 @@ export function PackagePage() {
 
   return (
     <>
-      <PageHead title="Package & deliver"
+      <PageHead title="Packaging"
         sub={base > 0 ? `What a build of version ${base} contains, and how your customer installs it.` : undefined}>
         {last && <Link to={`/servers/${id}/builds?build=${last.id}`} className="btn">Last build {last.serverVersion}</Link>}
         <BuildButton id={id} />
@@ -50,7 +50,7 @@ export function PackagePage() {
         <section className="col" aria-label="Package settings">
           <ErrorBox error={server.error ?? preview.error} />
           {preview.error instanceof ApiError && preview.error.status === 422 && (
-            <p className="hint">The latest version doesn't compile; the checks on <Link to={`/servers/${id}/sources`}>Sources</Link> say why.</p>
+            <p className="hint">The latest version doesn't compile; the checks on <Link to={`/servers/${id}/apis`}>API definitions</Link> say why.</p>
           )}
           {preview.isLoading && <Loading what="the package" />}
           {preview.data && (
@@ -70,7 +70,7 @@ export function PackagePage() {
                   ))}
                 </div>
                 <p className="hint">Choose formats with <span className="mono">build.targets</span> in the definition (on{' '}
-                  <Link to={`/servers/${id}/sources`}>Sources</Link>).</p>
+                  <Link to={`/servers/${id}/apis`}>API definitions</Link>).</p>
               </div>
               <div className="card">
                 <h2>How it runs</h2>

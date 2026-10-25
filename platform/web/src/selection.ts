@@ -1,4 +1,4 @@
-// Turning operations on and off on Tools & rules: each switch becomes a change to the API's `select`
+// Turning operations on and off on Tools: each switch becomes a change to the API's `select`
 // block (definition-format.md §4), written through the edits endpoint like any other page change.
 // Turning one tool off adds one exclude entry; turning an operation on undoes what left it out, which
 // may be broader than that one operation (the page says so before it happens).

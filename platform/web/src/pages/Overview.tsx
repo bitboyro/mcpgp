@@ -5,12 +5,12 @@ import { api, ApiError, type Change, type Diagnostic, type Manifest, type Tool }
 import { PACKS, choices, diffLines, packChange, packOn } from '../choices'
 import { AUTH_LABELS, EXPOSURE, counts, listedTools, useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
-import { ErrorBox, Loading, PageHead, Segmented, ago } from '../ui'
+import { ErrorBox, Loading, PageHead, Segmented } from '../ui'
 import { NoticesCard } from './Notices'
 
 type Tab = 'agent' | 'customer' | 'package' | 'checks' | 'changes'
 
-export function BuildButton({ id }: { id: string }) {
+export function BuildButton({ id, disabled = false }: { id: string; disabled?: boolean }) {
   const { can } = useSession()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -25,7 +25,7 @@ export function BuildButton({ id }: { id: string }) {
   return (
     <>
       {start.error && <ErrorBox error={start.error} />}
-      <button type="button" className="btn btn-primary" onClick={() => start.mutate()} disabled={start.isPending}>Build</button>
+      <button type="button" className="btn btn-primary" onClick={() => start.mutate()} disabled={disabled || start.isPending}>{start.isPending ? 'Starting…' : 'Build'}</button>
     </>
   )
 }
@@ -40,7 +40,6 @@ export function OverviewPage() {
   const [pending, setPending] = useState<Record<string, Pending>>({})
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
-  const latest = server.data?.versions.at(-1)
   const compileError = manifest.error instanceof ApiError ? manifest.error : null
   const changes = Object.values(pending).map((p) => p.change)
   const base = server.data?.latestVersion ?? 0
@@ -90,8 +89,8 @@ export function OverviewPage() {
         ) : (
           <>
             {server.data?.system
-              ? <Link to="/?connect" className="btn btn-primary">Connect an agent</Link>
-              : <Link to={`/servers/${id}/sources`} className="btn">Upload version</Link>}
+              ? <Link to="/agents?connect" className="btn btn-primary">Connect an agent</Link>
+              : <Link to={`/servers/${id}/apis`} className="btn">Upload version</Link>}
             <BuildButton id={id} />
           </>
         )}
@@ -106,7 +105,7 @@ export function OverviewPage() {
               <p className="hint">The platform's API as tools, for your agents. The platform makes this server and adds a version with every
                 release, so it can't be changed here. To change what your agents get (hide tools, add notices), make a variant of it on
                 {' '}<Link to="/">All servers</Link>: it follows every new version.</p>
-              <div><Link to="/?connect" className="btn btn-primary btn-sm">Connect an agent</Link></div>
+              <div><Link to="/agents?connect" className="btn btn-primary btn-sm">Connect an agent</Link></div>
             </div>
           )}
           {saving && (
@@ -129,7 +128,7 @@ export function OverviewPage() {
           {compileError && (
             <div className="card">
               <h2>This version doesn't compile</h2>
-              <p className="hint">{compileError.message}. The checks on <Link to={`/servers/${id}/sources`}>Sources</Link> say why.</p>
+              <p className="hint">{compileError.message}. The checks on <Link to={`/servers/${id}/apis`}>API definitions</Link> say why.</p>
             </div>
           )}
           {manifest.data && shown && (
@@ -137,18 +136,6 @@ export function OverviewPage() {
               variant={!!(server.data?.parent || manifest.data.build.extends)} />
           )}
           {manifest.data && <NoticesCard manifest={manifest.data} definition={definition.data} editable={editable} pending={pending} pick={pick} />}
-          {server.data && (
-            <div className="card">
-              <h2>Definition</h2>
-              <dl className="kv">
-                <dt>Server</dt><dd className="mono">{manifest.data?.server.name ?? id} {manifest.data?.server.version}</dd>
-                <dt>Version</dt><dd>{latest ? <>{latest.number} · by {latest.author} {ago(latest.created)}{latest.message ? ` · ${latest.message}` : ''}</> : 'none yet'}</dd>
-                {server.data.parent && <><dt>Variant of</dt><dd><Link to={`/servers/${server.data.parent}`}>{server.data.parent}</Link></dd></>}
-                {manifest.data?.build.extends && <><dt>Extends</dt><dd className="mono">{manifest.data.build.extends.name}{manifest.data.build.extends.version ? '@' + manifest.data.build.extends.version : ''}</dd></>}
-              </dl>
-              <p className="hint">Each saved change becomes a new version, like an upload, with your name in Activity. Comments and layout in the file stay as they are.</p>
-            </div>
-          )}
         </section>
         <section className="stage" aria-label="Preview">
           <div className="card-head">
@@ -191,12 +178,12 @@ function Choices({ id, original, shown, editable, pending, pick, variant }: {
   pick: (key: string, label: string, original: boolean, change: Change) => void
   variant: boolean
 }) {
-  const auth = new Set(shown.apis.flatMap((a) => a.downstreamAuth?.supported ?? []))
+  const auth = new Set(shown.apis.flatMap((a) => a.upstreamAuth?.supported ?? []))
   return (
     <div className="card">
       <div className="card-head">
         <h2>How it's shaped</h2>
-        <Link to={`/servers/${id}/tools`} className="hint">Tools &amp; rules →</Link>
+        <Link to={`/servers/${id}/tools`} className="hint">Tools →</Link>
       </div>
       <div className="rows">
         {choices(shown).map((c) => {
@@ -228,7 +215,7 @@ function Choices({ id, original, shown, editable, pending, pick, variant }: {
         </div>
         <div style={{ padding: '14px 0' }}>
           <b style={{ fontSize: 14, fontWeight: 600 }}>Sign-in to the API</b><br />
-          <span className="hint">{[...auth].map((a) => AUTH_LABELS[a] ?? a).join(', ') || 'None'} · each target server picks one · <Link to={`/servers/${id}/connections`}>Connections</Link></span>
+          <span className="hint">{[...auth].map((a) => AUTH_LABELS[a] ?? a).join(', ') || 'None'} · each target server picks one · <Link to={`/servers/${id}/targets`}>Target APIs</Link></span>
         </div>
       </div>
     </div>
@@ -342,7 +329,7 @@ export function Checks({ diagnostics }: { diagnostics: Diagnostic[] }) {
           </li>
         ))}
       </ul>
-      {c.info > 0 && <p className="hint">{c.info} notes (for example operations left out on purpose) are on Sources.</p>}
+      {c.info > 0 && <p className="hint">{c.info} notes (for example operations left out on purpose) are on API definitions.</p>}
     </>
   )
 }

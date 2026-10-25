@@ -23,10 +23,10 @@ const manifest = (contracts: string[], detect?: object) => ({
 
 function page() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/servers/orders-mcp/connections']}><App /></MemoryRouter></QueryClientProvider>)
+  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/servers/orders-mcp/apis']}><App /></MemoryRouter></QueryClientProvider>)
 }
 
-describe('version detection on Connections', () => {
+describe('version detection on API definitions', () => {
   it('is turned on with a rule that reads the version from the JSON answer under each base path', async () => {
     const { calls } = fakeApi({
       'GET /me': ME, 'GET /settings': SETTINGS, 'GET /servers/orders-mcp': SERVER,

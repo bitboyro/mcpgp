@@ -6,7 +6,7 @@ import { startingArguments } from '../tryArgs'
 import { ErrorBox } from '../ui'
 
 /**
- * Trying a tool (Tools & rules): the call goes to the server mcpgp packages, running against a mock
+ * Trying a tool (Tools): the call goes to the server mcpgp packages, running against a mock
  * made from the spec on the platform, never to a real system. It shows what the agent gets back and
  * the HTTP request the server would send.
  */

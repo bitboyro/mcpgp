@@ -16,6 +16,16 @@ function Item({ to, icon, children, end }: { to: string; icon: IconName; childre
   )
 }
 
+/** A labelled group of server pages (Configure, Deliver, History): the configuration groups of design/ui.md. */
+function Group({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div role="group" aria-label={label} className="nav-group">
+      <span className="nav-group-label" aria-hidden="true">{label}</span>
+      {children}
+    </div>
+  )
+}
+
 /** The dark sidebar: workspace pages, or a server's pages when one is open. */
 export function Shell({ children }: { children: ReactNode }) {
   const { id } = useParams()
@@ -50,25 +60,34 @@ export function Shell({ children }: { children: ReactNode }) {
         <Link to="/" className="brand"><span className="brand-mark"><Icon name="mark" stroke="#FFFFFF" width={2.2} /></span>mcpgp</Link>
         {id ? (
           <>
-            <Link to={`/servers/${id}`} className="nav-card"><small>Server</small><span className="mono">{id}</span></Link>
+            <Link to={`/servers/${id}`} className="nav-card"><small>MCP server</small><span className="mono">{id}</span></Link>
             <div className="nav-links">
-              <Item to="/" icon="home" end>All servers</Item>
-              <Item to={`/servers/${id}`} icon="shape" end>Overview</Item>
-              <Item to={`/servers/${id}/tools`} icon="tools">Tools &amp; rules</Item>
-              <Item to={`/servers/${id}/connections`} icon="connections">Connections</Item>
-              <Item to={`/servers/${id}/safety`} icon="shield">Security &amp; safety</Item>
-              <Item to={`/servers/${id}/sources`} icon="sources">Sources</Item>
-              <Item to={`/servers/${id}/changes`} icon="changes">Changes</Item>
-              <Item to={`/servers/${id}/package`} icon="deliver">Package &amp; deliver</Item>
-              <Item to={`/servers/${id}/builds`} icon="package">Builds</Item>
-              <Item to={`/servers/${id}/activity`} icon="activity">Activity</Item>
+              <Item to="/" icon="home" end>All MCP Servers</Item>
+              <Item to={`/servers/${id}`} icon="overview" end>Overview</Item>
+              <Group label="Configure">
+                <Item to={`/servers/${id}/general`} icon="general">General</Item>
+                <Item to={`/servers/${id}/apis`} icon="definition">API definitions</Item>
+                <Item to={`/servers/${id}/tools`} icon="tools">Tools</Item>
+                <Item to={`/servers/${id}/targets`} icon="connections">Target APIs</Item>
+                <Item to={`/servers/${id}/access`} icon="lock">Access control</Item>
+                <Item to={`/servers/${id}/execution`} icon="shape">Execution</Item>
+                <Item to={`/servers/${id}/observability`} icon="pulse">Observability</Item>
+              </Group>
+              <Group label="Deliver">
+                <Item to={`/servers/${id}/packaging`} icon="package">Packaging</Item>
+                <Item to={`/servers/${id}/builds`} icon="builds">Builds and releases</Item>
+              </Group>
+              <Group label="History">
+                <Item to={`/servers/${id}/changes`} icon="changes">Changes</Item>
+                <Item to={`/servers/${id}/activity`} icon="activity">Activity</Item>
+              </Group>
             </div>
           </>
         ) : (
           <>
             <div className="nav-card"><small>Workspace</small><span>{settings.workspace}</span></div>
             <div className="nav-links">
-              <Item to="/" icon="home" end>All servers</Item>
+              <Item to="/" icon="home" end>All MCP Servers</Item>
               <Item to="/library" icon="library">Shared library</Item>
               <Item to="/builds" icon="builds">All builds</Item>
               <Item to="/activity" icon="activity">Activity</Item>

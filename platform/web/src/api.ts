@@ -193,6 +193,8 @@ export interface Activity {
 }
 
 export interface LibraryItem {
+  example?: boolean
+  description?: string
   kind: string
   name: string
   title: string
@@ -247,7 +249,7 @@ export interface ManifestApi {
   toolPrefix?: string
   contracts: Contract[]
   detect?: Detect
-  downstreamAuth?: { supported: string[]; identity?: string; unsatisfiedTools?: string; apiKey?: { in: string; name: string }; fromRequest?: { header?: string }; tokenExchange?: Record<string, never> }
+  upstreamAuth?: { supported: string[]; identity?: string; unsatisfiedTools?: string; apiKey?: { in: string; name: string }; fromRequest?: { header?: string }; tokenExchange?: Record<string, never> }
 }
 
 export interface Manifest {
@@ -267,7 +269,16 @@ export interface Manifest {
     outputSchemas?: boolean
     inputLimits?: { enabled?: boolean; requestKb?: number; stringMaxLength?: number }
     rateLimits?: { enabled?: boolean; concurrent?: number; perMinute?: number; retryAfter?: boolean }
-    runtimeDefaults?: { audit?: { file?: { retainDays?: number; rotate?: string; enabled?: boolean }; arguments?: string } }
+    runtimeDefaults?: {
+      audit?: { file?: { retainDays?: number; rotate?: string; enabled?: boolean }; arguments?: string }
+      telemetry?: { enabled?: boolean; exporter?: string; serviceName?: string; signals?: string[] }
+      /** Defaults for any runtime setting the package ships with (definition `runtimeDefaults.configuration`). */
+      configuration?: {
+        server?: { auth?: { scopes?: Record<string, { access?: string; tools?: string[] }> } }
+        sessions?: { enabled?: boolean }
+        logging?: { level?: string }
+      }
+    }
   }
   runtime: { transports?: { allowed: string[]; default: string }; inboundAuth?: { allowed: string[]; default: string } }
   diagnostics: Diagnostic[]

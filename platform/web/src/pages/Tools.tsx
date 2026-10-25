@@ -5,6 +5,7 @@ import { listedTools, useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
 import { Chip, ErrorBox, Loading, PageHead, Segmented } from '../ui'
 import { NamingView } from './Naming'
+import { OutputSchemas } from './OutputSchemas'
 import { OperationsView } from './Operations'
 import { ToolEdit } from './ToolEdit'
 import { TryTool } from './TryTool'
@@ -45,7 +46,7 @@ export function ToolsPage() {
   if (view === 'naming') {
     return (
       <>
-        <PageHead title="Tools & rules" sub="How tools get their names: the policy, the vocabulary, and names the lock file keeps.">{switcher}</PageHead>
+        <PageHead title="Tools" sub="How tools get their names: the policy, the vocabulary, and names the lock file keeps.">{switcher}</PageHead>
         <NamingView id={id} />
       </>
     )
@@ -54,7 +55,7 @@ export function ToolsPage() {
   if (view === 'operations') {
     return (
       <>
-        <PageHead title="Tools & rules" sub="Every operation of the contracts. Switch one on to make it a tool, off to leave it out.">{switcher}</PageHead>
+        <PageHead title="Tools" sub="Every operation of the contracts. Switch one on to make it a tool, off to leave it out.">{switcher}</PageHead>
         <OperationsView id={id} />
       </>
     )
@@ -62,7 +63,7 @@ export function ToolsPage() {
 
   return (
     <>
-      <PageHead title="Tools & rules"
+      <PageHead title="Tools"
         sub={manifest.data ? <>{apiCount} of {apiCount + operations} operations become tools. Pick one to see exactly what the agent gets, and why.{' '}
           <Link to="?view=operations">Choose operations</Link></> : undefined}>{switcher}</PageHead>
       <div className="body">
@@ -91,12 +92,13 @@ export function ToolsPage() {
               </div>
             </div>
           )}
+          <OutputSchemas id={id} />
         </section>
         <section className="stage" aria-label="Selected tool">
           {selected ? <ToolDetail key={selected.name} id={id} tool={selected} /> : manifest.data && <p className="empty">Pick a tool.</p>}
           {manifest.data && (
             <p className="hint">Rules live in the definition's files (for example <span className="mono">overrides/*.yaml</span>); see them on{' '}
-              <Link to={`/servers/${id}/sources`}>Sources</Link>.</p>
+              <Link to={`/servers/${id}/apis`}>API definitions</Link>.</p>
           )}
         </section>
       </div>

@@ -5,14 +5,17 @@ import { api, type ContractPlan } from '../api'
 import { readPicked, type PickedProject } from '../files'
 import { specProblems } from '../specUpload'
 import { SpecPicker, SpecProblemsView, type SpecUpload } from './SpecUpload'
-import { useServer } from '../serverData'
+import { useManifest, useServer } from '../serverData'
+import { ShippedVersions } from './ShippedVersions'
 import { useSession } from '../session'
 import { ErrorBox, Loading, PageHead, ago, shortDigest } from '../ui'
 
-export function SourcesPage() {
+/** API definitions: the OpenAPI documents the server is made from, the versions it ships, and its saved versions. */
+export function ApiDefinitionsPage() {
   const { id = '' } = useParams()
   const { can } = useSession()
   const server = useServer(id)
+  const manifest = useManifest(id)
   const [chosen, setChosen] = useState<number | null>(null)
   const versionNumber = chosen ?? server.data?.latestVersion ?? null
   const version = useQuery({ queryKey: ['version', id, versionNumber], queryFn: () => api.version(id, versionNumber!), enabled: versionNumber != null })
@@ -23,7 +26,7 @@ export function SourcesPage() {
 
   return (
     <>
-      <PageHead title="Sources" sub="The API specs the server is made from, and the versions of its files.">
+      <PageHead title="API definitions" sub="The API specs the server is made from, the versions it ships, and the versions of its files.">
         <button type="button" className="btn" disabled={versionNumber == null || checks.isPending} onClick={() => checks.mutate()}>Run checks</button>
       </PageHead>
       <div className="body">
@@ -31,6 +34,7 @@ export function SourcesPage() {
           <ErrorBox error={server.error} />
           {server.isLoading && <Loading />}
           {server.data && <Contracts id={id} editable={can('servers:write') && !server.data.system} onDone={(n) => { setChosen(n); setFile(null) }} />}
+          {manifest.data && <ShippedVersions id={id} manifest={manifest.data} />}
           {can('servers:write') && server.data && !server.data.system && <Upload id={id} onDone={(n) => { setChosen(n); setFile(null) }} />}
           {server.data && (
             <div className="card">

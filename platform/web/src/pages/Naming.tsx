@@ -144,7 +144,7 @@ export function NamingView({ id }: { id: string }) {
                 <h2>Prefixes and suffix</h2>
                 <p className="hint">Tool names start with the prefixes, server prefix first, and end with the suffix: <span className="mono">
                   {[naming.data.effective.namespace?.server, manifest.data.apis[0]?.toolPrefix ?? manifest.data.apis[0]?.id, 'customer_list',
-                    naming.data.effective.namespace?.suffix].filter(Boolean).join('_')}</span>. One tool's name changes in its editor on Tools &amp; rules.</p>
+                    naming.data.effective.namespace?.suffix].filter(Boolean).join('_')}</span>. One tool's name changes in its editor on Tools.</p>
                 {manifest.data.apis.map((a) => {
                   const current = a.toolPrefix ?? a.id
                   return (
@@ -161,7 +161,7 @@ export function NamingView({ id }: { id: string }) {
             {manifest.data && (
               <div className="card">
                 <h2>When two tools would get the same name</h2>
-                <p className="hint">Usually two operations with the same operationId. One tool's own name can always be set in its editor on Tools &amp; rules.</p>
+                <p className="hint">Usually two operations with the same operationId. One tool's own name can always be set in its editor on Tools.</p>
                 <Segmented label="When two tools would get the same name" value={collisionsNow}
                   options={[['error', 'Stop and show them'], ['method-path', 'Name from method and path'], ['suffix-number', 'Add a number']]}
                   onChange={(v) => { if (editable) put(`name clashes: ${v}`, v === 'error' ? { op: 'remove', path: '/naming/collisions' } : { op: 'set', path: '/naming/collisions', value: v },
@@ -242,7 +242,7 @@ export function NamingView({ id }: { id: string }) {
               {words && !newKey && <p className="hint">Words are lowercase letters, digits and _; separate several with commas.</p>}
             </div>
             <p className="hint">A rule can add a prefix or suffix to chosen tools only (<span className="mono">name: {'{'} append: _v2 {'}'}</span>), in the
-              definition's files on <Link to={`/servers/${id}/sources`}>Sources</Link>. Shared policies change in the library.</p>
+              definition's files on <Link to={`/servers/${id}/apis`}>API definitions</Link>. Shared policies change in the library.</p>
           </>
         )}
       </section>

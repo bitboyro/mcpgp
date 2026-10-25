@@ -1,4 +1,4 @@
-// Editing a server's naming on Tools & rules → Naming (naming.md §2): vocabulary entries and prefixes,
+// Editing a server's naming on Tools → Naming (naming.md §2): vocabulary entries and prefixes,
 // written into the definition's `naming` and `apis[].toolPrefix` through the edits endpoint. A shared
 // policy's entries are overridden or switched off (`null` removes an inherited key) in the server's own
 // `naming`; the policy itself changes in the library.

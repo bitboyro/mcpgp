@@ -30,7 +30,6 @@ interface Settings {
   captureLimitKb: number
   resultTtl: number
   maxStoredKb: number
-  outputSchemas: boolean
 }
 
 function current(p: Manifest['policies']): Settings {
@@ -56,7 +55,6 @@ function current(p: Manifest['policies']): Settings {
     captureLimitKb: p.results?.captureLimitKb ?? 4096,
     resultTtl: p.results?.ttlSeconds ?? 900,
     maxStoredKb: p.results?.maxStoredKb ?? 65536,
-    outputSchemas: p.outputSchemas !== false,
   }
 }
 
@@ -82,26 +80,26 @@ const PATHS: Record<keyof Settings, string> = {
   captureLimitKb: '/results/captureLimitKb',
   resultTtl: '/results/ttlSeconds',
   maxStoredKb: '/results/maxStoredKb',
-  outputSchemas: '/schemas/output',
 }
 
 /**
- * Security & safety: what the server protects by default, each one something the builder can tune
- * or turn off. Saved in the definition's `safety` section, as the server's next version.
+ * Execution: how permitted calls run (confirmations, limits, batching, retained results), each one
+ * something the builder can tune or turn off. Saved in the definition's `safety`, `batch` and `results`
+ * sections, as the server's next version.
  */
-export function SafetyPage() {
+export function ExecutionPage() {
   const { id = '' } = useParams()
   const manifest = useManifest(id)
   return (
     <>
-      <PageHead title="Security & safety" sub="Configure safeguards, batching, and large results. These work with every discovery mode.">
+      <PageHead title="Execution" sub="How permitted calls run: confirmations, limits, batching, and large results. These work with every discovery mode.">
         <BuildButton id={id} />
       </PageHead>
       <div className="body">
         <section className="col" aria-label="Settings">
           <ErrorBox error={manifest.error} />
           {manifest.isLoading && <Loading />}
-          {manifest.data && <SafetyForm id={id} saved={current(manifest.data.policies)} />}
+          {manifest.data && <ExecutionForm id={id} saved={current(manifest.data.policies)} />}
         </section>
         <section className="stage" aria-label="Always on">
           <AlwaysOn />
@@ -111,7 +109,7 @@ export function SafetyPage() {
   )
 }
 
-function SafetyForm({ id, saved }: { id: string; saved: Settings }) {
+function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
   const { can } = useSession()
   const server = useServer(id)
   const queryClient = useQueryClient()
@@ -124,7 +122,7 @@ function SafetyForm({ id, saved }: { id: string; saved: Settings }) {
     .find((k) => !Number.isInteger(s[k]) || s[k] < (({ requestReceiptTtlSeconds: 60 } as Record<string, number>)[k] ?? 1) || s[k] > (({ batchMaxCalls: 100, batchConcurrency: 16, requestReceiptTtlSeconds: 2592000, maxStoredReceipts: 1000000, captureLimitKb: 65536, resultTtl: 86400, maxStoredKb: 262144 } as Record<string, number>)[k] ?? Number.MAX_SAFE_INTEGER))
   const save = useMutation({
     mutationFn: () => api.saveEdit(id, server.data?.latestVersion ?? 0,
-      changed.map((k) => ({ op: 'set' as const, path: PATHS[k], value: s[k] })), 'Security & safety: ' + changed.join(', ')),
+      changed.map((k) => ({ op: 'set' as const, path: PATHS[k], value: s[k] })), 'Execution: ' + changed.join(', ')),
     onSuccess: async () => {
       for (const key of ['server', 'manifest', 'servers', 'version', 'example-config']) await queryClient.invalidateQueries({ queryKey: [key] })
     },
@@ -177,13 +175,6 @@ function SafetyForm({ id, saved }: { id: string; saved: Settings }) {
       </div>
 
       <div className="card">
-        <h2>Tool results</h2>
-        <Toggle label="Describe each tool's result (output schema)" checked={s.outputSchemas} disabled={off}
-          onChange={(v) => set('outputSchemas', v)}
-          hint="From the API's spec, so agents and clients know the fields before calling. Kept loose (fields may be missing or extra), because real answers often differ from the spec; a difference is logged, never turned into an error. Lists come back as items." />
-      </div>
-
-      <div className="card">
         <h2>What agents send</h2>
         <Toggle label="Limit the size of what agents send" checked={s.inputLimits} disabled={off} onChange={(v) => set('inputLimits', v)}
           hint="Refuses oversized calls before anything reaches the target server. Files sent inline have their own limit, set by whoever runs the server." />
@@ -216,7 +207,7 @@ function SafetyForm({ id, saved }: { id: string; saved: Settings }) {
   )
 }
 
-function Toggle({ label, checked, disabled, onChange, hint }: {
+export function Toggle({ label, checked, disabled, onChange, hint }: {
   label: string; checked: boolean; disabled: boolean; onChange: (v: boolean) => void; hint?: string
 }) {
   return (
@@ -229,7 +220,7 @@ function Toggle({ label, checked, disabled, onChange, hint }: {
   )
 }
 
-function NumberField({ label, value, disabled, onChange, hint }: {
+export function NumberField({ label, value, disabled, onChange, hint }: {
   label: string; value: number; disabled: boolean; onChange: (v: number) => void; hint?: string
 }) {
   return (

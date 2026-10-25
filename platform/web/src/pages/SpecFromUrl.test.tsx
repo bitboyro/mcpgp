@@ -23,7 +23,7 @@ const plan = (extra: object) => ({ api: 'ledger', version: '2.0', spec: 'contrac
 
 function page() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/servers/ledger/sources']}><App /></MemoryRouter></QueryClientProvider>)
+  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/servers/ledger/apis']}><App /></MemoryRouter></QueryClientProvider>)
 }
 
 describe('specs from an address', () => {

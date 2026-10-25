@@ -6,6 +6,22 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- **Access control** and **Observability** pages for each server. Access control sets the client
+  sign-in methods a package offers and its default, default OAuth scope → tool permissions and whether
+  clients may narrow their own session; Observability sets the shipped audit file, rotation, retention
+  and argument handling, the log level, and OpenTelemetry on/off, exporter, service name and signals.
+  All are saved as `runtimeDefaults` the operator can still change. Settings the deployment supplies
+  (sign-in details, tool restrictions, identity and organization policy files, audit path, collector
+  endpoint) are listed read-only, marked "Set when deployed".
+- Build MCP servers directly from index cards; the platform utility highlights the first build step and links to its ready package afterward.
+- Shared Library starter examples for every category, with inspectable source and the existing
+  import presets shown as Bare, Default, Basic and Enterprise. Restarts preserve existing items
+  and edits. Enterprise defaults use the supported runtime paths. The platform MCP server stays
+  first on the index.
+- A simpler platform index: **All MCP Servers**, one creation action for API definitions or existing
+  projects, a short first-server guide, and a separate platform utility card. Agent setup opens on
+  **API & agents** instead of automatically on the index; setup panels close without revealing
+  unrelated Library content.
 - Opt-in runtime policy management endpoints with separate administrator keys, previewed and audited
   atomic configuration updates, and layered allow/deny tool policies across deployment, API and instance.
 - `mcpgp build --include-excluded-diagnostics` opts into exclusion details in the manifest. By default,
@@ -41,7 +57,40 @@ versions follow [SemVer](https://semver.org).
   zip and the CLI and platform images under `docs/`, and the files `init` writes link to them for
   this version.
 
+### Changed
+- The platform's server pages are grouped by what they configure: **Overview**, then **Configure**
+  (General, API definitions, Tools, Target APIs, Execution), **Deliver** (Packaging, Builds and releases)
+  and **History** (Changes, Activity). Sources became API definitions and gained the contracts shipped
+  and version detection; Connections became Target APIs; Security & safety became Execution, and its
+  output schema switch moved to Tools (saved on change); the new General page shows the server's
+  identity, instructions for agents and its definition. Tools & rules is now Tools, and Package &
+  deliver is Packaging. Old addresses (`/sources`, `/connections`, `/safety`, `/package`) redirect.
+  New versions saved from these pages are described as "Tools: …" and "Execution: …".
+- The definition key for how a server signs in to the API it calls is `apis[].upstreamAuth`, the
+  industry term (it was `downstreamAuth`; same settings). Compiled manifests carry `upstreamAuth`; the
+  runtime still reads `downstreamAuth` from manifests built before 0.4.0. Platform edits to an API whose
+  file still says `downstreamAuth` change that key rather than adding a second one.
+- **Breaking for clients that match on error codes:** the tool error `AUTH_DOWNSTREAM` is now
+  `AUTH_UPSTREAM`, matching `upstreamAuth` and the `UPSTREAM_*` codes. Same cases: the target refused
+  the server's credentials (401/403), a credential can't satisfy the operation, or a token request or
+  exchange failed. There is no alias: an agent, client or monitoring rule that checks for
+  `AUTH_DOWNSTREAM` must check for `AUTH_UPSTREAM` (or both, to serve 0.3.x and 0.4.0 servers).
+
+### Deprecated
+- `apis[].downstreamAuth` in definitions: rename it to `upstreamAuth`. It is still read, with a
+  `DEPRECATED_KEY` warning, and will be removed no earlier than the next minor release. An API that
+  has both keys is refused.
+
 ### Fixed
+- An identity policy file with a `scopes` section shut out every caller without OAuth scopes (API keys,
+  no sign-in, stdio), with no rule that could let them back in. Scope rules now apply to OAuth callers
+  only; other callers follow the file's `default` and `subjects` rules, and startup warns when a file with
+  `scopes` is used by a server whose callers don't sign in with OAuth. An OAuth caller holding none of the
+  listed scopes still gets no tools.
+- From the second configuration reload on, tools whose definition didn't change (such as `call_tool`
+  and the other built-ins) kept using the configuration of the first reload, so later changes to tool
+  policy, identity or organization policy files, sessions and other settings didn't reach them. Every
+  registered tool now dispatches to the newest configuration.
 - Retries of upstream calls, as the release gate found them: a `GET` or `HEAD` is sent a second time
   when the target closes the connection without answering. That is the JDK HTTP client's own retry,
   allowed by HTTP for those methods and impossible to turn off; the spec now says so (tools-contract
