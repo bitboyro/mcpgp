@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { api, ApiError, type Change, type Tool } from '../api'
 import { baseName, sameTool, ownDescription, overrideId, paramDescriptions, rulePath, setOverride, validBaseName, type Override } from '../descriptions'
 import { useServer } from '../serverData'
-import { ErrorBox } from '../ui'
+import { ErrorBox, Icon } from '../ui'
 import { agentView } from './Overview'
 
 /**
@@ -71,7 +71,7 @@ export function ToolEdit({ id, tool, onClose }: { id: string; tool: Tool; onClos
       <ErrorBox error={save.error ?? preview.error} />
       {save.error instanceof ApiError && save.error.status === 409 && <p className="hint">Someone saved a newer version; close and open the tool again.</p>}
       <div className="actions">
-        <button type="submit" className="btn btn-primary" disabled={!change || save.isPending}>Save as version {base + 1}</button>
+        <button type="submit" className="btn btn-primary" disabled={!change || save.isPending}><Icon name="save" />Save as revision {base + 1}</button>
         <button type="button" className="btn btn-stage" disabled={!change} onClick={() => setChanges(change ? [change] : null)}>Preview</button>
         {existing && <button type="button" className="btn btn-stage" onClick={() => save.mutate([{ op: 'remove', path: rulePath(ruleId) }])}>Back to the spec</button>}
         <button type="button" className="btn btn-stage" onClick={onClose}>Cancel</button>

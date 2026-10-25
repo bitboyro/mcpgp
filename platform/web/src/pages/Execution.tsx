@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import { api, type Manifest } from '../api'
 import { useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
-import { ErrorBox, Loading, PageHead, Icon } from '../ui'
+import { ErrorBox, Help, Loading, PageHead, Icon } from '../ui'
 import { BuildButton } from './Overview'
 
 /** The settings, as the definition's `safety` section holds them (all on by default). */
@@ -134,29 +134,37 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
         <h2>Changing and deleting data</h2>
         <Toggle label="Agents confirm before a tool deletes or changes data" checked={s.confirmDestructive} disabled={off}
           onChange={(v) => set('confirmDestructive', v)}
-          hint="The agent gets a confirmation step first, so an injected or mistaken instruction can't delete data in one call." />
+          hint="The agent must confirm before deleting or changing data."
+          more="The agent gets a confirmation step first, so an injected or mistaken instruction can't delete data in one call." />
       </div>
 
       <div className="card">
         <h2>Large answers</h2>
         <NumberField label="Largest answer an agent gets (KB)" value={s.responseLimitKb} disabled={off} onChange={(v) => set('responseLimitKb', v)}
-          hint="The inline output budget. Retention can save larger responses for retrieval; otherwise long answers are cut." />
+          hint="Longer answers are cut, unless retained results keep them."
+          more="This is the inline output budget. With retained results on, larger responses are saved for the agent to read in parts; otherwise long answers are cut." />
         <Toggle label="Cut long lists at whole items" checked={s.cleanTruncation} disabled={off} onChange={(v) => set('cleanTruncation', v)}
-          hint="The agent keeps valid data (as many items as fit) and is told how many were left out, instead of JSON cut in the middle." />
+          hint="The agent gets whole items and a count of what was left out."
+          more="Instead of JSON cut in the middle, the agent keeps valid data (as many items as fit) and is told how many items were left out." />
       </div>
 
       <div className="card">
         <h2>Batch execution</h2>
         <Toggle label="Enable batch calls" checked={s.batchEnabled} disabled={off} onChange={(v) => set('batchEnabled', v)}
-          hint="Adds batch_call alongside direct and discovery tools. Calls are independent; sequential execution stops on failure." />
+          hint="Adds batch_call, so an agent can send several calls at once."
+          more="batch_call sits alongside the direct and discovery tools. Calls are independent; a sequential batch stops at the first failure." />
         <NumberField label="Maximum operations per batch" value={s.batchMaxCalls} disabled={off || !s.batchEnabled} onChange={(v) => set('batchMaxCalls', v)} hint="1–100 operations." />
         <NumberField label="Parallel read operations" value={s.batchConcurrency} disabled={off || !s.batchEnabled} onChange={(v) => set('batchConcurrency', v)} hint="1–16 concurrent reads. Existing per-instance rate limits also apply." />
         <Toggle label="Allow writes in sequential batches" checked={s.batchAllowWrites} disabled={off || !s.batchEnabled} onChange={(v) => set('batchAllowWrites', v)}
-          hint="POST, PUT, PATCH and DELETE retain their validation and confirmation requirements. Earlier writes remain committed after a failure. No automatic retries or rollback." />
+          hint="POST, PUT, PATCH and DELETE may run in sequential batches."
+          more="Writes keep their validation and confirmation. Earlier writes stay committed after a failure; nothing is retried or rolled back automatically." />
         <Toggle label="Deduplicate retried batches" checked={s.batchDeduplicateRequests} disabled={off || !s.batchEnabled} onChange={(v) => set('batchDeduplicateRequests', v)}
-          hint="A caller can reuse a requestId to recover a recorded batch outcome without sending it upstream again. An interrupted batch reports an unknown outcome so writes are not replayed." />
-        <NumberField label="Request receipt lifetime (seconds)" value={s.requestReceiptTtlSeconds} disabled={off || !s.batchEnabled || !s.batchDeduplicateRequests} onChange={(v) => set('requestReceiptTtlSeconds', v)} hint="60 seconds to 30 days; completed receipts expire after this time. Unfinished receipts stay protected as unknown outcomes." />
-        <NumberField label="Maximum stored request receipts" value={s.maxStoredReceipts} disabled={off || !s.batchEnabled || !s.batchDeduplicateRequests} onChange={(v) => set('maxStoredReceipts', v)} hint="1–1,000,000 receipts. Expired completed receipts are removed before new receipts are accepted." />
+          hint="A retried batch with the same requestId isn't sent twice."
+          more="A caller can reuse a requestId to recover a recorded batch outcome without sending it upstream again. An interrupted batch reports an unknown outcome, so writes are never replayed." />
+        <NumberField label="Request receipt lifetime (seconds)" value={s.requestReceiptTtlSeconds} disabled={off || !s.batchEnabled || !s.batchDeduplicateRequests} onChange={(v) => set('requestReceiptTtlSeconds', v)} hint="60 seconds to 30 days."
+          more="Completed receipts expire after this time. Unfinished receipts stay protected as unknown outcomes." />
+        <NumberField label="Maximum stored request receipts" value={s.maxStoredReceipts} disabled={off || !s.batchEnabled || !s.batchDeduplicateRequests} onChange={(v) => set('maxStoredReceipts', v)} hint="1 to 1,000,000 receipts."
+          more="Expired completed receipts are removed before new receipts are accepted." />
       </div>
 
       <div className="card">
@@ -168,7 +176,8 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
             <option value="reference">Always return a result reference</option>
           </select>
         </label>
-        <p className="hint">Independent of batching and discovery. Adds result_get to read saved responses without repeating the operation. Results live in server memory, are private to a session, and expire or disappear on restart or reload. Full means one response, not every upstream page.</p>
+        <Help text="Keeps large answers so agents can read them in parts with result_get."
+          more="Independent of batching and discovery: result_get reads a saved response without repeating the operation. Results live in server memory, are private to a session, and expire or disappear on restart or reload. Full means one response, not every upstream page." />
         <NumberField label="Maximum captured response (KB)" value={s.captureLimitKb} disabled={off || s.resultMode === 'inline'} onChange={(v) => set('captureLimitKb', v)} hint="1–65536 KB. Responses beyond this limit are reported as incomplete." />
         <NumberField label="Result lifetime (seconds)" value={s.resultTtl} disabled={off || s.resultMode === 'inline'} onChange={(v) => set('resultTtl', v)} hint="1–86400 seconds." />
         <NumberField label="Result storage budget (KB)" value={s.maxStoredKb} disabled={off || s.resultMode === 'inline'} onChange={(v) => set('maxStoredKb', v)} hint="1–262144 KB. Shared by API responses and batch responses." />
@@ -177,16 +186,18 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
       <div className="card">
         <h2>What agents send</h2>
         <Toggle label="Limit the size of what agents send" checked={s.inputLimits} disabled={off} onChange={(v) => set('inputLimits', v)}
-          hint="Refuses oversized calls before anything reaches the target server. Files sent inline have their own limit, set by whoever runs the server." />
+          hint="Oversized calls are refused before anything reaches the target server."
+          more="Files sent inline have their own limit, set by whoever runs the server." />
         <NumberField label="Largest tool call (KB)" value={s.requestKb} disabled={off || !s.inputLimits} onChange={(v) => set('requestKb', v)} />
         <NumberField label="Longest text value (characters)" value={s.stringMaxLength} disabled={off || !s.inputLimits}
-          onChange={(v) => set('stringMaxLength', v)} hint="For fields whose spec sets no maximum length; a limit in the spec always applies." />
+          onChange={(v) => set('stringMaxLength', v)} hint="For fields without a maximum length in the API definition; a limit there always applies." />
       </div>
 
       <div className="card">
         <h2>Calls to the target server</h2>
         <Toggle label="Limit calls to each target server" checked={s.rateLimits} disabled={off} onChange={(v) => set('rateLimits', v)}
-          hint="Protects your customers' systems from an agent stuck in a loop. Whoever runs the server can change these for their own target server." />
+          hint="Protects target servers from an agent stuck in a loop."
+          more="Whoever runs the server can change these limits for their own target server." />
         <NumberField label="Calls at once" value={s.concurrent} disabled={off || !s.rateLimits} onChange={(v) => set('concurrent', v)}
           hint="More wait for a free slot (up to 30 seconds)." />
         <NumberField label="Calls per minute" value={s.perMinute} disabled={off || !s.rateLimits} onChange={(v) => set('perMinute', v)}
@@ -197,7 +208,7 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
 
       {editable && (
         <div className="actions">
-          <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || !!invalid || save.isPending}><Icon name="save" />Save as the next version</button>
+          <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || !!invalid || save.isPending}><Icon name="save" />Save as the next revision</button>
           {changed.length > 0 && <button type="button" className="btn" onClick={() => setS(saved)}><Icon name="undo" />Undo changes</button>}
           {invalid && <span className="hint" role="alert">Numbers are whole and at least 1</span>}
         </div>
@@ -207,21 +218,21 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
   )
 }
 
-export function Toggle({ label, checked, disabled, onChange, hint }: {
-  label: string; checked: boolean; disabled: boolean; onChange: (v: boolean) => void; hint?: string
+export function Toggle({ label, checked, disabled, onChange, hint, more }: {
+  label: string; checked: boolean; disabled: boolean; onChange: (v: boolean) => void; hint?: string; more?: string
 }) {
   return (
     <div className="list" style={{ gap: 2 }}>
       <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, fontWeight: 500 }}>
         <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} /> {label}
       </label>
-      {hint && <p className="hint" style={{ margin: '0 0 0 24px' }}>{hint}</p>}
+      {hint && <Help text={hint} more={more} style={{ marginLeft: 24 }} />}
     </div>
   )
 }
 
-export function NumberField({ label, value, disabled, onChange, hint }: {
-  label: string; value: number; disabled: boolean; onChange: (v: number) => void; hint?: string
+export function NumberField({ label, value, disabled, onChange, hint, more }: {
+  label: string; value: number; disabled: boolean; onChange: (v: number) => void; hint?: string; more?: string
 }) {
   return (
     <div className="list" style={{ gap: 2, marginLeft: 24 }}>
@@ -230,7 +241,7 @@ export function NumberField({ label, value, disabled, onChange, hint }: {
         <input className="input" type="number" min={1} step={1} value={Number.isNaN(value) ? '' : value} disabled={disabled}
           onChange={(e) => onChange(e.target.value === '' ? NaN : Number(e.target.value))} style={{ maxWidth: 180 }} />
       </label>
-      {hint && <span className="hint">{hint}</span>}
+      {hint && <Help text={hint} more={more} />}
     </div>
   )
 }

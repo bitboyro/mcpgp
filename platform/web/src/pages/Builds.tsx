@@ -37,7 +37,7 @@ export function ServerBuildsPage() {
                 <div key={b.id} className="build-row" style={b.id === selectedId ? { background: 'var(--accent-soft)', borderRadius: 12, paddingInline: 10 } : undefined}>
                   <button type="button" className="select" aria-current={b.id === selectedId} onClick={() => setParams({ build: b.id }, { replace: true })}>
                     <span className="v">{b.serverVersion ?? `version ${b.version}`}</span>
-                    <span className="meta">by {b.startedBy} · {ago(b.created)} · definition version {b.version}</span>
+                    <span className="meta">by {b.startedBy} · {ago(b.created)} · revision {b.version}</span>
                   </button>
                   <BuildChip build={b} />
                 </div>
@@ -82,7 +82,7 @@ function BuildDetail({ id }: { id: string }) {
       setNotice(null)
       if (what === 'release') {
         const result = await api.release(id)
-        if (result.status === 202) setNotice('Your release is waiting for a person to approve it (API & agents).')
+        if (result.status === 202) setNotice('Your release is waiting for a person to approve it, on Activity.')
         return
       }
       if (what === 'archive') await api.archiveBuild(id)

@@ -122,7 +122,8 @@ function ObservabilityForm({ id, saved, http }: { id: string; saved: Settings; h
       <div className="card">
         <h2>Audit log</h2>
         <Toggle label="Write an audit file" checked={s.auditEnabled} disabled={off} onChange={(v) => set('auditEnabled', v)}
-          hint="One JSON line per tool call, resource read, confirmation, refused sign-in, session and configuration change. Credentials are always masked." />
+          hint="One JSON line per tool call, sign-in decision and configuration change."
+          more="Also resource reads, confirmations and sessions. Credentials and secret fields are always masked." />
         <div className="list" style={{ gap: 2, marginLeft: 24 }}>
           <label className="field"><span>Start a new file</span>
             <select className="input" value={s.rotate.startsWith('size:') ? 'size' : s.rotate} disabled={off || !s.auditEnabled} style={{ maxWidth: 240 }}
@@ -186,7 +187,7 @@ function ObservabilityForm({ id, saved, http }: { id: string; saved: Settings; h
 
       {editable && (
         <div className="actions">
-          <button type="submit" className="btn btn-primary" disabled={changes.length === 0 || !!problem || save.isPending}><Icon name="save" />Save as the next version</button>
+          <button type="submit" className="btn btn-primary" disabled={changes.length === 0 || !!problem || save.isPending}><Icon name="save" />Save as the next revision</button>
           {changes.length > 0 && <button type="button" className="btn" onClick={() => setS(saved)}><Icon name="undo" />Undo changes</button>}
           {problem && <span className="hint" role="alert">{problem}</span>}
         </div>

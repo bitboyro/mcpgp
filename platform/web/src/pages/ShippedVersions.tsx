@@ -12,7 +12,7 @@ export function ShippedVersions({ id, manifest }: { id: string; manifest: Manife
       {manifest.apis.map((a) => (
         <div key={a.id} className="card">
           <div className="card-head">
-            <h2>{a.title ?? a.id}: contracts shipped</h2>
+            <h2>{a.title ?? a.id}: API versions shipped</h2>
             <span className="tag mono">{a.toolPrefix ?? a.id}_*</span>
           </div>
           {a.contracts.map((c) => (

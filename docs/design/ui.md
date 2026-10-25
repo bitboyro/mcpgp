@@ -34,8 +34,14 @@ and focus; dark stage `#0E0F14`; generous radii (12–22 px); segmented controls
 Type (0.4.0): body 16px / 1.6, labels, hints and tables 14px, card headings 17px, page titles 24px
 (`--text-*` tokens in `styles.css`). Page background `#F7F8FA`, dividers `#ECEEF2`. Icons: Lucide
 (`lucide-react`, ISC), one name per meaning in `ui.tsx`, in front of the label on main actions; the
-mcpgp mark stays our own. The sidebar footer has two labelled buttons: **API reference** (the API &
+mcpgp mark stays our own. The sidebar footer has two labelled buttons: **API reference** (the API and
 agents page) and **Connect an agent**.
+
+**Words (0.4.0):** *API definition* is the OpenAPI or Swagger document; *API version* is 1.0, 2.0 (what the
+file format calls a contract); *revision* is a saved state of a server ("Save as revision 6"). Library
+items keep *version*, because they're referenced as `@1`. *Validate* checks a revision. Labels and
+headings use "and", not "&". Help under a setting is one sentence of about 15 words; more detail opens in
+place under **How it works** (`Help` in `ui.tsx`), never only on hover.
 
 Page names in this table are the canvas's; the 2026-10-25 regroup renamed and split several of them
 (see [Server navigation](#server-navigation-2026-10-25)).

@@ -195,7 +195,7 @@ describe('choosing operations', () => {
     expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ base: 3, changes: [change], dryRun: true, operations: true })
     expect(screen.getByText('0 on, 1 off')).toBeTruthy()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Save as version 4' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save as revision 4' }))
     await waitFor(() => expect(calls.filter((c) => c.method === 'POST')).toHaveLength(2))
     expect(calls.filter((c) => c.method === 'POST')[1].body).toEqual({ base: 3, changes: [change], message: 'Tools: off: orders_account_list' })
   })
@@ -256,7 +256,7 @@ describe('naming', () => {
     const changes = await screen.findByRole('table', { name: 'Name changes' })
     await waitFor(() => expect(changes.textContent).toContain('orders_account_listorders_acct_list'))
     expect(screen.getByText(/breaks agents, prompts and clients/)).toBeTruthy()
-    await userEvent.click(screen.getByRole('button', { name: 'Save as version 4' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save as revision 4' }))
     await waitFor(() => expect(calls.filter((c) => c.method === 'POST' && !(c.body as { dryRun?: boolean }).dryRun)).toHaveLength(1))
     expect(calls.filter((c) => c.method === 'POST').at(-1)!.body).toEqual({ base: 3, message: 'Naming: account → acct',
       changes: [{ op: 'set', path: '/naming/vocabulary/account', value: 'acct' }] })
@@ -355,7 +355,7 @@ describe('descriptions', () => {
     await userEvent.clear(title)
     await userEvent.type(title, 'Refund an order')
     await userEvent.type(screen.getByLabelText('path.id'), 'The order.')
-    await userEvent.click(screen.getByRole('button', { name: 'Save as version 4' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save as revision 4' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true))
     expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ base: 3, message: 'Tools: orders_order_refund title and descriptions', changes: [{
       op: 'set', path: '/overrides/rules/[id=ui:refundOrder]',

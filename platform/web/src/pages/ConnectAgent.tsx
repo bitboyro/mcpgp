@@ -34,8 +34,8 @@ function AskAnAdmin() {
     <div className="stage-card">
       <span className="eyebrow">Ask an admin</span>
       <p>An agent has its own identity and token, so its quotas apply and its releases wait for a person. Only an admin can create one:
-        ask an admin to create an agent for you on <b>API &amp; agents</b> and to give you its token. Then come back here, or follow
-        the steps on <Link to="/agents">API &amp; agents</Link>.</p>
+        ask an admin to create an agent for you on <b>API and agents</b> and to give you its token. Then come back here, or follow
+        the steps on <Link to="/agents">API and agents</Link>.</p>
     </div>
   )
 }

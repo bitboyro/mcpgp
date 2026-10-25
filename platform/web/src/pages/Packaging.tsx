@@ -44,7 +44,7 @@ export function PackagingPage() {
   return (
     <>
       <PageHead title="Packaging"
-        sub={base > 0 ? `What a build of version ${base} contains, and how your customer installs it.` : undefined}>
+        sub={base > 0 ? `What a build of revision ${base} contains, and how your customer installs it.` : undefined}>
         {last && <Link to={`/servers/${id}/builds?build=${last.id}`} className="btn">Last build {last.serverVersion}</Link>}
         <BuildButton id={id} />
       </PageHead>
@@ -52,7 +52,7 @@ export function PackagingPage() {
         <section className="col" aria-label="Package settings">
           <ErrorBox error={server.error ?? preview.error} />
           {preview.error instanceof ApiError && preview.error.status === 422 && (
-            <p className="hint">The latest version doesn't compile; the checks on <Link to={`/servers/${id}/apis`}>API definitions</Link> say why.</p>
+            <p className="hint">The latest revision doesn't compile; validation on <Link to={`/servers/${id}/apis`}>API definitions</Link> says why.</p>
           )}
           {preview.isLoading && <Loading what="the package" />}
           {preview.data && (

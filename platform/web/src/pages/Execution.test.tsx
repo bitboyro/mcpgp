@@ -34,7 +34,7 @@ describe('execution', () => {
     await userEvent.clear(screen.getByLabelText('Request receipt lifetime (seconds)'))
     await userEvent.type(screen.getByLabelText('Request receipt lifetime (seconds)'), '3600')
     await userEvent.selectOptions(screen.getByLabelText('Result delivery'), 'auto')
-    await userEvent.click(screen.getByRole('button', { name: 'Save as the next version' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save as the next revision' }))
     await waitFor(() => expect(calls.some((c) => c.path.endsWith('/edits'))).toBe(true))
     const saved = calls.find((c) => c.path.endsWith('/edits'))!
     expect(saved.body).toMatchObject({ changes: [
@@ -59,13 +59,13 @@ describe('execution', () => {
     expect((screen.getByLabelText('Calls per minute') as HTMLInputElement).value).toBe('120')
     expect(screen.queryByLabelText("Describe each tool's result (output schema)")).toBeNull()   // on Tools now
     expect(screen.getByText('Always on')).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'Save as the next version' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Save as the next revision' }) as HTMLButtonElement).disabled).toBe(true)
 
     await userEvent.click(rate)
     expect((screen.getByLabelText('Calls per minute') as HTMLInputElement).disabled).toBe(true)
     await userEvent.clear(screen.getByLabelText('Largest answer an agent gets (KB)'))
     await userEvent.type(screen.getByLabelText('Largest answer an agent gets (KB)'), '512')
-    await userEvent.click(screen.getByRole('button', { name: 'Save as the next version' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save as the next revision' }))
 
     await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true))
     const body = calls.find((c) => c.method === 'POST')!.body as { base: number; changes: unknown[] }
@@ -98,6 +98,21 @@ describe('execution', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Execution' })).toBeTruthy()
   })
 
+  it('shows one line of help per setting, and the rest under How it works', async () => {
+    fakeApi({
+      'GET /me': ME, 'GET /settings': SETTINGS, 'GET /servers/orders-mcp': SERVER,
+      'GET /servers/orders-mcp/versions/latest/manifest': manifest({}),
+    })
+    page()
+    expect(await screen.findByText('The agent must confirm before deleting or changing data.')).toBeTruthy()
+    expect(screen.queryByText(/an injected or mistaken instruction/)).toBeNull()
+    const how = screen.getAllByRole('button', { name: 'How it works' })[0]
+    expect(how.getAttribute('aria-expanded')).toBe('false')
+    await userEvent.click(how)
+    expect(how.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText(/an injected or mistaken instruction can't delete data in one call/)).toBeTruthy()
+  })
+
   it('refuses numbers that make no sense', async () => {
     fakeApi({
       'GET /me': ME, 'GET /settings': SETTINGS, 'GET /servers/orders-mcp': SERVER,
@@ -108,6 +123,6 @@ describe('execution', () => {
     await userEvent.clear(perMinute)
     await userEvent.type(perMinute, '0')
     expect(screen.getByText('Numbers are whole and at least 1')).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'Save as the next version' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Save as the next revision' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

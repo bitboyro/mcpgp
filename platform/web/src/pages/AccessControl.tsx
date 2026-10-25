@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Change, Manifest } from '../api'
 import { useManifest } from '../serverData'
-import { ErrorBox, Loading, PageHead, Icon } from '../ui'
+import { ErrorBox, Loading, PageHead, Icon, Help } from '../ui'
 import { SetWhenDeployed, useDefinitionSave } from './Deployed'
 import { Toggle } from './Execution'
 import { BuildButton, CustomerPreview } from './Overview'
@@ -113,7 +113,7 @@ function AccessForm({ id, saved }: { id: string; saved: Settings }) {
     <form className="list" style={{ gap: 16 }} onSubmit={(e) => { e.preventDefault(); save.mutate({ changes, what: what.join(', ') }) }}>
       <div className="card">
         <h2>Client sign-in</h2>
-        <p className="hint">The methods this package offers. Whoever runs it picks one of these, and can't use another.</p>
+        <Help text="Whoever runs the server picks one of the methods offered here." />
         {METHODS.map(([key, label, hint]) => (
           <Toggle key={key} label={label} checked={s.allowed.includes(key)} disabled={off} onChange={(v) => toggleMethod(key, v)} hint={hint} />
         ))}
@@ -126,8 +126,8 @@ function AccessForm({ id, saved }: { id: string; saved: Settings }) {
 
       <div className="card">
         <h2>Permissions by OAuth scope</h2>
-        <p className="hint">With OAuth, a token's scopes decide which tools it can list and call. These ship as defaults; the operator can change
-          them to match their identity provider. Without any, every signed-in client gets every tool.</p>
+        <Help text="With OAuth, a token's scopes decide which tools it can use."
+          more="These ship as defaults; whoever runs the server can change them to match their identity provider. Without any, every signed-in client gets every tool." />
         {s.scopes.map((r, i) => (
           <div key={i} className="actions" style={{ alignItems: 'flex-end' }}>
             <label className="field" style={{ flex: '1 1 140px' }}><span>Scope</span>
@@ -152,12 +152,13 @@ function AccessForm({ id, saved }: { id: string; saved: Settings }) {
       <div className="card">
         <h2>Sessions</h2>
         <Toggle label="Let clients narrow their own access for a session" checked={s.sessions} disabled={off} onChange={(v) => setS({ ...s, sessions: v })}
-          hint="Adds the session_policy tool: a client can restrict the tools and target servers it uses until it disconnects, never widen them. A default the operator can change." />
+          hint="Clients can narrow their own tools and target servers until they disconnect."
+          more="Adds the session_policy tool. Restrictions only ever narrow access; they end with the connection. A default whoever runs the server can change." />
       </div>
 
       {editable && (
         <div className="actions">
-          <button type="submit" className="btn btn-primary" disabled={changes.length === 0 || !!problem || save.isPending}><Icon name="save" />Save as the next version</button>
+          <button type="submit" className="btn btn-primary" disabled={changes.length === 0 || !!problem || save.isPending}><Icon name="save" />Save as the next revision</button>
           {changes.length > 0 && <button type="button" className="btn" onClick={() => setS(saved)}><Icon name="undo" />Undo changes</button>}
           {problem && changes.length > 0 && <span className="hint" role="alert">{problem}</span>}
         </div>

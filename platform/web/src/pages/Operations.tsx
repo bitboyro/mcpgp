@@ -5,7 +5,7 @@ import { api, ApiError, type Operation, type OperationList, type Select } from '
 import { asList, changes, entryFor, same, turnOff, turnOffAll, turnOn, whyOff, type TurnOn } from '../selection'
 import { useServer } from '../serverData'
 import { useSession } from '../session'
-import { ErrorBox, Loading, Segmented } from '../ui'
+import { ErrorBox, Loading, Segmented, Icon } from '../ui'
 import { Checks, DefinitionDiff } from './Overview'
 
 type StateFilter = 'all' | 'on' | 'off'
@@ -162,7 +162,7 @@ export function OperationsView({ id, settings }: { id: string; settings?: ReactN
         {settings}
         <ErrorBox error={server.error ?? current.error} />
         {current.error instanceof ApiError && current.error.status === 422 && (
-          <p className="hint">The latest version doesn't compile; the checks on <Link to={`/servers/${id}/apis`}>API definitions</Link> say why.</p>
+          <p className="hint">The latest revision doesn't compile; validation on <Link to={`/servers/${id}/apis`}>API definitions</Link> says why.</p>
         )}
         {current.isLoading && <Loading what="operations" />}
         {shown && (
@@ -274,7 +274,7 @@ export function OperationsView({ id, settings }: { id: string; settings?: ReactN
             <p>Turning a tool off adds an <span className="mono">exclude</span> entry for that operation to the API's{' '}
               <span className="mono">select</span>. Turning one on undoes what left it out; when that reaches further than one
               operation, you're asked first.</p>
-            <p className="hint">Changes are previewed before you save, and saving makes the next version, with your name in Activity.
+            <p className="hint">Changes are previewed before you save, and saving makes the next revision, with your name in Activity.
               Operations a rule hides change in the rule's file, on <Link to={`/servers/${id}/apis`}>API definitions</Link>.</p>
           </>
         ) : (
@@ -305,7 +305,7 @@ export function OperationsView({ id, settings }: { id: string; settings?: ReactN
                   <button type="button" className="btn btn-sm btn-stage" onClick={() => { setWorking({}); save.reset(); void queryClient.invalidateQueries({ queryKey: ['server', id] }) }}>Reload</button></p>
               )}
               <div className="actions">
-                <button type="submit" className="btn btn-primary" disabled={!!broken || busy || save.isPending}>Save as version {base + 1}</button>
+                <button type="submit" className="btn btn-primary" disabled={!!broken || busy || save.isPending}><Icon name="save" />Save as revision {base + 1}</button>
                 <button type="button" className="btn btn-stage" onClick={() => { setWorking({}); setFlips({}); setAsked(null); save.reset() }}>Discard</button>
               </div>
             </form>

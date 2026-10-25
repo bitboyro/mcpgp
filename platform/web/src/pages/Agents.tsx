@@ -30,7 +30,7 @@ export function AgentsPage() {
 
   return (
     <>
-      <PageHead title="API & agents" sub="People, pipelines and agents use the same API. Agents can build their own MCP servers, within your guardrails." />
+      <PageHead title="API and agents" sub="People, pipelines and agents use the same API. Agents can build their own MCP servers, within your guardrails." />
       <div className="body">
         <section className="col" aria-label="Identities">
           {issued && <IssuedToken token={issued} onClose={() => setIssued(null)} />}

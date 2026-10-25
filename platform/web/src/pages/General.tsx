@@ -43,11 +43,11 @@ export function GeneralPage() {
               <h2>Definition</h2>
               <dl className="kv">
                 <dt>Server</dt><dd className="mono">{manifest.data?.server.name ?? id} {manifest.data?.server.version}</dd>
-                <dt>Version</dt><dd>{latest ? <>{latest.number} · by {latest.author} {ago(latest.created)}{latest.message ? ` · ${latest.message}` : ''}</> : 'none yet'}</dd>
+                <dt>Revision</dt><dd>{latest ? <>{latest.number} · by {latest.author} {ago(latest.created)}{latest.message ? ` · ${latest.message}` : ''}</> : 'none yet'}</dd>
                 {server.data.parent && <><dt>Variant of</dt><dd><Link to={`/servers/${server.data.parent}`}>{server.data.parent}</Link></dd></>}
                 {manifest.data?.build.extends && <><dt>Extends</dt><dd className="mono">{manifest.data.build.extends.name}{manifest.data.build.extends.version ? '@' + manifest.data.build.extends.version : ''}</dd></>}
               </dl>
-              <p className="hint">Each saved change becomes a new version, like an upload, with your name in Activity. Comments and layout in the file stay as they are.</p>
+              <p className="hint">Each saved change becomes a new revision, like an upload, with your name in Activity. Comments and layout in the file stay as they are.</p>
             </div>
           )}
         </section>

@@ -128,7 +128,7 @@ export function OverviewPage() {
         sub={latest ? `Revision ${latest.number} · saved by ${latest.author} ${ago(latest.created)}` : undefined}>
         {server.data?.system
           ? <Link to="/agents?connect" className="btn btn-primary"><Icon name="zap" />Connect an agent</Link>
-          : <Link to={`/servers/${id}/apis`} className="btn"><Icon name="upload" />Upload version</Link>}
+          : <Link to={`/servers/${id}/apis`} className="btn"><Icon name="upload" />Upload API definition</Link>}
         {manifest.data && <button type="button" className="btn" aria-pressed={previewing} onClick={() => setPreviewing(!previewing)}>
           <Icon name="eye" />{previewing ? 'Hide preview' : 'Preview as agent'}</button>}
         <BuildButton id={id} />
@@ -139,9 +139,9 @@ export function OverviewPage() {
         {server.data?.system && (
           <div className="card" aria-label="Made by the platform">
             <h2>Made by the platform</h2>
-            <p className="hint">The platform's API as tools, for your agents. The platform makes this server and adds a version with every
+            <p className="hint">The platform's API as tools, for your agents. The platform makes this server and adds a revision with every
               release, so it can't be changed here. To change what your agents get (hide tools, add notices), make a variant of it on
-              {' '}<Link to="/">All servers</Link>: it follows every new version.</p>
+              {' '}<Link to="/">All servers</Link>: it follows every new revision.</p>
           </div>
         )}
         {compileError && (

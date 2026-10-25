@@ -114,7 +114,7 @@ export function NamingView({ id }: { id: string }) {
                 onClick={() => { setPending({}); save.reset(); void queryClient.invalidateQueries({ queryKey: ['server', id] }) }}>Reload</button></p>
             )}
             <div className="actions">
-              <button type="submit" className="btn btn-primary" disabled={!!broken || busy || save.isPending}>Save as version {base + 1}</button>
+              <button type="submit" className="btn btn-primary" disabled={!!broken || busy || save.isPending}><Icon name="save" />Save as revision {base + 1}</button>
               <button type="button" className="btn" onClick={() => { setPending({}); save.reset() }}>Discard</button>
             </div>
           </form>
@@ -285,7 +285,7 @@ export function NamingView({ id }: { id: string }) {
         {manifest.isLoading && <Loading what="names" />}
         {naming.data && !naming.data.lock.present && (
           <div className="note note-warn">No <span className="mono">mcp-names.lock</span> yet: names may change when the policy, the
-            rules or the contract change. Lock them with <span className="mono">mcpgp names accept --all</span> and commit the file
+            rules or the API definition change. Lock them with <span className="mono">mcpgp names accept --all</span> and commit the file
             with the definition.</div>
         )}
         {drift.length > 0 && show !== 'unlocked' && (

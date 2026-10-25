@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import {
   Activity, BookOpen, Check, Code, Copy, Download, ExternalLink, Eye, FileCode, Folder, GitCompare, HeartPulse, Home, Info, Library,
   LayoutDashboard, ListChecks, Lock, Package, PackageCheck, Play, Plug, Plus, RefreshCw, Rocket, Save, SlidersHorizontal, Trash2, Undo2,
@@ -10,7 +10,7 @@ import { ApiError, type Build } from './api'
 const ICONS = {
   home: Home, library: Library, builds: PackageCheck, activity: Activity, api: Code, shape: SlidersHorizontal, tools: Wrench,
   connections: Plug, sources: Folder, package: Package, deliver: Download, close: X, changes: GitCompare, overview: LayoutDashboard,
-  general: Info, definition: FileCode, lock: Lock, pulse: HeartPulse,
+  general: Info, info: Info, definition: FileCode, lock: Lock, pulse: HeartPulse,
   save: Save, upload: Upload, download: Download, eye: Eye, play: Play, trash: Trash2, undo: Undo2, plus: Plus, check: Check,
   zap: Zap, book: BookOpen, refresh: RefreshCw, copy: Copy, external: ExternalLink, rocket: Rocket, checks: ListChecks,
 } satisfies Record<string, LucideIcon>
@@ -32,6 +32,23 @@ export function Icon({ name, size = 16, stroke = 'currentColor', width = 1.8 }: 
 /** A button's label with its icon in front: the icon names the action, the words say it. */
 export function Label({ icon, children }: { icon: IconName; children: ReactNode }) {
   return <><Icon name={icon} />{children}</>
+}
+
+/**
+ * Help under a setting (design-decisions R04): one short sentence always shown; the longer explanation opens in
+ * place under "How it works", so it works with touch and keyboard, never only on hover.
+ */
+export function Help({ text, more, style }: { text: ReactNode; more?: ReactNode; style?: React.CSSProperties }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  return (
+    <div className="help" style={style}>
+      <span className="hint">{text}</span>
+      {more && <button type="button" className="how" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+        <Icon name="info" size={14} />How it works</button>}
+      {more && open && <p id={id} className="hint help-more">{more}</p>}
+    </div>
+  )
 }
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'idle' | 'new'

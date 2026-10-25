@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, type Activity, type Approval } from '../api'
 import { useSession } from '../session'
-import { ErrorBox, Loading, PageHead, Segmented, ago } from '../ui'
+import { ErrorBox, Loading, PageHead, Segmented, ago, Icon } from '../ui'
 
 type Filter = 'all' | 'builds' | 'changes' | 'agents' | 'access'
 
@@ -106,7 +106,7 @@ function ApprovalCard({ approval, canDecide, onDone }: { approval: Approval; can
           </label>
           <ErrorBox error={decide.error} />
           <div className="actions">
-            <button type="button" className="btn btn-primary btn-sm" disabled={decide.isPending} onClick={() => decide.mutate(true)}>Approve &amp; release</button>
+            <button type="button" className="btn btn-primary btn-sm" disabled={decide.isPending} onClick={() => decide.mutate(true)}><Icon name="check" />Approve and release</button>
             <button type="button" className="btn btn-stage btn-sm" disabled={decide.isPending} onClick={() => decide.mutate(false)}>Reject</button>
           </div>
         </>

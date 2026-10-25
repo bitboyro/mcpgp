@@ -68,7 +68,7 @@ export function ToolsPage() {
   if (view === 'operations') {
     return (
       <>
-        <PageHead title="Tools" sub="Every operation of the contracts. Switch one on to make it a tool, off to leave it out.">{switcher}</PageHead>
+        <PageHead title="Tools" sub="Every operation in the API definitions. Switch one on to make it a tool, off to leave it out.">{switcher}</PageHead>
         <OperationsView id={id} settings={
           <SettingsCard id={id} title="What tools may do" edits={accessEdits}>
             {(m) => <ChoiceRows manifest={m} only={(c) => c.startsWith('access:')} edits={accessEdits} />}

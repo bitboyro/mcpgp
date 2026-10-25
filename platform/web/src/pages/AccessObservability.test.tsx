@@ -39,7 +39,7 @@ describe('access control', () => {
     await userEvent.selectOptions(screen.getByLabelText('Used unless the operator picks another'), 'oauth')
     await userEvent.click(screen.getByRole('button', { name: 'Add scope' }))
     await userEvent.type(screen.getByLabelText('Scope'), 'orders.read')
-    await userEvent.click(screen.getByRole('button', { name: 'Save as the next version' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save as the next revision' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true))
     expect(posted(calls)).toMatchObject({ message: 'Access control: sign-in methods, scope permissions', changes: [
       { op: 'set', path: '/runtimeDefaults/inboundAuth', value: { allowed: ['static', 'oauth'], default: 'oauth' } },
@@ -53,7 +53,7 @@ describe('access control', () => {
     expect(screen.getByText('--identity-policy <file>')).toBeTruthy()
     expect(screen.getByText('--organization-policy <file>')).toBeTruthy()
     expect(screen.getAllByText('Set when deployed').length).toBe(2)
-    await userEvent.click(screen.getByRole('button', { name: 'Save as the next version' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save as the next revision' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true))
     expect(posted(calls).changes).toEqual([{ op: 'set', path: '/runtimeDefaults/configuration/sessions/enabled', value: true }])
   })
@@ -71,7 +71,7 @@ describe('observability', () => {
     await userEvent.selectOptions(screen.getByLabelText('Level'), 'warn')
     await userEvent.click(screen.getByLabelText('Send OpenTelemetry traces and metrics'))
     await userEvent.click(screen.getByLabelText('Traces'))
-    await userEvent.click(screen.getByRole('button', { name: 'Save as the next version' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save as the next revision' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true))
     expect(posted(calls).changes).toEqual([
       { op: 'set', path: '/runtimeDefaults/audit/file/retainDays', value: 90 },
@@ -85,6 +85,6 @@ describe('observability', () => {
     page('/servers/orders-mcp/observability', manifest({ transports: { allowed: ['stdio'], default: 'stdio' } }, { telemetry: { enabled: true } }))
     await userEvent.selectOptions(await screen.findByLabelText('Exporter'), 'prometheus')
     expect(screen.getByText('Prometheus needs the HTTP transport; use OTLP for stdio servers')).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'Save as the next version' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Save as the next revision' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

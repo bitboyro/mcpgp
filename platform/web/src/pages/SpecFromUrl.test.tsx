@@ -46,7 +46,7 @@ describe('specs from an address', () => {
     expect(asked.path).toContain('version=2.0')
     expect(asked.body).toBeUndefined()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Save as the next version' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save as the next revision' }))
     await waitFor(() => expect(calls.filter((c) => c.method === 'POST')).toHaveLength(2))
     expect(calls.filter((c) => c.method === 'POST')[1].path).not.toContain('dryRun')
   })
@@ -59,8 +59,8 @@ describe('specs from an address', () => {
     })
     page()
     await userEvent.click(await screen.findByRole('button', { name: 'Check for updates' }))
-    expect(await screen.findByText('No changes: the spec at this address is the same as the saved one.')).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'Save as the next version' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(await screen.findByText('No changes: the API definition at this address matches the saved one.')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Save as the next revision' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('adds a version from an address the person types', async () => {
@@ -70,12 +70,12 @@ describe('specs from an address', () => {
       'POST /servers/ledger/contracts': plan({ version: '3.0', replaces: false, spec: 'contracts/3.0/openapi.json', unchanged: false }),
     })
     page()
-    await userEvent.click(await screen.findByRole('button', { name: 'Add a spec version' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Add an API version' }))
     await userEvent.click(screen.getByRole('radio', { name: 'From an address' }))
-    await userEvent.type(screen.getByLabelText('Address of the spec'), 'https://specs.acme.com/ledger/v3.json')
+    await userEvent.type(screen.getByLabelText('Address of the API definition'), 'https://specs.acme.com/ledger/v3.json')
     expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0) // nothing is fetched while typing
     await userEvent.click(screen.getByRole('button', { name: 'Fetch' }))
-    expect(await screen.findByText(/Adds version 3.0/)).toBeTruthy()
+    expect(await screen.findByText(/Adds API version 3.0/)).toBeTruthy()
     expect(calls.find((c) => c.method === 'POST')!.path).toContain('url=' + encodeURIComponent('https://specs.acme.com/ledger/v3.json'))
   })
 })
