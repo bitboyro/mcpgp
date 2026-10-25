@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Change, Manifest } from '../api'
 import { useManifest } from '../serverData'
-import { ErrorBox, Loading, PageHead } from '../ui'
+import { ErrorBox, Loading, PageHead, Icon } from '../ui'
 import { SetWhenDeployed, useDefinitionSave } from './Deployed'
 import { Toggle } from './Execution'
 import { BuildButton, CustomerPreview } from './Overview'
@@ -143,10 +143,10 @@ function AccessForm({ id, saved }: { id: string; saved: Settings }) {
               <input className="input mono" value={r.tools} disabled={off} placeholder="orders_order_*" onChange={(e) => setRow(i, { tools: e.target.value })} />
             </label>
             {!off && <button type="button" className="btn btn-sm" aria-label={`Remove scope ${r.scope || i + 1}`}
-              onClick={() => setS({ ...s, scopes: s.scopes.filter((_, n) => n !== i) })}>Remove</button>}
+              onClick={() => setS({ ...s, scopes: s.scopes.filter((_, n) => n !== i) })}><Icon name="trash" />Remove</button>}
           </div>
         ))}
-        {!off && <div><button type="button" className="btn btn-sm" onClick={() => setS({ ...s, scopes: [...s.scopes, { scope: '', access: 'read-only', tools: '' }] })}>Add scope</button></div>}
+        {!off && <div><button type="button" className="btn btn-sm" onClick={() => setS({ ...s, scopes: [...s.scopes, { scope: '', access: 'read-only', tools: '' }] })}><Icon name="plus" />Add scope</button></div>}
       </div>
 
       <div className="card">
@@ -157,8 +157,8 @@ function AccessForm({ id, saved }: { id: string; saved: Settings }) {
 
       {editable && (
         <div className="actions">
-          <button type="submit" className="btn btn-primary" disabled={changes.length === 0 || !!problem || save.isPending}>Save as the next version</button>
-          {changes.length > 0 && <button type="button" className="btn" onClick={() => setS(saved)}>Undo changes</button>}
+          <button type="submit" className="btn btn-primary" disabled={changes.length === 0 || !!problem || save.isPending}><Icon name="save" />Save as the next version</button>
+          {changes.length > 0 && <button type="button" className="btn" onClick={() => setS(saved)}><Icon name="undo" />Undo changes</button>}
           {problem && changes.length > 0 && <span className="hint" role="alert">{problem}</span>}
         </div>
       )}

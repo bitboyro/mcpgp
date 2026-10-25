@@ -8,7 +8,7 @@ import { SpecPicker, SpecProblemsView, type SpecUpload } from './SpecUpload'
 import { useManifest, useServer } from '../serverData'
 import { ShippedVersions } from './ShippedVersions'
 import { useSession } from '../session'
-import { ErrorBox, Loading, PageHead, ago, shortDigest } from '../ui'
+import { ErrorBox, Loading, PageHead, ago, shortDigest, Icon } from '../ui'
 
 /** API definitions: the OpenAPI documents the server is made from, the versions it ships, and its saved versions. */
 export function ApiDefinitionsPage() {
@@ -63,7 +63,7 @@ export function ApiDefinitionsPage() {
                   {checks.data.diagnostics.map((d, i) => (
                     <li key={i} className="row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
                       <span className={'chip chip-' + (d.level === 'error' ? 'bad' : d.level === 'warning' ? 'warn' : 'idle')}>{d.level} {d.code}</span>
-                      <span style={{ fontSize: 13 }}>{d.message}</span>
+                      <span style={{ fontSize: 14 }}>{d.message}</span>
                     </li>
                   ))}
                 </ul>
@@ -92,7 +92,7 @@ export function ApiDefinitionsPage() {
               </div>
               {path && (
                 <>
-                  <h3 className="mono" style={{ fontSize: 13 }}>{path}</h3>
+                  <h3 className="mono" style={{ fontSize: 14 }}>{path}</h3>
                   <ErrorBox error={content.error} />
                   {content.data !== undefined && <pre className="code" aria-label={`Content of ${path}`}>{content.data}</pre>}
                 </>
@@ -237,7 +237,7 @@ function Contracts({ id, editable, onDone }: { id: string; editable: boolean; on
           )}
           <ErrorBox error={save.error} />
           <div className="actions">
-            <button type="submit" className="btn btn-primary" disabled={!plan.data?.compiles || plan.data.unchanged || save.isPending}>Save as the next version</button>
+            <button type="submit" className="btn btn-primary" disabled={!plan.data?.compiles || plan.data.unchanged || save.isPending}><Icon name="save" />Save as the next version</button>
             <button type="button" className="btn" onClick={close}>Cancel</button>
           </div>
         </form>
@@ -300,7 +300,7 @@ function Upload({ id, onDone }: { id: string; onDone: (version: number) => void 
         <input className="input" value={message} onChange={(e) => setMessage(e.target.value)} maxLength={200} />
       </label>
       <ErrorBox error={upload.error} />
-      <div><button type="submit" className="btn btn-primary" disabled={!picked || upload.isPending}>Upload version</button></div>
+      <div><button type="submit" className="btn btn-primary" disabled={!picked || upload.isPending}><Icon name="upload" />Upload version</button></div>
     </form>
   )
 }

@@ -4,7 +4,7 @@ import { api, ApiError, type Change, type Manifest } from '../api'
 import { PACKS, choices, packChange, packOn } from '../choices'
 import { useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
-import { ErrorBox, Segmented } from '../ui'
+import { ErrorBox, Segmented, Icon } from '../ui'
 import { NoticesCard } from './Notices'
 
 export interface Pending { label: string; change: Change; value?: string }
@@ -52,8 +52,8 @@ export function SaveBar({ edits }: { edits: Edits }) {
       {count > 0 && (
         <div className="actions">
           <button type="button" className="btn btn-primary btn-sm" disabled={edits.save.isPending} onClick={() => edits.save.mutate()}>
-            Save as revision {edits.base + 1}</button>
-          <button type="button" className="btn btn-sm" onClick={edits.discard}>Undo changes</button>
+            <Icon name="save" />Save as revision {edits.base + 1}</button>
+          <button type="button" className="btn btn-sm" onClick={edits.discard}><Icon name="undo" />Undo changes</button>
           <span className="hint">{count} unsaved change{count === 1 ? '' : 's'}</span>
         </div>
       )}

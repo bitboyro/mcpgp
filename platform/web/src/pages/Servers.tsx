@@ -70,7 +70,7 @@ export function ServersPage() {
                 <div className="card-actions">
                   <BuildButton id={server.id} disabled={server.latestVersion == null || !manifest} />
                   <Link to={`/servers/${server.id}`} className="btn btn-dark btn-sm">{server.system ? 'View MCP server' : 'Open'}</Link>
-                  {server.system && <Link className="btn btn-sm" to="/agents?connect">Connect an agent</Link>}
+                  {server.system && <Link className="btn btn-sm" to="/agents?connect"><Icon name="zap" />Connect an agent</Link>}
                   {can('servers:write') && <>
                     {!server.system && <button type="button" className="btn btn-sm" onClick={() => setPanel({ mode: 'copy', source: server })}>Duplicate</button>}
                     <button type="button" className="btn btn-sm btn-soft" onClick={() => setPanel({ mode: 'variant', source: server })}>New variant</button>
@@ -296,7 +296,7 @@ function NewFromProject() {
         <input className="input input-stage" value={id} onChange={(e) => setId(slug(e.target.value))} required pattern="[a-z0-9][a-z0-9-]{1,62}" />
       </label>
       <ErrorBox error={create.error} />
-      <button type="submit" className="btn btn-primary" disabled={!picked || !id || create.isPending}>Create server</button>
+      <button type="submit" className="btn btn-primary" disabled={!picked || !id || create.isPending}><Icon name="plus" />Create server</button>
     </form>
   )
 }

@@ -6,7 +6,7 @@ import { methodVerbs, nameRows, policyLines, unusedLockEntries, vocabulary, type
 import { apiPrefix, methodVerb, removeWord, validVerb, renames, serverPrefix, serverSuffix, setWord, switchOff, validPrefix, validWord, vocabularyPath, wordsKey } from '../namingEdits'
 import { useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
-import { ErrorBox, Loading, Segmented } from '../ui'
+import { ErrorBox, Loading, Segmented, Icon } from '../ui'
 import { Checks } from './Overview'
 
 type Show = 'all' | 'drift' | 'unlocked'
@@ -202,7 +202,7 @@ export function NamingView({ id }: { id: string }) {
                               <>
                                 {' '}<button type="button" className="btn btn-sm" onClick={() => { setWords(v.words); setBecomes(v.becomes) }}>Change</button>
                                 {' '}{v.own
-                                  ? <button type="button" className="btn btn-sm" onClick={() => put(`remove ${v.words}`, removeWord(key))}>Remove</button>
+                                  ? <button type="button" className="btn btn-sm" onClick={() => put(`remove ${v.words}`, removeWord(key))}><Icon name="trash" />Remove</button>
                                   : <button type="button" className="btn btn-sm" onClick={() => put(`switch off ${v.words}`, switchOff(key))}>Switch off</button>}
                               </>
                             )}
@@ -310,7 +310,7 @@ export function NamingView({ id }: { id: string }) {
           <>
             <h3>In the lock file, not in this build</h3>
             <p className="hint">The operation is gone or left out; if it comes back, it gets its old name again.</p>
-            <ul className="mono" style={{ fontSize: 13, margin: 0, paddingLeft: 18 }}>
+            <ul className="mono" style={{ fontSize: 14, margin: 0, paddingLeft: 18 }}>
               {unused.map((e) => <li key={e.id}>{e.name} <span className="meta">({e.id.replace(/^[^:]+:/, '').replace(':', ' ')})</span></li>)}
             </ul>
           </>

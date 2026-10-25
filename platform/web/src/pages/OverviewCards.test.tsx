@@ -51,6 +51,13 @@ describe('overview', () => {
     expect(screen.queryByText("What the agent sees")).toBeNull()   // settings live on their pages now
   })
 
+  it('offers the API reference and connecting an agent from the sidebar', async () => {
+    page('/servers/orders-mcp')
+    const developers = await screen.findByLabelText('For developers')
+    expect(within(developers).getByRole('link', { name: 'API reference' }).getAttribute('href')).toBe('/agents')
+    expect(within(developers).getByRole('link', { name: 'Connect an agent' }).getAttribute('href')).toBe('/agents?connect')
+  })
+
   it('shows the agent preview on request', async () => {
     page('/servers/orders-mcp')
     await userEvent.click(await screen.findByRole('button', { name: 'Preview as agent' }))

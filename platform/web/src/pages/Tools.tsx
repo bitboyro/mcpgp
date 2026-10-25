@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { ProvenanceStep, Tool } from '../api'
 import { listedTools, useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
-import { Chip, ErrorBox, Loading, PageHead, Segmented } from '../ui'
+import { Chip, ErrorBox, Loading, PageHead, Segmented, Icon } from '../ui'
 import { NamingView } from './Naming'
 import { OutputSchemas } from './OutputSchemas'
 import { OperationsView } from './Operations'
@@ -147,7 +147,7 @@ function ToolDetail({ id, tool }: { id: string; tool: Tool }) {
           <div className="actions">
             {can('servers:write') && !server.data?.system && <button type="button" className="btn btn-sm btn-stage" onClick={() => setEditing(true)}>Edit title and descriptions</button>}
             {can('builds:run') && tool.kind !== 'custom' && <button type="button" className="btn btn-sm btn-stage" aria-pressed={trying} onClick={() => setTrying(!trying)}>
-              {trying ? 'Close the try' : 'Try it'}</button>}
+              <Icon name="play" />{trying ? 'Close the try' : 'Try it'}</button>}
           </div>
         )}
       {trying && !editing && <TryTool id={id} tool={tool} />}
@@ -159,7 +159,7 @@ function ToolDetail({ id, tool }: { id: string; tool: Tool }) {
         <div className="stage-card">
           <span className="eyebrow">Calls</span>
           {Object.entries(tool.variants).map(([contract, v]) => (
-            <span key={contract} className="mono" style={{ fontSize: 13 }}>{contract}: {v.method} {v.path}
+            <span key={contract} className="mono" style={{ fontSize: 14 }}>{contract}: {v.method} {v.path}
               {v.security && v.security.length > 0 && <span className="meta"> · {v.security.map((alt) => alt.map((s) => s.scheme + (s.scopes?.length ? ` (${s.scopes.join(' ')})` : '')).join(' + ')).join(' or ')}</span>}
             </span>
           ))}
@@ -170,7 +170,7 @@ function ToolDetail({ id, tool }: { id: string; tool: Tool }) {
           <span className="eyebrow">Why it looks like this</span>
           {provenance.map(([field, steps]) => (
             <div key={field}>
-              <h3 style={{ fontSize: 13, marginBottom: 4 }}>{field}</h3>
+              <h3 style={{ fontSize: 14, marginBottom: 4 }}>{field}</h3>
               <ol>
                 {steps.map((s, i) => (
                   <li key={i}>

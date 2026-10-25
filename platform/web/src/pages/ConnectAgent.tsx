@@ -91,7 +91,7 @@ function Paste({ token, agent }: { token: Token; agent: string }) {
       </div>
       <div className="stage-card">
         <span className="eyebrow">2 · The server</span>
-        <a className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }} href="/api/v1/platform-mcp" download>Download mcpgp-platform.zip</a>
+        <a className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }} href="/api/v1/platform-mcp" download><Icon name="download" />Download mcpgp-platform.zip</a>
         <p className="hint">Unzip it, and next to the jar save <span className="mono">mcpgp-platform.yaml</span>:</p>
         <pre className="code code-wrap" style={{ border: 0, padding: 0 }}>{platformConfig(origin)}</pre>
       </div>

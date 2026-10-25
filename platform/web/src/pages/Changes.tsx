@@ -89,7 +89,7 @@ export function ChangesPage() {
                         <li key={i} className="row" style={{ justifyContent: 'flex-start', gap: 8 }}>
                           {c.tool ? <Link className="mono" to={`/servers/${id}/tools?tool=${encodeURIComponent(c.tool)}`}>{c.tool}</Link>
                             : <span className="tag">server</span>}
-                          <span style={{ fontSize: 13 }}>{c.text}</span>
+                          <span style={{ fontSize: 14 }}>{c.text}</span>
                         </li>
                       ))}
                     </ul>

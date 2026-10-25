@@ -72,6 +72,11 @@ versions follow [SemVer](https://semver.org).
   moved to the pages that own them: what the agent sees, support packs, notices and what tools may do to
   **Tools**; one or several target servers and mixed versions to **Target APIs**; transports to
   **Packaging**. Each page saves its own changes as the next revision.
+- Calmer, more readable platform UI: 16px body text (14px for labels, hints and tables, 24px page
+  titles), lighter page background and dividers, violet kept for primary actions, links and focus.
+  Lucide icons in the sidebar and on main actions (save, build, upload, preview, try, download, release,
+  add, remove). The sidebar footer offers **API reference** and **Connect an agent** as labelled buttons.
+  The "Always on" protections on Execution are readable again (light text had been on a white card).
 - The definition key for how a server signs in to the API it calls is `apis[].upstreamAuth`, the
   industry term (it was `downstreamAuth`; same settings). Compiled manifests carry `upstreamAuth`; the
   runtime still reads `downstreamAuth` from manifests built before 0.4.0. Platform edits to an API whose

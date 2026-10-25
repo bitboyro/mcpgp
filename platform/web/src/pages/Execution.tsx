@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import { api, type Manifest } from '../api'
 import { useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
-import { ErrorBox, Loading, PageHead } from '../ui'
+import { ErrorBox, Loading, PageHead, Icon } from '../ui'
 import { BuildButton } from './Overview'
 
 /** The settings, as the definition's `safety` section holds them (all on by default). */
@@ -197,8 +197,8 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
 
       {editable && (
         <div className="actions">
-          <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || !!invalid || save.isPending}>Save as the next version</button>
-          {changed.length > 0 && <button type="button" className="btn" onClick={() => setS(saved)}>Undo changes</button>}
+          <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || !!invalid || save.isPending}><Icon name="save" />Save as the next version</button>
+          {changed.length > 0 && <button type="button" className="btn" onClick={() => setS(saved)}><Icon name="undo" />Undo changes</button>}
           {invalid && <span className="hint" role="alert">Numbers are whole and at least 1</span>}
         </div>
       )}
@@ -246,11 +246,11 @@ function AlwaysOn() {
     ['Tool results are data', 'The agent docs in the package tell agents never to follow instructions found in results.'],
   ]
   return (
-    <div className="card">
+    <div className="stage-card" style={{ gap: 12 }}>
       <h2>Always on</h2>
-      <div className="list" style={{ gap: 10 }}>
+      <div className="list" style={{ gap: 12 }}>
         {items.map(([title, text]) => (
-          <div key={title}><b style={{ fontSize: 14 }}>{title}</b><br /><span className="hint">{text}</span></div>
+          <div key={title}><b style={{ fontSize: 15, color: 'var(--stage-bright)' }}>{title}</b><br /><span className="hint">{text}</span></div>
         ))}
       </div>
     </div>

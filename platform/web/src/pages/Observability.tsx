@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Change, Manifest } from '../api'
 import { useManifest } from '../serverData'
-import { ErrorBox, Loading, PageHead } from '../ui'
+import { ErrorBox, Loading, PageHead, Icon } from '../ui'
 import { SetWhenDeployed, useDefinitionSave } from './Deployed'
 import { NumberField, Toggle } from './Execution'
 import { BuildButton, CustomerPreview } from './Overview'
@@ -186,8 +186,8 @@ function ObservabilityForm({ id, saved, http }: { id: string; saved: Settings; h
 
       {editable && (
         <div className="actions">
-          <button type="submit" className="btn btn-primary" disabled={changes.length === 0 || !!problem || save.isPending}>Save as the next version</button>
-          {changes.length > 0 && <button type="button" className="btn" onClick={() => setS(saved)}>Undo changes</button>}
+          <button type="submit" className="btn btn-primary" disabled={changes.length === 0 || !!problem || save.isPending}><Icon name="save" />Save as the next version</button>
+          {changes.length > 0 && <button type="button" className="btn" onClick={() => setS(saved)}><Icon name="undo" />Undo changes</button>}
           {problem && <span className="hint" role="alert">{problem}</span>}
         </div>
       )}

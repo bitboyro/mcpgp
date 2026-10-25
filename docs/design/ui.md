@@ -29,8 +29,13 @@ notes below are the baseline until each scoped change is implemented and verifie
 **Pattern:** dark sidebar; light controls on the left; a dark **live preview** on the right showing
 the consequence of each choice (what the agent gets, what the customer configures, what is shipped).
 
-**Style:** Geist + Geist Mono; neutral greys; one violet accent (`#5B4BEA`); dark stage `#0E0F14`;
-generous radii (12–22 px); segmented controls for choices.
+**Style:** Geist + Geist Mono; neutral greys; one violet accent (`#5B4BEA`) for primary actions, links
+and focus; dark stage `#0E0F14`; generous radii (12–22 px); segmented controls for choices.
+Type (0.4.0): body 16px / 1.6, labels, hints and tables 14px, card headings 17px, page titles 24px
+(`--text-*` tokens in `styles.css`). Page background `#F7F8FA`, dividers `#ECEEF2`. Icons: Lucide
+(`lucide-react`, ISC), one name per meaning in `ui.tsx`, in front of the label on main actions; the
+mcpgp mark stays our own. The sidebar footer has two labelled buttons: **API reference** (the API &
+agents page) and **Connect an agent**.
 
 Page names in this table are the canvas's; the 2026-10-25 regroup renamed and split several of them
 (see [Server navigation](#server-navigation-2026-10-25)).

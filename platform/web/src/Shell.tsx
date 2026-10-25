@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { Link, NavLink, useNavigate, useParams } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from './api'
 import { useSession } from './session'
 import { ChangePassword } from './pages/Passwords'
@@ -31,6 +31,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const { id } = useParams()
   const { me, settings } = useSession()
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
 
   const signOut = async () => {
@@ -95,7 +96,12 @@ export function Shell({ children }: { children: ReactNode }) {
           </>
         )}
         <div className="nav-foot">
-          <Item to="/agents" icon="api">API &amp; agents</Item>
+          <div className="nav-buttons" aria-label="For developers">
+            <NavLink to="/agents" end className={({ isActive }) => 'nav-button' + (isActive && !location.search.includes('connect') ? ' active' : '')}>
+              <Icon name="book" />API reference</NavLink>
+            <Link to="/agents?connect" className={'nav-button' + (location.pathname === '/agents' && location.search.includes('connect') ? ' active' : '')}>
+              <Icon name="zap" />Connect an agent</Link>
+          </div>
           <div className="nav-who"><Link to="/account" title="Your account">{me.name}</Link><button type="button" onClick={signOut}>Sign out</button></div>
         </div>
       </nav>

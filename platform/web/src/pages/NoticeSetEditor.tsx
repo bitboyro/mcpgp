@@ -5,7 +5,7 @@ import { api, ApiError, type Change, type LibraryItem, type Notice } from '../ap
 import { describeScope, noticeId, scopeMatch, scopeOf, type Scope } from '../descriptions'
 import { setNoticePath, setSetNotice } from '../sharedNotices'
 import { useSession } from '../session'
-import { ErrorBox, Loading, Segmented } from '../ui'
+import { ErrorBox, Loading, Segmented, Icon } from '../ui'
 
 interface Pending {
   label: string
@@ -131,7 +131,7 @@ export function NoticeSetEditor({ item }: { item: LibraryItem }) {
           </div>
         ))}
       </div>
-      {editable && editing === null && <button type="button" className="btn btn-sm btn-stage" style={{ alignSelf: 'flex-start' }} onClick={() => open()}>Add notice</button>}
+      {editable && editing === null && <button type="button" className="btn btn-sm btn-stage" style={{ alignSelf: 'flex-start' }} onClick={() => open()}><Icon name="plus" />Add notice</button>}
       {editing !== null && (
         <form className="list" aria-label="Shared notice" onSubmit={(e) => { e.preventDefault(); if (valid) done() }}>
           <label className="field">Text
@@ -186,7 +186,7 @@ export function NoticeSetEditor({ item }: { item: LibraryItem }) {
           {active.map((s) => {
             const on = using.get(s.id)
             return (
-              <label key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+              <label key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}>
                 <input type="checkbox" checked={targets.includes(s.id)}
                   onChange={(e) => setChosen(e.target.checked ? [...targets, s.id] : targets.filter((x) => x !== s.id))} />
                 <span className="mono">{s.id}</span>

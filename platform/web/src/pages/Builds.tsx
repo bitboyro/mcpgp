@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, type Build } from '../api'
 import { useSession } from '../session'
-import { BuildChip, ErrorBox, Loading, PageHead, Segmented, ago, bytes } from '../ui'
+import { BuildChip, ErrorBox, Loading, PageHead, Segmented, ago, bytes, Icon } from '../ui'
 import { BuildButton } from './Overview'
 
 const running = (b?: Build) => b?.status === 'queued' || b?.status === 'running'
@@ -136,15 +136,15 @@ function BuildDetail({ id }: { id: string }) {
 
       <div className="actions">
         {b.status === 'succeeded' && !b.released && !b.deleted && can('builds:release') &&
-          <button type="button" className="btn btn-primary" disabled={act.isPending} onClick={() => act.mutate('release')}>Release</button>}
+          <button type="button" className="btn btn-primary" disabled={act.isPending} onClick={() => act.mutate('release')}><Icon name="rocket" />Release</button>}
         {b.status === 'succeeded' && !b.released && !b.deleted &&
           <Link className="btn" to={`/servers/${b.server}/changes?to=${b.version}`}>What changed since the last release</Link>}
         {!running(b) && !b.archived && can('builds:delete') &&
-          <button type="button" className="btn btn-stage" disabled={act.isPending} onClick={() => act.mutate('archive')}>Archive</button>}
+          <button type="button" className="btn btn-stage" disabled={act.isPending} onClick={() => act.mutate('archive')}><Icon name="package" />Archive</button>}
         {b.archived && !b.deleted && can('builds:delete') &&
           <button type="button" className="btn btn-stage" disabled={act.isPending} onClick={() => act.mutate('restore')}>Restore</button>}
         {!running(b) && !b.deleted && can('builds:delete') && (!b.released || b.archived) &&
-          <button type="button" className="btn btn-stage" onClick={() => setConfirmDelete(true)}>Delete files</button>}
+          <button type="button" className="btn btn-stage" onClick={() => setConfirmDelete(true)}><Icon name="trash" />Delete files</button>}
       </div>
       {b.released && !b.archived && !b.deleted && <p className="hint">Released builds are archived before their files can be deleted.</p>}
       {confirmDelete && (

@@ -25,7 +25,7 @@ export function BuildButton({ id, disabled = false }: { id: string; disabled?: b
   return (
     <>
       {start.error && <ErrorBox error={start.error} />}
-      <button type="button" className="btn btn-primary" onClick={() => start.mutate()} disabled={disabled || start.isPending}>{start.isPending ? 'Starting…' : 'Build'}</button>
+      <button type="button" className="btn btn-primary" onClick={() => start.mutate()} disabled={disabled || start.isPending}><Icon name="package" />{start.isPending ? 'Starting…' : 'Build'}</button>
     </>
   )
 }
@@ -127,10 +127,10 @@ export function OverviewPage() {
       <PageHead title={manifest.data?.server.title ?? server.data?.title ?? id}
         sub={latest ? `Revision ${latest.number} · saved by ${latest.author} ${ago(latest.created)}` : undefined}>
         {server.data?.system
-          ? <Link to="/agents?connect" className="btn btn-primary">Connect an agent</Link>
-          : <Link to={`/servers/${id}/apis`} className="btn">Upload version</Link>}
+          ? <Link to="/agents?connect" className="btn btn-primary"><Icon name="zap" />Connect an agent</Link>
+          : <Link to={`/servers/${id}/apis`} className="btn"><Icon name="upload" />Upload version</Link>}
         {manifest.data && <button type="button" className="btn" aria-pressed={previewing} onClick={() => setPreviewing(!previewing)}>
-          {previewing ? 'Hide preview' : 'Preview as agent'}</button>}
+          <Icon name="eye" />{previewing ? 'Hide preview' : 'Preview as agent'}</button>}
         <BuildButton id={id} />
       </PageHead>
       <div className="body" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
@@ -228,7 +228,7 @@ function AgentPreview({ manifest }: { manifest: Manifest }) {
       <div className="list">
         {listed.slice(0, 8).map((t) => (
           <div key={t.name} className="stage-card" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="mono" style={{ color: 'var(--stage-bright)', fontSize: 13 }}>{t.name}</span>
+            <span className="mono" style={{ color: 'var(--stage-bright)', fontSize: 14 }}>{t.name}</span>
             <span className="meta">{t.title}</span>
           </div>
         ))}
