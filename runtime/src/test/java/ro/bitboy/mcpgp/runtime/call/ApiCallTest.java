@@ -91,6 +91,25 @@ class ApiCallTest {
     }
 
     @Test
+    void maskedFieldsAreHiddenInResultsErrorsAndTheAuditFile() throws Exception {
+        // the orders example lists paymentToken; password, secret, token, apiKey and authorization always apply
+        target.respond(MockTarget.Response.json(200, "{\"id\":\"c-1\",\"name\":\"Ana\",\"password\":\"hunter2\","
+                + "\"cards\":[{\"paymentToken\":\"pt-999\",\"last4\":\"1234\"}]}"));
+        McpSchema.CallToolResult result = call("orders_customer_get", Map.of("instance", "prod-eu", "path", Map.of("id", "c-1")));
+        assertThat(structured(result).path("password").asText()).isEqualTo("***");
+        assertThat(structured(result).at("/cards/0/paymentToken").asText()).isEqualTo("***");
+        assertThat(structured(result).at("/cards/0/last4").asText()).isEqualTo("1234");
+        assertThat(text(result)).doesNotContain("hunter2").doesNotContain("pt-999");
+
+        target.respond(MockTarget.Response.json(400, "{\"detail\":\"bad card\",\"secret\":\"s3cr3t-value\"}"));
+        McpSchema.CallToolResult refused = call("orders_customer_get", Map.of("instance", "prod-eu", "path", Map.of("id", "c-2")));
+        assertThat(refused.isError()).isTrue();
+        assertThat(text(refused)).contains("bad card").doesNotContain("s3cr3t-value");
+        String audit = Files.readString(dir.resolve("data/audit/audit.jsonl"));
+        assertThat(audit).contains("bad card").doesNotContain("s3cr3t-value").doesNotContain("hunter2");
+    }
+
+    @Test
     void pinnedInstanceUsesItsContractAndApiKey() {
         call("orders_customer_get", Map.of("instance", "partner-x", "path", Map.of("id", "c-1")));
         assertThat(target.last().path()).isEqualTo("/api/v1/customers/c-1");

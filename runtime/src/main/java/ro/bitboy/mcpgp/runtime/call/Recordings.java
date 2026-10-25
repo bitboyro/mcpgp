@@ -274,7 +274,7 @@ public final class Recordings {
             String pair = pairs[i];
             int eq = pair.indexOf('=');
             String name = java.net.URLDecoder.decode(eq < 0 ? pair : pair.substring(0, eq), StandardCharsets.UTF_8).toLowerCase(Locale.ROOT);
-            out.append(eq >= 0 && fields.contains(name) ? pair.substring(0, eq + 1) + "***" : pair);
+            out.append(eq >= 0 && fields.contains(name.toLowerCase(Locale.ROOT)) ? pair.substring(0, eq + 1) + "***" : pair);
             if (i < pairs.length - 1) {
                 out.append('&');
             }

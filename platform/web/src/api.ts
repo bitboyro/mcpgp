@@ -279,6 +279,7 @@ export interface Manifest {
         server?: { auth?: { scopes?: Record<string, { access?: string; tools?: string[] }> } }
         sessions?: { enabled?: boolean }
         logging?: { level?: string }
+        errors?: { detail?: 'full' | 'summary' }
       }
     }
   }

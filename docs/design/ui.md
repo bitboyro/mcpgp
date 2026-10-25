@@ -77,7 +77,7 @@ Built into the platform jar and served by it (`WebUi`), on the API's own origin.
 | Tools | `/servers/:id/tools` | what the agent sees (exposure mode) and support packs; filters, search, the tool as the agent gets it, its provenance; output schemas; Operations view (with what tools may do per API), Naming, Notices |
 | Target APIs | `/servers/:id/targets` | one or several target servers and what happens when they run different versions; per API: sign-in types, per-user credential, token exchange; the shipped example config |
 | Access control | `/servers/:id/access` | sign-in methods offered and default, scope → tool permissions, sessions default; deployment and administrator settings shown read-only |
-| Execution | `/servers/:id/execution` | confirmations, response and request limits, batching, retained results, rate limits; always-on protections |
+| Execution | `/servers/:id/execution` | confirmations, response and request limits, batching, retained results, rate limits; Data protection (error detail Full/Summary, masked fields with the defaults shown); always-on protections |
 | Observability | `/servers/:id/observability` | audit file, rotation, retention and arguments; log level; OpenTelemetry on/off, exporter, service name, signals; paths and endpoints read-only; health endpoints |
 | Packaging | `/servers/:id/packaging` | how agents connect (stdio, HTTP), formats, docs and contents as they ship |
 | Builds and releases | `/servers/:id/builds`, `/builds`, `/builds/:buildId` | packages built from the server: live log, downloads, package files, release, archive, restore, delete; the build's own Activity entries, linking to the rest. `/builds/:buildId` opens a build on its server's page |

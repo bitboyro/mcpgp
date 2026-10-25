@@ -67,8 +67,7 @@ final class Packs {
         if (!pack) {
             return null;
         }
-        java.util.Set<String> fields = new java.util.HashSet<>();
-        manifest.policies().at("/redaction/fields").forEach(f -> fields.add(f.asText()));
+        java.util.Set<String> fields = new java.util.HashSet<>(ro.bitboy.mcpgp.runtime.call.MaskedFields.of(manifest).names());
         // the same store the API tools record into (it is shared per storage root)
         return ro.bitboy.mcpgp.runtime.call.Recordings.of(config.storageRoot(), fields, java.util.Set.of(), config.secrets(),
                 manifest.policies().path("responseLimitKb").asInt(256) * 1024, config.packs().path("recording").path("retainDays").asInt(14));

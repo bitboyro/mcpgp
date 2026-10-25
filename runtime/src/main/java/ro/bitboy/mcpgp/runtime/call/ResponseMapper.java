@@ -30,6 +30,7 @@ final class ResponseMapper {
     private final int limitBytes;
     private final boolean fullErrors;
     private final Redactor redactor;
+    private final MaskedFields masked;
     /** A JSON answer over the limit is cut at whole list items (safety.cleanTruncation). */
     private final boolean cleanTruncation;
     /** A target's 429 tells the agent how long to wait (safety.rateLimits.retryAfter). */
@@ -40,6 +41,11 @@ final class ResponseMapper {
     }
 
     ResponseMapper(int responseLimitKb, String errorDetail, Redactor redactor, boolean cleanTruncation, boolean retryAfter) {
+        this(responseLimitKb, errorDetail, redactor, cleanTruncation, retryAfter, new MaskedFields(List.of()));
+    }
+
+    ResponseMapper(int responseLimitKb, String errorDetail, Redactor redactor, boolean cleanTruncation, boolean retryAfter, MaskedFields masked) {
+        this.masked = masked;
         this.limitBytes = responseLimitKb * 1024;
         this.fullErrors = !"summary".equals(errorDetail);
         this.redactor = redactor;
@@ -173,8 +179,9 @@ final class ResponseMapper {
         return cut(text.lines().findFirst().orElse(""));
     }
 
+    /** Known secret values, then the values of masked fields (MaskedFields), whatever the body's shape. */
     String redact(String text) {
-        return redactor.redact(text);
+        return masked.maskText(redactor.redact(text));
     }
 
     private String text(byte[] body) {

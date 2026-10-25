@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { App } from '../App'
@@ -111,6 +111,31 @@ describe('execution', () => {
     await userEvent.click(how)
     expect(how.getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByText(/an injected or mistaken instruction can't delete data in one call/)).toBeTruthy()
+  })
+
+  it('sets error detail and the masked fields, with the defaults always shown', async () => {
+    const { calls } = fakeApi({
+      'GET /me': ME, 'GET /settings': SETTINGS, 'GET /servers/orders-mcp': SERVER,
+      'GET /servers/orders-mcp/versions/latest/manifest': manifest({ redaction: { fields: ['password', 'paymentToken'] } }),
+      'POST /servers/orders-mcp/edits': SERVER,
+    })
+    page()
+    const card = await screen.findByLabelText('Data protection')
+    const list = within(card).getByRole('list', { name: 'Masked fields' })
+    expect(within(list).getAllByRole('listitem').map((i) => i.textContent)).toEqual(
+      ['password · always', 'secret · always', 'token · always', 'apiKey · always', 'authorization · always', 'paymentToken'])
+    await userEvent.click(within(card).getByRole('radio', { name: 'Summary' }))
+    await userEvent.type(within(card).getByLabelText('Field to mask'), 'Password')
+    expect(within(card).getByText('Already masked')).toBeTruthy()
+    await userEvent.clear(within(card).getByLabelText('Field to mask'))
+    await userEvent.type(within(card).getByLabelText('Field to mask'), 'iban{enter}')
+    await userEvent.click(within(card).getByRole('button', { name: 'Stop masking paymentToken' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save as the next revision' }))
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true))
+    expect((calls.find((c) => c.method === 'POST')!.body as { changes: unknown[] }).changes).toEqual([
+      { op: 'set', path: '/runtimeDefaults/configuration/errors/detail', value: 'summary' },
+      { op: 'set', path: '/runtimeDefaults/redaction/fields', value: ['iban'] },
+    ])
   })
 
   it('refuses numbers that make no sense', async () => {

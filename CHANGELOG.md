@@ -94,6 +94,8 @@ versions follow [SemVer](https://semver.org).
   what and when on the other. Activity's filters (All, Changes, Builds, Access, Agents) are kept in the
   address, build entries open their build, and each build lists its own Activity entries with a link to
   the rest. `/builds/<id>` opens a build on its server's page.
+- Execution has a **Data protection** card: error detail (Full or Summary, a shipped default) and the masked
+  fields, with the always-masked names shown and the server's own added or removed.
 - The definition key for how a server signs in to the API it calls is `apis[].upstreamAuth`, the
   industry term (it was `downstreamAuth`; same settings). Compiled manifests carry `upstreamAuth`; the
   runtime still reads `downstreamAuth` from manifests built before 0.4.0. Platform edits to an API whose
@@ -110,6 +112,11 @@ versions follow [SemVer](https://semver.org).
   has both keys is refused.
 
 ### Fixed
+- Masked fields (`password`, `secret`, `token`, `apiKey`, `authorization` and the definition's
+  `runtimeDefaults.redaction.fields`) were documented as masked in results, errors and the audit file,
+  but were applied only to recordings, and there only for lower-case names. Their values are now `***` at
+  any depth of JSON tool results (retained results included), error bodies (the agent's and the audit
+  file's) and recordings, whatever the case of the name.
 - An identity policy file with a `scopes` section shut out every caller without OAuth scopes (API keys,
   no sign-in, stdio), with no rule that could let them back in. Scope rules now apply to OAuth callers
   only; other callers follow the file's `default` and `subjects` rules, and startup warns when a file with

@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import { api, type Manifest } from '../api'
 import { useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
-import { ErrorBox, Help, Loading, PageHead, Icon } from '../ui'
+import { ErrorBox, Help, Loading, PageHead, Segmented, Icon } from '../ui'
 import { BuildButton } from './Overview'
 
 /** The settings, as the definition's `safety` section holds them (all on by default). */
@@ -30,7 +30,13 @@ interface Settings {
   captureLimitKb: number
   resultTtl: number
   maxStoredKb: number
+  errorDetail: 'full' | 'summary'
+  /** The definition's own masked fields, comma-joined so a change is a plain comparison (MaskedFields in the runtime). */
+  maskedFields: string
 }
+
+/** Masked whatever the definition lists (runtime MaskedFields.DEFAULTS). */
+export const ALWAYS_MASKED = ['password', 'secret', 'token', 'apiKey', 'authorization']
 
 function current(p: Manifest['policies']): Settings {
   return {
@@ -55,6 +61,8 @@ function current(p: Manifest['policies']): Settings {
     captureLimitKb: p.results?.captureLimitKb ?? 4096,
     resultTtl: p.results?.ttlSeconds ?? 900,
     maxStoredKb: p.results?.maxStoredKb ?? 65536,
+    errorDetail: p.runtimeDefaults?.configuration?.errors?.detail ?? 'full',
+    maskedFields: (p.redaction?.fields ?? []).filter((f) => !ALWAYS_MASKED.some((d) => d.toLowerCase() === f.toLowerCase())).join(','),
   }
 }
 
@@ -80,6 +88,13 @@ const PATHS: Record<keyof Settings, string> = {
   captureLimitKb: '/results/captureLimitKb',
   resultTtl: '/results/ttlSeconds',
   maxStoredKb: '/results/maxStoredKb',
+  errorDetail: '/runtimeDefaults/configuration/errors/detail',
+  maskedFields: '/runtimeDefaults/redaction/fields',
+}
+
+/** A setting's value as the definition stores it. */
+function stored(key: keyof Settings, value: Settings[keyof Settings]): unknown {
+  return key === 'maskedFields' ? String(value).split(',').filter(Boolean) : value
 }
 
 /**
@@ -122,7 +137,7 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
     .find((k) => !Number.isInteger(s[k]) || s[k] < (({ requestReceiptTtlSeconds: 60 } as Record<string, number>)[k] ?? 1) || s[k] > (({ batchMaxCalls: 100, batchConcurrency: 16, requestReceiptTtlSeconds: 2592000, maxStoredReceipts: 1000000, captureLimitKb: 65536, resultTtl: 86400, maxStoredKb: 262144 } as Record<string, number>)[k] ?? Number.MAX_SAFE_INTEGER))
   const save = useMutation({
     mutationFn: () => api.saveEdit(id, server.data?.latestVersion ?? 0,
-      changed.map((k) => ({ op: 'set' as const, path: PATHS[k], value: s[k] })), 'Execution: ' + changed.join(', ')),
+      changed.map((k) => ({ op: 'set' as const, path: PATHS[k], value: stored(k, s[k]) })), 'Execution: ' + changed.join(', ')),
     onSuccess: async () => {
       for (const key of ['server', 'manifest', 'servers', 'version', 'example-config']) await queryClient.invalidateQueries({ queryKey: [key] })
     },
@@ -206,6 +221,9 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
           onChange={(v) => set('retryAfter', v)} hint="Passes on the target's Retry-After with its 429 answer." />
       </div>
 
+      <DataProtection detail={s.errorDetail} fields={s.maskedFields} off={off}
+        onDetail={(v) => set('errorDetail', v)} onFields={(v) => set('maskedFields', v)} />
+
       {editable && (
         <div className="actions">
           <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || !!invalid || save.isPending}><Icon name="save" />Save as the next revision</button>
@@ -246,11 +264,59 @@ export function NumberField({ label, value, disabled, onChange, hint, more }: {
   )
 }
 
+/** What an agent sees of an upstream error, and which fields are masked wherever answers are shown or kept. */
+function DataProtection({ detail, fields, off, onDetail, onFields }: {
+  detail: Settings['errorDetail']; fields: string; off: boolean; onDetail: (v: Settings['errorDetail']) => void; onFields: (v: string) => void
+}) {
+  const [adding, setAdding] = useState('')
+  const own = fields.split(',').filter(Boolean)
+  const name = adding.trim()
+  const problem = !name ? null : !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name) ? 'A field name: letters, digits, _ . -'
+    : [...ALWAYS_MASKED, ...own].some((f) => f.toLowerCase() === name.toLowerCase()) ? 'Already masked' : null
+  const add = () => { if (name && !problem) { onFields([...own, name].join(',')); setAdding('') } }
+  return (
+    <div className="card" aria-label="Data protection">
+      <h2>Data protection</h2>
+      <div className="list" style={{ gap: 6 }}>
+        <span style={{ fontSize: 14, fontWeight: 500 }}>Error detail</span>
+        <Segmented label="Error detail" value={detail} onChange={(v) => !off && onDetail(v)}
+          options={[['full', 'Full'], ['summary', 'Summary']]} />
+        <Help text={detail === 'full' ? 'Agents get the target\'s whole error body, masked.' : 'Agents get one short line per error.'}
+          more="Full: status, error code and the upstream body (masked), easiest to debug. Summary: status, error code and the problem's title or the body's first line, at most 200 characters. The audit file always keeps the full masked body." />
+      </div>
+      <div className="list" style={{ gap: 6 }}>
+        <span style={{ fontSize: 14, fontWeight: 500 }}>Masked fields</span>
+        <Help text="Values of these fields show as *** in results, errors, the audit file and recordings."
+          more="Matched by name, whatever the case, at any depth of a JSON answer. Configured credentials and tokens are masked too, wherever they appear." />
+        <div className="actions" role="list" aria-label="Masked fields">
+          {ALWAYS_MASKED.map((f) => <span key={f} role="listitem" className="tag mono" title="Always masked">{f} · always</span>)}
+          {own.map((f) => (
+            <span key={f} role="listitem" className="pill mono" style={{ minHeight: 30 }}>{f}
+              {!off && <button type="button" className="how" aria-label={`Stop masking ${f}`} onClick={() => onFields(own.filter((o) => o !== f).join(','))}>
+                <Icon name="close" size={14} /></button>}
+            </span>
+          ))}
+        </div>
+        {!off && (
+          <div className="actions" style={{ alignItems: 'flex-start' }}>
+            <label className="field" style={{ flex: '1 1 200px' }}><span className="visually-hidden">Field to mask</span>
+              <input className="input mono" value={adding} placeholder="iban" onChange={(e) => setAdding(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }} />
+            </label>
+            <button type="button" className="btn" disabled={!name || !!problem} onClick={add}><Icon name="plus" />Mask field</button>
+          </div>
+        )}
+        {problem && <span className="hint" role="alert">{problem}</span>}
+      </div>
+    </div>
+  )
+}
+
 /** Protections without a switch: they keep the server correct, so nothing turns them off. */
 function AlwaysOn() {
   const items: [string, string][] = [
     ['Credentials stay on the server', 'Sent only to the target server they belong to; never shown to agents, written to logs or put in results.'],
-    ['Secrets are masked', 'In results, errors, the audit log and recordings, with the fields you list under redaction.'],
+    ['Secrets are masked', 'In results, errors, the audit log and recordings, with the fields under Data protection.'],
     ['No redirects to other hosts', 'A redirect from the target is not followed, so credentials never travel elsewhere.'],
     ['Parameters stay parameters', 'Path values are encoded and can’t leave the path; cookie values are encoded; header values can’t contain line breaks.'],
     ['Files only from allowed places', 'Files by path are off unless turned on, confined to one folder, without traversal or symlink escapes.'],
