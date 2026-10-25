@@ -90,6 +90,10 @@ versions follow [SemVer](https://semver.org).
   server's saved state ("Save as revision 6"). Help under settings is one short sentence, with the details
   under **How it works**. "API & agents" is now "API and agents", and a release waiting for approval points
   to Activity, where it's decided.
+- **Builds and releases** and **Activity** say what each holds: packages and their files on one, who did
+  what and when on the other. Activity's filters (All, Changes, Builds, Access, Agents) are kept in the
+  address, build entries open their build, and each build lists its own Activity entries with a link to
+  the rest. `/builds/<id>` opens a build on its server's page.
 - The definition key for how a server signs in to the API it calls is `apis[].upstreamAuth`, the
   industry term (it was `downstreamAuth`; same settings). Compiled manifests carry `upstreamAuth`; the
   runtime still reads `downstreamAuth` from manifests built before 0.4.0. Platform edits to an API whose

@@ -1,17 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, type Activity, type Approval } from '../api'
 import { useSession } from '../session'
 import { ErrorBox, Loading, PageHead, Segmented, ago, Icon } from '../ui'
 
 type Filter = 'all' | 'builds' | 'changes' | 'agents' | 'access'
+const FILTERS: Filter[] = ['all', 'builds', 'changes', 'agents', 'access']
+
+/** Build and download events: their target is the build's id. */
+export const aboutBuild = (a: Activity) => a.action.startsWith('build.') || a.action.startsWith('artifact.')
 
 const CHANGES = ['server.', 'version.', 'library.', 'variant', 'duplicate']
 const ACCESS = ['signin', 'signout', 'identity.', 'token.', 'password.']
 
 function matches(filter: Filter, a: Activity): boolean {
-  if (filter === 'builds') return a.action.startsWith('build.') || a.action.startsWith('artifact.')
+  if (filter === 'builds') return aboutBuild(a)
   if (filter === 'changes') return CHANGES.some((p) => a.action.startsWith(p))
   if (filter === 'agents') return a.actorKind === 'agent' || a.actorKind === 'pipeline'
   if (filter === 'access') return ACCESS.some((p) => a.action.startsWith(p))
@@ -22,8 +26,8 @@ export function describe(a: Activity): string {
   const d = a.details ?? {}
   switch (a.action) {
     case 'server.create': return `created ${a.target}`
-    case 'version.create': return `added version ${d.version ?? ''} of ${a.target}`
-    case 'build.start': return `started a build of ${d.server ?? ''} version ${d.version ?? ''}`
+    case 'version.create': return `saved revision ${d.version ?? ''} of ${a.target}`
+    case 'build.start': return `started a build of ${d.server ?? ''} revision ${d.version ?? ''}`
     case 'build.finish': return a.outcome === 'ok' ? `finished build ${a.target}` : `build ${a.target} failed`
     case 'build.release': return `released build ${a.target}`
     case 'artifact.download': return `downloaded ${d.name ?? 'a file'} of build ${a.target}`
@@ -35,18 +39,23 @@ export function describe(a: Activity): string {
 
 export function ActivityPage() {
   const { id } = useParams()
-  const [filter, setFilter] = useState<Filter>('all')
+  const [params, setParams] = useSearchParams()
+  const filter = FILTERS.find((f) => f === params.get('show')) ?? 'all'
+  const build = params.get('build')
+  const setFilter = (f: Filter) => setParams(f === 'all' ? {} : { show: f }, { replace: true })
   const activity = useQuery({ queryKey: ['activity', id ?? ''], queryFn: () => api.activity({ server: id, limit: 200 }), refetchInterval: 10_000 })
-  const items = (activity.data?.items ?? []).filter((a) => matches(filter, a))
+  const items = (activity.data?.items ?? []).filter((a) => matches(filter, a) && (!build || a.target === build))
   return (
     <>
-      <PageHead title="Activity" sub={id ? 'Every change to this server and every build, by people, pipelines and agents.'
-        : 'Everything that happened on the platform, by people, pipelines and agents.'} />
+      <PageHead title="Activity" sub={id
+        ? <>Who changed this server, built or released it, and when. The packages themselves are on <Link to={`/servers/${id}/builds`}>Builds and releases</Link>.</>
+        : 'Who did what on the platform, and when: changes, builds, releases and sign-ins, by people, pipelines and agents.'} />
       <div className="body">
         <section className="col col-wide" aria-label="Timeline">
           <div className="card">
             <Segmented label="Show" value={filter} onChange={setFilter}
-              options={[['all', 'Everything'], ['builds', 'Builds'], ['changes', 'Changes'], ['agents', 'Agents'], ...(id ? [] : [['access', 'Access'] as [Filter, string]])]} />
+              options={[['all', 'All'], ['changes', 'Changes'], ['builds', 'Builds'], ...(id ? [] : [['access', 'Access'] as [Filter, string]]), ['agents', 'Agents']]} />
+            {build && <p className="hint">Only build <span className="mono">{build}</span>. <button type="button" className="how" onClick={() => setFilter(filter)}>Show everything</button></p>}
             <ErrorBox error={activity.error} />
             {activity.isLoading && <Loading what="activity" />}
             <ul className="timeline">
@@ -57,7 +66,8 @@ export function ActivityPage() {
                   </span>
                   <span style={{ minWidth: 0 }}>
                     <span><b>{a.actorKind === 'person' ? a.actor : `${a.actorKind}:${a.actor}`}</b> {describe(a)}</span><br />
-                    <span className="meta"><time dateTime={a.ts} title={a.ts}>{ago(a.ts)}</time> · {a.action}{a.outcome !== 'ok' ? ` · ${a.outcome}` : ''}</span>
+                    <span className="meta"><time dateTime={a.ts} title={a.ts}>{ago(a.ts)}</time> · {a.action}{a.outcome !== 'ok' ? ` · ${a.outcome}` : ''}
+                      {aboutBuild(a) && <> · <Link to={`/builds/${encodeURIComponent(a.target)}`}>Open the build</Link></>}</span>
                   </span>
                 </li>
               ))}

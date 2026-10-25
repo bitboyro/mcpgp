@@ -4,7 +4,7 @@ import { AccessControlPage } from './pages/AccessControl'
 import { ActivityPage } from './pages/Activity'
 import { AgentsPage } from './pages/Agents'
 import { ApiDefinitionsPage } from './pages/ApiDefinitions'
-import { AllBuildsPage, ServerBuildsPage } from './pages/Builds'
+import { AllBuildsPage, BuildRedirect, ServerBuildsPage } from './pages/Builds'
 import { ExecutionPage } from './pages/Execution'
 import { GeneralPage } from './pages/General'
 import { LibraryPage } from './pages/Library'
@@ -38,6 +38,7 @@ export function App() {
       <Route path="/" element={<Signed><ServersPage /></Signed>} />
       <Route path="/library" element={<Signed><LibraryPage /></Signed>} />
       <Route path="/builds" element={<Signed><AllBuildsPage /></Signed>} />
+      <Route path="/builds/:buildId" element={<Signed><BuildRedirect /></Signed>} />
       <Route path="/activity" element={<Signed><ActivityPage /></Signed>} />
       <Route path="/agents" element={<Signed><AgentsPage /></Signed>} />
       <Route path="/account" element={<Signed><AccountPage /></Signed>} />

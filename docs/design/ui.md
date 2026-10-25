@@ -80,9 +80,9 @@ Built into the platform jar and served by it (`WebUi`), on the API's own origin.
 | Execution | `/servers/:id/execution` | confirmations, response and request limits, batching, retained results, rate limits; always-on protections |
 | Observability | `/servers/:id/observability` | audit file, rotation, retention and arguments; log level; OpenTelemetry on/off, exporter, service name, signals; paths and endpoints read-only; health endpoints |
 | Packaging | `/servers/:id/packaging` | how agents connect (stdio, HTTP), formats, docs and contents as they ship |
-| Builds and releases | `/servers/:id/builds`, `/builds` | live log, downloads, package files, release, archive, restore, delete |
+| Builds and releases | `/servers/:id/builds`, `/builds`, `/builds/:buildId` | packages built from the server: live log, downloads, package files, release, archive, restore, delete; the build's own Activity entries, linking to the rest. `/builds/:buildId` opens a build on its server's page |
 | Changes | `/servers/:id/changes` | differences between versions |
-| Activity | `/servers/:id/activity`, `/activity` | timeline with filters; approvals |
+| Activity | `/servers/:id/activity`, `/activity` | who did what, and when: filters All, Changes, Builds, Access (platform-wide), Agents, kept in the address (`?show=builds`, `?build=<id>` for one build); build entries link to their build; approvals |
 | Shared library | `/library` | items by kind (adding them is API / CLI) |
 | API & agents | `/agents` | identities, tokens (shown once), guardrails, approvals, agent activity |
 

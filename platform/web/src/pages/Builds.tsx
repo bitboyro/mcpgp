@@ -1,9 +1,10 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, type Build } from '../api'
 import { useSession } from '../session'
 import { BuildChip, ErrorBox, Loading, PageHead, Segmented, ago, bytes, Icon } from '../ui'
+import { aboutBuild, describe } from './Activity'
 import { BuildButton } from './Overview'
 
 const running = (b?: Build) => b?.status === 'queued' || b?.status === 'running'
@@ -22,7 +23,7 @@ export function ServerBuildsPage() {
 
   return (
     <>
-      <PageHead title="Builds and releases" sub="Every package built for this server. Download, release, archive or delete them.">
+      <PageHead title="Builds and releases" sub={<>Packages built from this server, their files and release approvals. Who did what is in <Link to={`/servers/${id}/activity?show=builds`}>Activity</Link>.</>}>
         <BuildButton id={id} />
       </PageHead>
       <div className="body">
@@ -157,12 +158,39 @@ function BuildDetail({ id }: { id: string }) {
           </div>
         </div>
       )}
+      <BuildActivity build={b} />
       <div>
         <h3 style={{ marginBottom: 8 }}>Log</h3>
         <pre className="code" aria-label="Build log">{log.data ?? ''}</pre>
       </div>
     </>
   )
+}
+
+/** Who started, released, downloaded or archived this build: its entries in Activity. */
+function BuildActivity({ build }: { build: Build }) {
+  const activity = useQuery({ queryKey: ['activity', build.server], queryFn: () => api.activity({ server: build.server, limit: 200 }) })
+  const items = (activity.data?.items ?? []).filter((a) => aboutBuild(a) && a.target === build.id)
+  return (
+    <div className="stage-card" aria-label="Build activity">
+      <div className="card-head">
+        <h3>Activity</h3>
+        <Link to={`/servers/${build.server}/activity?show=builds&build=${encodeURIComponent(build.id)}`}>All of it in Activity</Link>
+      </div>
+      {items.slice(0, 5).map((a, i) => (
+        <span key={a.ts + i} className="meta">{a.actorKind === 'person' ? a.actor : `${a.actorKind}:${a.actor}`} {describe(a)} · <time dateTime={a.ts}>{ago(a.ts)}</time></span>
+      ))}
+      {activity.isSuccess && items.length === 0 && <span className="meta">Nothing recorded yet.</span>}
+    </div>
+  )
+}
+
+/** /builds/<id>: a build wherever it's linked from (platform-wide Activity), shown on its server's page. */
+export function BuildRedirect() {
+  const { buildId = '' } = useParams()
+  const build = useQuery({ queryKey: ['build', buildId], queryFn: () => api.build(buildId) })
+  if (build.data) return <Navigate to={`/servers/${encodeURIComponent(build.data.server)}/builds?build=${encodeURIComponent(build.data.id)}`} replace />
+  return <div className="body">{build.isLoading ? <Loading what="the build" /> : <ErrorBox error={build.error} />}</div>
 }
 
 export function AllBuildsPage() {
@@ -181,7 +209,7 @@ export function AllBuildsPage() {
                 <div key={b.id} className="build-row">
                   <Link to={`/servers/${b.server}/builds?build=${b.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                     <span className="v mono">{b.server}</span> <span className="v">{b.serverVersion ?? ''}</span><br />
-                    <span className="meta">by {b.startedBy} · {ago(b.created)} · definition version {b.version}</span>
+                    <span className="meta">by {b.startedBy} · {ago(b.created)} · revision {b.version}</span>
                   </Link>
                   <BuildChip build={b} />
                 </div>
