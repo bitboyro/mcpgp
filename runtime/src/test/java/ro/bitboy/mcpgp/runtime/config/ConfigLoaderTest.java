@@ -56,6 +56,33 @@ class ConfigLoaderTest {
     }
 
     @Test
+    void theBuildsAccessAndObservabilityDefaultsApplyUntilTheOperatorChangesThem(@TempDir Path dir) throws Exception {
+        // what the platform's Access control and Observability pages write into runtimeDefaults
+        com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+        com.fasterxml.jackson.databind.node.ObjectNode root = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(
+                REPO.resolve("conformance/cases/content-types/multipart-split/expected/manifest.json").toFile());
+        ((com.fasterxml.jackson.databind.node.ObjectNode) root.path("policies")).set("runtimeDefaults", json.readTree("""
+                { "telemetry": { "enabled": false, "signals": ["metrics"], "serviceName": "orders" },
+                  "configuration": { "sessions": { "enabled": true }, "logging": { "level": "warn" },
+                                     "server": { "auth": { "scopes": { "orders.read": { "access": "read-only" } } } } } }
+                """));
+        Manifest manifest = Manifest.of(root);
+        Path config = Files.writeString(dir.resolve("c.yaml"), "instance: { baseUrl: https://api.example.com }\n");
+        RuntimeConfig shipped = load(manifest, config, Map.of());
+        assertThat(shipped.logLevel()).isEqualTo("warn");
+        assertThat(shipped.document().at("/sessions/enabled").asBoolean()).isTrue();
+        assertThat(shipped.server().auth().at("/scopes/orders.read/access").asText()).isEqualTo("read-only");
+        assertThat(shipped.telemetry().path("signals").get(0).asText()).isEqualTo("metrics");
+        assertThat(shipped.telemetry().path("serviceName").asText()).isEqualTo("orders");
+
+        Files.writeString(config, "instance: { baseUrl: https://api.example.com }\nlogging: { level: debug }\nsessions: { enabled: false }\n");
+        RuntimeConfig changed = load(manifest, config, Map.of());
+        assertThat(changed.logLevel()).isEqualTo("debug");
+        assertThat(changed.document().at("/sessions/enabled").asBoolean()).isFalse();
+        assertThat(changed.server().auth().at("/scopes/orders.read/access").asText()).isEqualTo("read-only");
+    }
+
+    @Test
     void loadsTheMultiInstanceExample() {
         // the example's certificate files don't exist in the repo: real test material instead
         RuntimeConfig config = loader.load(ORDERS, new ConfigLoader.Options(Optional.of(REPO.resolve("examples/client/multi-instance/orders-mcp.yaml")),
