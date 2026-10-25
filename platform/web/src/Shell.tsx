@@ -124,6 +124,8 @@ export function Shell({ children }: { children: ReactNode }) {
               <Icon name="book" />API reference</NavLink>
             <Link to="/agents?connect" className={'nav-button' + (location.pathname === '/agents' && location.search.includes('connect') ? ' active' : '')}>
               <Icon name="zap" />Connect an agent</Link>
+            <NavLink to="/cli" className={({ isActive }) => 'nav-button' + (isActive ? ' active' : '')}>
+              <Icon name="terminal" />Command line</NavLink>
           </div>
           <div className="nav-who"><Link to="/account" title="Your account">{me.name}</Link><button type="button" onClick={signOut}>Sign out</button></div>
           <AboutLine build={settings.build} />

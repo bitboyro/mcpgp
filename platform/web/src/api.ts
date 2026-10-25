@@ -221,6 +221,9 @@ export interface Settings {
   guardrails: { agentBuildsPerHour: number; agentVersionsPerHour: number }
   /** The platform's own build: version, build time (not start time), commit when recorded, and the Java it runs on. */
   build?: { version: string | null; time: string | null; commit: string | null; java: string }
+  /** The CLI image matching this platform, when it knows its registry (published images do). */
+  cli?: { image: string | null }
+  publicUrl?: string
 }
 
 // The manifest (docs/spec/manifest.md): only the parts the UI shows are typed.

@@ -13,6 +13,7 @@ import { OverviewPage } from './pages/Overview'
 import { PackagingPage } from './pages/Packaging'
 import { AccountPage } from './pages/Passwords'
 import { ChangesPage } from './pages/Changes'
+import { CommandLinePage } from './pages/CommandLine'
 import { ServersPage } from './pages/Servers'
 import { SignInPage } from './pages/SignIn'
 import { TargetApisPage } from './pages/TargetApis'
@@ -41,6 +42,7 @@ export function App() {
       <Route path="/builds/:buildId" element={<Signed><BuildRedirect /></Signed>} />
       <Route path="/activity" element={<Signed><ActivityPage /></Signed>} />
       <Route path="/agents" element={<Signed><AgentsPage /></Signed>} />
+      <Route path="/cli" element={<Signed><CommandLinePage /></Signed>} />
       <Route path="/account" element={<Signed><AccountPage /></Signed>} />
       <Route path="/servers/:id" element={<Signed><OverviewPage /></Signed>} />
       <Route path="/servers/:id/general" element={<Signed><GeneralPage /></Signed>} />

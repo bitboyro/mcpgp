@@ -6,6 +6,10 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- A **Command line** page in the platform (sidebar footer, and linked from Packaging → Pipeline): the CLI
+  that matches this platform's version, as the CI image (named from the platform's own image, or
+  `MCPGP_CLI_IMAGE`), the zip and the jar on the release page; how to use it; and how `mcpgp push` sends a
+  definition to this platform with a pipeline token. `GET /settings` returns `cli.image` and `publicUrl`.
 - The platform shows its release version and build date at the bottom of the sidebar, with an About panel
   (build time, commit, Java version). The build time is when the artifact was built, not when it started;
   `GET /settings` returns the same as `build`. Published images record their commit; for your own image

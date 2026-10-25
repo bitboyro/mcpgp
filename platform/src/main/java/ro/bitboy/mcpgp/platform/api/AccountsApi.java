@@ -117,6 +117,10 @@ public class AccountsApi {
         body.put("retention", config.retention());
         body.put("guardrails", config.guardrails());
         body.put("build", ro.bitboy.mcpgp.platform.service.BuildInfo.current().asMap());
+        Map<String, Object> cli = new LinkedHashMap<>();
+        cli.put("image", ro.bitboy.mcpgp.platform.service.BuildInfo.cliImage(System.getenv()));
+        body.put("cli", cli);
+        body.put("publicUrl", config.publicUrl());
         return Json.ok(body);
     }
 

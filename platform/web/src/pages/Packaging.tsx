@@ -122,7 +122,8 @@ export function PackagingPage() {
                 <>
                   <div className="eyebrow">The same build in a pipeline</div>
                   <pre className="code">{[`mcpgp validate ${root}`, `mcpgp test ${root}`, `mcpgp build ${root} --frozen-lock`].join('\n')}</pre>
-                  <p className="hint">Or let the platform build it: push the definition from CI with a pipeline token.</p>
+                  <p className="hint"><span className="mono">mcpgp</span> is the command-line tool. Or let the platform build it: push the definition
+                    from CI with a pipeline token. <Link to="/cli">Get the CLI and connect it to this platform</Link>.</p>
                   <pre className="code">{`MCPGP_PLATFORM=${window.location.origin} MCPGP_TOKEN=… \\\n  mcpgp push ${root} --build --verify-local`}</pre>
                 </>
               )}

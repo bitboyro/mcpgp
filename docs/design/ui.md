@@ -35,7 +35,7 @@ Type (0.4.0): body 16px / 1.6, labels, hints and tables 14px, card headings 17px
 (`--text-*` tokens in `styles.css`). Page background `#F7F8FA`, dividers `#ECEEF2`. Icons: Lucide
 (`lucide-react`, ISC), one name per meaning in `ui.tsx`, in front of the label on main actions; the
 mcpgp mark stays our own. The sidebar footer has two labelled buttons: **API reference** (the API and
-agents page) and **Connect an agent**. Under the account row: `mcpgp <version> · built <date>`, opening
+agents page), **Connect an agent** and **Command line**. Under the account row: `mcpgp <version> · built <date>`, opening
 an About panel (version, build time, commit, Java). The build time is the artifact's, from
 `META-INF/build-info.properties`, never the start time; the commit comes from `-Dmcpgp.commit` (CI and
 the image build pass it) and shows as "not recorded" otherwise.
@@ -84,7 +84,8 @@ Built into the platform jar and served by it (`WebUi`), on the API's own origin.
 | Changes | `/servers/:id/changes` | differences between versions |
 | Activity | `/servers/:id/activity`, `/activity` | who did what, and when: filters All, Changes, Builds, Access (platform-wide), Agents, kept in the address (`?show=builds`, `?build=<id>` for one build); build entries link to their build; approvals |
 | Shared library | `/library` | items by kind (adding them is API / CLI) |
-| API & agents | `/agents` | identities, tokens (shown once), guardrails, approvals, agent activity |
+| API and agents | `/agents` | identities, tokens (shown once), guardrails, approvals, agent activity |
+| Command line | `/cli` | where to get the CLI matching this platform (CI image, zip, jar on the release page), how to use it, and `mcpgp push` to this platform with a pipeline token |
 
 The old server routes `/sources`, `/connections`, `/safety` and `/package` redirect to
 `/apis`, `/targets`, `/execution` and `/packaging`, keeping the query string.

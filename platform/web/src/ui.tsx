@@ -2,7 +2,7 @@ import { useId, useState, type ReactNode } from 'react'
 import {
   Activity, BookOpen, Check, Code, Copy, Download, ExternalLink, Eye, FileCode, Folder, GitCompare, HeartPulse, Home, Info, Library,
   LayoutDashboard, ListChecks, Lock, Package, PackageCheck, Play, Plug, Plus, RefreshCw, Rocket, Save, SlidersHorizontal, Trash2, Undo2,
-  Upload, Wrench, X, Zap, type LucideIcon,
+  SquareTerminal, Upload, Wrench, X, Zap, type LucideIcon,
 } from 'lucide-react'
 import { ApiError, type Build } from './api'
 
@@ -12,7 +12,7 @@ const ICONS = {
   connections: Plug, sources: Folder, package: Package, deliver: Download, close: X, changes: GitCompare, overview: LayoutDashboard,
   general: Info, info: Info, definition: FileCode, lock: Lock, pulse: HeartPulse,
   save: Save, upload: Upload, download: Download, eye: Eye, play: Play, trash: Trash2, undo: Undo2, plus: Plus, check: Check,
-  zap: Zap, book: BookOpen, refresh: RefreshCw, copy: Copy, external: ExternalLink, rocket: Rocket, checks: ListChecks,
+  zap: Zap, book: BookOpen, refresh: RefreshCw, copy: Copy, external: ExternalLink, rocket: Rocket, checks: ListChecks, terminal: SquareTerminal,
 } satisfies Record<string, LucideIcon>
 
 export type IconName = keyof typeof ICONS | 'mark'

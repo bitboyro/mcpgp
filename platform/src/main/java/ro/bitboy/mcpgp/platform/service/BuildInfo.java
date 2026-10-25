@@ -37,6 +37,21 @@ public record BuildInfo(String version, String time, String commit) {
         return value == null || value.isBlank() ? null : value;
     }
 
+    /**
+     * The CLI image that matches this platform, for the Command line page: {@code MCPGP_CLI_IMAGE} when set,
+     * else the published platform image's sibling ({@code docker.io/acme/mcpgp-platform:0.4.0} →
+     * {@code docker.io/acme/mcpgp-cli:0.4.0}); null for a platform built locally, which knows no registry.
+     */
+    public static String cliImage(java.util.Map<String, String> env) {
+        String set = env.get("MCPGP_CLI_IMAGE");
+        if (set != null && !set.isBlank()) {
+            return set.strip();
+        }
+        String platform = env.getOrDefault("MCPGP_PLATFORM_IMAGE", "");
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(.+/)mcpgp-platform(:[^/]+)?$").matcher(platform.strip());
+        return m.matches() ? m.group(1) + "mcpgp-cli" + (m.group(2) == null ? "" : m.group(2)) : null;
+    }
+
     /** For the settings endpoint: what's recorded, plus the Java runtime it runs on now. */
     public Map<String, Object> asMap() {
         Map<String, Object> map = new LinkedHashMap<>();
