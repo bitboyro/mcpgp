@@ -52,7 +52,7 @@ class CredentialsFromRequestTest {
     Path manifest(boolean enabled) throws Exception {
         ObjectNode manifest = (ObjectNode) JSON.readTree(REPO.resolve("examples/manifest/orders-mcp.manifest.json").toFile());
         if (enabled) {
-            ((ObjectNode) manifest.at("/apis/0/downstreamAuth")).putObject("fromRequest");
+            ((ObjectNode) manifest.at("/apis/0/upstreamAuth")).putObject("fromRequest");
         }
         Path file = dir.resolve("orders-mcp.manifest.json");
         JSON.writeValue(file.toFile(), manifest);
@@ -125,7 +125,7 @@ class CredentialsFromRequestTest {
         // the next request without the header: nothing was kept from the one before
         JsonNode missing = call(session, "prod-eu", Map.of());
         assertThat(missing.at("/result/isError").asBoolean()).isTrue();
-        assertThat(missing.toString()).contains("AUTH_DOWNSTREAM").contains("X-Orders-Authorization");
+        assertThat(missing.toString()).contains("AUTH_UPSTREAM").contains("X-Orders-Authorization");
 
         // each instance reads its own header: prod's credential never reaches test
         int before = target.received.size();

@@ -100,14 +100,14 @@ class YamlEditTest {
         String edited = YamlEdit.apply(readonly, List.of(
                 set("/packs/diagnostics", "null"),
                 set("/safety/confirmDestructive", "false"),
-                set("/apis/[id=orders]/downstreamAuth/supported", "[\"basic\"]"),
+                set("/apis/[id=orders]/upstreamAuth/supported", "[\"basic\"]"),
                 set("/apis/[id=billing]/select/access", "\"read-only\"")));
         JsonNode data = YAML.readTree(edited);
         assertThat(data.at("/packs").has("diagnostics")).isTrue();
         assertThat(data.at("/packs/diagnostics").isNull()).isTrue();
         assertThat(data.at("/safety/confirmDestructive").asBoolean(true)).isFalse();
         assertThat(data.at("/apis/0/select/access").asText()).isEqualTo("read-only");
-        assertThat(data.at("/apis/0/downstreamAuth/supported/0").asText()).isEqualTo("basic");
+        assertThat(data.at("/apis/0/upstreamAuth/supported/0").asText()).isEqualTo("basic");
         assertThat(data.at("/apis/1/id").asText()).isEqualTo("billing");
         assertThat(edited).contains("extends: mcpgp://acme/servers/orders-mcp@latest   # CLI: --workspace ../workspace")
                 .contains("  - { id: billing, select: { access: read-only } }");
@@ -165,5 +165,24 @@ class YamlEditTest {
         assertThat(at(notices, "/descriptions/notices/0/text").asText()).isEqualTo("Audited.");
         String none = YamlEdit.apply(notices, List.of(new Change("remove", "/descriptions/notices/[id=policy]", null)));
         assertThat(at(none, "/descriptions/notices").size()).isZero();
+    }
+
+    @Test
+    void anUpstreamAuthEditGoesToTheNameBefore040WhenTheFileStillUsesIt() throws Exception {
+        String old = """
+                apiVersion: mcpgp/v1
+                apis:
+                  - id: orders
+                    downstreamAuth: { supported: [bearer] }   # kept
+                """;
+        String edited = YamlEdit.apply(old, List.of(set("/apis/[id=orders]/upstreamAuth/fromRequest", "{}")));
+        JsonNode data = YAML.readTree(edited);
+        assertThat(data.at("/apis/0").has("upstreamAuth")).isFalse();
+        assertThat(data.at("/apis/0/downstreamAuth/fromRequest").isObject()).isTrue();
+        assertThat(edited).contains("# kept");
+
+        String fresh = YamlEdit.apply("apiVersion: mcpgp/v1\napis:\n  - id: orders\n",
+                List.of(set("/apis/[id=orders]/upstreamAuth/fromRequest", "{}")));
+        assertThat(YAML.readTree(fresh).at("/apis/0/upstreamAuth/fromRequest").isObject()).isTrue();
     }
 }

@@ -27,6 +27,16 @@ public final class Manifest {
     /** One API of the server: its id, title and contracts. */
     public record Api(String id, String title, String toolPrefix, Map<String, Contract> contracts, String defaultContract,
                       List<String> supportedAuth, JsonNode node) {
+
+        /** How the server signs in to this API; read from {@code downstreamAuth} in manifests built before 0.4.0. */
+        public JsonNode upstreamAuth() {
+            return Manifest.upstreamAuth(node);
+        }
+    }
+
+    /** An API entry's {@code upstreamAuth}, or its {@code downstreamAuth} in a manifest built before 0.4.0. */
+    public static JsonNode upstreamAuth(JsonNode api) {
+        return api.has("upstreamAuth") ? api.path("upstreamAuth") : api.path("downstreamAuth");
     }
 
     public record Contract(String version, String format, String basePath, boolean isDefault) {
@@ -52,7 +62,7 @@ public final class Manifest {
                 }
             }
             List<String> auth = new ArrayList<>();
-            api.path("downstreamAuth").path("supported").forEach(a -> auth.add(a.asText()));
+            upstreamAuth(api).path("supported").forEach(a -> auth.add(a.asText()));
             String id = api.path("id").asText();
             apis.put(id, new Api(id, api.path("title").asText(id), api.path("toolPrefix").asText(id), contracts,
                     defaultContract, List.copyOf(auth), api));

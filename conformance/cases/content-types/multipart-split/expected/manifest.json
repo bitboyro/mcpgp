@@ -10,9 +10,6 @@
           "version": "2.0"
         }
       ],
-      "downstreamAuth": {
-        "supported": [ ]
-      },
       "id": "orders",
       "pagination": null,
       "requestBody": {
@@ -23,7 +20,10 @@
           "multipart/form-data": "multipart"
         }
       },
-      "toolPrefix": "orders"
+      "toolPrefix": "orders",
+      "upstreamAuth": {
+        "supported": [ ]
+      }
     }
   ],
   "build": {

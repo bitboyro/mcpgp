@@ -151,6 +151,11 @@ public final class ConfigLoader {
         Map<String, List<RuntimeConfig.Instance>> instances = instances(manifest, resolved, baseDir, problems, warnings);
         credentialHeaders(instances, server, problems, warnings);
         ToolPolicy.validate(manifest, resolved, instances, problems, warnings);
+        if (!identity.path("scopes").isEmpty() && !(server.transport().equals("http") && server.authMode().equals("oauth"))) {
+            warnings.add("identity policy: its scopes section doesn't apply here, because callers of this server sign in "
+                    + (server.transport().equals("stdio") ? "over stdio" : "with " + server.authMode()) + ", not OAuth;"
+                    + " default and subjects govern them");
+        }
         management(resolved, server, file, problems);
         TrustedPolicies.enforce(organization, server, instances, resolved, manifest.policies().path("rateLimits"), problems);
         RuntimeConfig.Files files = files(manifest, resolved.path("files"), storage, baseDir, problems);
@@ -459,8 +464,8 @@ public final class ConfigLoader {
                 } else {
                     entries.add(auth);
                 }
-                JsonNode fromRequest = api.node().path("downstreamAuth").path("fromRequest");
-                boolean exchange = api.node().path("downstreamAuth").path("tokenExchange").isObject();
+                JsonNode fromRequest = api.upstreamAuth().path("fromRequest");
+                boolean exchange = api.upstreamAuth().path("tokenExchange").isObject();
                 for (int e = 0; e < entries.size(); e++) {
                     JsonNode entry = entries.get(e);
                     String at2 = where + "/auth" + (auth.isArray() ? "/" + e : "");
@@ -468,7 +473,7 @@ public final class ConfigLoader {
                     if (authType.equals("fromRequest")) {
                         if (!fromRequest.isObject()) {
                             problems.add(at2 + "/type: credentials from the request are not enabled in this server's definition"
-                                    + " (downstreamAuth.fromRequest)");
+                                    + " (upstreamAuth.fromRequest)");
                         } else if (!entry.has("header")) {
                             ((ObjectNode) entry).put("header", fromRequest.has("header") && !multi && manifest.apis().size() == 1
                                     ? fromRequest.get("header").asText()
@@ -477,7 +482,7 @@ public final class ConfigLoader {
                     } else if (authType.equals("tokenExchange")) {
                         if (!exchange) {
                             problems.add(at2 + "/type: calling the API as the signed-in user is not enabled in this server's definition"
-                                    + " (downstreamAuth.tokenExchange)");
+                                    + " (upstreamAuth.tokenExchange)");
                         }
                     } else if (!authType.equals("none") && !api.supportedAuth().contains(authType)) {
                         problems.add(at2 + "/type: '" + authType + "' is not supported by this server (supported: "

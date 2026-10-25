@@ -13,7 +13,7 @@
 | [spec/runtime-config.md](spec/runtime-config.md) | You write or parse the customer's runtime config. |
 | [spec/layered-runtime-policy.md](spec/layered-runtime-policy.md) | You implement layered tool restrictions, live policy updates or configuration templates (implementation status and remaining stages). |
 | [spec/runtime-policy-management.md](spec/runtime-policy-management.md) | You administer runtime tool policies through authenticated preview/apply transactions. |
-| [spec/auth.md](spec/auth.md) | You touch inbound or downstream authentication. |
+| [spec/auth.md](spec/auth.md) | You touch inbound or upstream authentication. |
 | [spec/tools-contract.md](spec/tools-contract.md) | You need to know exactly what an agent receives. |
 | [spec/audit-and-errors.md](spec/audit-and-errors.md) | You emit audit events, errors or telemetry. |
 | [spec/packaging.md](spec/packaging.md) | You build or deliver packages, or register clients. |
@@ -32,6 +32,7 @@
 | [design/ui.md](design/ui.md) | You work on the web UI. |
 | [process/development.md](process/development.md) | Before your first change. |
 | [process/roadmap.md](process/roadmap.md) | You want to know what comes next. |
+| [process/release-0.4.0.md](process/release-0.4.0.md) | You need the agreed 0.4.0 scope, acceptance checkpoints and explicit deferrals. |
 | [process/release-gate.md](process/release-gate.md) | You are working on the release gate. |
 | [process/feature-matrix.md](process/feature-matrix.md) | You need every feature, its settings and what tests it. |
 

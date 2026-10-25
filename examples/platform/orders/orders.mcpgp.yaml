@@ -30,7 +30,7 @@ apis:
         - { tag: [users-roles, system] }
         - { path: "/internal/**" }
       deprecated: hide
-    downstreamAuth:
+    upstreamAuth:
       supported: [basic, apiKey, oauth2ClientCredentials, mtls]
       identity: service-account
       unsatisfiedTools: hide

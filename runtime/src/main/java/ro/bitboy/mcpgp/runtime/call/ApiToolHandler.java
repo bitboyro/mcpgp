@@ -50,7 +50,7 @@ public final class ApiToolHandler implements ToolHandler {
         this.requests = new RequestBuilder(new FileInputs(config.files()));
         Map<String, JsonNode> apiKeys = new LinkedHashMap<>();
         manifest.apis().forEach((id, api) -> {
-            JsonNode placement = api.node().path("downstreamAuth").path("apiKey");
+            JsonNode placement = api.upstreamAuth().path("apiKey");
             if (placement.isObject()) {
                 apiKeys.put(id, placement);
             }
@@ -88,7 +88,7 @@ public final class ApiToolHandler implements ToolHandler {
         if (variant == null || instance.readOnly() && !tool.at("/annotations/readOnlyHint").asBoolean(false))
             throw new ToolError("NOT_AVAILABLE_ON_INSTANCE", "Operation is unavailable on " + instance.id());
         boolean publicOperation = variant.path("security").isArray() && variant.path("security").isEmpty();
-        Upstream.credential(instance, credentials, publicOperation, variant.get("security"), api.node().path("downstreamAuth").path("schemes"));
+        Upstream.credential(instance, credentials, publicOperation, variant.get("security"), api.upstreamAuth().path("schemes"));
         validator.validate(tool, JSON.valueToTree(arguments), contract, instance.id());
         requests.build(variant, JSON.valueToTree(arguments), BaseUrl.resolve(instance.baseUrl(), api.contracts().get(contract).basePath()), new CallRecord());
     }
@@ -181,7 +181,7 @@ public final class ApiToolHandler implements ToolHandler {
             // security: [] marks a public operation: no credentials (auth.md §2.2)
             boolean publicOperation = variant.path("security").isArray() && variant.path("security").isEmpty();
             Upstream.Credential credential = Upstream.credential(instance, credentials, publicOperation, variant.get("security"),
-                    api.node().path("downstreamAuth").path("schemes"));
+                    api.upstreamAuth().path("schemes"));
             record.auth = credential.type().equals("none") ? null : credential.type();
             HttpResponse<byte[]> response;
             Recordings.RuntimeConfig_Instance recorded = new Recordings.RuntimeConfig_Instance(instance.api(), instance.id());

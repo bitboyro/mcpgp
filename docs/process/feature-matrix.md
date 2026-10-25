@@ -46,7 +46,7 @@ feature, which is not the same as covering every value.
 | F18 | Hidden per rule | D | `overrides.rules[].hidden` | Tool removed after naming | ✅ | — | Hidden tool unreachable directly and through discovery |
 | F19a | Layered runtime tool policy | R | `tools.allow/deny`, `apis.<id>.tools`, `instance(s).tools`; `policy` command | Intersect permissions, filter catalogs, enforce selected instance, reload live | ✅ organization/deployment/API/instance/identity/session; see policy specs | ToolPolicyTest, ReloadTest | Inheritance, deny wins, no helper bypass, stale config rejected, stdio/HTTP |
 | F19b | Policy management API | R | `server.management.enabled/keys/port`; `/management/v1/config`, `/preview`, `/apply` | Separate administrator credentials, bounded previews, revision checks, persist-before-publication | ✅ registered policy and ordinary-setting subset; see runtime-policy-management.md | PolicyManagementTest | Separate auth, port/origin restrictions, no preview side effects, stale/competing previews, persistence failures, secret-reference recovery |
-| F19 | Unsatisfiable tools | D | `downstreamAuth.unsatisfiedTools`: `hide` · `error` | Tools no instance's credentials can call: hidden or explained | ✅ | UnsatisfiedToolsTest | Both values |
+| F19 | Unsatisfiable tools | D | `upstreamAuth.unsatisfiedTools`: `hide` · `error` | Tools no instance's credentials can call: hidden or explained | ✅ | UnsatisfiedToolsTest | Both values |
 
 ## 3. Names, descriptions and shapes
 
@@ -92,11 +92,11 @@ feature, which is not the same as covering every value.
 
 | ID | Feature | Set in | Settings → values | What changes | Code | Tests today | Gate must verify |
 |---|---|---|---|---|---|---|---|
-| F45 | Auth types offered | D | `downstreamAuth.supported`: `basic`, `apiKey`, `bearer`, `oauth2ClientCredentials`, `mtls`, …; per-operation `security` | Which credential types the operator may configure; public operations send none | ✅ | conformance public-operation | A type the build doesn't support refuses to start |
+| F45 | Auth types offered | D | `upstreamAuth.supported`: `basic`, `apiKey`, `bearer`, `oauth2ClientCredentials`, `mtls`, …; per-operation `security` | Which credential types the operator may configure; public operations send none | ✅ | conformance public-operation | A type the build doesn't support refuses to start |
 | F46 | Static credentials | R | `auth.type` `basic` (`username`, `password`), `bearer` (`token`), `apiKey` (`value`; header/query from the contract) | Header or query sent | ✅ | ApiCallTest | Each type; secrets never in results |
 | F47 | OAuth client credentials | R | `tokenUrl`, `clientId`, `clientSecret`, `clientAuth` `basic`·`post`, `scopes`, `audience`, `resource` | Token fetched, cached, shared, refreshed once on 401 | ✅ | TlsAndOAuthTest | Both `clientAuth`; one token under concurrency; one retry |
-| F48 | Credential from the request | D + R | D `downstreamAuth.fromRequest.header`; R `auth[]` entry `fromRequest` with `header`, `as` | HTTP clients send a per-user credential, forwarded and never stored | ✅ | CredentialsFromRequestTest | Present, absent (falls to next entry), stdio (ignored) |
-| F49 | Token exchange (per user) | D + R | D `downstreamAuth.tokenExchange`, `identity` `service-account`·`per-user`; R `flavor` `rfc8693`·`entra-obo` | Signed-in user's token exchanged for one for the API | ✅ | TokenExchangeTest | Both flavors; exchange failure; cache per user |
+| F48 | Credential from the request | D + R | D `upstreamAuth.fromRequest.header`; R `auth[]` entry `fromRequest` with `header`, `as` | HTTP clients send a per-user credential, forwarded and never stored | ✅ | CredentialsFromRequestTest | Present, absent (falls to next entry), stdio (ignored) |
+| F49 | Token exchange (per user) | D + R | D `upstreamAuth.tokenExchange`, `identity` `service-account`·`per-user`; R `flavor` `rfc8693`·`entra-obo` | Signed-in user's token exchanged for one for the API | ✅ | TokenExchangeTest | Both flavors; exchange failure; cache per user |
 | F50 | Credential lists | R | `auth: [ … ]` tried in order | First usable entry wins | ✅ | CredentialsFromRequestTest | Order permutations |
 | F51 | Instance TLS | R | `tls.ca.{path, base64}`, `tls.trust` `ca-only`·`ca-and-system`·`system`, `clientCert`/`clientKey` (`path`·`base64`), `password`, `insecureSkipHostnameVerify` | Own truststore, mTLS, hostname-only relaxation | ✅ | TlsAndOAuthTest | Each trust mode with a matching and a wrong CA; mTLS; rotation of `path` files |
 | F52 | Trust on first use | R | `<server> instance trust <id>` (`--base64`, `--yes`) | Saves the target's certificate after confirmation | ✅ | ServerCommandsTest | Then a call succeeds |

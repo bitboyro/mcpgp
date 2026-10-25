@@ -596,13 +596,13 @@
           "description": "One credential, or a list tried in order: a fromRequest entry when its header is in the request, any other entry always",
           "oneOf": [
             {
-              "$ref": "#/$defs/downstreamAuth"
+              "$ref": "#/$defs/upstreamAuth"
             },
             {
               "type": "array",
               "minItems": 1,
               "items": {
-                "$ref": "#/$defs/downstreamAuth"
+                "$ref": "#/$defs/upstreamAuth"
               }
             }
           ]
@@ -641,7 +641,7 @@
       ],
       "additionalProperties": false
     },
-    "downstreamAuth": {
+    "upstreamAuth": {
       "type": "object",
       "required": [
         "type"

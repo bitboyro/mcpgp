@@ -64,7 +64,7 @@ build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `auth
 | `TOOLSET_DISABLED` | toolsets mode: the tool's toolsets are not enabled for this session | `isError` |
 | `CONFIRMATION_REQUIRED` | destructive tool needs confirmation | `isError` + `confirm` token |
 | `AUTH_INBOUND` | client not allowed | JSON-RPC / HTTP 401/403 |
-| `AUTH_DOWNSTREAM` | target server rejected credentials or scope | `isError` |
+| `AUTH_UPSTREAM` | target server rejected credentials or scope; also a credential that can't satisfy the operation, or a failed token request or exchange (named `AUTH_DOWNSTREAM` before 0.4.0) | `isError` |
 | `UPSTREAM_4XX` | target returned 4xx (other than auth) | `isError`, status + safe message |
 | `UPSTREAM_5XX` | target returned 5xx | `isError` |
 | `UPSTREAM_TIMEOUT` | no response within timeout | `isError` |

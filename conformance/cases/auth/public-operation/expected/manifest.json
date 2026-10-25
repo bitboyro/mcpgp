@@ -10,14 +10,6 @@
           "version": "1.0"
         }
       ],
-      "downstreamAuth": {
-        "schemes": {
-          "basicAuth": "basic"
-        },
-        "supported": [
-          "basic"
-        ]
-      },
       "id": "status",
       "pagination": null,
       "requestBody": {
@@ -28,14 +20,22 @@
           "multipart/form-data": "multipart"
         }
       },
-      "toolPrefix": "status"
+      "toolPrefix": "status",
+      "upstreamAuth": {
+        "schemes": {
+          "basicAuth": "basic"
+        },
+        "supported": [
+          "basic"
+        ]
+      }
     }
   ],
   "build": {
     "cli": "0.0.0",
     "createdAt": "1970-01-01T00:00:00Z",
     "definition": {
-      "digest": "sha256:ce40c139b778c5fc635576a7d11fb5d7b5ea06d9f9000aacf99cc3ab85c86e04",
+      "digest": "sha256:a1b965c465e82ba7e27828fb4637b5eead40facb4e58bbf34b54cf46f57a09cb",
       "name": "status-mcp"
     },
     "extends": null,

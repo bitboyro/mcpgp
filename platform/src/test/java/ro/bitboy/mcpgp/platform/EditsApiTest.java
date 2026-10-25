@@ -55,15 +55,15 @@ class EditsApiTest extends PlatformTestBase {
     void clientsCredentialsAreTurnedOnAndOffFromConnections() throws Exception {
         int base = latest().path("latestVersion").asInt();
         HttpResponseLike on = save(Map.of("base", base, "changes",
-                List.of(set("/apis/[id=orders]/downstreamAuth/fromRequest", Map.of("header", "X-Orders-Authorization")))));
+                List.of(set("/apis/[id=orders]/upstreamAuth/fromRequest", Map.of("header", "X-Orders-Authorization")))));
         assertThat(on.status()).as(on.body().toString()).isEqualTo(201);
         JsonNode manifest = json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null)));
-        assertThat(manifest.at("/apis/0/downstreamAuth/fromRequest/header").asText()).isEqualTo("X-Orders-Authorization");
+        assertThat(manifest.at("/apis/0/upstreamAuth/fromRequest/header").asText()).isEqualTo("X-Orders-Authorization");
 
         HttpResponseLike off = save(Map.of("base", base + 1, "changes",
-                List.of(Map.of("op", "remove", "path", "/apis/[id=orders]/downstreamAuth/fromRequest"))));
+                List.of(Map.of("op", "remove", "path", "/apis/[id=orders]/upstreamAuth/fromRequest"))));
         assertThat(off.status()).as(off.body().toString()).isEqualTo(201);
-        assertThat(json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null))).at("/apis/0/downstreamAuth")
+        assertThat(json(send(bearer("GET", "/api/v1/servers/orders-mcp/versions/latest/manifest", null))).at("/apis/0/upstreamAuth")
                 .has("fromRequest")).isFalse();
     }
 

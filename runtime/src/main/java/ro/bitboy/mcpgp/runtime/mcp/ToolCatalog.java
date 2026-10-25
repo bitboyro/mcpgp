@@ -65,7 +65,7 @@ public final class ToolCatalog {
     /**
      * Tools no instance's credentials can call (auth.md §2.2), with {@code unsatisfiedTools: hide} (the
      * default): not listed, not callable. A tool one instance can call stays, and calls for the others
-     * answer AUTH_DOWNSTREAM saying what's missing; with {@code error}, every tool stays.
+     * answer AUTH_UPSTREAM saying what's missing; with {@code error}, every tool stays.
      */
     private void hideUnsatisfied(RuntimeConfig config) {
         Map<String, List<String>> hidden = new java.util.TreeMap<>();
@@ -73,10 +73,10 @@ public final class ToolCatalog {
         for (Map.Entry<String, JsonNode> e : List.copyOf(tools.entrySet())) {
             JsonNode tool = e.getValue();
             Manifest.Api api = tool.path("kind").asText().equals("api") ? manifest.apis().get(tool.path("api").asText()) : null;
-            if (api == null || !api.node().path("downstreamAuth").path("unsatisfiedTools").asText("hide").equals("hide")) {
+            if (api == null || !api.upstreamAuth().path("unsatisfiedTools").asText("hide").equals("hide")) {
                 continue;
             }
-            JsonNode kinds = api.node().path("downstreamAuth").path("schemes");
+            JsonNode kinds = api.upstreamAuth().path("schemes");
             List<String> reasons = new ArrayList<>();
             boolean usable = false;
             for (RuntimeConfig.Instance instance : policy.allowedInstances(tool)) {
@@ -106,7 +106,7 @@ public final class ToolCatalog {
         }
         if (!hidden.isEmpty()) {
             org.slf4j.LoggerFactory.getLogger(ToolCatalog.class).warn("{} tool(s) hidden: no instance's credentials can call them"
-                    + " (downstreamAuth.unsatisfiedTools: hide): {}", hidden.size(), hidden);
+                    + " (upstreamAuth.unsatisfiedTools: hide): {}", hidden.size(), hidden);
             this.hidden.putAll(hidden);
         }
     }

@@ -10,17 +10,6 @@
           "version": "2.0"
         }
       ],
-      "downstreamAuth": {
-        "schemes": {
-          "apiKey": "apiKey",
-          "basicAuth": "basic",
-          "oauth": "oauth2ClientCredentials"
-        },
-        "supported": [
-          "basic",
-          "oauth2ClientCredentials"
-        ]
-      },
       "id": "orders",
       "pagination": null,
       "requestBody": {
@@ -31,7 +20,18 @@
           "multipart/form-data": "multipart"
         }
       },
-      "toolPrefix": "orders"
+      "toolPrefix": "orders",
+      "upstreamAuth": {
+        "schemes": {
+          "apiKey": "apiKey",
+          "basicAuth": "basic",
+          "oauth": "oauth2ClientCredentials"
+        },
+        "supported": [
+          "basic",
+          "oauth2ClientCredentials"
+        ]
+      }
     },
     {
       "contracts": [
@@ -43,16 +43,6 @@
           "version": "3"
         }
       ],
-      "downstreamAuth": {
-        "schemes": {
-          "basicAuth": "basic",
-          "bearerAuth": "bearer"
-        },
-        "supported": [
-          "basic",
-          "bearer"
-        ]
-      },
       "id": "tickets",
       "pagination": null,
       "requestBody": {
@@ -64,7 +54,17 @@
         }
       },
       "title": "Example Tickets API",
-      "toolPrefix": "tickets"
+      "toolPrefix": "tickets",
+      "upstreamAuth": {
+        "schemes": {
+          "basicAuth": "basic",
+          "bearerAuth": "bearer"
+        },
+        "supported": [
+          "basic",
+          "bearer"
+        ]
+      }
     },
     {
       "contracts": [
@@ -76,14 +76,6 @@
           "version": "2024-09-01"
         }
       ],
-      "downstreamAuth": {
-        "schemes": {
-          "oauth": "oauth2ClientCredentials"
-        },
-        "supported": [
-          "oauth2ClientCredentials"
-        ]
-      },
       "id": "monitoring",
       "pagination": null,
       "requestBody": {
@@ -95,14 +87,22 @@
         }
       },
       "title": "Example Monitoring API",
-      "toolPrefix": "monitoring"
+      "toolPrefix": "monitoring",
+      "upstreamAuth": {
+        "schemes": {
+          "oauth": "oauth2ClientCredentials"
+        },
+        "supported": [
+          "oauth2ClientCredentials"
+        ]
+      }
     }
   ],
   "build": {
     "cli": "0.1.0",
     "createdAt": "2026-10-10T12:00:00Z",
     "definition": {
-      "digest": "sha256:12bfccd17b2ba50180424e1aaac55d788b505d7e0a6b31b961d2b849f4bb3b8c",
+      "digest": "sha256:03b87a31f1e247b24f261d43568a925683b4206a8a4988ddfa58a20d996b63a2",
       "name": "ops-assistant"
     },
     "extends": null,

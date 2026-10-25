@@ -40,7 +40,7 @@
 | **Multi-instance build** | Several target servers; every tool requires an `instance` parameter. No default. |
 | **Contract selection** | Per instance: `auto` (detect at startup) or a pinned version (`"1.0"`). |
 | **Inbound auth** | Client → MCP server: `none`, `static` (API key), `oauth` (OAuth 2.1 resource server). |
-| **Downstream auth** | MCP server → target server: one type per instance, chosen from the types the build supports. |
+| **Upstream auth** | MCP server → target server: one type per instance, chosen from the types the build supports (`apis[].upstreamAuth`; `downstreamAuth` before 0.4.0). |
 | **Audit file** | JSON Lines file of audit events written by the server. See [spec/audit-and-errors.md](spec/audit-and-errors.md). |
 | **Telemetry** | OpenTelemetry (OTLP push), off by default. Never includes tool arguments. |
 

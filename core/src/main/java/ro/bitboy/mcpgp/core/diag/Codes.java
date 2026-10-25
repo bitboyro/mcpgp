@@ -18,6 +18,7 @@ public final class Codes {
     public static final String NAMING_POLICY_INVALID = "NAMING_POLICY_INVALID";
     public static final String NOTICES_INVALID = "NOTICES_INVALID";
     public static final String WORKSPACE_INVALID = "WORKSPACE_INVALID";
+    public static final String DEPRECATED_KEY = "DEPRECATED_KEY";
 
     // merging and structure
     public static final String MERGE_TYPE_CONFLICT = "MERGE_TYPE_CONFLICT";

@@ -100,6 +100,9 @@ public final class DefinitionResolver {
                 }
                 JsonNode expanded = expandReferences(document, file, root, "");
                 document = (ObjectNode) expanded;
+                if (!renameDownstreamAuth(document, location)) {
+                    return Optional.empty();
+                }
 
                 resolveNaming(document, file, root, location);
                 Set<String> ownNotices = new HashSet<>();
@@ -192,6 +195,32 @@ public final class DefinitionResolver {
         }
 
         // ---------------------------------------------------------------- pieces
+
+        /**
+         * {@code apis[].downstreamAuth}, the name before 0.4.0, becomes {@code upstreamAuth} in each file before
+         * merging, so a parent and a child can use either name. Warns per use; both names on one API is an error.
+         */
+        private boolean renameDownstreamAuth(ObjectNode document, Location location) {
+            JsonNode apis = document.path("apis");
+            for (int i = 0; i < apis.size(); i++) {
+                if (!(apis.get(i) instanceof ObjectNode api) || !api.has("downstreamAuth")) {
+                    continue;
+                }
+                Location at = location.withPointer("/apis/" + i + "/downstreamAuth");
+                if (api.has("upstreamAuth")) {
+                    diagnostics.error(Codes.DEFINITION_INVALID, "API " + api.path("id").asText() + " has both upstreamAuth and"
+                            + " downstreamAuth; keep upstreamAuth (downstreamAuth is its name before 0.4.0)", at);
+                    return false;
+                }
+                diagnostics.warning(Codes.DEPRECATED_KEY, "downstreamAuth is deprecated: rename it to upstreamAuth"
+                        + " (the same settings; the old name is read until a later release)", at);
+                ObjectNode renamed = api.objectNode();
+                api.fields().forEachRemaining(f -> renamed.set(f.getKey().equals("downstreamAuth") ? "upstreamAuth" : f.getKey(), f.getValue()));
+                api.removeAll();
+                api.setAll(renamed);
+            }
+            return true;
+        }
 
         private void normalizeApi(ObjectNode document) {
             JsonNode api = document.remove("api");

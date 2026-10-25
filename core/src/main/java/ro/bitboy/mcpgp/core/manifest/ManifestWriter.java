@@ -337,8 +337,8 @@ public final class ManifestWriter {
             node.set("detect", detect);
         }
 
-        // downstream auth: declared, or derived from the contracts' security schemes
-        JsonNode declared = api.path("downstreamAuth");
+        // how the server signs in to the API: declared, or derived from the contracts' security schemes
+        JsonNode declared = api.path("upstreamAuth");
         ObjectNode auth = NODES.objectNode();
         Set<String> supported = new LinkedHashSet<>();
         declared.path("supported").forEach(s -> supported.add(s.asText()));
@@ -390,7 +390,7 @@ public final class ManifestWriter {
         if (supported.contains("apiKey") && apiKey != null && apiKey.in() != null && apiKey.parameterName() != null) {
             auth.set("apiKey", NODES.objectNode().put("in", apiKey.in()).put("name", apiKey.parameterName()));
         }
-        node.set("downstreamAuth", auth);
+        node.set("upstreamAuth", auth);
 
         ObjectNode requestBody = NODES.objectNode().put("multiple", api.path("requestBody").path("multiple").asText("split"));
         if (api.path("requestBody").has("prefer")) {

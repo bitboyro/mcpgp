@@ -12,7 +12,7 @@ apis:
     select:
       access: read-write
       include: [{ tag: [orders, customers, invoices] }]
-    downstreamAuth: { supported: [basic, oauth2ClientCredentials] }
+    upstreamAuth: { supported: [basic, oauth2ClientCredentials] }
 
   - id: tickets
     title: Example Tickets API
@@ -20,14 +20,14 @@ apis:
       - { version: "3", spec: contracts/tickets-3.yaml, default: true }
     select:
       include: [{ tag: [tickets, ticket-comments, ticket-search] }]
-    downstreamAuth: { supported: [basic, bearer] }
+    upstreamAuth: { supported: [basic, bearer] }
 
   - id: monitoring
     title: Example Monitoring API
     contracts:
       - { version: "2024-09-01", spec: contracts/monitoring.yaml, default: true }
     select: { access: read-only }
-    downstreamAuth: { supported: [oauth2ClientCredentials] }
+    upstreamAuth: { supported: [oauth2ClientCredentials] }
 
 instances:
   mode: multi

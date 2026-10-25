@@ -86,7 +86,7 @@ Full example: [examples/manifest/orders-mcp.manifest.json](https://github.com/bi
     { "version": "2.0", "format": "openapi-3.1", "digest": "sha256:…", "basePath": "/api/v2", "default": true }
   ],
   "detect": { "method": "GET", "path": "/version", "underBasePath": true, "field": "/version", "pattern": "^(\\d+\\.\\d+)" },
-  "downstreamAuth": {
+  "upstreamAuth": {   // "downstreamAuth" in manifests built before 0.4.0; the runtime reads either
     "supported": ["basic", "apiKey", "oauth2ClientCredentials", "mtls"],
     "identity": "service-account",
     "unsatisfiedTools": "hide",

@@ -164,7 +164,7 @@ public final class Contracts {
             Upstream.Credential credential = null;
             if (caller) {
                 try {
-                    credential = Upstream.credential(instance, sent, false, null, d.api.node().path("downstreamAuth").path("schemes"));
+                    credential = Upstream.credential(instance, sent, false, null, d.api.upstreamAuth().path("schemes"));
                 } catch (ToolError e) {
                     return choice(d, outcome); // this caller has nothing to send either
                 }
@@ -405,7 +405,7 @@ public final class Contracts {
     static Map<String, JsonNode> apiKeys(Manifest manifest) {
         Map<String, JsonNode> apiKeys = new java.util.LinkedHashMap<>();
         manifest.apis().forEach((id, api) -> {
-            JsonNode placement = api.node().path("downstreamAuth").path("apiKey");
+            JsonNode placement = api.upstreamAuth().path("apiKey");
             if (placement.isObject()) {
                 apiKeys.put(id, placement);
             }

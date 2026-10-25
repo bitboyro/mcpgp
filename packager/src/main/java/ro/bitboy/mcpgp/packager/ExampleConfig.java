@@ -59,7 +59,7 @@ public final class ExampleConfig {
             if (versions.size() > 1) {
                 lines.add(more + "contract: auto             # auto | " + String.join(" | ", versions.stream().map(v -> "\"" + v + "\"").toList()));
             }
-            List<String> supported = texts(api.at("/downstreamAuth/supported")).stream().filter(t -> !t.equals("mtls")).toList();
+            List<String> supported = texts(api.at("/upstreamAuth/supported")).stream().filter(t -> !t.equals("mtls")).toList();
             String type = supported.isEmpty() ? "none" : supported.get(0);
             String var = (id + "_").toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", "_");
             lines.add(more + "auth:" + (supported.size() > 1 ? "                      # type: " + String.join(" | ", supported) : ""));
@@ -79,11 +79,11 @@ public final class ExampleConfig {
                 default -> {
                 }
             }
-            if (api.at("/downstreamAuth/fromRequest").isObject()) {
+            if (api.at("/upstreamAuth/fromRequest").isObject()) {
                 lines.add(more + "# or the client's own credential, from a request header (HTTP only), then the one above when it's missing:");
                 lines.add(more + "# auth: [ { type: fromRequest }, { type: " + type + ", … } ]");
             }
-            if (api.at("/downstreamAuth/tokenExchange").isObject()) {
+            if (api.at("/upstreamAuth/tokenExchange").isObject()) {
                 lines.add(more + "# or as the signed-in user (server.auth.mode: oauth): their sign-in exchanged for a token for the API:");
                 lines.add(more + "# auth: { type: tokenExchange, tokenUrl: https://login.example.com/oauth2/token, clientId: …, clientSecret: …, audience: … }");
             }

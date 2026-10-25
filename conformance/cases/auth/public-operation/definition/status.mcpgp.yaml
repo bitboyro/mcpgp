@@ -5,6 +5,6 @@ apis:
   - id: status
     contracts:
       - { version: "1.0", spec: contracts/status-1.0.yaml, default: true }
-    downstreamAuth: { supported: [basic] }
+    upstreamAuth: { supported: [basic] }
 instances:
   mode: single

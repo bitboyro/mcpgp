@@ -5,11 +5,11 @@ Status: **draft v1** · Owner: runtime · Decisions: [ADR-0005](../decisions/000
 Two independent sides:
 
 ```
-MCP client ──(inbound)──► MCP server ──(downstream)──► target server
+MCP client ──(inbound)──► MCP server ──(upstream)──► target server
 ```
 
 Tokens never cross from one side to the other (no token passthrough). A client may send its own
-credential *for the API* in a separate, configured header (§2.4); that is a downstream credential,
+credential *for the API* in a separate, configured header (§2.4); that is an upstream credential,
 never the client's sign-in to the MCP server.
 
 ## 1. Inbound (client → MCP server)
@@ -56,10 +56,10 @@ Needs `server.auth.issuer` and `server.publicUrl` (the server refuses to start w
   (RFC 6750 §3.1). `tools/list` shows only allowed tools. Built-in tools (instances, discovery) are
   open to any valid token; without a mapping, a valid token allows every tool.
 - The token's `sub` (or `client_id`) is the `actor` in audit events; tokens are never logged.
-- The server never forwards the client's token downstream and never accepts tokens issued for another
+- The server never forwards the client's token upstream and never accepts tokens issued for another
   audience.
 
-## 2. Downstream (MCP server → target server)
+## 2. Upstream (MCP server → target server)
 
 Each instance uses one of the types the build supports, plus optional mTLS. `mtls` is not an
 `auth.type` in the runtime config: it is `tls.clientCert` (runtime-config §5.2), allowed only when
@@ -92,7 +92,7 @@ auth:
 - Cached per instance until `expires_in` minus 60 s; requested again before expiry.
 - On `401` from the target: the token is discarded, a new one requested, and the call retried **once**.
 - Concurrent calls share one token request (no stampede).
-- Token endpoint errors (RFC 6749 §5.2 `error` codes) surface as `AUTH_DOWNSTREAM` with the `error`
+- Token endpoint errors (RFC 6749 §5.2 `error` codes) surface as `AUTH_UPSTREAM` with the `error`
   value, never the secret.
 - The token endpoint is reached with the instance's own TLS settings (runtime-config §5); if it uses
   a public CA while the instance trusts only its own, set `trust: ca-and-system`.
@@ -104,7 +104,7 @@ auth:
 OpenAPI security requirements are alternatives (OR) of sets (AND) of schemes with scopes. The
 manifest carries them per tool and contract (manifest §5). For each instance at startup:
 
-- The manifest says what each scheme is (`apis[].downstreamAuth.schemes`: `basic`, `bearer`,
+- The manifest says what each scheme is (`apis[].upstreamAuth.schemes`: `basic`, `bearer`,
   `apiKey`, `oauth2ClientCredentials`, `mtls`, `oauth2` for other OAuth flows and OpenID Connect,
   `other`).
 - A credential **covers** a scheme of its kind: `basic`, `apiKey`; `bearer` covers bearer and OAuth
@@ -117,10 +117,10 @@ manifest carries them per tool and contract (manifest §5). For each instance at
   either.
 - A tool is **usable** on an instance if one of its credentials covers every scheme of one
   alternative.
-- A tool no instance can use follows `downstreamAuth.unsatisfiedTools`: `hide` (the default: not
+- A tool no instance can use follows `upstreamAuth.unsatisfiedTools`: `hide` (the default: not
   listed, not callable; the startup log lists the hidden tools and what each instance lacks) or
   `error` (listed). A tool some instance can use stays listed; calls for an instance that can't
-  return `AUTH_DOWNSTREAM` naming what's missing (`needs oauth with the scope orders.write`),
+  return `AUTH_UPSTREAM` naming what's missing (`needs oauth with the scope orders.write`),
   without calling the API.
 - **On each call** the first credential of the instance's list that can be used now (§2.4) and
   covers the operation is used, so an instance can hold, say, an OAuth client and a basic login
@@ -131,13 +131,13 @@ manifest carries them per tool and contract (manifest §5). For each instance at
 
 - Credentials are secret fields (runtime-config §2.2): references only, always redacted.
 - Credentials are sent only to the instance's own address; redirects to another host drop them.
-- `401`/`403` from the target → `AUTH_DOWNSTREAM` with status and a short reason.
+- `401`/`403` from the target → `AUTH_UPSTREAM` with status and a short reason.
 
 ### 2.4 Credentials from the request (`fromRequest`)
 
 The MCP client sends the credential for the API in a request header of its own, set in the client's
 configuration from the user's environment or secret store: the model never sees it, and the MCP
-server never stores it. Allowed when the definition enables it (`apis[].downstreamAuth.fromRequest`);
+server never stores it. Allowed when the definition enables it (`apis[].upstreamAuth.fromRequest`);
 HTTP transport only.
 
 ```yaml
@@ -157,7 +157,7 @@ instances:
 - **`auth` is one credential or a list**, tried in order for every call: a `fromRequest` entry is used
   when the request carries its header, any other entry always. Entries after a non-`fromRequest`
   one are never reached (a startup warning says so). With nothing usable the call fails with
-  `AUTH_DOWNSTREAM`, naming the header; there's no retry with another entry after the API refuses.
+  `AUTH_UPSTREAM`, naming the header; there's no retry with another entry after the API refuses.
 - **Per request, never kept**: the value is read from the HTTP request that carries the call (not
   from the MCP session), used for that call, and dropped. It is never written to disk, the cache,
   logs, audit events or recordings; for the duration of the call it is masked (`***`) in everything
@@ -180,7 +180,7 @@ instances:
 For a shared server whose users sign in with OAuth (§1.1): on each call the server exchanges the
 user's access token, which it already checked, at the identity provider for a token issued for the
 API, and sends that. The API sees who is calling and applies its own permissions. Allowed when the
-definition enables it (`apis[].downstreamAuth.tokenExchange: {}`); needs `server.transport: http`
+definition enables it (`apis[].upstreamAuth.tokenExchange: {}`); needs `server.transport: http`
 and `server.auth.mode: oauth`.
 
 ```yaml
@@ -207,9 +207,9 @@ auth:
   `expires_in` minus 60 s, at most 1,000; a `401` from the API discards the user's token and the call
   is tried once more with a new exchange. Both tokens are masked in everything the call produces; the
   audit records `upstream.auth: tokenExchange` and the user as `actor`.
-- A refused exchange answers `AUTH_DOWNSTREAM` with the identity provider's `error` (e.g.
+- A refused exchange answers `AUTH_UPSTREAM` with the identity provider's `error` (e.g.
   `invalid_grant`). A request without a signed-in user uses the next credential in the list, or
-  answers `AUTH_DOWNSTREAM`.
+  answers `AUTH_UPSTREAM`.
 - For §2.2 it covers bearer and OAuth schemes like `oauth2ClientCredentials`: scopes are judged when
   the config lists them, except a `…/.default` scope (Entra), which stands for every granted one.
 

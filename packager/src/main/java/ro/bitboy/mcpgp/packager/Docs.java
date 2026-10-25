@@ -477,7 +477,7 @@ final class Docs {
     private void tokenExchange(StringBuilder md) {
         boolean enabled = false;
         for (JsonNode api : manifest.path("apis")) {
-            enabled |= api.at("/downstreamAuth/tokenExchange").isObject();
+            enabled |= api.at("/upstreamAuth/tokenExchange").isObject();
         }
         if (!enabled) {
             return;
@@ -497,7 +497,7 @@ final class Docs {
     private void fromRequest(StringBuilder md) {
         boolean enabled = false;
         for (JsonNode api : manifest.path("apis")) {
-            enabled |= api.at("/downstreamAuth/fromRequest").isObject();
+            enabled |= api.at("/upstreamAuth/fromRequest").isObject();
         }
         if (!enabled) {
             return;
@@ -528,11 +528,11 @@ final class Docs {
     private List<String> authTypes() {
         Set<String> types = new LinkedHashSet<>();
         manifest.path("apis").forEach(a -> {
-            a.at("/downstreamAuth/supported").forEach(t -> types.add(t.asText()));
-            if (a.at("/downstreamAuth/fromRequest").isObject()) {
+            a.at("/upstreamAuth/supported").forEach(t -> types.add(t.asText()));
+            if (a.at("/upstreamAuth/fromRequest").isObject()) {
                 types.add("fromRequest");
             }
-            if (a.at("/downstreamAuth/tokenExchange").isObject()) {
+            if (a.at("/upstreamAuth/tokenExchange").isObject()) {
                 types.add("tokenExchange");
             }
         });
@@ -560,7 +560,7 @@ final class Docs {
             {"TOOLSET_DISABLED", "toolsets mode: enable the tool's toolset with toolset_enable first"},
             {"CONFIRMATION_REQUIRED", "the tool needs the user's confirmation"},
             {"AUTH_INBOUND", "the client isn't allowed (HTTP 401/403)"},
-            {"AUTH_DOWNSTREAM", "the target server rejected the server's credentials"},
+            {"AUTH_UPSTREAM", "the target server rejected the server's credentials"},
             {"UPSTREAM_4XX / UPSTREAM_5XX", "the target server answered with an error"},
             {"UPSTREAM_TIMEOUT / UPSTREAM_UNREACHABLE", "no answer in time / DNS, TCP or TLS failure"},
             {"RESPONSE_PARSE_ERROR / RESPONSE_TOO_LARGE", "the answer couldn't be read, or is over the size limit"},
