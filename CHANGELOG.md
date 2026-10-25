@@ -66,6 +66,12 @@ versions follow [SemVer](https://semver.org).
   identity, instructions for agents and its definition. Tools & rules is now Tools, and Package &
   deliver is Packaging. Old addresses (`/sources`, `/connections`, `/safety`, `/package`) redirect.
   New versions saved from these pages are described as "Tools: …" and "Execution: …".
+- The server Overview shows one card per area (API definitions, Tools, Target APIs, Access control,
+  Execution, Observability, Delivery, General): what it does, whether it's set up, and a link to its page,
+  plus the single most important next step; the previews open from **Preview as agent**. Its settings
+  moved to the pages that own them: what the agent sees, support packs, notices and what tools may do to
+  **Tools**; one or several target servers and mixed versions to **Target APIs**; transports to
+  **Packaging**. Each page saves its own changes as the next revision.
 - The definition key for how a server signs in to the API it calls is `apis[].upstreamAuth`, the
   industry term (it was `downstreamAuth`; same settings). Compiled manifests carry `upstreamAuth`; the
   runtime still reads `downstreamAuth` from manifests built before 0.4.0. Platform edits to an API whose

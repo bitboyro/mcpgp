@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, type Operation, type OperationList, type Select } from '../api'
 import { asList, changes, entryFor, same, turnOff, turnOffAll, turnOn, whyOff, type TurnOn } from '../selection'
@@ -32,7 +32,7 @@ interface Asked {
  * Switches change the API's `select` block; unsaved changes are previewed by the platform (a dry run),
  * and saving makes the next version, like the settings on Overview.
  */
-export function OperationsView({ id }: { id: string }) {
+export function OperationsView({ id, settings }: { id: string; settings?: ReactNode }) {
   const { can } = useSession()
   const queryClient = useQueryClient()
   const server = useServer(id)
@@ -159,6 +159,7 @@ export function OperationsView({ id }: { id: string }) {
   return (
     <div className="body">
       <section className="col col-wide" aria-label="Operations">
+        {settings}
         <ErrorBox error={server.error ?? current.error} />
         {current.error instanceof ApiError && current.error.status === 422 && (
           <p className="hint">The latest version doesn't compile; the checks on <Link to={`/servers/${id}/apis`}>API definitions</Link> say why.</p>

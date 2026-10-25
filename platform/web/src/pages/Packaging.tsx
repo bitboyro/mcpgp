@@ -6,6 +6,7 @@ import { Markdown } from '../markdown'
 import { useManifest, useServer } from '../serverData'
 import { ErrorBox, Loading, PageHead, Segmented } from '../ui'
 import { BuildButton } from './Overview'
+import { ChoiceRows, SettingsCard, usePendingEdits } from './SettingsCard'
 
 const FORMATS: { id: PackagePreview['formats'][number]['id']; title: string; use: string }[] = [
   { id: 'jar', title: 'Java jar', use: 'Runs wherever Java 21 runs: java -jar. stdio for desktop clients, HTTP for shared use. Always in the package.' },
@@ -28,6 +29,7 @@ export function PackagingPage() {
   const server = useServer(id)
   const manifest = useManifest(id, 'latest', server.data?.latestVersion != null)
   const base = server.data?.latestVersion ?? 0
+  const edits = usePendingEdits(id, 'Packaging')
   const preview = useQuery({ queryKey: ['package', id, base], queryFn: () => api.packagePreview(id, base), enabled: base > 0, retry: false })
   const version = useQuery({ queryKey: ['version', id, base], queryFn: () => api.version(id, base), enabled: base > 0 })
   const builds = useQuery({ queryKey: ['builds', id], queryFn: () => api.builds(id) })
@@ -72,11 +74,13 @@ export function PackagingPage() {
                 <p className="hint">Choose formats with <span className="mono">build.targets</span> in the definition (on{' '}
                   <Link to={`/servers/${id}/apis`}>API definitions</Link>).</p>
               </div>
+              <SettingsCard id={id} title="How it runs" edits={edits}>
+                {(m) => <ChoiceRows manifest={m} only={(c) => c === 'transports'} edits={edits} />}
+              </SettingsCard>
               <div className="card">
-                <h2>How it runs</h2>
+                <h2>What's in it</h2>
                 <dl className="kv">
                   <dt>Generation</dt><dd>Runtime: the server works from its manifest; nothing is generated as code</dd>
-                  <dt>Transports</dt><dd>{manifest.data?.runtime.transports?.allowed.join(', ') ?? '—'}{manifest.data?.runtime.transports?.default && ` (default ${manifest.data.runtime.transports.default})`}</dd>
                   <dt>Packs</dt><dd>{manifest.data?.packs.length ? manifest.data.packs.map((p) => p.id).join(', ') : 'none'}</dd>
                   <dt>Signing</dt><dd>{preview.data.signed ? 'Signed: SHA256SUMS.sig and the public key ship with it' : 'Not signed: the platform has no signing key'}</dd>
                   <dt>Docs</dt><dd>{docs.length} files{agentDocs ? ', including docs for agents' : <>; add docs for agents with <span className="mono">build.docs: [agents]</span></>}</dd>

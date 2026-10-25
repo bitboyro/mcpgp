@@ -57,15 +57,15 @@ Built into the platform jar and served by it (`WebUi`), on the API's own origin.
 |---|---|---|
 | Sign in | `/sign-in` | local and directory accounts; company SSO (OIDC) |
 | All servers | `/` | cards, duplicate / variant panel, new server (folder or zip), shared library |
-| Overview (canvas: Shape) | `/servers/:id` | the definition's choices and packs, editable: changes preview live (agent, customer setup, package, checks), Review shows the file's diff, Save makes the next version |
+| Overview | `/servers/:id` | one card per area (API definitions, Tools, Target APIs, Access control, Execution, Observability, Delivery, General) with its purpose, state and summary, linking to the page; one "Next" step for the most important unfinished area; "Preview as agent" shows the agent, customer setup, package and validation previews. Nothing is edited here |
 | General | `/servers/:id/general` | name, title, server version, instructions for agents (read-only), the definition's version, variant and base |
 | API definitions | `/servers/:id/apis` | specs, contracts shipped per API, version detection, upload a new version, saved versions, files, checks |
-| Tools | `/servers/:id/tools` | filters, search, the tool as the agent gets it, its provenance; output schemas; Operations and Naming views |
-| Target APIs | `/servers/:id/targets` | target servers; per API: sign-in types, per-user credential, token exchange; the shipped example config |
+| Tools | `/servers/:id/tools` | what the agent sees (exposure mode) and support packs; filters, search, the tool as the agent gets it, its provenance; output schemas; Operations view (with what tools may do per API), Naming, Notices |
+| Target APIs | `/servers/:id/targets` | one or several target servers and what happens when they run different versions; per API: sign-in types, per-user credential, token exchange; the shipped example config |
 | Access control | `/servers/:id/access` | sign-in methods offered and default, scope → tool permissions, sessions default; deployment and administrator settings shown read-only |
 | Execution | `/servers/:id/execution` | confirmations, response and request limits, batching, retained results, rate limits; always-on protections |
 | Observability | `/servers/:id/observability` | audit file, rotation, retention and arguments; log level; OpenTelemetry on/off, exporter, service name, signals; paths and endpoints read-only; health endpoints |
-| Packaging | `/servers/:id/packaging` | formats, how it runs, docs and contents as they ship |
+| Packaging | `/servers/:id/packaging` | how agents connect (stdio, HTTP), formats, docs and contents as they ship |
 | Builds and releases | `/servers/:id/builds`, `/builds` | live log, downloads, package files, release, archive, restore, delete |
 | Changes | `/servers/:id/changes` | differences between versions |
 | Activity | `/servers/:id/activity`, `/activity` | timeline with filters; approvals |

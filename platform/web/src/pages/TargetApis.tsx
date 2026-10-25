@@ -6,12 +6,7 @@ import { AUTH_LABELS, useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
 import { ErrorBox, Loading, PageHead } from '../ui'
 import { BuildButton, CustomerPreview } from './Overview'
-
-const MIXED: Record<string, string> = {
-  union: 'One tool, checked per call',
-  namespaced: 'Separate tools per server',
-  forbid: 'Same version only',
-}
+import { ChoiceRows, SettingsCard, usePendingEdits } from './SettingsCard'
 
 /** Target APIs: the servers a customer's MCP server calls, and how it signs in to them. */
 export function TargetApisPage() {
@@ -39,17 +34,15 @@ export function TargetApisPage() {
 
 function Settings({ id, manifest }: { id: string; manifest: Manifest }) {
   const multi = manifest.instances.mode === 'multi'
+  const edits = usePendingEdits(id, 'Target APIs')
   return (
     <>
-      <div className="card">
-        <h2>Target servers</h2>
-        <dl className="kv">
-          <dt>How many</dt><dd>{multi ? 'Several; agents choose one per call' : 'One'}</dd>
-          {multi && <><dt>Different versions</dt><dd>{MIXED[manifest.instances.mixedContracts ?? 'union'] ?? manifest.instances.mixedContracts}</dd></>}
-          {manifest.instances.max != null && <><dt>At most</dt><dd>{manifest.instances.max}</dd></>}
-        </dl>
-        <p className="hint">These come from the definition's <span className="mono">instances</span> and <span className="mono">apis</span> sections.</p>
-      </div>
+      <SettingsCard id={id} title="Target servers" edits={edits}>
+        {(m) => <>
+          <ChoiceRows manifest={m} only={(c) => c === 'instances' || c === 'mixed'} edits={edits} />
+          {m.instances.max != null && <dl className="kv"><dt>At most</dt><dd>{m.instances.max}</dd></dl>}
+        </>}
+      </SettingsCard>
       {manifest.apis.map((a) => (
         <div key={a.id} className="card">
           <div className="card-head">

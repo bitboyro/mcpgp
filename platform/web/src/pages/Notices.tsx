@@ -15,7 +15,7 @@ interface Props {
 }
 
 /**
- * Notices on Overview (definition-format.md §5.1): text added to the descriptions of every tool, or of
+ * Notices on Tools → Notices (definition-format.md §5.1): text added to the descriptions of every tool, or of
  * the tools it selects (a tag, the tools that change data, chosen tools). Never cut off; changes are
  * previewed and saved like the other settings on the page.
  */

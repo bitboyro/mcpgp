@@ -7,6 +7,7 @@ import { Chip, ErrorBox, Loading, PageHead, Segmented } from '../ui'
 import { NamingView } from './Naming'
 import { OutputSchemas } from './OutputSchemas'
 import { OperationsView } from './Operations'
+import { ChoiceRows, NoticesEditor, PackRow, SettingsCard, usePendingEdits } from './SettingsCard'
 import { ToolEdit } from './ToolEdit'
 import { TryTool } from './TryTool'
 import { agentView } from './Overview'
@@ -37,11 +38,23 @@ export function ToolsPage() {
   const selected = manifest.data?.tools.find((t) => t.name === selectedName)
   const operations = manifest.data ? manifest.data.diagnostics.filter((d) => d.code === 'OPERATION_EXCLUDED').length : 0
   const apiCount = manifest.data?.tools.filter((t) => t.kind === 'api').length ?? 0
-  const view = params.get('view') === 'operations' ? 'operations' : params.get('view') === 'naming' ? 'naming' : 'tools'
+  const views = ['operations', 'naming', 'notices'] as const
+  const view = views.find((v) => v === params.get('view')) ?? 'tools'
   const switcher = (
     <Segmented role="tab" label="View" value={view} onChange={(v) => setParams(v === 'tools' ? {} : { view: v }, { replace: true })}
-      options={[['tools', 'Tools'], ['operations', 'Operations'], ['naming', 'Naming']]} />
+      options={[['tools', 'Tools'], ['operations', 'Operations'], ['naming', 'Naming'], ['notices', 'Notices']]} />
   )
+  const agentEdits = usePendingEdits(id, 'Tools')
+  const accessEdits = usePendingEdits(id, 'Tools')
+
+  if (view === 'notices') {
+    return (
+      <>
+        <PageHead title="Tools" sub="Text added to tool descriptions: this server's own notices and shared sets from the Library.">{switcher}</PageHead>
+        <div className="body"><section className="col col-wide" aria-label="Notices"><NoticesEditor id={id} /></section></div>
+      </>
+    )
+  }
 
   if (view === 'naming') {
     return (
@@ -56,7 +69,10 @@ export function ToolsPage() {
     return (
       <>
         <PageHead title="Tools" sub="Every operation of the contracts. Switch one on to make it a tool, off to leave it out.">{switcher}</PageHead>
-        <OperationsView id={id} />
+        <OperationsView id={id} settings={
+          <SettingsCard id={id} title="What tools may do" edits={accessEdits}>
+            {(m) => <ChoiceRows manifest={m} only={(c) => c.startsWith('access:')} edits={accessEdits} />}
+          </SettingsCard>} />
       </>
     )
   }
@@ -70,6 +86,9 @@ export function ToolsPage() {
         <section className="col" aria-label="Tools">
           <ErrorBox error={manifest.error} />
           {manifest.isLoading && <Loading what="tools" />}
+          <SettingsCard id={id} title="What the agent sees" edits={agentEdits}>
+            {(m) => <><ChoiceRows manifest={m} only={(c) => c === 'exposure'} edits={agentEdits} /><PackRow manifest={m} edits={agentEdits} /></>}
+          </SettingsCard>
           {manifest.data && (
             <div className="card">
               <Segmented label="Show" value={filter} onChange={setFilter}

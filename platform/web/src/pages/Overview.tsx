@@ -1,14 +1,14 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api, ApiError, type Change, type Diagnostic, type Manifest, type Tool } from '../api'
-import { PACKS, choices, diffLines, packChange, packOn } from '../choices'
+import { api, ApiError, type Build, type Diagnostic, type Manifest, type Tool } from '../api'
+import { access, diffLines } from '../choices'
 import { AUTH_LABELS, EXPOSURE, counts, listedTools, useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
-import { ErrorBox, Loading, PageHead, Segmented } from '../ui'
-import { NoticesCard } from './Notices'
+import { ErrorBox, Icon, Loading, PageHead, Segmented, ago } from '../ui'
 
-type Tab = 'agent' | 'customer' | 'package' | 'checks' | 'changes'
+type Tab = 'agent' | 'customer' | 'package' | 'checks'
+type IconName = Parameters<typeof Icon>[0]['name']
 
 export function BuildButton({ id, disabled = false }: { id: string; disabled?: boolean }) {
   const { can } = useSession()
@@ -30,196 +30,161 @@ export function BuildButton({ id, disabled = false }: { id: string; disabled?: b
   )
 }
 
+type State = 'ok' | 'warn' | 'idle'
+
+interface Area {
+  key: string; title: string; icon: IconName; purpose: string; state: State; status: string; summary: string; to: string
+  /** Shown as the page's next step when this is the most important thing left. */
+  next?: string
+}
+
+const SIGN_IN: Record<string, string> = { none: 'No sign-in', static: 'API keys', oauth: 'OAuth' }
+
+/** One card per area of the server (design/ui.md, Overview): what it does, how it's set up, and a link to it. */
+export function areas(id: string, m: Manifest, build: Build | undefined, compileError: boolean): Area[] {
+  const path = (p: string) => `/servers/${id}/${p}`
+  const errors = counts(m).error
+  const apiTools = m.tools.filter((t) => t.kind === 'api').length
+  const excluded = m.diagnostics.filter((d) => d.code === 'OPERATION_EXCLUDED').length
+  const http = m.runtime.transports?.allowed.includes('http') ?? false
+  const signIn = m.runtime.inboundAuth?.default ?? 'none'
+  const rd = m.policies.runtimeDefaults ?? {}
+  const scopes = Object.keys(rd.configuration?.server?.auth?.scopes ?? {}).length
+  const upstream = [...new Set(m.apis.flatMap((a) => a.upstreamAuth?.supported ?? []))].map((a) => AUTH_LABELS[a] ?? a)
+  const levels = [...new Set(m.apis.map((a) => access(m, a.id)))].map((l) => ({ 'read-only': 'read only', 'read-write': 'read and write', all: 'everything' }[l] ?? l))
+  return [
+    {
+      key: 'apis', title: 'API definitions', icon: 'definition', purpose: 'The OpenAPI documents the server is built from.', to: path('apis'),
+      ...(compileError || errors > 0
+        ? { state: 'warn' as State, status: compileError ? "Doesn't compile" : `${errors} error${errors === 1 ? '' : 's'}`, next: 'fix the API definition errors' }
+        : { state: 'ok' as State, status: 'Valid' }),
+      summary: m.apis.map((a) => `${a.title ?? a.id} · ${a.contracts.map((c) => c.version).join(', ')}`).join('; '),
+    },
+    {
+      key: 'tools', title: 'Tools', icon: 'tools', purpose: 'What connecting agents see and can call.', to: path('tools'),
+      state: apiTools > 0 ? 'ok' : 'warn', status: `${apiTools} of ${apiTools + excluded} operations`,
+      ...(apiTools === 0 ? { next: 'choose which operations become tools' } : {}),
+      summary: [EXPOSURE[m.exposure.mode] ?? m.exposure.mode, levels.join(' / '), m.packs.length ? `${m.packs.length} support pack${m.packs.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · '),
+    },
+    {
+      key: 'targets', title: 'Target APIs', icon: 'connections', purpose: 'The APIs it calls and how it signs in to them.', to: path('targets'),
+      state: 'ok', status: m.instances.mode === 'multi' ? 'Several target servers' : 'One target server',
+      summary: upstream.length ? upstream.join(', ') : 'No sign-in declared',
+    },
+    {
+      key: 'access', title: 'Access control', icon: 'lock', purpose: 'Who can connect and what they may do.', to: path('access'),
+      ...(http && signIn === 'none'
+        ? { state: 'warn' as State, status: 'No sign-in by default', next: 'choose how clients sign in before sharing this server' }
+        : { state: 'ok' as State, status: http ? `Sign-in: ${SIGN_IN[signIn] ?? signIn}` : 'Local use (stdio)' }),
+      summary: [`Offers ${(m.runtime.inboundAuth?.allowed ?? ['none', 'static', 'oauth']).map((a) => SIGN_IN[a] ?? a).join(', ')}`,
+        scopes ? `${scopes} scope rule${scopes === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · '),
+    },
+    {
+      key: 'execution', title: 'Execution', icon: 'shape', purpose: 'How calls run: confirmations and limits.', to: path('execution'),
+      ...(m.policies.confirmDestructive === false ? { state: 'warn' as State, status: 'Changes run without confirmation' } : { state: 'ok' as State, status: 'Confirms changes' }),
+      summary: [m.policies.rateLimits?.enabled === false ? 'no rate limit' : `${m.policies.rateLimits?.perMinute ?? 120} calls/min per target`,
+        m.policies.batch?.enabled ? 'batching on' : 'batching off', (m.policies.results?.mode ?? 'inline') === 'inline' ? '' : 'large results kept'].filter(Boolean).join(' · '),
+    },
+    {
+      key: 'observability', title: 'Observability', icon: 'pulse', purpose: 'What the delivered server records.', to: path('observability'),
+      ...(rd.audit || rd.telemetry || rd.configuration?.logging ? { state: 'ok' as State, status: 'Set' } : { state: 'idle' as State, status: 'Package defaults' }),
+      summary: [rd.audit?.file?.enabled === false ? 'audit file off' : `audit ${rd.audit?.file?.retainDays ?? 30} days`, rd.telemetry?.enabled ? 'telemetry on' : 'telemetry off'].join(' · '),
+    },
+    {
+      key: 'delivery', title: 'Delivery', icon: 'package', purpose: "How it's packaged and runs for customers.", to: path('packaging'),
+      ...(!build ? { state: 'idle' as State, status: 'Not built yet', next: 'build the package' }
+        : build.status === 'failed' ? { state: 'warn' as State, status: 'Last build failed', next: 'look at why the last build failed' }
+          : build.status === 'succeeded' ? { state: 'ok' as State, status: `Built ${ago(build.finished ?? build.created)}` }
+            : { state: 'idle' as State, status: 'Building' }),
+      summary: (m.runtime.transports?.allowed ?? ['stdio']).join(' and '),
+    },
+    {
+      key: 'general', title: 'General', icon: 'general', purpose: 'Name and the instructions agents receive.', to: path('general'),
+      ...(m.server.instructions ? { state: 'ok' as State, status: 'Has instructions' } : { state: 'warn' as State, status: 'No instructions', next: 'write instructions for agents' }),
+      summary: `${m.server.name} ${m.server.version}`,
+    },
+  ]
+}
+
+/** The order in which unfinished areas become the page's one next step. */
+const NEXT_ORDER = ['apis', 'tools', 'access', 'delivery', 'general']
+
 export function OverviewPage() {
   const { id = '' } = useParams()
-  const { can } = useSession()
-  const queryClient = useQueryClient()
   const server = useServer(id)
   const manifest = useManifest(id, 'latest', server.data?.latestVersion != null)
+  const builds = useQuery({ queryKey: ['builds', id], queryFn: () => api.builds(id), enabled: !!server.data })
+  const [previewing, setPreviewing] = useState(false)
   const [tab, setTab] = useState<Tab>('agent')
-  const [pending, setPending] = useState<Record<string, Pending>>({})
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
   const compileError = manifest.error instanceof ApiError ? manifest.error : null
-  const changes = Object.values(pending).map((p) => p.change)
-  const base = server.data?.latestVersion ?? 0
-  const preview = useQuery({
-    queryKey: ['edit-preview', id, base, changes],
-    queryFn: () => api.previewEdit(id, base, changes),
-    enabled: changes.length > 0 && base > 0,
-    placeholderData: keepPreviousData,
-    retry: false,
-  })
-  const shown = changes.length > 0 ? preview.data?.manifest ?? manifest.data : manifest.data
-  const broken = changes.length > 0 && preview.data && !preview.data.manifest
-  const save = useMutation({
-    mutationFn: () => api.saveEdit(id, base, changes, message || describeChanges(Object.values(pending))),
-    onSuccess: async () => {
-      setPending({})
-      setSaving(false)
-      setTab('agent')
-      setMessage('')
-      for (const key of ['server', 'manifest', 'servers', 'example-config', 'version', 'definition']) await queryClient.invalidateQueries({ queryKey: [key] })
-    },
-  })
-  const editable = can('servers:write') && !!manifest.data && !server.data?.archived && !server.data?.system
-  const definition = useQuery({ queryKey: ['definition', id, base], queryFn: () => api.definition(id, base), enabled: base > 0 && !!manifest.data, retry: false })
-
-  const pick = (key: string, label: string, original: boolean, change: Change) => {
-    setPending((now) => {
-      const next = { ...now }
-      if (original) delete next[key]
-      else next[key] = { label, change }
-      return next
-    })
-    save.reset()
-  }
+  const latest = server.data?.versions.at(-1)
+  const lastBuild = [...(builds.data?.items ?? [])].sort((a, b) => b.created.localeCompare(a.created))[0]
+  const list = manifest.data ? areas(id, manifest.data, lastBuild, !!compileError) : []
+  const next = NEXT_ORDER.map((k) => list.find((a) => a.key === k && a.next)).find(Boolean)
 
   return (
     <>
       <PageHead title={manifest.data?.server.title ?? server.data?.title ?? id}
-        sub="Change something on the left. The right side shows the server you'll ship.">
-        {changes.length > 0 ? (
-          <>
-            <span className="hint">{changes.length} unsaved change{changes.length === 1 ? '' : 's'}</span>
-            <button type="button" className="btn" onClick={() => { setPending({}); setSaving(false); setTab('agent'); save.reset() }}>Discard</button>
-            <button type="button" className="btn" onClick={() => setTab('changes')}>Review</button>
-            <button type="button" className="btn btn-primary" disabled={!!broken || preview.isFetching} onClick={() => setSaving(true)}>Save as version {base + 1}</button>
-          </>
-        ) : (
-          <>
-            {server.data?.system
-              ? <Link to="/agents?connect" className="btn btn-primary">Connect an agent</Link>
-              : <Link to={`/servers/${id}/apis`} className="btn">Upload version</Link>}
-            <BuildButton id={id} />
-          </>
-        )}
+        sub={latest ? `Revision ${latest.number} · saved by ${latest.author} ${ago(latest.created)}` : undefined}>
+        {server.data?.system
+          ? <Link to="/agents?connect" className="btn btn-primary">Connect an agent</Link>
+          : <Link to={`/servers/${id}/apis`} className="btn">Upload version</Link>}
+        {manifest.data && <button type="button" className="btn" aria-pressed={previewing} onClick={() => setPreviewing(!previewing)}>
+          {previewing ? 'Hide preview' : 'Preview as agent'}</button>}
+        <BuildButton id={id} />
       </PageHead>
-      <div className="body">
-        <section className="col" aria-label="Settings">
-          <ErrorBox error={server.error} />
-          {server.isLoading && <Loading />}
-          {server.data?.system && (
-            <div className="card" aria-label="Made by the platform">
-              <h2>Made by the platform</h2>
-              <p className="hint">The platform's API as tools, for your agents. The platform makes this server and adds a version with every
-                release, so it can't be changed here. To change what your agents get (hide tools, add notices), make a variant of it on
-                {' '}<Link to="/">All servers</Link>: it follows every new version.</p>
-              <div><Link to="/agents?connect" className="btn btn-primary btn-sm">Connect an agent</Link></div>
-            </div>
-          )}
-          {saving && (
-            <form className="card" style={{ borderColor: 'var(--accent)' }} onSubmit={(e) => { e.preventDefault(); save.mutate() }}>
-              <h2>Save as version {base + 1}</h2>
-              <ul className="hint" style={{ margin: 0, paddingLeft: 18 }}>{Object.values(pending).map((p) => <li key={p.change.path}>{p.label}</li>)}</ul>
-              <label className="field">What changed (optional)
-                <input className="input" value={message} placeholder={describeChanges(Object.values(pending))} onChange={(e) => setMessage(e.target.value)} maxLength={200} />
-              </label>
-              <ErrorBox error={save.error} />
-              {save.error instanceof ApiError && save.error.status === 409 && (
-                <p className="hint">Someone saved a newer version. <button type="button" className="btn btn-sm" onClick={() => { setPending({}); setSaving(false); save.reset(); void queryClient.invalidateQueries({ queryKey: ['server', id] }) }}>Reload</button></p>
-              )}
-              <div className="actions">
-                <button type="submit" className="btn btn-primary" disabled={save.isPending}>Save</button>
-                <button type="button" className="btn" onClick={() => setSaving(false)}>Cancel</button>
-              </div>
-            </form>
-          )}
-          {compileError && (
-            <div className="card">
-              <h2>This version doesn't compile</h2>
-              <p className="hint">{compileError.message}. The checks on <Link to={`/servers/${id}/apis`}>API definitions</Link> say why.</p>
-            </div>
-          )}
-          {manifest.data && shown && (
-            <Choices id={id} original={manifest.data} shown={shown} editable={editable} pending={pending} pick={pick}
-              variant={!!(server.data?.parent || manifest.data.build.extends)} />
-          )}
-          {manifest.data && <NoticesCard manifest={manifest.data} definition={definition.data} editable={editable} pending={pending} pick={pick} />}
-        </section>
-        <section className="stage" aria-label="Preview">
-          <div className="card-head">
-            <Segmented role="tab" label="Preview" value={tab} onChange={setTab}
-              options={[['agent', 'Agent'], ['customer', 'Customer setup'], ['package', 'Package'], ['checks', 'Checks'], ...(changes.length ? [['changes', 'Changes'] as [Tab, string]] : [])]} />
-            <span className="live">{changes.length ? (preview.isFetching ? 'Updating…' : 'Unsaved preview') : 'Live'}</span>
+      <div className="body" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+        <ErrorBox error={server.error} />
+        {server.isLoading && <Loading />}
+        {server.data?.system && (
+          <div className="card" aria-label="Made by the platform">
+            <h2>Made by the platform</h2>
+            <p className="hint">The platform's API as tools, for your agents. The platform makes this server and adds a version with every
+              release, so it can't be changed here. To change what your agents get (hide tools, add notices), make a variant of it on
+              {' '}<Link to="/">All servers</Link>: it follows every new version.</p>
           </div>
-          {preview.error && <ErrorBox error={preview.error} />}
-          {broken && <div className="note note-bad">With these changes the definition doesn't compile; see Checks.</div>}
-          {manifest.isLoading && <Loading what="the preview" />}
-          {shown && tab === 'agent' && <AgentPreview manifest={shown} />}
-          {shown && tab === 'customer' && <CustomerPreview id={id} text={changes.length ? preview.data?.exampleConfig : undefined} />}
-          {shown && tab === 'package' && <PackagePreview id={id} manifest={shown} />}
-          {tab === 'checks' && <Checks diagnostics={(changes.length ? preview.data?.manifest?.diagnostics ?? preview.data?.diagnostics : undefined)
-            ?? manifest.data?.diagnostics ?? compileDiagnostics(compileError)} />}
-          {tab === 'changes' && changes.length > 0 && <DefinitionDiff id={id} version={base} after={preview.data?.definition} />}
-          {tab === 'changes' && changes.length === 0 && <p className="empty">No unsaved changes.</p>}
-        </section>
+        )}
+        {compileError && (
+          <div className="card">
+            <h2>This revision doesn't compile</h2>
+            <p className="hint">{compileError.message}. Validation on <Link to={`/servers/${id}/apis`}>API definitions</Link> says why.</p>
+          </div>
+        )}
+        {next && !server.data?.system && (
+          <Link to={next.to} className="next-step">Next: {next.next} →</Link>
+        )}
+        {list.length > 0 && (
+          <section className="area-grid" aria-label="Areas">
+            {list.map((a) => (
+              <Link key={a.key} to={a.to} className="area-card" aria-label={`${a.title}: ${a.status}`}>
+                <span className="area-title"><Icon name={a.icon} size={18} />{a.title}</span>
+                <span className="hint">{a.purpose}</span>
+                <span className={'chip chip-' + (a.state === 'ok' ? 'ok' : a.state === 'warn' ? 'warn' : 'idle')}>{a.status}</span>
+                <span className="area-summary">{a.summary}</span>
+                <span className="area-open">Open {a.title} →</span>
+              </Link>
+            ))}
+          </section>
+        )}
+        {previewing && manifest.data && (
+          <section className="stage" aria-label="Preview">
+            <div className="card-head">
+              <Segmented role="tab" label="Preview" value={tab} onChange={setTab}
+                options={[['agent', 'Agent'], ['customer', 'Customer setup'], ['package', 'Package'], ['checks', 'Validation']]} />
+            </div>
+            {tab === 'agent' && <AgentPreview manifest={manifest.data} />}
+            {tab === 'customer' && <CustomerPreview id={id} />}
+            {tab === 'package' && <PackagePreview id={id} manifest={manifest.data} />}
+            {tab === 'checks' && <Checks diagnostics={manifest.data.diagnostics ?? compileDiagnostics(compileError)} />}
+          </section>
+        )}
       </div>
     </>
   )
 }
 
-interface Pending { label: string; change: Change }
-
-function describeChanges(pending: Pending[]): string {
-  return pending.map((p) => p.label).join('; ')
-}
-
 function compileDiagnostics(error: ApiError | null): Diagnostic[] {
   return error ? [{ level: 'error', code: error.code, message: error.message }] : []
-}
-
-function Choices({ id, original, shown, editable, pending, pick, variant }: {
-  id: string
-  original: Manifest
-  shown: Manifest
-  editable: boolean
-  pending: Record<string, Pending>
-  pick: (key: string, label: string, original: boolean, change: Change) => void
-  variant: boolean
-}) {
-  const auth = new Set(shown.apis.flatMap((a) => a.upstreamAuth?.supported ?? []))
-  return (
-    <div className="card">
-      <div className="card-head">
-        <h2>How it's shaped</h2>
-        <Link to={`/servers/${id}/tools`} className="hint">Tools →</Link>
-      </div>
-      <div className="rows">
-        {choices(shown).map((c) => {
-          const now = c.current(shown)
-          const was = c.current(original)
-          return (
-            <div key={c.id} style={{ padding: '14px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <span><b style={{ fontSize: 14, fontWeight: 600 }}>{c.title}</b>{pending[c.id] && <span className="tag" style={{ marginLeft: 8 }}>changed</span>}<br />
-                <span className="hint">{c.hint}</span></span>
-              {editable ? (
-                <Segmented label={c.title} value={now} options={c.options.map((o) => [o.value, o.label])}
-                  onChange={(v) => pick(c.id, `${c.title}: ${c.options.find((o) => o.value === v)?.label ?? v}`, v === was, c.change(v))} />
-              ) : <span className="tag" style={{ alignSelf: 'flex-start' }}>{c.options.find((o) => o.value === now)?.label ?? now}</span>}
-            </div>
-          )
-        })}
-        <div style={{ padding: '14px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span><b style={{ fontSize: 14, fontWeight: 600 }}>Extra tools in the package</b><br /><span className="hint">Support packs: audit, explanations, checks.</span></span>
-          <div className="actions">
-            {PACKS.map(([pack, label]) => {
-              const on = packOn(shown, pack)
-              const key = 'pack:' + pack
-              return (
-                <button key={pack} type="button" className="pill" aria-pressed={on} disabled={!editable}
-                  onClick={() => pick(key, `${label}: ${on ? 'off' : 'on'}`, !on === packOn(original, pack), packChange(pack, !on, variant))}>{label}</button>
-              )
-            })}
-          </div>
-        </div>
-        <div style={{ padding: '14px 0' }}>
-          <b style={{ fontSize: 14, fontWeight: 600 }}>Sign-in to the API</b><br />
-          <span className="hint">{[...auth].map((a) => AUTH_LABELS[a] ?? a).join(', ') || 'None'} · each target server picks one · <Link to={`/servers/${id}/targets`}>Target APIs</Link></span>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export function DefinitionDiff({ id, version, after }: { id: string; version: number; after?: string }) {
