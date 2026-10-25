@@ -34,7 +34,9 @@ kind: McpServer               # required
 metadata:
   name: orders-mcp              # required; [a-z0-9-]{2,63}; unique in the workspace
   title: Example Orders API           # shown to people
-  description: …              # becomes the MCP server instructions intro
+  description: …              # a short summary; the instructions (on one line) when there are none
+  instructions: |             # what agents are told on initialize, kept as written (paragraphs, lists)
+    …
 extends: …                    # optional; makes this a variant (§6)
 
 apis: [ … ]                   # required; one or more (§3). `api:` is accepted for exactly one.

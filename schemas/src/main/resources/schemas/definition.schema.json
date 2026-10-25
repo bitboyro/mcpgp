@@ -12,7 +12,8 @@
       "properties": {
         "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}$" },
         "title": { "type": "string" },
-        "description": { "type": "string" }
+        "description": { "type": "string" },
+        "instructions": { "type": "string", "description": "What connecting agents are told about this server (the MCP initialize instructions), kept as written; the description is used when absent" }
       },
       "required": ["name"],
       "additionalProperties": false

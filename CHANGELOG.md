@@ -6,6 +6,10 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- `metadata.instructions` in definitions: what agents are told on initialize, kept as written (paragraphs
+  and lists). Without it, the description is used on one line, as before. The platform edits it on
+  **General** with a live preview of exactly what initialize sends, including the note multi-instance
+  servers add.
 - **Access control** and **Observability** pages for each server. Access control sets the client
   sign-in methods a package offers and its default, default OAuth scope → tool permissions and whether
   clients may narrow their own session; Observability sets the shipped audit file, rotation, retention
