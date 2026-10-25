@@ -169,8 +169,9 @@ function BuildDetail({ id }: { id: string }) {
 
 /** Who started, released, downloaded or archived this build: its entries in Activity. */
 function BuildActivity({ build }: { build: Build }) {
-  const activity = useQuery({ queryKey: ['activity', build.server], queryFn: () => api.activity({ server: build.server, limit: 200 }) })
-  const items = (activity.data?.items ?? []).filter((a) => aboutBuild(a) && a.target === build.id)
+  // by the build's id: also finds events recorded before build events named their server
+  const activity = useQuery({ queryKey: ['activity', 'build', build.id], queryFn: () => api.activity({ target: build.id, limit: 50 }) })
+  const items = (activity.data?.items ?? []).filter(aboutBuild)
   return (
     <div className="stage-card" aria-label="Build activity">
       <div className="card-head">

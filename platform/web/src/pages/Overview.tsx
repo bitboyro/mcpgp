@@ -96,7 +96,7 @@ export function areas(id: string, m: Manifest, build: Build | undefined, compile
         : build.status === 'failed' ? { state: 'warn' as State, status: 'Last build failed', next: 'look at why the last build failed' }
           : build.status === 'succeeded' ? { state: 'ok' as State, status: `Built ${ago(build.finished ?? build.created)}` }
             : { state: 'idle' as State, status: 'Building' }),
-      summary: (m.runtime.transports?.allowed ?? ['stdio']).join(' and '),
+      summary: (m.runtime.transports?.allowed ?? ['stdio']).map((t) => t === 'http' ? 'HTTP' : t).join(' and '),
     },
     {
       key: 'general', title: 'General', icon: 'general', purpose: 'Name and the instructions agents receive.', to: path('general'),

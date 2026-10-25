@@ -527,6 +527,6 @@ export const api = {
   approvals: (status = 'pending') => json<Items<Approval>>('GET', '/approvals' + q({ status })),
   decide: (id: string, approve: boolean, comment?: string) =>
     json<Approval>('POST', `/approvals/${enc(id)}/${approve ? 'approve' : 'reject'}`, { comment }),
-  activity: (filter: { server?: string; actor?: string; action?: string; limit?: number } = {}) =>
+  activity: (filter: { server?: string; target?: string; actor?: string; action?: string; limit?: number } = {}) =>
     json<Items<Activity>>('GET', '/activity' + q(filter)),
 }

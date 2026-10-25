@@ -117,6 +117,9 @@ versions follow [SemVer](https://semver.org).
   but were applied only to recordings, and there only for lower-case names. Their values are now `***` at
   any depth of JSON tool results (retained results included), error bodies (the agent's and the audit
   file's) and recordings, whatever the case of the name.
+- A server's Activity (`GET /activity?server=`) listed only the start of its builds: finishing, releasing,
+  archiving, restoring, deleting and downloading didn't name the server. They now do, from this release on;
+  a build's page asks by its id, so it also shows events recorded before.
 - An identity policy file with a `scopes` section shut out every caller without OAuth scopes (API keys,
   no sign-in, stdio), with no rule that could let them back in. Scope rules now apply to OAuth callers
   only; other callers follow the file's `default` and `subjects` rules, and startup warns when a file with

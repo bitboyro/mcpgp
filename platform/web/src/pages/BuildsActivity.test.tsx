@@ -24,6 +24,7 @@ function page(path: string) {
   fakeApi({
     'GET /me': ME, 'GET /settings': SETTINGS, 'GET /servers/orders-mcp': { id: 'orders-mcp', title: 'Orders', archived: false, latestVersion: 5, versions: [] },
     'GET /activity?server=orders-mcp&limit=200': ACTIVITY, 'GET /approvals': { items: [] },
+    'GET /activity?target=b-1&limit=50': { items: ACTIVITY.items.filter((i) => i.target === 'b-1') },
     'GET /servers/orders-mcp/builds': { items: [BUILD] }, 'GET /builds/b-1': BUILD, 'GET /builds/b-1/log': 'done\n',
     'GET /builds/b-1/artifacts': { items: [] },
   })

@@ -287,7 +287,7 @@ function Upload({ id, onDone }: { id: string; onDone: (version: number) => void 
     <form className="card" onSubmit={(e) => { e.preventDefault(); upload.mutate() }}>
       <h2>Upload the whole project</h2>
       <p className="hint">For projects kept in git: the folder with the <code>*.mcpgp.yaml</code>, or a zip of it, as the next revision.
-        A version with the same content as the latest isn't created again.</p>
+        A revision with the same content as the latest isn't created again.</p>
       <div className="actions">
         <button type="button" className="btn" onClick={() => folder.current?.click()}>Choose folder</button>
         <button type="button" className="btn" onClick={() => zip.current?.click()}>Choose zip</button>
