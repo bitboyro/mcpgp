@@ -108,6 +108,7 @@ jobs:
           # the platform image knows its own name, for `setup` (the CLI image ignores it)
           build-args: |
             MCPGP_IMAGE=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:${{ steps.meta.outputs.version }}
+            MCPGP_COMMIT=${{ github.sha }}
 
       - name: Pushed
         run: echo "${{ steps.meta.outputs.tags }}" | sed 's/^/pushed /'

@@ -276,7 +276,9 @@ installation; nothing reads it any more.
 ## Building from the repository
 
 Instead of the published image, build it on the host from a clone; the files are the ones in
-`deploy/` (with a `build:` section), and the secrets are made by hand:
+`deploy/` (with a `build:` section), and the secrets are made by hand. The platform shows its version and
+build date in the sidebar; to record the commit too, build with
+`--build-arg MCPGP_COMMIT=$(git rev-parse HEAD)`.
 
 ```bash
 git clone https://github.com/bitboyro/mcpgp && cd mcpgp/deploy

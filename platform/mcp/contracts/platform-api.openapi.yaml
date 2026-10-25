@@ -693,7 +693,7 @@ paths:
       operationId: getSettings
       tags: [identities]
       summary: Platform settings
-      description: The workspace name, sign-in options, whether a signing key is configured, build retention and agent guardrails.
+      description: The workspace name, sign-in options, whether a signing key is configured, build retention, agent guardrails, and the platform's own build (version, build time, commit, Java).
       responses:
         "200": { description: Settings, content: { application/json: { schema: { type: object } } } }
         default: { $ref: "#/components/responses/Problem" }

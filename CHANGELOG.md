@@ -6,6 +6,10 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- The platform shows its release version and build date at the bottom of the sidebar, with an About panel
+  (build time, commit, Java version). The build time is when the artifact was built, not when it started;
+  `GET /settings` returns the same as `build`. Published images record their commit; for your own image
+  build, pass `--build-arg MCPGP_COMMIT=$(git rev-parse HEAD)`.
 - `metadata.instructions` in definitions: what agents are told on initialize, kept as written (paragraphs
   and lists). Without it, the description is used on one line, as before. The platform edits it on
   **General** with a live preview of exactly what initialize sends, including the note multi-instance

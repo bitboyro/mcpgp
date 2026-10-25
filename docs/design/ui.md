@@ -35,7 +35,10 @@ Type (0.4.0): body 16px / 1.6, labels, hints and tables 14px, card headings 17px
 (`--text-*` tokens in `styles.css`). Page background `#F7F8FA`, dividers `#ECEEF2`. Icons: Lucide
 (`lucide-react`, ISC), one name per meaning in `ui.tsx`, in front of the label on main actions; the
 mcpgp mark stays our own. The sidebar footer has two labelled buttons: **API reference** (the API and
-agents page) and **Connect an agent**.
+agents page) and **Connect an agent**. Under the account row: `mcpgp <version> · built <date>`, opening
+an About panel (version, build time, commit, Java). The build time is the artifact's, from
+`META-INF/build-info.properties`, never the start time; the commit comes from `-Dmcpgp.commit` (CI and
+the image build pass it) and shows as "not recorded" otherwise.
 
 **Words (0.4.0):** *API definition* is the OpenAPI or Swagger document; *API version* is 1.0, 2.0 (what the
 file format calls a contract); *revision* is a saved state of a server ("Save as revision 6"). Library

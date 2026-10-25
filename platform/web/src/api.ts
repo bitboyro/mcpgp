@@ -219,6 +219,8 @@ export interface Settings {
   signing: { configured: boolean }
   retention: { archiveAfterDays: number; deleteArchivedAfterDays: number; keepLast: number }
   guardrails: { agentBuildsPerHour: number; agentVersionsPerHour: number }
+  /** The platform's own build: version, build time (not start time), commit when recorded, and the Java it runs on. */
+  build?: { version: string | null; time: string | null; commit: string | null; java: string }
 }
 
 // The manifest (docs/spec/manifest.md): only the parts the UI shows are typed.

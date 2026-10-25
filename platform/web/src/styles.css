@@ -114,6 +114,12 @@ code, pre, .mono { font-family: var(--mono); }
 .nav-button:hover { border-color: #3A3F4E; color: var(--stage-bright); }
 .nav-button.active { border-color: var(--nav-icon); color: var(--stage-bright); }
 .nav-button svg { color: var(--nav-icon); }
+.nav-about { padding: 0 10px 4px; }
+.nav-version { display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; color: var(--stage-dim); font-size: var(--text-tiny); cursor: pointer; }
+.nav-version:hover { color: var(--nav-ink); }
+.about { margin-top: 6px; padding: 10px 12px; border: 1px solid var(--nav-line); border-radius: 10px; background: var(--nav-card); color: var(--nav-ink); }
+.about .kv { font-size: var(--text-tiny); }
+.about .kv dt { color: var(--stage-dim); }
 .nav-who { font-size: 13px; color: var(--stage-dim); padding: 6px 10px; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .nav-who button { background: none; border: 0; color: var(--nav-dim); cursor: pointer; font-size: 13px; text-decoration: underline; padding: 4px; }
 

@@ -116,6 +116,7 @@ public class AccountsApi {
         body.put("signing", Map.of("configured", config.signingKey() != null && !config.signingKey().isBlank()));
         body.put("retention", config.retention());
         body.put("guardrails", config.guardrails());
+        body.put("build", ro.bitboy.mcpgp.platform.service.BuildInfo.current().asMap());
         return Json.ok(body);
     }
 
