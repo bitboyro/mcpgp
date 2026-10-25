@@ -53,6 +53,10 @@ other people on the host out. Back up `secrets/` and `.env` somewhere safe (a pa
 secret store): the signing key can't be recreated. To see the admin password for the first sign-in:
 `cat secrets/admin_password`.
 
+`setup` names the Compose project `mcpgp`. To run a second installation on the same machine (a test
+of a new version, say), change `name:` in its `compose.yaml` first: otherwise both folders share one
+project, and `docker compose down -v` in either deletes the other's data.
+
 ## 2. Check, then start
 
 ```bash
