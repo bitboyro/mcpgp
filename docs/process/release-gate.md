@@ -1,6 +1,6 @@
 # Release gate (plan)
 
-Status: **plan; G1 in progress** ([#85](https://github.com/bitboyro/mcpgp/pull/85)) · Roadmap: **M10 · Release gate**
+Status: **G1 and G2 in place** ([#85](https://github.com/bitboyro/mcpgp/pull/85), [#88](https://github.com/bitboyro/mcpgp/pull/88)); G3–G5 planned · Roadmap: **M10 · Release gate**
 
 A release is published only when the packages we ship pass an integration suite run by an MCP
 client we did not write, over real transports, against an API mock that checks every request.
