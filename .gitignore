@@ -6,5 +6,6 @@ target/
 # agent worktrees (local)
 .claude/worktrees/
 
-# personal study material (local)
+# not part of the product (local): study material, working notes and review ledgers
 learning/
+notes/
