@@ -33,6 +33,34 @@ catalogue, Tab-to-accept predictions, central runtime/fleet management, and a co
 Access control and Observability pages; the UI placement, terminology and visual tokens were decided
 in its design review: [ui.md](../design/ui.md).)
 
+## 0.5.0 scope (agreed 2026-10-27)
+
+Chosen for what enterprise customers need, not carried over from older plans. In this order:
+
+1. **Security scanning and a security policy.** CodeQL, Trivy (dependencies, Dockerfiles, compose files,
+   committed secrets, both images), npm audit and Dependabot on every change and weekly; CycloneDX SBOMs
+   on every release; secret scanning with push protection; `SECURITY.md`. Files that aren't part of the
+   product leave the repository.
+2. **Enterprise readiness of the generated server and the platform:**
+
+   | # | What | Why | Today |
+   |---|---|---|---|
+   | E1 | Corporate proxies: outbound proxy (`HTTPS_PROXY`, `NO_PROXY`, proxy sign-in) and `trustProxy` behind a load balancer | Locked-down networks send all outbound traffic through a proxy | `server.outboundProxy` and `server.trustProxy` refused at startup |
+   | E2 | Secrets from a secret manager: Vault, AWS Secrets Manager, Azure Key Vault, rotated on reload | Security reviews don't accept secrets in environment variables or files | `${env:}` and `${file:}` only |
+   | E3 | Supply-chain evidence in every package: an SBOM of the generated server, a signed image with provenance, a vulnerability report | The first questions of a security questionnaire | minisign checksums; image publishing from a build refused |
+   | E4 | Audit events into the customer's log system (stdout, OTLP logs, syslog) with a documented format and the signed-in user on every event | Security teams want MCP activity in their SIEM | a JSON Lines file |
+   | E5 | A Helm chart generated with the Docker package | Enterprises run Kubernetes | customers write their own manifests |
+   | E6 | In-place platform upgrades, and one Compose project per installation | Dump-and-restore upgrades and a shared project name that lets one installation delete another's data stop adoption | export and import when the store format changes; every project named `mcpgp` |
+
+3. **A landing page with downloads:** the platform without Docker (deferred from 0.4.0 as R09) and the
+   CLI as packages to download, next to the images.
+4. **Example servers for APIs people use:** GitHub, Docker and Jira, generated with mcpgp from their
+   public API definitions and hosted on our platform to download.
+
+Not in 0.5.0 (still deferred from 0.4.0): the complete template workflow (R07), agent guidance in
+packages (R11), the feature-inventory review (R02). After 0.5.0, for enterprises: permissions per server
+or team on the platform, running the platform with several replicas, URL-mode elicitation.
+
 ## Releases
 
 | Version | Contents |
@@ -48,7 +76,7 @@ in its design review: [ui.md](../design/ui.md).)
 | **0.2.7** (released 2026-10-13) | Per-operation security enforced (tools no credential can call hidden or explained; each call uses the credential that fits); a suffix for every tool and renaming one tool from the UI; audit defaults on Overview; `init --from-spec` copies referenced files; broken schema references are errors; Try starts its server early |
 | **0.3.0** (released 2026-10-20) | Passwords in the web UI (change, set and unlock); per-user identity by token exchange; clashing tool names chosen on upload; contract detection for `auto` instances and a Connections page for the rule; spec versions from an address with Check for updates; `mcpgp diff`, `preview`, `try`, `migrate` and the platform's Changes page; the platform's own server with Connect an agent; MCP cancellation, list pagination, resource-template completion and real progress; Security & safety protections; output schemas; `mixedContracts` and `instances.max` enforced; settings that did nothing are refused; stdio parallel-answer fix |
 | **0.4.0** (released 2026-10-26) | Batching, retained results and durable receipts; layered runtime policy with identity and organization policy files and session narrowing; the platform's navigation regrouped (General, API definitions, Tools, Target APIs, Access control, Execution, Observability, Packaging, Builds and releases), Overview area cards, 16px type and Lucide icons, plain words (Validate, API version, revision), `metadata.instructions`, version and build date, a Command line page; `upstreamAuth` (was `downstreamAuth`) and `AUTH_UPSTREAM`; masked fields in results, errors and audit; reload and import fixes. [Release scope](release-0.4.0.md) |
-| **0.5.0** (planned) | Deferred from 0.4.0: a standalone platform distribution without Docker (R09), the complete template workflow (R07), agent guidance in packages and its docs (R11), the feature-inventory review (R02) |
+| **0.5.0** (planned) | Ready for enterprise IT and security review, and for people to find and try: security scanning, SBOMs and a security policy; corporate proxies, secret managers, supply-chain evidence in every package, audit to the customer's log system, a Helm chart, in-place platform upgrades; a landing page with downloads (the platform without Docker, the CLI); example servers for public APIs ([scope below](#050-scope-agreed-2026-10-27)) |
 | TODO, not yet scheduled | Marked TODO in the docs: `release.versionFrom` other than `contract`, `platform:` in the repository config; git sources on the platform (a spec from an address, with Check for updates: on `main`); a native CLI binary. (CLI `diff`, `preview`, `try`, `migrate` and `--no-color`, the platform's Changes page, and contract detection for `auto` instances: on `main`.) |
 
 ## MCP 2026-07-28 and protocol utilities (added 2026-10-17; updated 2026-10-26)
@@ -82,7 +110,6 @@ Releases happen when they're asked for; these land on `main` first.
 | Item | What | State |
 |---|---|---|
 | UX and wording review | The first pass shipped in 0.4.0: navigation by configuration group, Overview area cards, plain words (API definition, API version, revision), one-line help with How it works, icons. Next: the walkthrough with people who haven't seen the platform ([Main priorities](#main-priorities)) | 0.4.0 pass released; review with people pending |
-| One Compose project per installation | `setup` writes `name: mcpgp`, so a second installation on the same machine (a test of a new version) joins the first, and `docker compose down -v` in either deletes the other's data. Name the project after the folder (or `setup --name`), and have `check` warn when another project with that name runs from a different folder | Documented in [self-hosting §1](../guides/self-hosting.md#1-write-the-folder-with-setup); not built |
 | Record the 0.4.0 design decisions | The 0.4.0 design review's decisions (grouping settings by configuration concern, the Access control and Observability split between platform-edited defaults and deployment settings, the wording and help rules) are partly in [ui.md](../design/ui.md) and the specs; move the rest into [decisions](../decisions/README.md) so they outlive the review notes | Pending |
 
 Shipped from this list: tool-name clashes on spec upload, passwords in the web UI, per-user identity by
