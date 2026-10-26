@@ -3,7 +3,11 @@
 All notable changes are documented here. Format: [Keep a Changelog](https://keepachangelog.com),
 versions follow [SemVer](https://semver.org).
 
-## Unreleased
+## 0.4.0 — 2026-10-26
+
+**Deferred to 0.5.0:** a standalone platform distribution without Docker (the platform image and the CLI
+zip remain the supported installs), the complete template workflow, further agent guidance in the packages,
+and the review of the feature inventory ([release plan](docs/process/release-0.4.0.md)).
 
 ### Added
 - A **Command line** page in the platform (sidebar footer, and linked from Packaging → Pipeline): the CLI

@@ -1,4 +1,4 @@
-image: docker.io/example/mcpgp-cli:0.3.0   # the CLI image; pin by digest in real use
+image: docker.io/example/mcpgp-cli:0.4.0   # the CLI image; pin by digest in real use
 
 stages: [check, build, release]
 
