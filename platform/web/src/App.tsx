@@ -4,7 +4,7 @@ import { AccessControlPage } from './pages/AccessControl'
 import { ActivityPage } from './pages/Activity'
 import { AgentsPage } from './pages/Agents'
 import { ApiDefinitionsPage } from './pages/ApiDefinitions'
-import { AllBuildsPage, ServerBuildsPage } from './pages/Builds'
+import { AllBuildsPage, BuildRedirect, ServerBuildsPage } from './pages/Builds'
 import { ExecutionPage } from './pages/Execution'
 import { GeneralPage } from './pages/General'
 import { LibraryPage } from './pages/Library'
@@ -13,6 +13,7 @@ import { OverviewPage } from './pages/Overview'
 import { PackagingPage } from './pages/Packaging'
 import { AccountPage } from './pages/Passwords'
 import { ChangesPage } from './pages/Changes'
+import { CommandLinePage } from './pages/CommandLine'
 import { ServersPage } from './pages/Servers'
 import { SignInPage } from './pages/SignIn'
 import { TargetApisPage } from './pages/TargetApis'
@@ -38,8 +39,10 @@ export function App() {
       <Route path="/" element={<Signed><ServersPage /></Signed>} />
       <Route path="/library" element={<Signed><LibraryPage /></Signed>} />
       <Route path="/builds" element={<Signed><AllBuildsPage /></Signed>} />
+      <Route path="/builds/:buildId" element={<Signed><BuildRedirect /></Signed>} />
       <Route path="/activity" element={<Signed><ActivityPage /></Signed>} />
       <Route path="/agents" element={<Signed><AgentsPage /></Signed>} />
+      <Route path="/cli" element={<Signed><CommandLinePage /></Signed>} />
       <Route path="/account" element={<Signed><AccountPage /></Signed>} />
       <Route path="/servers/:id" element={<Signed><OverviewPage /></Signed>} />
       <Route path="/servers/:id/general" element={<Signed><GeneralPage /></Signed>} />

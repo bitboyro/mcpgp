@@ -185,4 +185,13 @@ class YamlEditTest {
                 List.of(set("/apis/[id=orders]/upstreamAuth/fromRequest", "{}")));
         assertThat(YAML.readTree(fresh).at("/apis/0/upstreamAuth/fromRequest").isObject()).isTrue();
     }
+
+    @Test
+    void multiLineInstructionsAreWrittenSoTheyReadBackExactly() throws Exception {
+        String text = "Look up orders.\n\n- Search first.\n- Ask before \"changing\" data: it's real.";
+        String edited = YamlEdit.apply("apiVersion: mcpgp/v1\nmetadata:\n  name: orders-mcp   # kept\n  description: Orders.\n",
+                List.of(new YamlEdit.Change("set", "/metadata/instructions", JSON.valueToTree(text))));
+        assertThat(YAML.readTree(edited).at("/metadata/instructions").asText()).isEqualTo(text);
+        assertThat(edited).contains("# kept").contains("description: Orders.");
+    }
 }

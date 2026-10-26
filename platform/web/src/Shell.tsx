@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
-import { Link, NavLink, useNavigate, useParams } from 'react-router-dom'
-import { api } from './api'
+import { useState, type ReactNode } from 'react'
+import { Link, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { api, type Settings } from './api'
 import { useSession } from './session'
 import { ChangePassword } from './pages/Passwords'
 import { Icon } from './ui'
@@ -13,6 +13,29 @@ function Item({ to, icon, children, end }: { to: string; icon: IconName; childre
     <NavLink to={to} end={end} className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
       <Icon name={icon} />{children}
     </NavLink>
+  )
+}
+
+/** The platform's version and build date, always visible; the details open in an About panel (R08). */
+function AboutLine({ build }: { build?: Settings['build'] }) {
+  const [open, setOpen] = useState(false)
+  const date = build?.time ? new Date(build.time).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : null
+  return (
+    <div className="nav-about">
+      <button type="button" className="nav-version" aria-expanded={open} aria-controls="about-panel" onClick={() => setOpen(!open)}>
+        mcpgp {build?.version ?? 'development'}{date && ` · built ${date}`}<Icon name="info" size={13} />
+      </button>
+      {open && (
+        <div id="about-panel" className="about" role="region" aria-label="About this platform">
+          <dl className="kv">
+            <dt>Version</dt><dd>{build?.version ?? 'not recorded'}</dd>
+            <dt>Built</dt><dd>{build?.time ? new Date(build.time).toLocaleString() : 'not recorded'}</dd>
+            <dt>Commit</dt><dd className="mono" title={build?.commit ?? undefined}>{build?.commit ? build.commit.slice(0, 12) : 'not recorded'}</dd>
+            <dt>Java</dt><dd>{build?.java ?? 'unknown'}</dd>
+          </dl>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -31,6 +54,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const { id } = useParams()
   const { me, settings } = useSession()
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
 
   const signOut = async () => {
@@ -95,8 +119,16 @@ export function Shell({ children }: { children: ReactNode }) {
           </>
         )}
         <div className="nav-foot">
-          <Item to="/agents" icon="api">API &amp; agents</Item>
+          <div className="nav-buttons" aria-label="For developers">
+            <NavLink to="/agents" end className={({ isActive }) => 'nav-button' + (isActive && !location.search.includes('connect') ? ' active' : '')}>
+              <Icon name="book" />API reference</NavLink>
+            <Link to="/agents?connect" className={'nav-button' + (location.pathname === '/agents' && location.search.includes('connect') ? ' active' : '')}>
+              <Icon name="zap" />Connect an agent</Link>
+            <NavLink to="/cli" className={({ isActive }) => 'nav-button' + (isActive ? ' active' : '')}>
+              <Icon name="terminal" />Command line</NavLink>
+          </div>
           <div className="nav-who"><Link to="/account" title="Your account">{me.name}</Link><button type="button" onClick={signOut}>Sign out</button></div>
+          <AboutLine build={settings.build} />
         </div>
       </nav>
       <div className="main">{children}</div>

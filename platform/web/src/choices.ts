@@ -130,7 +130,7 @@ export const PACKS: [string, string][] = [
 ]
 
 export function packOn(m: Manifest, id: string): boolean {
-  return m.packs.some((p) => p.id === id)
+  return m.packs?.some((p) => p.id === id) ?? false
 }
 
 /** In a variant, null removes what the original has; elsewhere the key goes. */

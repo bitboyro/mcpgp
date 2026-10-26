@@ -29,8 +29,22 @@ notes below are the baseline until each scoped change is implemented and verifie
 **Pattern:** dark sidebar; light controls on the left; a dark **live preview** on the right showing
 the consequence of each choice (what the agent gets, what the customer configures, what is shipped).
 
-**Style:** Geist + Geist Mono; neutral greys; one violet accent (`#5B4BEA`); dark stage `#0E0F14`;
-generous radii (12–22 px); segmented controls for choices.
+**Style:** Geist + Geist Mono; neutral greys; one violet accent (`#5B4BEA`) for primary actions, links
+and focus; dark stage `#0E0F14`; generous radii (12–22 px); segmented controls for choices.
+Type (0.4.0): body 16px / 1.6, labels, hints and tables 14px, card headings 17px, page titles 24px
+(`--text-*` tokens in `styles.css`). Page background `#F7F8FA`, dividers `#ECEEF2`. Icons: Lucide
+(`lucide-react`, ISC), one name per meaning in `ui.tsx`, in front of the label on main actions; the
+mcpgp mark stays our own. The sidebar footer has two labelled buttons: **API reference** (the API and
+agents page), **Connect an agent** and **Command line**. Under the account row: `mcpgp <version> · built <date>`, opening
+an About panel (version, build time, commit, Java). The build time is the artifact's, from
+`META-INF/build-info.properties`, never the start time; the commit comes from `-Dmcpgp.commit` (CI and
+the image build pass it) and shows as "not recorded" otherwise.
+
+**Words (0.4.0):** *API definition* is the OpenAPI or Swagger document; *API version* is 1.0, 2.0 (what the
+file format calls a contract); *revision* is a saved state of a server ("Save as revision 6"). Library
+items keep *version*, because they're referenced as `@1`. *Validate* checks a revision. Labels and
+headings use "and", not "&". Help under a setting is one sentence of about 15 words; more detail opens in
+place under **How it works** (`Help` in `ui.tsx`), never only on hover.
 
 Page names in this table are the canvas's; the 2026-10-25 regroup renamed and split several of them
 (see [Server navigation](#server-navigation-2026-10-25)).
@@ -57,20 +71,21 @@ Built into the platform jar and served by it (`WebUi`), on the API's own origin.
 |---|---|---|
 | Sign in | `/sign-in` | local and directory accounts; company SSO (OIDC) |
 | All servers | `/` | cards, duplicate / variant panel, new server (folder or zip), shared library |
-| Overview (canvas: Shape) | `/servers/:id` | the definition's choices and packs, editable: changes preview live (agent, customer setup, package, checks), Review shows the file's diff, Save makes the next version |
-| General | `/servers/:id/general` | name, title, server version, instructions for agents (read-only), the definition's version, variant and base |
+| Overview | `/servers/:id` | one card per area (API definitions, Tools, Target APIs, Access control, Execution, Observability, Delivery, General) with its purpose, state and summary, linking to the page; one "Next" step for the most important unfinished area; "Preview as agent" shows the agent, customer setup, package and validation previews. Nothing is edited here |
+| General | `/servers/:id/general` | name, title, server version; instructions for agents (`metadata.instructions`) with a live preview of what initialize sends; the latest revision, variant and base |
 | API definitions | `/servers/:id/apis` | specs, contracts shipped per API, version detection, upload a new version, saved versions, files, checks |
-| Tools | `/servers/:id/tools` | filters, search, the tool as the agent gets it, its provenance; output schemas; Operations and Naming views |
-| Target APIs | `/servers/:id/targets` | target servers; per API: sign-in types, per-user credential, token exchange; the shipped example config |
+| Tools | `/servers/:id/tools` | what the agent sees (exposure mode) and support packs; filters, search, the tool as the agent gets it, its provenance; output schemas; Operations view (with what tools may do per API), Naming, Notices |
+| Target APIs | `/servers/:id/targets` | one or several target servers and what happens when they run different versions; per API: sign-in types, per-user credential, token exchange; the shipped example config |
 | Access control | `/servers/:id/access` | sign-in methods offered and default, scope → tool permissions, sessions default; deployment and administrator settings shown read-only |
-| Execution | `/servers/:id/execution` | confirmations, response and request limits, batching, retained results, rate limits; always-on protections |
+| Execution | `/servers/:id/execution` | confirmations, response and request limits, batching, retained results, rate limits; Data protection (error detail Full/Summary, masked fields with the defaults shown); always-on protections |
 | Observability | `/servers/:id/observability` | audit file, rotation, retention and arguments; log level; OpenTelemetry on/off, exporter, service name, signals; paths and endpoints read-only; health endpoints |
-| Packaging | `/servers/:id/packaging` | formats, how it runs, docs and contents as they ship |
-| Builds and releases | `/servers/:id/builds`, `/builds` | live log, downloads, package files, release, archive, restore, delete |
+| Packaging | `/servers/:id/packaging` | how agents connect (stdio, HTTP), formats, docs and contents as they ship |
+| Builds and releases | `/servers/:id/builds`, `/builds`, `/builds/:buildId` | packages built from the server: live log, downloads, package files, release, archive, restore, delete; the build's own Activity entries, linking to the rest. `/builds/:buildId` opens a build on its server's page |
 | Changes | `/servers/:id/changes` | differences between versions |
-| Activity | `/servers/:id/activity`, `/activity` | timeline with filters; approvals |
+| Activity | `/servers/:id/activity`, `/activity` | who did what, and when: filters All, Changes, Builds, Access (platform-wide), Agents, kept in the address (`?show=builds`, `?build=<id>` for one build); build entries link to their build; approvals |
 | Shared library | `/library` | items by kind (adding them is API / CLI) |
-| API & agents | `/agents` | identities, tokens (shown once), guardrails, approvals, agent activity |
+| API and agents | `/agents` | identities, tokens (shown once), guardrails, approvals, agent activity |
+| Command line | `/cli` | where to get the CLI matching this platform (CI image, zip, jar on the release page), how to use it, and `mcpgp push` to this platform with a pipeline token |
 
 The old server routes `/sources`, `/connections`, `/safety` and `/package` redirect to
 `/apis`, `/targets`, `/execution` and `/packaging`, keeping the query string.

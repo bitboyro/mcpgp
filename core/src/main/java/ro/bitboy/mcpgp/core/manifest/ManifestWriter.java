@@ -257,11 +257,13 @@ public final class ManifestWriter {
             server.put("title", metadata.get("title").asText());
         }
         server.put("version", version(doc, build));
-        String instructions = metadata.path("description").asText("").strip().replaceAll("\\s+", " ");
+        // metadata.instructions as written (paragraphs and lists kept); otherwise the description on one line
+        String written = metadata.path("instructions").asText("").strip();
+        String instructions = !written.isEmpty() ? written : metadata.path("description").asText("").strip().replaceAll("\\s+", " ");
         if (multi) {
             String list = severalApis ? "the <api>_instances_list tools" : "instances_list";
-            instructions = (instructions.isEmpty() ? "" : instructions + " ")
-                    + "Every tool requires `instance`; call " + list + " to see the configured servers.";
+            String note = "Every tool requires `instance`; call " + list + " to see the configured servers.";
+            instructions = instructions.isEmpty() ? note : instructions + (written.contains("\n") ? "\n\n" : " ") + note;
         }
         if (!instructions.isEmpty()) {
             server.put("instructions", instructions);

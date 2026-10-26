@@ -8,7 +8,7 @@ import { NoticeSetEditor } from './NoticeSetEditor'
 import { PolicyEditor } from './PolicyEditor'
 
 const KINDS: [string, string, string][] = [
-  ['contracts', 'API contracts', 'OpenAPI and Swagger documents several servers ship.'],
+  ['contracts', 'API definitions', 'OpenAPI and Swagger documents several servers ship.'],
   ['naming', 'Naming policies', 'How operation ids become tool names.'],
   ['notices', 'Shared notices', 'Company policy and disclaimers on the tools of every server that includes them.'],
   ['rules', 'Rule sets', 'Descriptions, safety and selection rules.'],

@@ -70,7 +70,7 @@ export function ServersPage() {
                 <div className="card-actions">
                   <BuildButton id={server.id} disabled={server.latestVersion == null || !manifest} />
                   <Link to={`/servers/${server.id}`} className="btn btn-dark btn-sm">{server.system ? 'View MCP server' : 'Open'}</Link>
-                  {server.system && <Link className="btn btn-sm" to="/agents?connect">Connect an agent</Link>}
+                  {server.system && <Link className="btn btn-sm" to="/agents?connect"><Icon name="zap" />Connect an agent</Link>}
                   {can('servers:write') && <>
                     {!server.system && <button type="button" className="btn btn-sm" onClick={() => setPanel({ mode: 'copy', source: server })}>Duplicate</button>}
                     <button type="button" className="btn btn-sm btn-soft" onClick={() => setPanel({ mode: 'variant', source: server })}>New variant</button>
@@ -216,7 +216,7 @@ function NewFromSpec() {
         <>
           <div className="stage-card">
             <span className="eyebrow">Found</span>
-            <span><b>{plan.data.title}</b> · {FORMATS[plan.data.format] ?? plan.data.format} · version {plan.data.version}</span>
+            <span><b>{plan.data.title}</b> · {FORMATS[plan.data.format] ?? plan.data.format} · API version {plan.data.version}</span>
             <span className="hint">{plan.data.tools === 1 ? '1 operation becomes a tool' : `${plan.data.tools} operations become tools`} · main file <span className="mono">{plan.data.main}</span>
               {plan.data.files.filter((f) => f.startsWith('contracts/')).length > 1 && ` and ${plan.data.files.filter((f) => f.startsWith('contracts/')).length - 1} more`}</span>
             {plan.data.moved.length > 0 && (
@@ -239,7 +239,7 @@ function NewFromSpec() {
           <label className="field">Title
             <input className="input input-stage" value={title ?? plan.data.title} onChange={(e) => setTitle(e.target.value)} />
           </label>
-          <label className="field">Contract version (from the spec's info.version)
+          <label className="field">API version (from info.version in the definition)
             <input className="input input-stage" value={version ?? plan.data.version} onChange={(e) => setVersion(e.target.value)} />
           </label>
           {(rule || renames) && <p className="hint">{rule ? 'Clashing tools are named from their method and path (naming.collisions: method-path).'
@@ -276,7 +276,7 @@ function NewFromProject() {
   }
   return (
     <form className="list" style={{ gap: 16 }} onSubmit={(e) => { e.preventDefault(); create.mutate() }}>
-      <p className="hint">For a project kept in git: a folder with one <code>*.mcpgp.yaml</code> at the top, its contracts, overlays and rules.
+      <p className="hint">For a project kept in git: a folder with one <code>*.mcpgp.yaml</code> at the top, its API definitions, overlays and rules.
         Files are checked like the CLI checks them; hidden files are left out.</p>
       <div className="actions">
         <button type="button" className="btn btn-stage" onClick={() => folder.current?.click()}>Choose folder</button>
@@ -296,7 +296,7 @@ function NewFromProject() {
         <input className="input input-stage" value={id} onChange={(e) => setId(slug(e.target.value))} required pattern="[a-z0-9][a-z0-9-]{1,62}" />
       </label>
       <ErrorBox error={create.error} />
-      <button type="submit" className="btn btn-primary" disabled={!picked || !id || create.isPending}>Create server</button>
+      <button type="submit" className="btn btn-primary" disabled={!picked || !id || create.isPending}><Icon name="plus" />Create server</button>
     </form>
   )
 }

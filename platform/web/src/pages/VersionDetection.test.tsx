@@ -72,7 +72,7 @@ describe('version detection on API definitions', () => {
       'GET /servers/orders-mcp/versions/latest/manifest': manifest(['2.0']),
     })
     page()
-    expect(await screen.findByText('Orders: contracts shipped')).toBeTruthy()
+    expect(await screen.findByText('Orders: API versions shipped')).toBeTruthy()
     expect(screen.queryByText('Which version a customer’s server runs')).toBeNull()
   })
 })

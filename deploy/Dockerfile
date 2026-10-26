@@ -6,10 +6,12 @@
 # The jar is the same on every architecture, so this stage runs natively on the builder (no emulation
 # for multi-architecture images); only the run stage below is built per architecture.
 FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-21 AS build
+# the commit, recorded in the jar and shown in the UI's About panel (.git isn't copied into the build)
+ARG MCPGP_COMMIT=unknown
 WORKDIR /src
 COPY . .
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -q -pl platform -am package -DskipTests \
+    mvn -B -q -pl platform -am package -DskipTests -Dmcpgp.commit="$MCPGP_COMMIT" \
  && cp platform/target/mcpgp-platform-*-exec.jar /mcpgp-platform.jar
 
 # ---- run

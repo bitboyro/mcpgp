@@ -130,7 +130,7 @@ public class BuildsApi {
             filename = file.substring(file.lastIndexOf('/') + 1);
         }
         store.append(new Model.Activity(Instant.now().toString(), who.identity().name(), who.identity().kind(), "artifact.download", build,
-                "ok", Map.of("artifact", downloaded)));
+                "ok", Map.of("server", b.server(), "artifact", downloaded)));
         long total = content.length;
         if (offset != null || limit != null) {
             // a part of a big file: bytes offset … offset + limit (the whole size is in X-Total-Size)

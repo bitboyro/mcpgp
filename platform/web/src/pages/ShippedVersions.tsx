@@ -12,14 +12,14 @@ export function ShippedVersions({ id, manifest }: { id: string; manifest: Manife
       {manifest.apis.map((a) => (
         <div key={a.id} className="card">
           <div className="card-head">
-            <h2>{a.title ?? a.id}: contracts shipped</h2>
+            <h2>{a.title ?? a.id}: API versions shipped</h2>
             <span className="tag mono">{a.toolPrefix ?? a.id}_*</span>
           </div>
           {a.contracts.map((c) => (
             <div key={c.version} className="row">
               <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <b style={{ fontSize: 20, letterSpacing: '-0.02em' }}>{c.version}</b>
-                <span><span style={{ fontSize: 13, fontWeight: 500 }}>{c.format}</span><br /><span className="meta">{c.basePath ?? '/'}{c.default ? ' · default' : ''}</span></span>
+                <span><span style={{ fontSize: 14, fontWeight: 500 }}>{c.format}</span><br /><span className="meta">{c.basePath ?? '/'}{c.default ? ' · default' : ''}</span></span>
               </span>
             </div>
           ))}
@@ -85,7 +85,7 @@ function VersionDetection({ id, api: apiId, current }: { id: string; api: string
           <label className="field"><span>Path that answers with the version</span>
             <input className="input mono" value={path} onChange={(e) => setPath(e.target.value)} />
           </label>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}><input type="checkbox" checked={under} onChange={(e) => setUnder(e.target.checked)} />
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}><input type="checkbox" checked={under} onChange={(e) => setUnder(e.target.checked)} />
             Each version answers under its own base path (<span className="mono">/api/v2/version</span>, <span className="mono">/api/v1/version</span>)</label>
           <label className="field"><span>Where the version is in the answer</span>
             <select className="input" value={where} onChange={(e) => setWhere(e.target.value as Where)}>

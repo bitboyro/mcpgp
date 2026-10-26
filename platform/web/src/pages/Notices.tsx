@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { api, type Change, type DefinitionData, type Manifest, type Notice } from '../api'
 import { describeScope, noticeId, noticePath, removeNotice, scopeMatch, scopeOf, setNotice, type Scope } from '../descriptions'
 import { INCLUDE_PATH, includeChange, includeList, noticeRef, parseNoticeRef, withSet, withoutSet } from '../sharedNotices'
-import { Segmented } from '../ui'
+import { Segmented, Icon } from '../ui'
 
 interface Props {
   manifest: Manifest
@@ -15,7 +15,7 @@ interface Props {
 }
 
 /**
- * Notices on Overview (definition-format.md §5.1): text added to the descriptions of every tool, or of
+ * Notices on Tools → Notices (definition-format.md §5.1): text added to the descriptions of every tool, or of
  * the tools it selects (a tag, the tools that change data, chosen tools). Never cut off; changes are
  * previewed and saved like the other settings on the page.
  */
@@ -76,7 +76,7 @@ export function NoticesCard({ manifest, definition, editable, pending, pick }: P
     <div className="card">
       <div className="card-head">
         <h2>Notices on tool descriptions</h2>
-        {editable && editing === null && <button type="button" className="btn btn-sm" onClick={() => open()}>Add notice</button>}
+        {editable && editing === null && <button type="button" className="btn btn-sm" onClick={() => open()}><Icon name="plus" />Add notice</button>}
       </div>
       <p className="hint">Company policy, disclaimers: text added to the descriptions of every tool or of chosen tools. Never cut off;
         a long description is shortened to make room.</p>
@@ -98,7 +98,7 @@ export function NoticesCard({ manifest, definition, editable, pending, pick }: P
                     <button type="button" className="btn btn-sm" onClick={() => pickSets(withSet(sets, noticeRef(library.data!.workspace, parsed.name, latest)),
                       `shared notices ${parsed.name} → @${latest}`)}>Use @{latest}</button>
                   )}
-                  <button type="button" className="btn btn-sm" onClick={() => pickSets(withoutSet(sets, parsed.name), `stop using shared notices ${parsed.name}`)}>Remove</button>
+                  <button type="button" className="btn btn-sm" onClick={() => pickSets(withoutSet(sets, parsed.name), `stop using shared notices ${parsed.name}`)}><Icon name="trash" />Remove</button>
                 </span>
               )}
             </div>
@@ -141,7 +141,7 @@ export function NoticesCard({ manifest, definition, editable, pending, pick }: P
             {editable && editing === null && (own.has(n.id) || pending[noticePath(n.id)]) && (
               <span className="actions">
                 <button type="button" className="btn btn-sm" onClick={() => open(n)}>Edit</button>
-                <button type="button" className="btn btn-sm" onClick={() => pick(noticePath(n.id), `remove notice “${n.text.slice(0, 40)}”`, false, removeNotice(n.id))}>Remove</button>
+                <button type="button" className="btn btn-sm" onClick={() => pick(noticePath(n.id), `remove notice “${n.text.slice(0, 40)}”`, false, removeNotice(n.id))}><Icon name="trash" />Remove</button>
               </span>
             )}
           </div>
@@ -168,7 +168,7 @@ export function NoticesCard({ manifest, definition, editable, pending, pick }: P
             <fieldset className="list" style={{ border: 0, padding: 0, margin: 0, maxHeight: 220, overflow: 'auto' }}>
               <legend className="hint">Tools</legend>
               {names.map((name) => (
-                <label key={name} className="mono" style={{ fontSize: 13, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <label key={name} className="mono" style={{ fontSize: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input type="checkbox" checked={chosen.includes(name)}
                     onChange={(e) => setChosen((now) => (e.target.checked ? [...now, name] : now.filter((x) => x !== name)))} />{name}
                 </label>

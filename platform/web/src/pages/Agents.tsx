@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, type Identity, type Token } from '../api'
 import { useSession } from '../session'
-import { ErrorBox, Loading, PageHead, Segmented, ago } from '../ui'
+import { ErrorBox, Loading, PageHead, Segmented, ago, Icon } from '../ui'
 import { Approvals, describe } from './Activity'
 import { ConnectAgent } from './ConnectAgent'
 import { PersonPassword } from './Passwords'
@@ -30,7 +30,7 @@ export function AgentsPage() {
 
   return (
     <>
-      <PageHead title="API & agents" sub="People, pipelines and agents use the same API. Agents can build their own MCP servers, within your guardrails." />
+      <PageHead title="API and agents" sub="People, pipelines and agents use the same API. Agents can build their own MCP servers, within your guardrails." />
       <div className="body">
         <section className="col" aria-label="Identities">
           {issued && <IssuedToken token={issued} onClose={() => setIssued(null)} />}
@@ -70,7 +70,7 @@ export function AgentsPage() {
               same scopes, quotas and approvals apply.</p>
             <div className="actions">
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setConnecting(true)}>Connect an agent</button>
-              <a className="btn btn-stage btn-sm" href="/api/v1/platform-mcp" download>Download mcpgp-platform.zip</a>
+              <a className="btn btn-stage btn-sm" href="/api/v1/platform-mcp" download><Icon name="download" />Download mcpgp-platform.zip</a>
             </div>
             <pre className="code code-wrap" style={{ border: 0, padding: 0 }}>{`# mcpgp-platform.yaml, next to the jar
 instance:

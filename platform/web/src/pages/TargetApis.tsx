@@ -4,14 +4,9 @@ import { useParams } from 'react-router-dom'
 import { api, type Manifest } from '../api'
 import { AUTH_LABELS, useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
-import { ErrorBox, Loading, PageHead } from '../ui'
+import { ErrorBox, Loading, PageHead, Help } from '../ui'
 import { BuildButton, CustomerPreview } from './Overview'
-
-const MIXED: Record<string, string> = {
-  union: 'One tool, checked per call',
-  namespaced: 'Separate tools per server',
-  forbid: 'Same version only',
-}
+import { ChoiceRows, SettingsCard, usePendingEdits } from './SettingsCard'
 
 /** Target APIs: the servers a customer's MCP server calls, and how it signs in to them. */
 export function TargetApisPage() {
@@ -39,17 +34,15 @@ export function TargetApisPage() {
 
 function Settings({ id, manifest }: { id: string; manifest: Manifest }) {
   const multi = manifest.instances.mode === 'multi'
+  const edits = usePendingEdits(id, 'Target APIs')
   return (
     <>
-      <div className="card">
-        <h2>Target servers</h2>
-        <dl className="kv">
-          <dt>How many</dt><dd>{multi ? 'Several; agents choose one per call' : 'One'}</dd>
-          {multi && <><dt>Different versions</dt><dd>{MIXED[manifest.instances.mixedContracts ?? 'union'] ?? manifest.instances.mixedContracts}</dd></>}
-          {manifest.instances.max != null && <><dt>At most</dt><dd>{manifest.instances.max}</dd></>}
-        </dl>
-        <p className="hint">These come from the definition's <span className="mono">instances</span> and <span className="mono">apis</span> sections.</p>
-      </div>
+      <SettingsCard id={id} title="Target servers" edits={edits}>
+        {(m) => <>
+          <ChoiceRows manifest={m} only={(c) => c === 'instances' || c === 'mixed'} edits={edits} />
+          {m.instances.max != null && <dl className="kv"><dt>At most</dt><dd>{m.instances.max}</dd></dl>}
+        </>}
+      </SettingsCard>
       {manifest.apis.map((a) => (
         <div key={a.id} className="card">
           <div className="card-head">
@@ -106,12 +99,9 @@ function FromRequest({ id, api: apiId, server, several, current }: {
   const shown = header.trim() || defaultCredentialHeader(server) + (several ? ' (plus the API or server id)' : '')
   return (
     <div className="list" style={{ gap: 8, marginTop: 6 }}>
-      <h2>The user's own credential</h2>
-      <p className="hint">
-        The MCP client can send its user's credential for the API in a request header, set in the client's configuration: the agent never
-        sees it, and the server uses it for that call only, never storing or logging it. A credential configured for the target server is
-        used when the header is missing. Over HTTP only.
-      </p>
+      <h2>Per-user credential</h2>
+      <Help text="Each user's own API credential, sent by their MCP client. Never stored."
+        more="The client sends it in a request header set in its configuration; the agent never sees it, and the server uses it for that call only, never storing or logging it. A credential configured for the target server is used when the header is missing. Over HTTP only." />
       <dl className="kv">
         <dt>Allowed</dt><dd>{enabled ? `Yes, in ${shown}` : 'No'}</dd>
       </dl>
@@ -147,12 +137,9 @@ function TokenExchangeSwitch({ id, api: apiId, on }: { id: string; api: string; 
   })
   return (
     <div className="list" style={{ gap: 8, marginTop: 6 }}>
-      <h2>The signed-in user's identity</h2>
-      <p className="hint">
-        For a shared server whose users sign in with your identity provider (OAuth): every call exchanges the user's sign-in for a token
-        issued for the API (token exchange, or Microsoft Entra on-behalf-of), so the API sees who is calling. The user's own token goes
-        only to your identity provider. Whoever runs the server configures the exchange.
-      </p>
+      <h2>Act as the signed-in user</h2>
+      <Help text="Calls the API as the signed-in user, through OAuth token exchange."
+        more="For a shared server whose users sign in with your identity provider: every call exchanges the user's sign-in for a token issued for the API (token exchange, or Microsoft Entra on-behalf-of), so the API sees who is calling. The user's own token goes only to your identity provider. Whoever runs the server configures the exchange." />
       <dl className="kv"><dt>Allowed</dt><dd>{on ? 'Yes' : 'No'}</dd></dl>
       {editable && (
         <div className="actions">
@@ -174,7 +161,7 @@ function InstanceNote({ manifest }: { manifest: Manifest }) {
     <div className={'note ' + (mixed === 'namespaced' ? 'note-warn' : '')}>
       {mixed === 'union' && 'Every tool takes an "instance" input, filled from the customer’s list. One tool serves every version; a field a server’s version lacks returns a clear error.'}
       {mixed === 'namespaced' && 'Exact schema per server, but tools repeat for every target server.'}
-      {mixed === 'forbid' && 'All target servers must run the same contract version, or the server refuses to start.'}
+      {mixed === 'forbid' && 'All target servers must run the same API version, or the server refuses to start.'}
     </div>
   )
 }

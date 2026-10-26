@@ -15,6 +15,8 @@
   <description>The self-hosted platform: definition store, builds, identities, REST API (spec/platform-api.md)</description>
 
   <properties>
+    <!-- the commit the platform is built from; CI and the image build pass it, a plain local build says unknown -->
+    <mcpgp.commit>unknown</mcpgp.commit>
     <!-- Spring maps @PathVariable / @RequestParam by parameter name -->
     <maven.compiler.parameters>true</maven.compiler.parameters>
     <!-- the web UI (platform/web) is built with its own Node, as in the other bitboy.ro projects;
@@ -170,6 +172,19 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
         <executions>
+          <!-- META-INF/build-info.properties: the version, the build time (project.build.outputTimestamp when set,
+               else when it was built, never when it starts) and the commit given as -Dmcpgp.commit; shown in the UI -->
+          <execution>
+            <id>build-info</id>
+            <goals>
+              <goal>build-info</goal>
+            </goals>
+            <configuration>
+              <additionalProperties>
+                <commit>${mcpgp.commit}</commit>
+              </additionalProperties>
+            </configuration>
+          </execution>
           <execution>
             <goals>
               <goal>repackage</goal>

@@ -118,7 +118,7 @@ export function PersonPassword({ identity }: { identity: Identity }) {
           <label className="field">Again
             <input className="input" type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} required />
           </label>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}><input type="checkbox" checked={temporary} onChange={(e) => setTemporary(e.target.checked)} />
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}><input type="checkbox" checked={temporary} onChange={(e) => setTemporary(e.target.checked)} />
             Temporary: {identity.name} chooses a new one at the next sign-in</label>
           {password && why && <p className="hint">{why}</p>}
           <ErrorBox error={set.error} />

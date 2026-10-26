@@ -34,8 +34,8 @@ function AskAnAdmin() {
     <div className="stage-card">
       <span className="eyebrow">Ask an admin</span>
       <p>An agent has its own identity and token, so its quotas apply and its releases wait for a person. Only an admin can create one:
-        ask an admin to create an agent for you on <b>API &amp; agents</b> and to give you its token. Then come back here, or follow
-        the steps on <Link to="/agents">API &amp; agents</Link>.</p>
+        ask an admin to create an agent for you on <b>API and agents</b> and to give you its token. Then come back here, or follow
+        the steps on <Link to="/agents">API and agents</Link>.</p>
     </div>
   )
 }
@@ -91,7 +91,7 @@ function Paste({ token, agent }: { token: Token; agent: string }) {
       </div>
       <div className="stage-card">
         <span className="eyebrow">2 · The server</span>
-        <a className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }} href="/api/v1/platform-mcp" download>Download mcpgp-platform.zip</a>
+        <a className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }} href="/api/v1/platform-mcp" download><Icon name="download" />Download mcpgp-platform.zip</a>
         <p className="hint">Unzip it, and next to the jar save <span className="mono">mcpgp-platform.yaml</span>:</p>
         <pre className="code code-wrap" style={{ border: 0, padding: 0 }}>{platformConfig(origin)}</pre>
       </div>

@@ -125,7 +125,7 @@ describe('connect an agent', () => {
     })
     renderAt('/servers/mcpgp-platform')
     expect(await screen.findByRole('heading', { name: 'Made by the platform' })).toBeTruthy()
-    expect(screen.queryByRole('link', { name: 'Upload version' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Upload project' })).toBeNull()
     expect(screen.getAllByRole('link', { name: 'Connect an agent' })[0].getAttribute('href')).toBe('/agents?connect')
   })
 })

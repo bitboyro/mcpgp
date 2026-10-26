@@ -6,7 +6,7 @@ import { diffLines } from '../choices'
 import { METHOD_VERBS } from '../naming'
 import { escape, validWord, wordsKey } from '../namingEdits'
 import { useSession } from '../session'
-import { ErrorBox, Loading } from '../ui'
+import { ErrorBox, Loading, Icon } from '../ui'
 import { WordField } from './Naming'
 
 interface Pending {
@@ -110,7 +110,7 @@ export function PolicyEditor({ item }: { item: LibraryItem }) {
                 <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                   {editable && !change && <>
                     <button type="button" className="btn btn-sm btn-stage" onClick={() => { setWords(k.split('|').join(', ')); setBecomes(String(v)) }}>Change</button>{' '}
-                    <button type="button" className="btn btn-sm btn-stage" onClick={() => put(`remove ${k.split('|').join(', ')}`, { op: 'remove', path })}>Remove</button>
+                    <button type="button" className="btn btn-sm btn-stage" onClick={() => put(`remove ${k.split('|').join(', ')}`, { op: 'remove', path })}><Icon name="trash" />Remove</button>
                   </>}
                   {change && <button type="button" className="btn btn-sm btn-stage" onClick={() => put('', change, true)}>Undo</button>}
                 </td>

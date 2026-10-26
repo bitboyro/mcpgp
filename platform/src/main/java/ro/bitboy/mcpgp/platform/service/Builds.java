@@ -169,8 +169,9 @@ public final class Builds implements AutoCloseable {
         Model.Build done = with(build, status, build.started(), now(), serverVersion, artifacts, error);
         save(done);
         log(id, status);
+        // every build event names its server, so the server's Activity lists it (GET /activity?server=)
         record(build.startedBy(), build.startedByKind(), "build.finish", id, status.equals("succeeded") ? "ok" : "error",
-                serverVersion == null ? Map.of() : Map.of("serverVersion", serverVersion));
+                serverVersion == null ? Map.of("server", build.server()) : Map.of("server", build.server(), "serverVersion", serverVersion));
     }
 
     /** The platform MCP server's project, bundled in the jar from platform/mcp. */
@@ -252,7 +253,7 @@ public final class Builds implements AutoCloseable {
                 build.startedBy(), build.startedByKind(), build.created(), build.started(), build.finished(), build.buildNumber(),
                 build.serverVersion(), true, by, build.archived(), build.archivedAt(), build.deleted(), build.artifacts(), build.error());
         save(released);
-        record(by, kind, "build.release", build.id(), "ok", Map.of("serverVersion", build.serverVersion()));
+        record(by, kind, "build.release", build.id(), "ok", Map.of("server", build.server(), "serverVersion", build.serverVersion()));
         return released;
     }
 
@@ -265,7 +266,7 @@ public final class Builds implements AutoCloseable {
                 build.serverVersion(), build.released(), build.releasedBy(), archived, archived ? now() : null, build.deleted(),
                 build.artifacts(), build.error());
         save(changed);
-        record(by, kind, archived ? "build.archive" : "build.restore", build.id(), "ok", Map.of());
+        record(by, kind, archived ? "build.archive" : "build.restore", build.id(), "ok", Map.of("server", build.server()));
         return changed;
     }
 
@@ -283,7 +284,7 @@ public final class Builds implements AutoCloseable {
                 build.serverVersion(), build.released(), build.releasedBy(), build.archived(), build.archivedAt(), true, List.of(),
                 build.error());
         save(deleted);
-        record(by, kind, "build.delete", build.id(), "ok", Map.of());
+        record(by, kind, "build.delete", build.id(), "ok", Map.of("server", build.server()));
         return deleted;
     }
 

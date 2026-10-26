@@ -55,7 +55,7 @@ Full example: [examples/manifest/orders-mcp.manifest.json](https://github.com/bi
   "name": "orders-mcp",
   "title": "Example Orders API",
   "version": "2.0.0+3",
-  "instructions": "Look up and manage customers, accounts, orders and invoices…"
+  "instructions": "Look up and manage customers, accounts, orders and invoices…"   // metadata.instructions as written, else the description on one line; multi-instance servers add a note on `instance`
 },
 "build": {
   "createdAt": "2026-10-09T10:40:00Z",           // from SOURCE_DATE_EPOCH or the commit time

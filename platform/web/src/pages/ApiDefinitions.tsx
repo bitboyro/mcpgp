@@ -8,7 +8,7 @@ import { SpecPicker, SpecProblemsView, type SpecUpload } from './SpecUpload'
 import { useManifest, useServer } from '../serverData'
 import { ShippedVersions } from './ShippedVersions'
 import { useSession } from '../session'
-import { ErrorBox, Loading, PageHead, ago, shortDigest } from '../ui'
+import { ErrorBox, Loading, PageHead, ago, shortDigest, Icon } from '../ui'
 
 /** API definitions: the OpenAPI documents the server is made from, the versions it ships, and its saved versions. */
 export function ApiDefinitionsPage() {
@@ -26,11 +26,11 @@ export function ApiDefinitionsPage() {
 
   return (
     <>
-      <PageHead title="API definitions" sub="The API specs the server is made from, the versions it ships, and the versions of its files.">
-        <button type="button" className="btn" disabled={versionNumber == null || checks.isPending} onClick={() => checks.mutate()}>Run checks</button>
+      <PageHead title="API definitions" sub="The OpenAPI documents the server is built from, the API versions it ships, and its saved revisions.">
+        <button type="button" className="btn" disabled={versionNumber == null || checks.isPending} onClick={() => checks.mutate()}><Icon name="checks" />Validate</button>
       </PageHead>
       <div className="body">
-        <section className="col" aria-label="Versions">
+        <section className="col" aria-label="Revisions">
           <ErrorBox error={server.error} />
           {server.isLoading && <Loading />}
           {server.data && <Contracts id={id} editable={can('servers:write') && !server.data.system} onDone={(n) => { setChosen(n); setFile(null) }} />}
@@ -38,13 +38,13 @@ export function ApiDefinitionsPage() {
           {can('servers:write') && server.data && !server.data.system && <Upload id={id} onDone={(n) => { setChosen(n); setFile(null) }} />}
           {server.data && (
             <div className="card">
-              <h2>Versions</h2>
-              <div className="list" role="listbox" aria-label="Versions">
+              <h2>Revisions</h2>
+              <div className="list" role="listbox" aria-label="Revisions">
                 {[...server.data.versions].reverse().map((v) => (
                   <button key={v.number} type="button" role="option" aria-selected={v.number === versionNumber} className="tool-item"
                     onClick={() => { setChosen(v.number); setFile(null); checks.reset() }}>
                     <span>
-                      <b>Version {v.number}</b>{v.number === server.data.latestVersion && <span className="hint"> · latest</span>}
+                      <b>Revision {v.number}</b>{v.number === server.data.latestVersion && <span className="hint"> · latest</span>}
                       <small>{v.message ?? 'no message'} · {v.author} {ago(v.created)}</small>
                     </span>
                     <span className="meta mono">{shortDigest(v.digest)}</span>
@@ -55,7 +55,7 @@ export function ApiDefinitionsPage() {
           )}
           {(checks.data || checks.error) && (
             <div className="card">
-              <h2>Checks for version {versionNumber}</h2>
+              <h2>Validation results for revision {versionNumber}</h2>
               <ErrorBox error={checks.error} />
               {checks.data && (
                 <ul className="list" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
@@ -63,7 +63,7 @@ export function ApiDefinitionsPage() {
                   {checks.data.diagnostics.map((d, i) => (
                     <li key={i} className="row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
                       <span className={'chip chip-' + (d.level === 'error' ? 'bad' : d.level === 'warning' ? 'warn' : 'idle')}>{d.level} {d.code}</span>
-                      <span style={{ fontSize: 13 }}>{d.message}</span>
+                      <span style={{ fontSize: 14 }}>{d.message}</span>
                     </li>
                   ))}
                 </ul>
@@ -76,7 +76,7 @@ export function ApiDefinitionsPage() {
             <>
               <div className="card-head">
                 <div>
-                  <div className="eyebrow">Version {version.data.number}</div>
+                  <div className="eyebrow">Revision {version.data.number}</div>
                   <h2>{version.data.files.length} files</h2>
                 </div>
                 <span className="meta mono">{shortDigest(version.data.digest)}</span>
@@ -92,7 +92,7 @@ export function ApiDefinitionsPage() {
               </div>
               {path && (
                 <>
-                  <h3 className="mono" style={{ fontSize: 13 }}>{path}</h3>
+                  <h3 className="mono" style={{ fontSize: 14 }}>{path}</h3>
                   <ErrorBox error={content.error} />
                   {content.data !== undefined && <pre className="code" aria-label={`Content of ${path}`}>{content.data}</pre>}
                 </>
@@ -152,13 +152,13 @@ function Contracts({ id, editable, onDone }: { id: string; editable: boolean; on
     setApiId(apiOf); setOpen(c.version); setMode('url'); setUrl(c.source!); setFetchUrl(c.source!); setRev((r) => r + 1)
   }
   const problems = specProblems(plan.error)
-  if (definition.isLoading) return <Loading what="the contracts" />
+  if (definition.isLoading) return <Loading what="the API definitions" />
   if (!definition.data) return <ErrorBox error={definition.error} />
   return (
     <div className="card">
       <div className="card-head">
-        <h2>API specs</h2>
-        {editable && open === null && apis.length > 0 && <button type="button" className="btn btn-sm" onClick={() => setOpen('')}>Add a spec version</button>}
+        <h2>API versions</h2>
+        {editable && open === null && apis.length > 0 && <button type="button" className="btn btn-sm" onClick={() => setOpen('')}><Icon name="plus" />Add an API version</button>}
       </div>
       {apis.length === 0 && <p className="hint">This server gets its APIs from the server it extends.</p>}
       {apis.map((a) => (
@@ -167,7 +167,7 @@ function Contracts({ id, editable, onDone }: { id: string; editable: boolean; on
           {(a.contracts ?? []).map((c) => (
             <div key={c.version} className="row" style={{ background: 'none', padding: '6px 0' }}>
               <span style={{ minWidth: 0 }}>
-                Version <b>{c.version}</b>{c.default && <> <span className="tag">default</span></>}<br />
+                API version <b>{c.version}</b>{c.default && <> <span className="tag">default</span></>}<br />
                 <span className="meta mono" style={{ overflowWrap: 'anywhere' }}>{c.spec}</span>
                 {c.source && <><br /><span className="meta" style={{ overflowWrap: 'anywhere' }}>From <span className="mono">{c.source}</span></span></>}
               </span>
@@ -182,8 +182,8 @@ function Contracts({ id, editable, onDone }: { id: string; editable: boolean; on
         </div>
       ))}
       {open !== null && (
-        <form className="list" style={{ gap: 12 }} aria-label="Spec version" onSubmit={(e) => { e.preventDefault(); if (plan.data?.compiles) save.mutate() }}>
-          <h3>{open ? `Replace the spec of version ${open}` : 'Add a spec version'}</h3>
+        <form className="list" style={{ gap: 12 }} aria-label="API version" onSubmit={(e) => { e.preventDefault(); if (plan.data?.compiles) save.mutate() }}>
+          <h3>{open ? `Replace the API definition of version ${open}` : 'Add an API version'}</h3>
           {apis.length > 1 && !open && (
             <label className="field">API
               <select className="input" value={target} onChange={(e) => setApiId(e.target.value)}>
@@ -191,7 +191,7 @@ function Contracts({ id, editable, onDone }: { id: string; editable: boolean; on
               </select>
             </label>
           )}
-          <div className="actions" role="radiogroup" aria-label="Where the spec comes from">
+          <div className="actions" role="radiogroup" aria-label="Where the API definition comes from">
             <button type="button" role="radio" aria-checked={mode === 'files'} className={'btn btn-sm' + (mode === 'files' ? ' btn-primary' : '')}
               onClick={() => { setMode('files'); save.reset() }}>Upload files</button>
             <button type="button" role="radio" aria-checked={mode === 'url'} className={'btn btn-sm' + (mode === 'url' ? ' btn-primary' : '')}
@@ -201,24 +201,24 @@ function Contracts({ id, editable, onDone }: { id: string; editable: boolean; on
           {mode === 'url' && (
             <div className="list" style={{ gap: 6 }}>
               <div className="actions">
-                <label className="field" style={{ flex: '1 1 320px' }}><span className="visually-hidden">Address of the spec</span>
+                <label className="field" style={{ flex: '1 1 320px' }}><span className="visually-hidden">Address of the API definition</span>
                   <input className="input mono" type="url" value={url} placeholder="https://api.acme.com/openapi.json"
                     onChange={(e) => setUrl(e.target.value)} />
                 </label>
                 <button type="button" className="btn btn-sm" disabled={!url.trim() || plan.isFetching}
                   onClick={() => { setFetchUrl(url.trim()); setRev((r) => r + 1); save.reset() }}>Fetch</button>
               </div>
-              <p className="hint">The platform fetches the spec from this address now, and again whenever you check for updates. Only hosts an
+              <p className="hint">The platform fetches the API definition from this address now, and again whenever you check for updates. Only hosts an
                 administrator allows (specHosts) can be used; one spec file, with no references to other files.</p>
             </div>
           )}
-          {plan.isFetching && <p className="hint">{mode === 'url' ? 'Fetching the spec…' : 'Reading the spec…'}</p>}
+          {plan.isFetching && <p className="hint">{mode === 'url' ? 'Fetching the API definition…' : 'Reading the API definition…'}</p>}
           {problems && <SpecProblemsView problems={problems} main={main} onMain={setMain} />}
           {plan.error && !problems && <ErrorBox error={plan.error} />}
           {plan.data && (
             <>
               {!open && (
-                <label className="field">Version (from the spec's info.version)
+                <label className="field">API version (from info.version in the definition)
                   <input className="input" value={version ?? plan.data.version} onChange={(e) => setVersion(e.target.value)} />
                 </label>
               )}
@@ -226,18 +226,18 @@ function Contracts({ id, editable, onDone }: { id: string; editable: boolean; on
                 <input type="checkbox" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} /> Make it the default version
               </label>
               {plan.data.unchanged
-                ? <div className="note note-ok">No changes: the spec at this address is the same as the saved one.</div>
-                : <p className="hint">{plan.data.replaces ? `Replaces the spec of version ${plan.data.version}` : `Adds version ${plan.data.version}`}
+                ? <div className="note note-ok">No changes: the API definition at this address matches the saved one.</div>
+                : <p className="hint">{plan.data.replaces ? `Replaces the API definition of version ${plan.data.version}` : `Adds API version ${plan.data.version}`}
                   {' '}(files under <span className="mono">{plan.data.spec.replace(/[^/]+$/, '')}</span>).</p>}
               {plan.data.summary && !plan.data.unchanged && <PlannedChanges plan={plan.data} />}
               {!plan.data.compiles && (
-                <div className="note note-bad">With this spec the server doesn't compile: {plan.data.diagnostics.filter((d) => d.level === 'error').map((d) => d.message).join('; ')}</div>
+                <div className="note note-bad">With this API definition the server doesn't compile: {plan.data.diagnostics.filter((d) => d.level === 'error').map((d) => d.message).join('; ')}</div>
               )}
             </>
           )}
           <ErrorBox error={save.error} />
           <div className="actions">
-            <button type="submit" className="btn btn-primary" disabled={!plan.data?.compiles || plan.data.unchanged || save.isPending}>Save as the next version</button>
+            <button type="submit" className="btn btn-primary" disabled={!plan.data?.compiles || plan.data.unchanged || save.isPending}><Icon name="save" />Save as the next revision</button>
             <button type="button" className="btn" onClick={close}>Cancel</button>
           </div>
         </form>
@@ -286,8 +286,8 @@ function Upload({ id, onDone }: { id: string; onDone: (version: number) => void 
   return (
     <form className="card" onSubmit={(e) => { e.preventDefault(); upload.mutate() }}>
       <h2>Upload the whole project</h2>
-      <p className="hint">For projects kept in git: the folder with the <code>*.mcpgp.yaml</code>, or a zip of it, as the next version.
-        A version with the same content as the latest isn't created again.</p>
+      <p className="hint">For projects kept in git: the folder with the <code>*.mcpgp.yaml</code>, or a zip of it, as the next revision.
+        A revision with the same content as the latest isn't created again.</p>
       <div className="actions">
         <button type="button" className="btn" onClick={() => folder.current?.click()}>Choose folder</button>
         <button type="button" className="btn" onClick={() => zip.current?.click()}>Choose zip</button>
@@ -300,7 +300,7 @@ function Upload({ id, onDone }: { id: string; onDone: (version: number) => void 
         <input className="input" value={message} onChange={(e) => setMessage(e.target.value)} maxLength={200} />
       </label>
       <ErrorBox error={upload.error} />
-      <div><button type="submit" className="btn btn-primary" disabled={!picked || upload.isPending}>Upload version</button></div>
+      <div><button type="submit" className="btn btn-primary" disabled={!picked || upload.isPending}><Icon name="upload" />Upload project</button></div>
     </form>
   )
 }

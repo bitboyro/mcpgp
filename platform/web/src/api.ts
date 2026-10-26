@@ -219,6 +219,11 @@ export interface Settings {
   signing: { configured: boolean }
   retention: { archiveAfterDays: number; deleteArchivedAfterDays: number; keepLast: number }
   guardrails: { agentBuildsPerHour: number; agentVersionsPerHour: number }
+  /** The platform's own build: version, build time (not start time), commit when recorded, and the Java it runs on. */
+  build?: { version: string | null; time: string | null; commit: string | null; java: string }
+  /** The CLI image matching this platform, when it knows its registry (published images do). */
+  cli?: { image: string | null }
+  publicUrl?: string
 }
 
 // The manifest (docs/spec/manifest.md): only the parts the UI shows are typed.
@@ -277,6 +282,7 @@ export interface Manifest {
         server?: { auth?: { scopes?: Record<string, { access?: string; tools?: string[] }> } }
         sessions?: { enabled?: boolean }
         logging?: { level?: string }
+        errors?: { detail?: 'full' | 'summary' }
       }
     }
   }
@@ -524,6 +530,6 @@ export const api = {
   approvals: (status = 'pending') => json<Items<Approval>>('GET', '/approvals' + q({ status })),
   decide: (id: string, approve: boolean, comment?: string) =>
     json<Approval>('POST', `/approvals/${enc(id)}/${approve ? 'approve' : 'reject'}`, { comment }),
-  activity: (filter: { server?: string; actor?: string; action?: string; limit?: number } = {}) =>
+  activity: (filter: { server?: string; target?: string; actor?: string; action?: string; limit?: number } = {}) =>
     json<Items<Activity>>('GET', '/activity' + q(filter)),
 }

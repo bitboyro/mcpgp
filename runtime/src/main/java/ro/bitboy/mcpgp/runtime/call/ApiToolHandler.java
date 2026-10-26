@@ -65,7 +65,7 @@ public final class ApiToolHandler implements ToolHandler {
         this.recordings = recordings(manifest, config, apiKeys);
         this.responses = new ResponseMapper(responseLimit / 1024,
                 config.errorDetail(), redactor, manifest.policies().path("cleanTruncation").asBoolean(true),
-                manifest.policies().at("/rateLimits/retryAfter").asBoolean(true));
+                manifest.policies().at("/rateLimits/retryAfter").asBoolean(true), MaskedFields.of(manifest));
     }
 
     public ro.bitboy.mcpgp.runtime.mcp.RetainedResults resultStore() { return retained; }
@@ -238,14 +238,13 @@ public final class ApiToolHandler implements ToolHandler {
         if (!pack) {
             return null;
         }
-        java.util.Set<String> fields = new java.util.HashSet<>();
-        manifest.policies().at("/redaction/fields").forEach(f -> fields.add(f.asText()));
+        java.util.Set<String> fields = new java.util.HashSet<>(MaskedFields.of(manifest).names());
         java.util.Set<String> keyHeaders = new java.util.HashSet<>();
         apiKeys.values().forEach(placement -> {
             if (placement.path("in").asText("header").equals("header")) {
                 keyHeaders.add(placement.path("name").asText());
             } else {
-                fields.add(placement.path("name").asText());        // an API key in the query is masked there
+                fields.add(placement.path("name").asText().toLowerCase(java.util.Locale.ROOT));   // an API key in the query is masked there
             }
         });
         return Recordings.of(config.storageRoot(), fields, keyHeaders, config.secrets(),

@@ -26,7 +26,8 @@ export function OutputSchemas({ id }: { id: string }) {
       <h2>Tool results</h2>
       <Toggle label="Describe each tool's result (output schema)" checked={on} disabled={!editable || save.isPending}
         onChange={(v) => save.mutate(v)}
-        hint="From the API's spec, so agents and clients know the fields before calling. Kept loose (fields may be missing or extra), because real answers often differ from the spec; a difference is logged, never turned into an error. Lists come back as items. Saved as the next version." />
+        hint="Agents and clients see each result's fields before calling."
+        more="Taken from the API definition and kept loose (fields may be missing or extra), because real answers often differ from it; a difference is logged, never turned into an error. Lists come back as items. Saved as the next revision." />
       <ErrorBox error={save.error} />
     </div>
   )

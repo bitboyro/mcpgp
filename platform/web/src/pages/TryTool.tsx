@@ -35,7 +35,7 @@ export function TryTool({ id, tool }: { id: string; tool: Tool }) {
     <div className="stage-card" aria-label={`Try ${tool.name}`}>
       <span className="eyebrow">Try it against a mock</span>
       <p className="hint">The server runs on the platform against a mock made from the spec’s examples; no real system is called.
-        The first try of a version starts it (a few seconds).</p>
+        The first try of a revision starts it (a few seconds).</p>
       <label className="field">Arguments
         <textarea className="input input-stage" rows={Math.min(14, text.split('\n').length + 1)} style={{ padding: 10 }} value={text}
           onChange={(e) => { setText(e.target.value); run.reset() }} spellCheck={false} aria-invalid={!!invalid} />

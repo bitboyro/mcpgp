@@ -1,33 +1,53 @@
-import type { ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
+import {
+  Activity, BookOpen, Check, Code, Copy, Download, ExternalLink, Eye, FileCode, Folder, GitCompare, HeartPulse, Home, Info, Library,
+  LayoutDashboard, ListChecks, Lock, Package, PackageCheck, Play, Plug, Plus, RefreshCw, Rocket, Save, SlidersHorizontal, Trash2, Undo2,
+  SquareTerminal, Upload, Wrench, X, Zap, type LucideIcon,
+} from 'lucide-react'
 import { ApiError, type Build } from './api'
 
-const paths: Record<string, ReactNode> = {
-  home: <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
-  library: <path d="M4 4h16v16H4zM4 10h16M10 4v16" />,
-  builds: <path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4" />,
-  activity: <path d="M3 12h4l3-8 4 16 3-8h4" />,
-  api: <path d="M8 6l-6 6 6 6M16 6l6 6-6 6" />,
-  shape: <><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></>,
-  tools: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z" />,
-  connections: <path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4" />,
-  sources: <path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />,
-  package: <path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8" />,
-  deliver: <path d="M12 3v12M7 10l5 5 5-5M4 19h16" />,
-  close: <path d="M6 6l12 12M18 6L6 18" />,
-  changes: <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />,
-  mark: <path d="M4 7h7M4 12h16M13 17h7" />,
-  lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>,
-  pulse: <><circle cx="12" cy="12" r="9" /><path d="M7 12h3l1.5-3 3 6 1.5-3h1" /></>,
-  overview: <path d="M4 4h7v9H4zM13 4h7v5h-7zM13 11h7v9h-7zM4 15h7v5H4z" />,
-  general: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>,
-  definition: <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M10 12l-2 2 2 2M14 12l2 2-2 2" />,
+// Icons: Lucide (ISC licence), except the mcpgp mark. One name per meaning, so a meaning keeps its icon everywhere.
+const ICONS = {
+  home: Home, library: Library, builds: PackageCheck, activity: Activity, api: Code, shape: SlidersHorizontal, tools: Wrench,
+  connections: Plug, sources: Folder, package: Package, deliver: Download, close: X, changes: GitCompare, overview: LayoutDashboard,
+  general: Info, info: Info, definition: FileCode, lock: Lock, pulse: HeartPulse,
+  save: Save, upload: Upload, download: Download, eye: Eye, play: Play, trash: Trash2, undo: Undo2, plus: Plus, check: Check,
+  zap: Zap, book: BookOpen, refresh: RefreshCw, copy: Copy, external: ExternalLink, rocket: Rocket, checks: ListChecks, terminal: SquareTerminal,
+} satisfies Record<string, LucideIcon>
+
+export type IconName = keyof typeof ICONS | 'mark'
+
+export function Icon({ name, size = 16, stroke = 'currentColor', width = 1.8 }: { name: IconName; size?: number; stroke?: string; width?: number }) {
+  if (name === 'mark') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 7h7M4 12h16M13 17h7" />
+      </svg>
+    )
+  }
+  const Lucide = ICONS[name]
+  return <Lucide size={size} color={stroke} strokeWidth={width} aria-hidden="true" />
 }
 
-export function Icon({ name, size = 16, stroke = 'currentColor', width = 1.8 }: { name: keyof typeof paths; size?: number; stroke?: string; width?: number }) {
+/** A button's label with its icon in front: the icon names the action, the words say it. */
+export function Label({ icon, children }: { icon: IconName; children: ReactNode }) {
+  return <><Icon name={icon} />{children}</>
+}
+
+/**
+ * Help under a setting (design-decisions R04): one short sentence always shown; the longer explanation opens in
+ * place under "How it works", so it works with touch and keyboard, never only on hover.
+ */
+export function Help({ text, more, style }: { text: ReactNode; more?: ReactNode; style?: React.CSSProperties }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {paths[name]}
-    </svg>
+    <div className="help" style={style}>
+      <span className="hint">{text}</span>
+      {more && <button type="button" className="how" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+        <Icon name="info" size={14} />How it works</button>}
+      {more && open && <p id={id} className="hint help-more">{more}</p>}
+    </div>
   )
 }
 

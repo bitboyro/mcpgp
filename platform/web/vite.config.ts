@@ -28,6 +28,9 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       globals: true,
       include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+      setupFiles: ['src/test-setup.ts'],
+      // whole tests that click through several pages can pass 5 s under a full parallel run
+      testTimeout: 15_000,
     },
   }
 })

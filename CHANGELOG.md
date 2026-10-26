@@ -6,6 +6,18 @@ versions follow [SemVer](https://semver.org).
 ## Unreleased
 
 ### Added
+- A **Command line** page in the platform (sidebar footer, and linked from Packaging → Pipeline): the CLI
+  that matches this platform's version, as the CI image (named from the platform's own image, or
+  `MCPGP_CLI_IMAGE`), the zip and the jar on the release page; how to use it; and how `mcpgp push` sends a
+  definition to this platform with a pipeline token. `GET /settings` returns `cli.image` and `publicUrl`.
+- The platform shows its release version and build date at the bottom of the sidebar, with an About panel
+  (build time, commit, Java version). The build time is when the artifact was built, not when it started;
+  `GET /settings` returns the same as `build`. Published images record their commit; for your own image
+  build, pass `--build-arg MCPGP_COMMIT=$(git rev-parse HEAD)`.
+- `metadata.instructions` in definitions: what agents are told on initialize, kept as written (paragraphs
+  and lists). Without it, the description is used on one line, as before. The platform edits it on
+  **General** with a live preview of exactly what initialize sends, including the note multi-instance
+  servers add.
 - **Access control** and **Observability** pages for each server. Access control sets the client
   sign-in methods a package offers and its default, default OAuth scope → tool permissions and whether
   clients may narrow their own session; Observability sets the shipped audit file, rotation, retention
@@ -66,6 +78,28 @@ versions follow [SemVer](https://semver.org).
   identity, instructions for agents and its definition. Tools & rules is now Tools, and Package &
   deliver is Packaging. Old addresses (`/sources`, `/connections`, `/safety`, `/package`) redirect.
   New versions saved from these pages are described as "Tools: …" and "Execution: …".
+- The server Overview shows one card per area (API definitions, Tools, Target APIs, Access control,
+  Execution, Observability, Delivery, General): what it does, whether it's set up, and a link to its page,
+  plus the single most important next step; the previews open from **Preview as agent**. Its settings
+  moved to the pages that own them: what the agent sees, support packs, notices and what tools may do to
+  **Tools**; one or several target servers and mixed versions to **Target APIs**; transports to
+  **Packaging**. Each page saves its own changes as the next revision.
+- Calmer, more readable platform UI: 16px body text (14px for labels, hints and tables, 24px page
+  titles), lighter page background and dividers, violet kept for primary actions, links and focus.
+  Lucide icons in the sidebar and on main actions (save, build, upload, preview, try, download, release,
+  add, remove). The sidebar footer offers **API reference** and **Connect an agent** as labelled buttons.
+  The "Always on" protections on Execution are readable again (light text had been on a white card).
+- Plainer words in the platform UI: **Validate** (was Run checks) with "Validation results"; *API
+  definition* for the OpenAPI document, *API version* for what was called a contract, and *revision* for a
+  server's saved state ("Save as revision 6"). Help under settings is one short sentence, with the details
+  under **How it works**. "API & agents" is now "API and agents", and a release waiting for approval points
+  to Activity, where it's decided.
+- **Builds and releases** and **Activity** say what each holds: packages and their files on one, who did
+  what and when on the other. Activity's filters (All, Changes, Builds, Access, Agents) are kept in the
+  address, build entries open their build, and each build lists its own Activity entries with a link to
+  the rest. `/builds/<id>` opens a build on its server's page.
+- Execution has a **Data protection** card: error detail (Full or Summary, a shipped default) and the masked
+  fields, with the always-masked names shown and the server's own added or removed.
 - The definition key for how a server signs in to the API it calls is `apis[].upstreamAuth`, the
   industry term (it was `downstreamAuth`; same settings). Compiled manifests carry `upstreamAuth`; the
   runtime still reads `downstreamAuth` from manifests built before 0.4.0. Platform edits to an API whose
@@ -82,6 +116,14 @@ versions follow [SemVer](https://semver.org).
   has both keys is refused.
 
 ### Fixed
+- Masked fields (`password`, `secret`, `token`, `apiKey`, `authorization` and the definition's
+  `runtimeDefaults.redaction.fields`) were documented as masked in results, errors and the audit file,
+  but were applied only to recordings, and there only for lower-case names. Their values are now `***` at
+  any depth of JSON tool results (retained results included), error bodies (the agent's and the audit
+  file's) and recordings, whatever the case of the name.
+- A server's Activity (`GET /activity?server=`) listed only the start of its builds: finishing, releasing,
+  archiving, restoring, deleting and downloading didn't name the server. They now do, from this release on;
+  a build's page asks by its id, so it also shows events recorded before.
 - An identity policy file with a `scopes` section shut out every caller without OAuth scopes (API keys,
   no sign-in, stdio), with no rule that could let them back in. Scope rules now apply to OAuth callers
   only; other callers follow the file's `default` and `subjects` rules, and startup warns when a file with

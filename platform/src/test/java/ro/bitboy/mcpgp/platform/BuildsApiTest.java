@@ -204,6 +204,11 @@ class BuildsApiTest {
         String log = new String(call("GET", "/builds/" + id + "/log", admin, null, null).body(), StandardCharsets.UTF_8);
         assertThat(log).contains("building orders version 1").contains("(signed)").contains("succeeded");
         assertThat(json(call("GET", "/activity?action=artifact.download", admin, null, null)).path("items")).isNotEmpty();
+        // every event of the build names its server, so the server's Activity lists them all
+        JsonNode ofServer = json(call("GET", "/activity?server=" + build.path("server").asText(), admin, null, null)).path("items");
+        java.util.List<String> actions = new java.util.ArrayList<>();
+        ofServer.forEach(e -> { if (e.path("target").asText().equals(id)) actions.add(e.path("action").asText()); });
+        assertThat(actions).contains("build.start", "build.finish", "artifact.download");
     }
 
     @Test

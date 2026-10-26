@@ -117,6 +117,11 @@ class WebUiTest extends PlatformTestBase {
         assertThat(settings.path("workspace").asText()).isEqualTo("acme");
         assertThat(settings.at("/retention/keepLast").asInt()).isEqualTo(10);
         assertThat(settings.at("/signing/configured").asBoolean()).isFalse();
+        // the platform's own build: the recorded version and build time, never the time it started
+        assertThat(settings.at("/build/version").asText()).matches("\\d+\\.\\d+\\.\\d+.*");
+        java.time.Instant built = java.time.Instant.parse(settings.at("/build/time").asText());
+        assertThat(built).isBefore(java.time.Instant.ofEpochMilli(java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime()));
+        assertThat(settings.at("/build/java").asText()).startsWith(System.getProperty("java.version"));
         assertThat(settings.at("/guardrails/agentBuildsPerHour").asInt()).isEqualTo(20);
     }
 

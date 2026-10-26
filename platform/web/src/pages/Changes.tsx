@@ -7,8 +7,8 @@ import { ErrorBox, Loading, PageHead } from '../ui'
 
 const GROUPS: [VersionChange['impact'], string, string][] = [
   ['breaking', 'Breaking', 'Agents or clients of the earlier version need updating: tools removed or renamed, inputs removed or now required, types changed.'],
-  ['notable', 'Worth a look', 'Behaviour that changes without breaking calls: annotations, confirmations, exposure, the default contract.'],
-  ['info', 'Other changes', 'New tools, new optional inputs, new contract versions, texts.'],
+  ['notable', 'Worth a look', 'Behaviour that changes without breaking calls: annotations, confirmations, exposure, the default API version.'],
+  ['info', 'Other changes', 'New tools, new optional inputs, new API versions, texts.'],
 ]
 
 /**
@@ -52,13 +52,13 @@ export function ChangesPage() {
                 <label className="field">From
                   <select className="input" value={from ?? (diff.data?.from.released ? 'released' : String(diff.data?.from.version ?? ''))}
                     onChange={(e) => pick('from', e.target.value)}>
-                    {diff.data?.released != null && <option value="released">The last release (version {diff.data.released})</option>}
-                    {versions.map((v) => <option key={v.number} value={String(v.number)}>Version {v.number}{v.message ? ` · ${v.message}` : ''}</option>)}
+                    {diff.data?.released != null && <option value="released">The last release (revision {diff.data.released})</option>}
+                    {versions.map((v) => <option key={v.number} value={String(v.number)}>Revision {v.number}{v.message ? ` · ${v.message}` : ''}</option>)}
                   </select>
                 </label>
                 <label className="field">To
                   <select className="input" value={to ?? String(diff.data?.to.version ?? '')} onChange={(e) => pick('to', e.target.value)}>
-                    {versions.map((v) => <option key={v.number} value={String(v.number)}>Version {v.number}{v.number === server.data!.latestVersion ? ' (latest)' : ''}</option>)}
+                    {versions.map((v) => <option key={v.number} value={String(v.number)}>Revision {v.number}{v.number === server.data!.latestVersion ? ' (latest)' : ''}</option>)}
                   </select>
                 </label>
               </div>
@@ -68,7 +68,7 @@ export function ChangesPage() {
             <div className="card">
               <div className="card-head">
                 <div>
-                  <div className="eyebrow">Version {diff.data.from.version} ({diff.data.from.serverVersion || '—'}) → {diff.data.to.version} ({diff.data.to.serverVersion})</div>
+                  <div className="eyebrow">Revision {diff.data.from.version} ({diff.data.from.serverVersion || '—'}) → {diff.data.to.version} ({diff.data.to.serverVersion})</div>
                   <h2>{diff.data.summary}</h2>
                 </div>
                 {diff.data.changes.length > 0 && (
@@ -89,7 +89,7 @@ export function ChangesPage() {
                         <li key={i} className="row" style={{ justifyContent: 'flex-start', gap: 8 }}>
                           {c.tool ? <Link className="mono" to={`/servers/${id}/tools?tool=${encodeURIComponent(c.tool)}`}>{c.tool}</Link>
                             : <span className="tag">server</span>}
-                          <span style={{ fontSize: 13 }}>{c.text}</span>
+                          <span style={{ fontSize: 14 }}>{c.text}</span>
                         </li>
                       ))}
                     </ul>

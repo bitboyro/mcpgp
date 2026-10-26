@@ -34,8 +34,15 @@ JSON Lines, one event per line, UTF-8. Written to `audit.file.path`. **Never to 
 
 ### Redaction
 
-Always masked regardless of settings: credentials, auth headers, values of fields matching the
-build's redaction list (defaults: `password`, `secret`, `token`, `apiKey`, `authorization`).
+Always masked regardless of settings: credentials, auth headers, and every configured secret value
+or token learned at runtime, wherever it appears.
+
+Masked fields: the values of fields named `password`, `secret`, `token`, `apiKey` or `authorization`,
+plus the definition's `runtimeDefaults.redaction.fields`, become `***`. Names match whatever the
+case, at any depth of a JSON body, in tool results (including retained results), error bodies (the
+agent's and the audit file's `upstream.body`) and recordings. A body cut off at the size limit is
+masked pair by pair (string, number, boolean or null values). Plain-text bodies are masked only for
+secret values. Audit `args` follow `audit.arguments` (`redacted` masks every value).
 
 ## 2. Event types
 

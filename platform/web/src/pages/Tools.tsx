@@ -3,10 +3,11 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import type { ProvenanceStep, Tool } from '../api'
 import { listedTools, useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
-import { Chip, ErrorBox, Loading, PageHead, Segmented } from '../ui'
+import { Chip, ErrorBox, Loading, PageHead, Segmented, Icon } from '../ui'
 import { NamingView } from './Naming'
 import { OutputSchemas } from './OutputSchemas'
 import { OperationsView } from './Operations'
+import { ChoiceRows, NoticesEditor, PackRow, SettingsCard, usePendingEdits } from './SettingsCard'
 import { ToolEdit } from './ToolEdit'
 import { TryTool } from './TryTool'
 import { agentView } from './Overview'
@@ -37,11 +38,23 @@ export function ToolsPage() {
   const selected = manifest.data?.tools.find((t) => t.name === selectedName)
   const operations = manifest.data ? manifest.data.diagnostics.filter((d) => d.code === 'OPERATION_EXCLUDED').length : 0
   const apiCount = manifest.data?.tools.filter((t) => t.kind === 'api').length ?? 0
-  const view = params.get('view') === 'operations' ? 'operations' : params.get('view') === 'naming' ? 'naming' : 'tools'
+  const views = ['operations', 'naming', 'notices'] as const
+  const view = views.find((v) => v === params.get('view')) ?? 'tools'
   const switcher = (
     <Segmented role="tab" label="View" value={view} onChange={(v) => setParams(v === 'tools' ? {} : { view: v }, { replace: true })}
-      options={[['tools', 'Tools'], ['operations', 'Operations'], ['naming', 'Naming']]} />
+      options={[['tools', 'Tools'], ['operations', 'Operations'], ['naming', 'Naming'], ['notices', 'Notices']]} />
   )
+  const agentEdits = usePendingEdits(id, 'Tools')
+  const accessEdits = usePendingEdits(id, 'Tools')
+
+  if (view === 'notices') {
+    return (
+      <>
+        <PageHead title="Tools" sub="Text added to tool descriptions: this server's own notices and shared sets from the Library.">{switcher}</PageHead>
+        <div className="body"><section className="col col-wide" aria-label="Notices"><NoticesEditor id={id} /></section></div>
+      </>
+    )
+  }
 
   if (view === 'naming') {
     return (
@@ -55,8 +68,11 @@ export function ToolsPage() {
   if (view === 'operations') {
     return (
       <>
-        <PageHead title="Tools" sub="Every operation of the contracts. Switch one on to make it a tool, off to leave it out.">{switcher}</PageHead>
-        <OperationsView id={id} />
+        <PageHead title="Tools" sub="Every operation in the API definitions. Switch one on to make it a tool, off to leave it out.">{switcher}</PageHead>
+        <OperationsView id={id} settings={
+          <SettingsCard id={id} title="What tools may do" edits={accessEdits}>
+            {(m) => <ChoiceRows manifest={m} only={(c) => c.startsWith('access:')} edits={accessEdits} />}
+          </SettingsCard>} />
       </>
     )
   }
@@ -70,6 +86,9 @@ export function ToolsPage() {
         <section className="col" aria-label="Tools">
           <ErrorBox error={manifest.error} />
           {manifest.isLoading && <Loading what="tools" />}
+          <SettingsCard id={id} title="What the agent sees" edits={agentEdits}>
+            {(m) => <><ChoiceRows manifest={m} only={(c) => c === 'exposure'} edits={agentEdits} /><PackRow manifest={m} edits={agentEdits} /></>}
+          </SettingsCard>
           {manifest.data && (
             <div className="card">
               <Segmented label="Show" value={filter} onChange={setFilter}
@@ -128,7 +147,7 @@ function ToolDetail({ id, tool }: { id: string; tool: Tool }) {
           <div className="actions">
             {can('servers:write') && !server.data?.system && <button type="button" className="btn btn-sm btn-stage" onClick={() => setEditing(true)}>Edit title and descriptions</button>}
             {can('builds:run') && tool.kind !== 'custom' && <button type="button" className="btn btn-sm btn-stage" aria-pressed={trying} onClick={() => setTrying(!trying)}>
-              {trying ? 'Close the try' : 'Try it'}</button>}
+              <Icon name="play" />{trying ? 'Close the try' : 'Try it'}</button>}
           </div>
         )}
       {trying && !editing && <TryTool id={id} tool={tool} />}
@@ -140,7 +159,7 @@ function ToolDetail({ id, tool }: { id: string; tool: Tool }) {
         <div className="stage-card">
           <span className="eyebrow">Calls</span>
           {Object.entries(tool.variants).map(([contract, v]) => (
-            <span key={contract} className="mono" style={{ fontSize: 13 }}>{contract}: {v.method} {v.path}
+            <span key={contract} className="mono" style={{ fontSize: 14 }}>{contract}: {v.method} {v.path}
               {v.security && v.security.length > 0 && <span className="meta"> · {v.security.map((alt) => alt.map((s) => s.scheme + (s.scopes?.length ? ` (${s.scopes.join(' ')})` : '')).join(' + ')).join(' or ')}</span>}
             </span>
           ))}
@@ -151,7 +170,7 @@ function ToolDetail({ id, tool }: { id: string; tool: Tool }) {
           <span className="eyebrow">Why it looks like this</span>
           {provenance.map(([field, steps]) => (
             <div key={field}>
-              <h3 style={{ fontSize: 13, marginBottom: 4 }}>{field}</h3>
+              <h3 style={{ fontSize: 14, marginBottom: 4 }}>{field}</h3>
               <ol>
                 {steps.map((s, i) => (
                   <li key={i}>

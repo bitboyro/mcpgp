@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import { api, type Manifest } from '../api'
 import { useManifest, useServer } from '../serverData'
 import { useSession } from '../session'
-import { ErrorBox, Loading, PageHead } from '../ui'
+import { ErrorBox, Help, Loading, PageHead, Segmented, Icon } from '../ui'
 import { BuildButton } from './Overview'
 
 /** The settings, as the definition's `safety` section holds them (all on by default). */
@@ -30,7 +30,13 @@ interface Settings {
   captureLimitKb: number
   resultTtl: number
   maxStoredKb: number
+  errorDetail: 'full' | 'summary'
+  /** The definition's own masked fields, comma-joined so a change is a plain comparison (MaskedFields in the runtime). */
+  maskedFields: string
 }
+
+/** Masked whatever the definition lists (runtime MaskedFields.DEFAULTS). */
+export const ALWAYS_MASKED = ['password', 'secret', 'token', 'apiKey', 'authorization']
 
 function current(p: Manifest['policies']): Settings {
   return {
@@ -55,6 +61,8 @@ function current(p: Manifest['policies']): Settings {
     captureLimitKb: p.results?.captureLimitKb ?? 4096,
     resultTtl: p.results?.ttlSeconds ?? 900,
     maxStoredKb: p.results?.maxStoredKb ?? 65536,
+    errorDetail: p.runtimeDefaults?.configuration?.errors?.detail ?? 'full',
+    maskedFields: (p.redaction?.fields ?? []).filter((f) => !ALWAYS_MASKED.some((d) => d.toLowerCase() === f.toLowerCase())).join(','),
   }
 }
 
@@ -80,6 +88,13 @@ const PATHS: Record<keyof Settings, string> = {
   captureLimitKb: '/results/captureLimitKb',
   resultTtl: '/results/ttlSeconds',
   maxStoredKb: '/results/maxStoredKb',
+  errorDetail: '/runtimeDefaults/configuration/errors/detail',
+  maskedFields: '/runtimeDefaults/redaction/fields',
+}
+
+/** A setting's value as the definition stores it. */
+function stored(key: keyof Settings, value: Settings[keyof Settings]): unknown {
+  return key === 'maskedFields' ? String(value).split(',').filter(Boolean) : value
 }
 
 /**
@@ -122,7 +137,7 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
     .find((k) => !Number.isInteger(s[k]) || s[k] < (({ requestReceiptTtlSeconds: 60 } as Record<string, number>)[k] ?? 1) || s[k] > (({ batchMaxCalls: 100, batchConcurrency: 16, requestReceiptTtlSeconds: 2592000, maxStoredReceipts: 1000000, captureLimitKb: 65536, resultTtl: 86400, maxStoredKb: 262144 } as Record<string, number>)[k] ?? Number.MAX_SAFE_INTEGER))
   const save = useMutation({
     mutationFn: () => api.saveEdit(id, server.data?.latestVersion ?? 0,
-      changed.map((k) => ({ op: 'set' as const, path: PATHS[k], value: s[k] })), 'Execution: ' + changed.join(', ')),
+      changed.map((k) => ({ op: 'set' as const, path: PATHS[k], value: stored(k, s[k]) })), 'Execution: ' + changed.join(', ')),
     onSuccess: async () => {
       for (const key of ['server', 'manifest', 'servers', 'version', 'example-config']) await queryClient.invalidateQueries({ queryKey: [key] })
     },
@@ -134,29 +149,37 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
         <h2>Changing and deleting data</h2>
         <Toggle label="Agents confirm before a tool deletes or changes data" checked={s.confirmDestructive} disabled={off}
           onChange={(v) => set('confirmDestructive', v)}
-          hint="The agent gets a confirmation step first, so an injected or mistaken instruction can't delete data in one call." />
+          hint="The agent must confirm before deleting or changing data."
+          more="The agent gets a confirmation step first, so an injected or mistaken instruction can't delete data in one call." />
       </div>
 
       <div className="card">
         <h2>Large answers</h2>
         <NumberField label="Largest answer an agent gets (KB)" value={s.responseLimitKb} disabled={off} onChange={(v) => set('responseLimitKb', v)}
-          hint="The inline output budget. Retention can save larger responses for retrieval; otherwise long answers are cut." />
+          hint="Longer answers are cut, unless retained results keep them."
+          more="This is the inline output budget. With retained results on, larger responses are saved for the agent to read in parts; otherwise long answers are cut." />
         <Toggle label="Cut long lists at whole items" checked={s.cleanTruncation} disabled={off} onChange={(v) => set('cleanTruncation', v)}
-          hint="The agent keeps valid data (as many items as fit) and is told how many were left out, instead of JSON cut in the middle." />
+          hint="The agent gets whole items and a count of what was left out."
+          more="Instead of JSON cut in the middle, the agent keeps valid data (as many items as fit) and is told how many items were left out." />
       </div>
 
       <div className="card">
         <h2>Batch execution</h2>
         <Toggle label="Enable batch calls" checked={s.batchEnabled} disabled={off} onChange={(v) => set('batchEnabled', v)}
-          hint="Adds batch_call alongside direct and discovery tools. Calls are independent; sequential execution stops on failure." />
+          hint="Adds batch_call, so an agent can send several calls at once."
+          more="batch_call sits alongside the direct and discovery tools. Calls are independent; a sequential batch stops at the first failure." />
         <NumberField label="Maximum operations per batch" value={s.batchMaxCalls} disabled={off || !s.batchEnabled} onChange={(v) => set('batchMaxCalls', v)} hint="1–100 operations." />
         <NumberField label="Parallel read operations" value={s.batchConcurrency} disabled={off || !s.batchEnabled} onChange={(v) => set('batchConcurrency', v)} hint="1–16 concurrent reads. Existing per-instance rate limits also apply." />
         <Toggle label="Allow writes in sequential batches" checked={s.batchAllowWrites} disabled={off || !s.batchEnabled} onChange={(v) => set('batchAllowWrites', v)}
-          hint="POST, PUT, PATCH and DELETE retain their validation and confirmation requirements. Earlier writes remain committed after a failure. No automatic retries or rollback." />
+          hint="POST, PUT, PATCH and DELETE may run in sequential batches."
+          more="Writes keep their validation and confirmation. Earlier writes stay committed after a failure; nothing is retried or rolled back automatically." />
         <Toggle label="Deduplicate retried batches" checked={s.batchDeduplicateRequests} disabled={off || !s.batchEnabled} onChange={(v) => set('batchDeduplicateRequests', v)}
-          hint="A caller can reuse a requestId to recover a recorded batch outcome without sending it upstream again. An interrupted batch reports an unknown outcome so writes are not replayed." />
-        <NumberField label="Request receipt lifetime (seconds)" value={s.requestReceiptTtlSeconds} disabled={off || !s.batchEnabled || !s.batchDeduplicateRequests} onChange={(v) => set('requestReceiptTtlSeconds', v)} hint="60 seconds to 30 days; completed receipts expire after this time. Unfinished receipts stay protected as unknown outcomes." />
-        <NumberField label="Maximum stored request receipts" value={s.maxStoredReceipts} disabled={off || !s.batchEnabled || !s.batchDeduplicateRequests} onChange={(v) => set('maxStoredReceipts', v)} hint="1–1,000,000 receipts. Expired completed receipts are removed before new receipts are accepted." />
+          hint="A retried batch with the same requestId isn't sent twice."
+          more="A caller can reuse a requestId to recover a recorded batch outcome without sending it upstream again. An interrupted batch reports an unknown outcome, so writes are never replayed." />
+        <NumberField label="Request receipt lifetime (seconds)" value={s.requestReceiptTtlSeconds} disabled={off || !s.batchEnabled || !s.batchDeduplicateRequests} onChange={(v) => set('requestReceiptTtlSeconds', v)} hint="60 seconds to 30 days."
+          more="Completed receipts expire after this time. Unfinished receipts stay protected as unknown outcomes." />
+        <NumberField label="Maximum stored request receipts" value={s.maxStoredReceipts} disabled={off || !s.batchEnabled || !s.batchDeduplicateRequests} onChange={(v) => set('maxStoredReceipts', v)} hint="1 to 1,000,000 receipts."
+          more="Expired completed receipts are removed before new receipts are accepted." />
       </div>
 
       <div className="card">
@@ -168,7 +191,8 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
             <option value="reference">Always return a result reference</option>
           </select>
         </label>
-        <p className="hint">Independent of batching and discovery. Adds result_get to read saved responses without repeating the operation. Results live in server memory, are private to a session, and expire or disappear on restart or reload. Full means one response, not every upstream page.</p>
+        <Help text="Keeps large answers so agents can read them in parts with result_get."
+          more="Independent of batching and discovery: result_get reads a saved response without repeating the operation. Results live in server memory, are private to a session, and expire or disappear on restart or reload. Full means one response, not every upstream page." />
         <NumberField label="Maximum captured response (KB)" value={s.captureLimitKb} disabled={off || s.resultMode === 'inline'} onChange={(v) => set('captureLimitKb', v)} hint="1–65536 KB. Responses beyond this limit are reported as incomplete." />
         <NumberField label="Result lifetime (seconds)" value={s.resultTtl} disabled={off || s.resultMode === 'inline'} onChange={(v) => set('resultTtl', v)} hint="1–86400 seconds." />
         <NumberField label="Result storage budget (KB)" value={s.maxStoredKb} disabled={off || s.resultMode === 'inline'} onChange={(v) => set('maxStoredKb', v)} hint="1–262144 KB. Shared by API responses and batch responses." />
@@ -177,16 +201,18 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
       <div className="card">
         <h2>What agents send</h2>
         <Toggle label="Limit the size of what agents send" checked={s.inputLimits} disabled={off} onChange={(v) => set('inputLimits', v)}
-          hint="Refuses oversized calls before anything reaches the target server. Files sent inline have their own limit, set by whoever runs the server." />
+          hint="Oversized calls are refused before anything reaches the target server."
+          more="Files sent inline have their own limit, set by whoever runs the server." />
         <NumberField label="Largest tool call (KB)" value={s.requestKb} disabled={off || !s.inputLimits} onChange={(v) => set('requestKb', v)} />
         <NumberField label="Longest text value (characters)" value={s.stringMaxLength} disabled={off || !s.inputLimits}
-          onChange={(v) => set('stringMaxLength', v)} hint="For fields whose spec sets no maximum length; a limit in the spec always applies." />
+          onChange={(v) => set('stringMaxLength', v)} hint="For fields without a maximum length in the API definition; a limit there always applies." />
       </div>
 
       <div className="card">
         <h2>Calls to the target server</h2>
         <Toggle label="Limit calls to each target server" checked={s.rateLimits} disabled={off} onChange={(v) => set('rateLimits', v)}
-          hint="Protects your customers' systems from an agent stuck in a loop. Whoever runs the server can change these for their own target server." />
+          hint="Protects target servers from an agent stuck in a loop."
+          more="Whoever runs the server can change these limits for their own target server." />
         <NumberField label="Calls at once" value={s.concurrent} disabled={off || !s.rateLimits} onChange={(v) => set('concurrent', v)}
           hint="More wait for a free slot (up to 30 seconds)." />
         <NumberField label="Calls per minute" value={s.perMinute} disabled={off || !s.rateLimits} onChange={(v) => set('perMinute', v)}
@@ -195,10 +221,13 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
           onChange={(v) => set('retryAfter', v)} hint="Passes on the target's Retry-After with its 429 answer." />
       </div>
 
+      <DataProtection detail={s.errorDetail} fields={s.maskedFields} off={off}
+        onDetail={(v) => set('errorDetail', v)} onFields={(v) => set('maskedFields', v)} />
+
       {editable && (
         <div className="actions">
-          <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || !!invalid || save.isPending}>Save as the next version</button>
-          {changed.length > 0 && <button type="button" className="btn" onClick={() => setS(saved)}>Undo changes</button>}
+          <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || !!invalid || save.isPending}><Icon name="save" />Save as the next revision</button>
+          {changed.length > 0 && <button type="button" className="btn" onClick={() => setS(saved)}><Icon name="undo" />Undo changes</button>}
           {invalid && <span className="hint" role="alert">Numbers are whole and at least 1</span>}
         </div>
       )}
@@ -207,21 +236,21 @@ function ExecutionForm({ id, saved }: { id: string; saved: Settings }) {
   )
 }
 
-export function Toggle({ label, checked, disabled, onChange, hint }: {
-  label: string; checked: boolean; disabled: boolean; onChange: (v: boolean) => void; hint?: string
+export function Toggle({ label, checked, disabled, onChange, hint, more }: {
+  label: string; checked: boolean; disabled: boolean; onChange: (v: boolean) => void; hint?: string; more?: string
 }) {
   return (
     <div className="list" style={{ gap: 2 }}>
       <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, fontWeight: 500 }}>
         <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} /> {label}
       </label>
-      {hint && <p className="hint" style={{ margin: '0 0 0 24px' }}>{hint}</p>}
+      {hint && <Help text={hint} more={more} style={{ marginLeft: 24 }} />}
     </div>
   )
 }
 
-export function NumberField({ label, value, disabled, onChange, hint }: {
-  label: string; value: number; disabled: boolean; onChange: (v: number) => void; hint?: string
+export function NumberField({ label, value, disabled, onChange, hint, more }: {
+  label: string; value: number; disabled: boolean; onChange: (v: number) => void; hint?: string; more?: string
 }) {
   return (
     <div className="list" style={{ gap: 2, marginLeft: 24 }}>
@@ -230,7 +259,55 @@ export function NumberField({ label, value, disabled, onChange, hint }: {
         <input className="input" type="number" min={1} step={1} value={Number.isNaN(value) ? '' : value} disabled={disabled}
           onChange={(e) => onChange(e.target.value === '' ? NaN : Number(e.target.value))} style={{ maxWidth: 180 }} />
       </label>
-      {hint && <span className="hint">{hint}</span>}
+      {hint && <Help text={hint} more={more} />}
+    </div>
+  )
+}
+
+/** What an agent sees of an upstream error, and which fields are masked wherever answers are shown or kept. */
+function DataProtection({ detail, fields, off, onDetail, onFields }: {
+  detail: Settings['errorDetail']; fields: string; off: boolean; onDetail: (v: Settings['errorDetail']) => void; onFields: (v: string) => void
+}) {
+  const [adding, setAdding] = useState('')
+  const own = fields.split(',').filter(Boolean)
+  const name = adding.trim()
+  const problem = !name ? null : !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name) ? 'A field name: letters, digits, _ . -'
+    : [...ALWAYS_MASKED, ...own].some((f) => f.toLowerCase() === name.toLowerCase()) ? 'Already masked' : null
+  const add = () => { if (name && !problem) { onFields([...own, name].join(',')); setAdding('') } }
+  return (
+    <div className="card" aria-label="Data protection">
+      <h2>Data protection</h2>
+      <div className="list" style={{ gap: 6 }}>
+        <span style={{ fontSize: 14, fontWeight: 500 }}>Error detail</span>
+        <Segmented label="Error detail" value={detail} onChange={(v) => !off && onDetail(v)}
+          options={[['full', 'Full'], ['summary', 'Summary']]} />
+        <Help text={detail === 'full' ? 'Agents get the target\'s whole error body, masked.' : 'Agents get one short line per error.'}
+          more="Full: status, error code and the upstream body (masked), easiest to debug. Summary: status, error code and the problem's title or the body's first line, at most 200 characters. The audit file always keeps the full masked body." />
+      </div>
+      <div className="list" style={{ gap: 6 }}>
+        <span style={{ fontSize: 14, fontWeight: 500 }}>Masked fields</span>
+        <Help text="Values of these fields show as *** in results, errors, the audit file and recordings."
+          more="Matched by name, whatever the case, at any depth of a JSON answer. Configured credentials and tokens are masked too, wherever they appear." />
+        <div className="actions" role="list" aria-label="Masked fields">
+          {ALWAYS_MASKED.map((f) => <span key={f} role="listitem" className="tag mono" title="Always masked">{f} · always</span>)}
+          {own.map((f) => (
+            <span key={f} role="listitem" className="pill mono" style={{ minHeight: 30 }}>{f}
+              {!off && <button type="button" className="how" aria-label={`Stop masking ${f}`} onClick={() => onFields(own.filter((o) => o !== f).join(','))}>
+                <Icon name="close" size={14} /></button>}
+            </span>
+          ))}
+        </div>
+        {!off && (
+          <div className="actions" style={{ alignItems: 'flex-start' }}>
+            <label className="field" style={{ flex: '1 1 200px' }}><span className="visually-hidden">Field to mask</span>
+              <input className="input mono" value={adding} placeholder="iban" onChange={(e) => setAdding(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }} />
+            </label>
+            <button type="button" className="btn" disabled={!name || !!problem} onClick={add}><Icon name="plus" />Mask field</button>
+          </div>
+        )}
+        {problem && <span className="hint" role="alert">{problem}</span>}
+      </div>
     </div>
   )
 }
@@ -239,18 +316,18 @@ export function NumberField({ label, value, disabled, onChange, hint }: {
 function AlwaysOn() {
   const items: [string, string][] = [
     ['Credentials stay on the server', 'Sent only to the target server they belong to; never shown to agents, written to logs or put in results.'],
-    ['Secrets are masked', 'In results, errors, the audit log and recordings, with the fields you list under redaction.'],
+    ['Secrets are masked', 'In results, errors, the audit log and recordings, with the fields under Data protection.'],
     ['No redirects to other hosts', 'A redirect from the target is not followed, so credentials never travel elsewhere.'],
     ['Parameters stay parameters', 'Path values are encoded and can’t leave the path; cookie values are encoded; header values can’t contain line breaks.'],
     ['Files only from allowed places', 'Files by path are off unless turned on, confined to one folder, without traversal or symlink escapes.'],
     ['Tool results are data', 'The agent docs in the package tell agents never to follow instructions found in results.'],
   ]
   return (
-    <div className="card">
+    <div className="stage-card" style={{ gap: 12 }}>
       <h2>Always on</h2>
-      <div className="list" style={{ gap: 10 }}>
+      <div className="list" style={{ gap: 12 }}>
         {items.map(([title, text]) => (
-          <div key={title}><b style={{ fontSize: 14 }}>{title}</b><br /><span className="hint">{text}</span></div>
+          <div key={title}><b style={{ fontSize: 15, color: 'var(--stage-bright)' }}>{title}</b><br /><span className="hint">{text}</span></div>
         ))}
       </div>
     </div>
