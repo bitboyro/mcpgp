@@ -26,11 +26,12 @@ baseline instructions editing, completion of existing versioned template workflo
 version/build metadata, and a tested standalone platform distribution. Clarify Builds versus
 Activity without removing audit events or restructuring all navigation.
 
-After 0.4.0, with no release assigned: full Access & Security consolidation, comprehensive
-advanced-setting forms, AI description enhancement/optimization skill, an in-product tutorial/FAQ
-and video center, an expanded template catalogue, Tab-to-accept predictions, central runtime/fleet
-management, and a complete brand identity. A simple logo may land if ready; branding does not block
-0.4.0. Exact UI placement, terminology and visual tokens still need design review.
+After 0.4.0, with no release assigned: comprehensive advanced-setting forms, AI description
+enhancement/optimization skill, an in-product tutorial/FAQ and video center, an expanded template
+catalogue, Tab-to-accept predictions, central runtime/fleet management, and a complete brand identity.
+(The planned Access & Security consolidation became 0.4.0's regroup by configuration concern, with
+Access control and Observability pages; the UI placement, terminology and visual tokens were decided
+in its design review: [ui.md](../design/ui.md).)
 
 ## Releases
 
@@ -50,14 +51,13 @@ management, and a complete brand identity. A simple logo may land if ready; bran
 | **0.5.0** (planned) | Deferred from 0.4.0: a standalone platform distribution without Docker (R09), the complete template workflow (R07), agent guidance in packages and its docs (R11), the feature-inventory review (R02) |
 | TODO, not yet scheduled | Marked TODO in the docs: `release.versionFrom` other than `contract`, `platform:` in the repository config; git sources on the platform (a spec from an address, with Check for updates: on `main`); a native CLI binary. (CLI `diff`, `preview`, `try`, `migrate` and `--no-color`, the platform's Changes page, and contract detection for `auto` instances: on `main`.) |
 
-## Before 0.3.0: MCP 2026-07-28 and protocol utilities (added 2026-10-17)
+## MCP 2026-07-28 and protocol utilities (added 2026-10-17; updated 2026-10-26)
 
-Where we are today (checked in `runtime/.../mcp/`): **tools** ✓, **resources** ✓, **prompts** ✓ with
-**completion** (`completion/complete`, prompt arguments with an enum only; no resource-template
-completion), **progress** (a tick every second during an upstream call, only when the client sent a
-`progressToken`; no real progress or `total`), **elicitation** form mode ✓ (confirm destructive calls).
-Not implemented: cancellation, MCP-level pagination, tasks, URL-mode elicitation, MRTR, request-scoped
-SSE as a chosen mode. SDK is 2.0.1; the SDK may not carry the 2026-07-28 revision yet (check first).
+Where we are (0.4.0): **tools**, **resources** and **prompts** ✓; **completion** for prompt arguments
+and resource templates; **progress** with increasing values and a `total`; **cancellation**; **list
+pagination** (`server.pageSize`); **elicitation** form mode (confirmations). Not implemented: MRTR,
+request-scoped streaming as a chosen mode, URL-mode elicitation, tasks. Check first whether the Java SDK
+carries the 2026-07-28 revision.
 
 Order matters: 1 decides what the rest build on.
 
@@ -75,17 +75,18 @@ Order matters: 1 decides what the rest build on.
 
 Also today ✓: the MCP support table is in [compatibility.md](../spec/compatibility.md) §1.2. Protocol-level behaviour is tested in the runtime's own tests, because the conformance traffic format (one call, one API request) has no cancel or paging step; fixtures for 1 and 2 follow when they exist. Left on purpose: `server.pageSize` is set at start (a reload keeps it, like telemetry), and API tool results don't page (the compiler still refuses `pagination`: its own feature).
 
-## Next (agreed 2026-10-13, not scheduled into a release)
+## Next (not scheduled into a release; updated 2026-10-26)
 
 Releases happen when they're asked for; these land on `main` first.
 
 | Item | What | State |
 |---|---|---|
-| Tool-name clashes on spec upload | When two operations would get the same tool name, the upload shows them with suggested names (from method and path) to accept or edit, or sets a rule for the server (`naming.collisions`); both are saved in the definition | on `main` |
-| 0.3.0 passwords | See the release table | on `main` |
-| UX and wording review | Focused 0.4.0 pass and later structural work: [release scope](release-0.4.0.md); broader review below | 0.4.0 scope agreed; detailed design/implementation pending |
-| Per-user identity by token exchange | `tokenExchange`: RFC 8693 or Entra on-behalf-of, for a shared server whose users sign in with OAuth (auth.md §2.5) | on `main` |
-| Store performance at scale | Activity searches filtered by the store (SQL and indexes on PostgreSQL) and bounded in time; the cache cleanup batched | on `main` |
+| UX and wording review | The first pass shipped in 0.4.0: navigation by configuration group, Overview area cards, plain words (API definition, API version, revision), one-line help with How it works, icons. Next: the walkthrough with people who haven't seen the platform ([Main priorities](#main-priorities)) | 0.4.0 pass released; review with people pending |
+| One Compose project per installation | `setup` writes `name: mcpgp`, so a second installation on the same machine (a test of a new version) joins the first, and `docker compose down -v` in either deletes the other's data. Name the project after the folder (or `setup --name`), and have `check` warn when another project with that name runs from a different folder | Documented in [self-hosting §1](../guides/self-hosting.md#1-write-the-folder-with-setup); not built |
+| Record the 0.4.0 design decisions | The 0.4.0 design review's decisions (grouping settings by configuration concern, the Access control and Observability split between platform-edited defaults and deployment settings, the wording and help rules) are partly in [ui.md](../design/ui.md) and the specs; move the rest into [decisions](../decisions/README.md) so they outlive the review notes | Pending |
+
+Shipped from this list: tool-name clashes on spec upload, passwords in the web UI, per-user identity by
+token exchange and store performance at scale (all 0.3.0).
 
 ### Backlog: stakeholder feedback (2026-10-20)
 
