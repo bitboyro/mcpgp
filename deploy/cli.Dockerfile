@@ -26,6 +26,7 @@ COPY docs/guides /opt/mcpgp/docs/guides
 COPY docs/decisions /opt/mcpgp/docs/decisions
 COPY schemas/src/main/resources/schemas /opt/mcpgp/schemas/src/main/resources/schemas
 COPY docs/concepts.md docs/security.md docs/deployment.md /opt/mcpgp/docs/
+COPY SECURITY.md /opt/mcpgp/
 RUN chmod 755 /opt/mcpgp/bin/mcpgp && ln -s /opt/mcpgp/bin/mcpgp /usr/local/bin/mcpgp
 # CI runners mount the checkout and run steps as root; locally, pass --user "$(id -u):$(id -g)"
 WORKDIR /work

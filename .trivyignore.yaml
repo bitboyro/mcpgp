@@ -1,0 +1,8 @@
+# Findings we accept, with the reason (SECURITY.md). Trivy reads this in .github/workflows/security.yml.
+misconfigurations:
+  - id: DS-0002
+    paths: ["deploy/cli.Dockerfile"]
+    statement: >-
+      The CLI image runs as root on purpose: CI runners mount the checkout and run steps as root, and the
+      image writes build output there. Locally, pass --user "$(id -u):$(id -g)". The platform image runs
+      as 10001.

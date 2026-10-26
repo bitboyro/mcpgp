@@ -3,6 +3,22 @@
 All notable changes are documented here. Format: [Keep a Changelog](https://keepachangelog.com),
 versions follow [SemVer](https://semver.org).
 
+## Unreleased
+
+### Added
+- **Security scanning** on every pull request, every push to `main` and weekly ([SECURITY.md](SECURITY.md)):
+  CodeQL on the Java and TypeScript code; Trivy on the shipped dependencies, the lockfiles, the Dockerfiles,
+  compose files, committed secrets and both images; npm audit on the web UI; Dependabot for updates.
+- **SBOMs** (CycloneDX) on every release: `mcpgp-<version>-sbom.cdx.json` (Java) and
+  `mcpgp-<version>-web-sbom.cdx.json` (the web UI).
+- [SECURITY.md](SECURITY.md): how to report a vulnerability, supported versions, and how to check downloads.
+
+### Security
+- Spring Boot 4.1.2 (Tomcat 11.0.27: CVE-2026-65182, CVE-2026-65905, CVE-2026-68525; Jackson 3.1.7),
+  Jackson 2.21.7 and json-smart 2.6.0 (CVE-2024-57699), fixing the high and critical advisories the first
+  scan found in the platform, the CLI and the runtime inside generated servers. Packages built before this
+  should be built again once it's released.
+
 ## 0.4.0 — 2026-10-26
 
 **Deferred to 0.5.0:** a standalone platform distribution without Docker (the platform image and the CLI
