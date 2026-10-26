@@ -258,7 +258,8 @@
           }
         },
         "detect": { "type": ["object", "null"] },
-        "downstreamAuth": {
+        "upstreamAuth": {
+          "description": "How the server signs in to the API (manifests built before 0.4.0 name it downstreamAuth)",
           "type": "object",
           "properties": {
             "supported": { "type": "array", "items": { "type": "string" } },
@@ -288,7 +289,7 @@
         "requestBody": { "type": "object" },
         "pagination": { "type": ["object", "null"] }
       },
-      "required": ["id", "toolPrefix", "contracts", "downstreamAuth"],
+      "required": ["id", "toolPrefix", "contracts", "upstreamAuth"],
       "additionalProperties": false
     },
 

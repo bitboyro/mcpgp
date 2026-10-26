@@ -22,7 +22,7 @@ export function ServerBuildsPage() {
 
   return (
     <>
-      <PageHead title="Builds" sub="Every package built for this server. Download, release, archive or delete them.">
+      <PageHead title="Builds and releases" sub="Every package built for this server. Download, release, archive or delete them.">
         <BuildButton id={id} />
       </PageHead>
       <div className="body">

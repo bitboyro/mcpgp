@@ -109,7 +109,7 @@ export function expectedCode(status: string, documented: Set<string>): string[] 
   if (!/^\d{3}$/.test(status)) return null;
   const n = Number(status);
   if (n >= 200 && n < 300) return [];
-  if (n === 401 || n === 403) return ["AUTH_DOWNSTREAM"];
+  if (n === 401 || n === 403) return ["AUTH_UPSTREAM"];
   if (n === 429) return documented.has("RATE_LIMITED") ? ["UPSTREAM_4XX", "RATE_LIMITED"] : ["UPSTREAM_4XX"];
   if (n >= 400 && n < 500) return ["UPSTREAM_4XX"];
   if (n >= 500) return ["UPSTREAM_5XX"];

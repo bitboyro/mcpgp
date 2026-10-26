@@ -2,6 +2,11 @@
 
 Every configurable thing, grouped by concern.
 
+**Release allocation (agreed 2026-10-23):** [0.4.0 scope and checkpoints](process/release-0.4.0.md)
+identify the required readiness fixes, focused UX work and standalone platform delivery, plus
+explicit post-0.4.0 deferrals. The [roadmap](process/roadmap.md) carries later work; P0/P1/P2 below
+are broad priorities, not a promise that every item ships in 0.4.0.
+
 **Set by**
 - **B**: build definition (`*.mcpgp.yaml`), edited by the builder.
 - **R**: runtime config (`<server>.yaml`), edited by the operator.
@@ -89,7 +94,7 @@ Every configurable thing, grouped by concern.
 | Inbound auth: none, static | B→R | P0 |
 | Inbound OAuth 2.1 resource server per MCP authorization spec (RFC 9728 metadata, RFC 8707 audience, JWKS or RFC 7662 introspection, insufficient_scope) | B→R | P1 |
 | Guardrail: no inbound auth on HTTP only on localhost unless `allowInsecure` | B→R | P0 |
-| Downstream auth types supported by the build: basic, apiKey, bearer | B | P0 |
+| Upstream auth types supported by the build: basic, apiKey, bearer | B | P0 |
 | OAuth 2 client credentials (RFC 6749 §4.4, token cache, refresh on 401), mTLS (combinable) | B | P1 |
 | Per-user identity (token exchange, URL elicitation) | B | P2 |
 | Secrets only as references (`env:`, `file:`); keychain | R | P0 |
@@ -214,6 +219,6 @@ See [spec/compatibility.md](spec/compatibility.md).
 - Breaking-change detection and gating between builds: the server version follows the API version, so tool changes come with API versions.
 
 - Generated web UI / local admin page for delivered servers, and multi-tenant HTTP mode: out of scope for now; mcpgp generates MCP servers only.
-- `loginToken` downstream auth type (custom login endpoints).
+- `loginToken` upstream auth type (custom login endpoints).
 
 - Comparing variants in harness-lab. Revisit after the core is validated.

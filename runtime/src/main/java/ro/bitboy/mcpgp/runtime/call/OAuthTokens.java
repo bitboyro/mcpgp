@@ -101,7 +101,7 @@ final class OAuthTokens {
         try {
             response = client.send(http.build(), HttpResponse.BodyHandlers.ofString());
         } catch (IOException e) {
-            throw new ToolError("AUTH_DOWNSTREAM", "token request for " + instance.id() + " failed: " + e.getClass().getSimpleName(),
+            throw new ToolError("AUTH_UPSTREAM", "token request for " + instance.id() + " failed: " + e.getClass().getSimpleName(),
                     "Check the instance's tokenUrl and network");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -115,7 +115,7 @@ final class OAuthTokens {
         }
         if (response.statusCode() != 200 || !body.path("access_token").isTextual()) {
             String error = body.path("error").asText("HTTP " + response.statusCode());
-            throw new ToolError("AUTH_DOWNSTREAM", "token request for " + instance.id() + " was refused: " + error,
+            throw new ToolError("AUTH_UPSTREAM", "token request for " + instance.id() + " was refused: " + error,
                     "Check the instance's clientId, clientSecret and scopes");
         }
         String value = body.get("access_token").asText();

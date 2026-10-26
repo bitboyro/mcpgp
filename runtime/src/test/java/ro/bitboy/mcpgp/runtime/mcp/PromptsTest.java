@@ -94,7 +94,7 @@ class PromptsTest {
         Path manifest = dir.resolve("manifest.json");
         Files.writeString(manifest, CanonicalJson.pretty(result.manifest().get()));
         target = new MockTarget();
-        try (ServerSocket socket = new ServerSocket(0)) {
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) {
             port = socket.getLocalPort();
         }
         Path config = dir.resolve("orders-mcp.yaml");

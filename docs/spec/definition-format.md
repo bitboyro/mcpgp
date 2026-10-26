@@ -68,11 +68,12 @@ build: { … }
 | `apis[].select.access` | enum | `read-write` | `read-only` · `read-write` (no DELETE) · `all` |
 | `apis[].select.include` / `exclude` | selector | all | See §5. |
 | `apis[].select.deprecated` | enum | `hide` | `hide` · `show` · `mark` |
-| `apis[].downstreamAuth.supported` | list | from spec | `basic` · `apiKey` · `bearer` · `oauth2ClientCredentials` · `mtls` · `custom:<id>` |
-| `apis[].downstreamAuth.fromRequest` | object | absent | Lets the MCP client send the credential for the API in a request header (`{ header: X-… }`, optional name); HTTP only, never stored. auth.md §2.4 |
-| `apis[].downstreamAuth.tokenExchange` | object | absent | `{}` lets instances call the API as the signed-in user (token exchange; inbound oauth). auth.md §2.5 |
-| `apis[].downstreamAuth.identity` | enum | `service-account` | informational; per-user identity comes from `fromRequest` or `tokenExchange` |
-| `apis[].downstreamAuth.unsatisfiedTools` | enum | `hide` | `hide` · `error` |
+| `apis[].upstreamAuth.supported` | list | from spec | `basic` · `apiKey` · `bearer` · `oauth2ClientCredentials` · `mtls` · `custom:<id>` |
+| `apis[].upstreamAuth.fromRequest` | object | absent | Lets the MCP client send the credential for the API in a request header (`{ header: X-… }`, optional name); HTTP only, never stored. auth.md §2.4 |
+| `apis[].upstreamAuth.tokenExchange` | object | absent | `{}` lets instances call the API as the signed-in user (token exchange; inbound oauth). auth.md §2.5 |
+| `apis[].upstreamAuth.identity` | enum | `service-account` | informational; per-user identity comes from `fromRequest` or `tokenExchange` |
+| `apis[].upstreamAuth.unsatisfiedTools` | enum | `hide` | `hide` · `error` |
+| `apis[].downstreamAuth` | object | — | **Deprecated since 0.4.0:** the earlier name of `upstreamAuth`, same settings. Read with a `DEPRECATED_KEY` warning; an API may not have both. Each file is renamed before merging, so a parent and a variant may use either name |
 | `apis[].requestBody` | object | `{ multiple: split }` | operations with several request body types: `split` (one tool per type, suffixes from `suffixes`) or `prefer` (one tool, first match of `prefer`). Default suffixes: `multipart/form-data → multipart`, `application/x-www-form-urlencoded → form`, `application/octet-stream → binary`. See tools-contract §13 |
 | `apis[].pagination` | object | none | **Not supported yet:** the compiler refuses it (`NOT_SUPPORTED_YET`). Planned: normalizes paging (tools-contract §10). `{ style: offset \| page \| cursor \| link-header \| client, request: {…param names}, response: {items, total, next}, defaultLimit, maxLimit }` |
 | `instances.mode` | enum | `single` | `single` · `multi` |
@@ -310,6 +311,7 @@ Diagnostics carry a stable code, the file (relative to the project root) and a J
 | `DUPLICATE_KEY` | error | two APIs in one file share an `id` |
 | `DEFAULT_CONTRACT_AMBIGUOUS` | error | more than one contract of an API is marked `default` |
 | `INCLUDE_MATCHES_NOTHING` | warning | an `include` pattern matches no file |
+| `DEPRECATED_KEY` | warning | a key under an old name still read, such as `apis[].downstreamAuth` (now `upstreamAuth`) |
 | `MERGE_TYPE_CONFLICT` | warning | a later file replaces a map with a list (or similar) |
 | `SPEC_INVALID` | error | a contract is not a Swagger 2.0 / OpenAPI 3.x document, or is malformed |
 | `SPEC_VERSION_UNSUPPORTED` | error | OpenAPI 3.2 (planned) |

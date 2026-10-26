@@ -1,4 +1,4 @@
-// The Naming section of Tools & rules (naming.md): the policy in words, and each tool's name next to
+// The Naming section of Tools (naming.md): the policy in words, and each tool's name next to
 // what the pipeline would give it now and what the lock file keeps, read from the manifest's provenance.
 
 import type { Manifest, NamingInfo, NamingPolicy, ProvenanceStep } from './api'

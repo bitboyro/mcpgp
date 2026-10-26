@@ -1,4 +1,4 @@
-// Arguments to start trying a tool with (Tools & rules → Try): the required ones, filled from the input
+// Arguments to start trying a tool with (Tools → Try): the required ones, filled from the input
 // schema (its examples, defaults and enums, else a value of the right type); `instance` is the mock.
 
 type Schema = { type?: string | string[]; properties?: Record<string, Schema>; required?: string[]; enum?: unknown[]; default?: unknown;

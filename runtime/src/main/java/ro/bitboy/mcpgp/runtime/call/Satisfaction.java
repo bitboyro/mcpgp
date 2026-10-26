@@ -22,7 +22,7 @@ public final class Satisfaction {
      * alternative needs, in words ("oauth with the scopes orders.write").
      *
      * @param security the variant's {@code security}; missing means nothing is known, so anything goes
-     * @param kinds    the API's {@code downstreamAuth.schemes}: scheme name → kind
+     * @param kinds    the API's {@code upstreamAuth.schemes}: scheme name → kind
      */
     public static String unmet(JsonNode entry, RuntimeConfig.Instance instance, JsonNode security, JsonNode kinds) {
         if (security == null || !security.isArray() || security.isEmpty()) {

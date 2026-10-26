@@ -39,9 +39,18 @@ class UnsatisfiedToolsTest {
 
     /** The orders example with customer_create needing oauth with orders.write, and customer_get basic only. */
     McpServerFactory server(String unsatisfiedTools) throws Exception {
+        return server(unsatisfiedTools, false);
+    }
+
+    /** {@code before040}: the API's sign-in under its name in manifests built before 0.4.0, downstreamAuth. */
+    McpServerFactory server(String unsatisfiedTools, boolean before040) throws Exception {
         target = new MockTarget();
         ObjectNode root = (ObjectNode) JSON.readTree(REPO.resolve("examples/manifest/orders-mcp.manifest.json").toFile());
-        ((ObjectNode) root.at("/apis/0/downstreamAuth")).put("unsatisfiedTools", unsatisfiedTools);
+        ((ObjectNode) root.at("/apis/0/upstreamAuth")).put("unsatisfiedTools", unsatisfiedTools);
+        if (before040) {
+            ObjectNode api = (ObjectNode) root.at("/apis/0");
+            api.set("downstreamAuth", api.remove("upstreamAuth"));
+        }
         for (JsonNode tool : root.path("tools")) {
             String security = switch (tool.path("name").asText()) {
                 case "orders_customer_create" -> "[[{\"scheme\": \"oauth\", \"scopes\": [\"orders.write\"]}]]";
@@ -97,7 +106,7 @@ class UnsatisfiedToolsTest {
         // basic only: prod can't, and says what's missing, without calling
         McpSchema.CallToolResult prod = get(server, "prod");
         assertThat(prod.isError()).isTrue();
-        assertThat(prod.content().toString()).contains("AUTH_DOWNSTREAM").contains("basicAuth");
+        assertThat(prod.content().toString()).contains("AUTH_UPSTREAM").contains("basicAuth");
         assertThat(target.received).isEmpty();
 
         assertThat(get(server, "partner").isError()).isFalse();
@@ -117,6 +126,14 @@ class UnsatisfiedToolsTest {
         McpSchema.CallToolResult create = server.call(null, new McpSchema.CallToolRequest("orders_customer_create",
                 Map.of("instance", "partner", "body", Map.of("name", "n", "email", "a@b.c", "accountId", "a-1")), null));
         assertThat(create.isError()).isTrue();
-        assertThat(create.content().toString()).contains("AUTH_DOWNSTREAM").contains("orders.write");
+        assertThat(create.content().toString()).contains("AUTH_UPSTREAM").contains("orders.write");
+    }
+
+    @Test
+    void aManifestBuiltBefore040IsReadTheSameWay() throws Exception {
+        McpServerFactory server = server("hide", true);
+        assertThat(server.catalog().tool("orders_customer_create")).isEmpty();
+        assertThat(server.catalog().hidden().get("orders_customer_create").toString()).contains("orders.write");
+        assertThat(server.catalog().tool("orders_customer_get")).isPresent();
     }
 }

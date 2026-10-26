@@ -159,7 +159,7 @@ class TlsAndOAuthTest {
         McpSchema.CallToolResult refused = get(server);
         assertThat(target.received).hasSize(6);
         assertThat(target.received.get(5).header("Authorization")).isEqualTo("Bearer tok-BBBB");
-        assertThat(text(refused)).startsWith("AUTH_DOWNSTREAM").contains("bad token ***").doesNotContain("tok-BBBB");
+        assertThat(text(refused)).startsWith("AUTH_UPSTREAM").contains("bad token ***").doesNotContain("tok-BBBB");
     }
 
     @Test
@@ -172,10 +172,10 @@ class TlsAndOAuthTest {
                 """.formatted(target.address()), Map.of("CS", "very-secret"));
         target.respond(MockTarget.Response.json(400, "{\"error\":\"invalid_client\",\"error_description\":\"secret very-secret is wrong\"}"));
         McpSchema.CallToolResult result = get(server);
-        assertThat(text(result)).startsWith("AUTH_DOWNSTREAM: token request for a was refused: invalid_client").doesNotContain("very-secret");
+        assertThat(text(result)).startsWith("AUTH_UPSTREAM: token request for a was refused: invalid_client").doesNotContain("very-secret");
         assertThat(URLDecoder.decode(target.last().text(), StandardCharsets.UTF_8)).contains("client_id=c").contains("client_secret=very-secret");
         assertThat(target.last().header("Authorization")).isNull();
         JsonNode structured = JSON.valueToTree(result.structuredContent());
-        assertThat(structured.path("code").asText()).isEqualTo("AUTH_DOWNSTREAM");
+        assertThat(structured.path("code").asText()).isEqualTo("AUTH_UPSTREAM");
     }
 }

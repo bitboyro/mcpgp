@@ -219,7 +219,7 @@ class ApiCallTest {
 
         target.respond(MockTarget.Response.json(401, "{}"));
         assertThat(structured(call("orders_customer_get", Map.of("instance", "prod-eu", "path", Map.of("id", "1")))).path("code").asText())
-                .isEqualTo("AUTH_DOWNSTREAM");
+                .isEqualTo("AUTH_UPSTREAM");
         target.respond(MockTarget.Response.json(503, "{\"message\":\"maintenance\"}"));
         assertThat(structured(call("orders_customer_get", Map.of("instance", "prod-eu", "path", Map.of("id", "1")))).path("code").asText())
                 .isEqualTo("UPSTREAM_5XX");

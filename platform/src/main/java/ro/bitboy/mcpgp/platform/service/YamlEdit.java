@@ -70,7 +70,7 @@ public final class YamlEdit {
         }
         String edited = text;
         for (Change change : changes) {
-            List<Segment> path = parse(change.path());
+            List<Segment> path = deprecatedAuthKey(expected, parse(change.path()));
             if ("set".equals(change.op())) {
                 JsonNode value = change.value() == null ? JsonNodeFactory.instance.nullNode() : change.value();
                 expected = setData((ObjectNode) expected, path, value);
@@ -107,6 +107,29 @@ public final class YamlEdit {
             }
         }
         return segments;
+    }
+
+    /**
+     * An edit under an API's {@code upstreamAuth} goes to its {@code downstreamAuth} when the file still uses that
+     * name (before 0.4.0), so the file never holds both; the compiler's warning asks for the rename.
+     */
+    static List<Segment> deprecatedAuthKey(JsonNode data, List<Segment> path) {
+        for (int i = 1; i < path.size(); i++) {
+            if (!(path.get(i) instanceof Key key) || !key.name().equals("upstreamAuth")) {
+                continue;
+            }
+            JsonNode api = data;
+            for (Segment segment : path.subList(0, i)) {
+                api = api == null ? null : child(api, segment);
+            }
+            if (api != null && api.has("downstreamAuth") && !api.has("upstreamAuth")) {
+                List<Segment> renamed = new ArrayList<>(path);
+                renamed.set(i, new Key("downstreamAuth"));
+                return renamed;
+            }
+            return path;
+        }
+        return path;
     }
 
     // ---- the data, for the check

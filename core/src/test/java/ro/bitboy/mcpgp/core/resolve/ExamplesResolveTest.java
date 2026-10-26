@@ -67,7 +67,7 @@ class ExamplesResolveTest {
         JsonNode api = doc.at("/apis/0");
         assertThat(api.at("/select/access").asText()).isEqualTo("read-only");             // overridden
         assertThat(api.at("/select/exclude").isArray()).isTrue();                          // inherited
-        assertThat(api.at("/downstreamAuth/supported").size()).isEqualTo(4);               // inherited
+        assertThat(api.at("/upstreamAuth/supported").size()).isEqualTo(4);               // inherited
         assertThat(d.contracts()).hasSize(2);                                               // inherited, not wiped
         assertThat(doc.at("/instances/mode").asText()).isEqualTo("single");
         assertThat(doc.path("packs").has("jira")).isFalse();                               // removed with null

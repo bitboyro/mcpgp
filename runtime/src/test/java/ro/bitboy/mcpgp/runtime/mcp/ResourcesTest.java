@@ -180,7 +180,7 @@ class ResourcesTest {
     void clientsListResourcesAndTemplates() throws Exception {
         target = new MockTarget();
         int port;
-        try (ServerSocket socket = new ServerSocket(0)) {
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) {
             port = socket.getLocalPort();
         }
         Path config = dir.resolve("http.yaml");
@@ -227,7 +227,7 @@ class ResourcesTest {
     void templateVariablesWithListedValuesCompleteLikePromptArguments() throws Exception {
         target = new MockTarget();
         int port;
-        try (ServerSocket socket = new ServerSocket(0)) {
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) {
             port = socket.getLocalPort();
         }
         Path config = dir.resolve("http.yaml");

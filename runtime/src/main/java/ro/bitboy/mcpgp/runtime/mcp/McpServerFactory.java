@@ -61,7 +61,11 @@ public final class McpServerFactory {
     private final Toolsets toolsets;
     /** stdio, toolsets mode: the API tools currently registered on the server. */
     /** Who handles calls of the registered tools: this factory, or its replacement after a config reload. */
-    private final java.util.concurrent.atomic.AtomicReference<McpServerFactory> current = new java.util.concurrent.atomic.AtomicReference<>(this);
+    /**
+     * The factory that handles calls now. Shared by every generation after a hand-over: registrations made by an
+     * earlier factory dispatch through it, so the newest configuration applies to all of them.
+     */
+    private volatile java.util.concurrent.atomic.AtomicReference<McpServerFactory> current = new java.util.concurrent.atomic.AtomicReference<>(this);
 
     public McpServerFactory(Manifest manifest, RuntimeConfig config) {
         this(manifest, config, new AuditLog(config.audit(), manifest.serverName(), manifest.serverVersion(), Clock.systemUTC()), Clock.systemUTC());
@@ -306,8 +310,8 @@ public final class McpServerFactory {
      * @return true when the tool list changed (clients were notified by the SDK, once per changed tool)
      */
     public boolean handOver(McpServerFactory next, McpSyncServer server) {
+        next.current = this.current;
         this.current.set(next);
-        next.current.set(next);
         boolean changed = false;
         Map<String, JsonNode> before = new HashMap<>();
         catalog.listed().forEach(t -> before.put(t.path("name").asText(), t));
@@ -526,7 +530,7 @@ public final class McpServerFactory {
             outcome = e.code().equals("CONFIRMATION_REQUIRED") || e.code().equals("NOT_AVAILABLE_ON_INSTANCE") ? "denied"
                     : e.code().equals("CANCELLED") ? "cancelled" : "error";
             code = e.code();
-            if (e.code().startsWith("UPSTREAM_") || e.code().equals("AUTH_DOWNSTREAM") || e.code().equals("RATE_LIMITED")) {
+            if (e.code().startsWith("UPSTREAM_") || e.code().equals("AUTH_UPSTREAM") || e.code().equals("RATE_LIMITED")) {
                 notifyClient(exchange, McpSchema.LoggingLevel.WARNING, name + ": " + e.code() + ": " + e.getMessage());
             }
             result = Results.error(e, e.meta());

@@ -46,7 +46,7 @@ class PlatformApiTest {
     @BeforeAll
     static void start() throws IOException {
         int port;
-        try (ServerSocket socket = new ServerSocket(0)) {
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) {
             port = socket.getLocalPort();
         }
         PlatformConfig config = TestStores.of(new PlatformConfig(store, "127.0.0.1", port));

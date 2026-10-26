@@ -101,7 +101,7 @@ public final class ManifestDiff {
                 changes.add(new Change(Impact.NOTABLE, null, "contract.default", e.getKey() + ": the default contract is now " + defaultAfter
                         + " (was " + defaultBefore + ")"));
             }
-            setChange(old.at("/downstreamAuth/supported"), e.getValue().at("/downstreamAuth/supported"), e.getKey() + ": sign-in types",
+            setChange(upstreamAuth(old).path("supported"), upstreamAuth(e.getValue()).path("supported"), e.getKey() + ": sign-in types",
                     "auth", changes);
             if (!old.path("toolPrefix").asText().equals(e.getValue().path("toolPrefix").asText())) {
                 changes.add(new Change(Impact.NOTABLE, null, "api.prefix", e.getKey() + ": tool prefix " + old.path("toolPrefix").asText()
@@ -358,5 +358,10 @@ public final class ManifestDiff {
 
     private static String text(JsonNode value) {
         return value.isMissingNode() || value.isNull() ? "none" : value.isTextual() ? value.asText() : value.toString();
+    }
+
+    /** An API entry's {@code upstreamAuth}; {@code downstreamAuth} in a manifest built before 0.4.0. */
+    private static JsonNode upstreamAuth(JsonNode api) {
+        return api.has("upstreamAuth") ? api.path("upstreamAuth") : api.path("downstreamAuth");
     }
 }

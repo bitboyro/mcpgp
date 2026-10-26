@@ -128,7 +128,7 @@ class DeploymentTest {
         Path password = dir.resolve("admin_password");
         Files.writeString(password, "a long first password");
         int port;
-        try (ServerSocket socket = new ServerSocket(0)) {
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) {
             port = socket.getLocalPort();
         }
         PlatformConfig config = TestStores.of(new PlatformConfig(dir.resolve("store"), "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT,
@@ -200,7 +200,7 @@ class DeploymentTest {
         Path password = dir.resolve("admin_password");
         Files.writeString(password, "a long first password");
         int port;
-        try (ServerSocket socket = new ServerSocket(0)) {
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) {
             port = socket.getLocalPort();
         }
         PlatformConfig config = new PlatformConfig(dir.resolve("store"), "127.0.0.1", port, null, PlatformConfig.Retention.DEFAULT, "acme", true,

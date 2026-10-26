@@ -139,7 +139,8 @@ describe('all servers', () => {
     expect(card.textContent).toContain('1variants')
     expect(card.textContent).toContain('Released')
     expect((await screen.findByRole('article', { name: 'orders-readonly' })).textContent).toContain('variant of orders-mcp')
-    expect(await screen.findByText('Naming policies')).toBeTruthy()
+    expect(screen.queryByText('Naming policies')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Shared library' }).getAttribute('href')).toBe('/library')
   })
 
   it('makes a variant that follows the original, and opens it', async () => {
@@ -196,7 +197,7 @@ describe('choosing operations', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Save as version 4' }))
     await waitFor(() => expect(calls.filter((c) => c.method === 'POST')).toHaveLength(2))
-    expect(calls.filter((c) => c.method === 'POST')[1].body).toEqual({ base: 3, changes: [change], message: 'Tools & rules: off: orders_account_list' })
+    expect(calls.filter((c) => c.method === 'POST')[1].body).toEqual({ base: 3, changes: [change], message: 'Tools: off: orders_account_list' })
   })
 
   it('asks before turning on what a broader entry leaves out', async () => {
@@ -262,7 +263,7 @@ describe('naming', () => {
   })
 })
 
-describe('package & deliver', () => {
+describe('packaging', () => {
   it('shows the formats, the docs as they ship and the contents before a build', async () => {
     fakeApi({
       'GET /me': ME,
@@ -277,7 +278,7 @@ describe('package & deliver', () => {
         files: ['orders-mcp.jar', 'orders-mcp-2.0.0.mcpb', 'docs/INSTALL.md', 'SHA256SUMS'],
         docs: { 'docs/README.md': '# Orders', 'docs/INSTALL.md': '# Installing Orders\n\nSee [the config](CONFIGURATION.md).', 'docs/CONFIGURATION.md': '# Configuration' } },
     })
-    renderAt('/servers/orders-mcp/package')
+    renderAt('/servers/orders-mcp/packaging')
     expect(await screen.findByRole('heading', { name: 'Installing Orders' })).toBeTruthy()
     const formats = screen.getByRole('region', { name: 'Package settings' }).textContent!
     expect(formats).toContain('Desktop bundle (.mcpb)')
@@ -355,7 +356,7 @@ describe('descriptions', () => {
     await userEvent.type(screen.getByLabelText('path.id'), 'The order.')
     await userEvent.click(screen.getByRole('button', { name: 'Save as version 4' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true))
-    expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ base: 3, message: 'Tools & rules: orders_order_refund title and descriptions', changes: [{
+    expect(calls.find((c) => c.method === 'POST')!.body).toEqual({ base: 3, message: 'Tools: orders_order_refund title and descriptions', changes: [{
       op: 'set', path: '/overrides/rules/[id=ui:refundOrder]',
       value: { match: { operationId: 'refundOrder' }, title: { set: 'Refund an order' }, params: { 'path.id': { description: { set: 'The order.' } } } } }] })
   })

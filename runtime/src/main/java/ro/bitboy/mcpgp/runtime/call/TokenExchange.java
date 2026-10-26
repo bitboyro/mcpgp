@@ -123,7 +123,7 @@ final class TokenExchange {
         try {
             response = client.send(http.build(), HttpResponse.BodyHandlers.ofString());
         } catch (IOException e) {
-            throw new ToolError("AUTH_DOWNSTREAM", "token exchange for " + instance.id() + " failed: " + e.getClass().getSimpleName(),
+            throw new ToolError("AUTH_UPSTREAM", "token exchange for " + instance.id() + " failed: " + e.getClass().getSimpleName(),
                     "Check the instance's tokenUrl and network");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -137,7 +137,7 @@ final class TokenExchange {
         }
         if (response.statusCode() != 200 || !body.path("access_token").isTextual()) {
             String error = body.path("error").asText("HTTP " + response.statusCode());
-            throw new ToolError("AUTH_DOWNSTREAM", "the identity provider didn't exchange your sign-in for " + instance.id() + ": " + error,
+            throw new ToolError("AUTH_UPSTREAM", "the identity provider didn't exchange your sign-in for " + instance.id() + ": " + error,
                     "invalid_grant usually means your sign-in isn't accepted for this API; ask whoever runs this server");
         }
         String value = body.get("access_token").asText();

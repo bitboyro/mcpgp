@@ -17,6 +17,21 @@ Milestones, in order. Each ends with something demonstrable. Scope per item: see
 | **M9 · Self-hosting** (in progress) | Run it at work | Platform image and Docker Compose (✓), PostgreSQL store with `copy-store` (✓), deployment settings: first admin from config, `/healthz`, secure cookies behind TLS, start-up warnings (✓), company sign-in wired into compose (✓, OIDC and LDAP existed), [deployment.md](../deployment.md) and the [how-to](../guides/self-hosting.md) (✓); publishing the image to Docker Hub (✓, `publish` workflow); next: passwords in the web UI (0.3.0) |
 | **M10 · Release gate** (G1 in progress) | Releases blocked by an integration suite | [release-gate.md](release-gate.md): packaged servers driven by an independent MCP client against a validating API mock; performance measured against the previous release; a gate report attached to every release. G1 minimal gate → G5 performance budgets |
 
+## 0.4.0 scope (agreed 2026-10-23)
+
+The [0.4.0 release plan](release-0.4.0.md) is the current release-specific scope and acceptance
+checklist. Ship the existing capabilities with confirmed defects and exposure/documentation
+misalignments fixed, a focused readable/plain-language UI pass, an Overview setup checklist,
+baseline instructions editing, completion of existing versioned template workflows, visible
+version/build metadata, and a tested standalone platform distribution. Clarify Builds versus
+Activity without removing audit events or restructuring all navigation.
+
+After 0.4.0, with no release assigned: full Access & Security consolidation, comprehensive
+advanced-setting forms, AI description enhancement/optimization skill, an in-product tutorial/FAQ
+and video center, an expanded template catalogue, Tab-to-accept predictions, central runtime/fleet
+management, and a complete brand identity. A simple logo may land if ready; branding does not block
+0.4.0. Exact UI placement, terminology and visual tokens still need design review.
+
 ## Releases
 
 | Version | Contents |
@@ -31,6 +46,7 @@ Milestones, in order. Each ends with something demonstrable. Scope per item: see
 | **0.2.6** (released 2026-10-13) | Credentials from the MCP client (`fromRequest`): the client sends the user's credential for the API in a configured header, never stored; instances can list several credentials, tried in order (fallback); a switch on Connections |
 | **0.2.7** (released 2026-10-13) | Per-operation security enforced (tools no credential can call hidden or explained; each call uses the credential that fits); a suffix for every tool and renaming one tool from the UI; audit defaults on Overview; `init --from-spec` copies referenced files; broken schema references are errors; Try starts its server early |
 | **0.3.0** (released 2026-10-20) | Passwords in the web UI (change, set and unlock); per-user identity by token exchange; clashing tool names chosen on upload; contract detection for `auto` instances and a Connections page for the rule; spec versions from an address with Check for updates; `mcpgp diff`, `preview`, `try`, `migrate` and the platform's Changes page; the platform's own server with Connect an agent; MCP cancellation, list pagination, resource-template completion and real progress; Security & safety protections; output schemas; `mixedContracts` and `instances.max` enforced; settings that did nothing are refused; stdio parallel-answer fix |
+| **0.4.0** (planned) | Batching/results/receipts and layered policy work since 0.3.0, defect/API/MCP/docs alignment, focused UX cleanup and standalone platform delivery. Required acceptance and explicit deferrals: [release scope](release-0.4.0.md). |
 | TODO, not yet scheduled | Marked TODO in the docs: `release.versionFrom` other than `contract`, `platform:` in the repository config; git sources on the platform (a spec from an address, with Check for updates: on `main`); a native CLI binary. (CLI `diff`, `preview`, `try`, `migrate` and `--no-color`, the platform's Changes page, and contract detection for `auto` instances: on `main`.) |
 
 ## Before 0.3.0: MCP 2026-07-28 and protocol utilities (added 2026-10-17)
@@ -66,7 +82,7 @@ Releases happen when they're asked for; these land on `main` first.
 |---|---|---|
 | Tool-name clashes on spec upload | When two operations would get the same tool name, the upload shows them with suggested names (from method and path) to accept or edit, or sets a rule for the server (`naming.collisions`); both are saved in the definition | on `main` |
 | 0.3.0 passwords | See the release table | on `main` |
-| UX and wording review | See Main priorities | planned |
+| UX and wording review | Focused 0.4.0 pass and later structural work: [release scope](release-0.4.0.md); broader review below | 0.4.0 scope agreed; detailed design/implementation pending |
 | Per-user identity by token exchange | `tokenExchange`: RFC 8693 or Entra on-behalf-of, for a shared server whose users sign in with OAuth (auth.md §2.5) | on `main` |
 | Store performance at scale | Activity searches filtered by the store (SQL and indexes on PostgreSQL) and bounded in time; the cache cleanup batched | on `main` |
 

@@ -67,7 +67,7 @@ class TelemetryTest {
     }
 
     static int freePort() throws Exception {
-        try (ServerSocket socket = new ServerSocket(0)) {
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) {
             return socket.getLocalPort();
         }
     }

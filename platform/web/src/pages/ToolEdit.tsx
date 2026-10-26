@@ -32,8 +32,8 @@ export function ToolEdit({ id, tool, onClose }: { id: string; tool: Tool; onClos
   // a renamed tool has a new name: find it by its operation
   const previewed = preview.data?.manifest?.tools.find((t) => sameTool(t, tool))
   const save = useMutation({
-    mutationFn: (list: Change[]) => api.saveEdit(id, base, list, list[0].op === 'remove' ? `Tools & rules: ${tool.name} back to the spec`
-      : wanted.name !== now.name ? `Tools & rules: ${tool.name} renamed (${wanted.name})` : `Tools & rules: ${tool.name} title and descriptions`),
+    mutationFn: (list: Change[]) => api.saveEdit(id, base, list, list[0].op === 'remove' ? `Tools: ${tool.name} back to the spec`
+      : wanted.name !== now.name ? `Tools: ${tool.name} renamed (${wanted.name})` : `Tools: ${tool.name} title and descriptions`),
     onSuccess: async () => {
       for (const key of ['server', 'manifest', 'servers', 'definition', 'version', 'naming', 'operations']) await queryClient.invalidateQueries({ queryKey: [key] })
       onClose()

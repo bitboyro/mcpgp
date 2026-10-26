@@ -21,7 +21,7 @@ apis:
       exclude:
         # people's sign-in and passwords, and moving the whole store, aren't for agents
         - { operationId: "~^(signIn|signOut|getSignInOptions|setPassword|exportStore|importStore)$" }
-    downstreamAuth:
+    upstreamAuth:
       supported: [bearer]            # the agent's own platform token
       identity: service-account
 

@@ -74,8 +74,10 @@ public final class CallerAccess {
         if (context == null || tool.path("kind").asText().equals("builtin")) { return true; }
         JsonNode identities = config.document().path("_identities");
         if (!selection(identities.path("default"), tool, instance) || !selection(identities.path("subjects").path(context.principal()), tool, instance)) { return false; }
+        // scope grants apply to OAuth callers, the only ones whose credential carries scopes; static keys, anonymous
+        // and stdio callers are governed by the default and their subject (policy-sources-and-sessions.md)
         JsonNode scopes = identities.path("scopes");
-        if (!scopes.isEmpty()) {
+        if (context.principal().startsWith("oauth:") && !scopes.isEmpty()) {
             boolean grant = false;
             for (String scope : context.scopes()) {
                 JsonNode restriction = scopes.path(scope);

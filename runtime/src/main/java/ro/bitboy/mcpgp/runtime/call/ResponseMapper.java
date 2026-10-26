@@ -59,9 +59,9 @@ final class ResponseMapper {
         if (status >= 200 && status < 300) {
             return success(body, contentType, response, meta);
         }
-        String code = status == 401 || status == 403 ? "AUTH_DOWNSTREAM" : status >= 500 ? "UPSTREAM_5XX" : "UPSTREAM_4XX";
+        String code = status == 401 || status == 403 ? "AUTH_UPSTREAM" : status >= 500 ? "UPSTREAM_5XX" : "UPSTREAM_4XX";
         String hint = switch (code) {
-            case "AUTH_DOWNSTREAM" -> "The server's credentials for " + instance + " were rejected or lack permission; ask the operator";
+            case "AUTH_UPSTREAM" -> "The server's credentials for " + instance + " were rejected or lack permission; ask the operator";
             case "UPSTREAM_5XX" -> "The target server failed; trying again later may help";
             default -> status >= 300 && status < 400 ? "The target answered with a redirect, which is not followed" : null;
         };

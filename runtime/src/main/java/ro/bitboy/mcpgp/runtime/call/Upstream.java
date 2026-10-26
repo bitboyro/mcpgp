@@ -87,7 +87,7 @@ final class Upstream {
      * @param sent     the request's credential headers, by lower-case name, and under {@link #SUBJECT} the
      *                 signed-in user's access token (inbound oauth), for tokenExchange
      * @param security the operation's security requirements (variant {@code security})
-     * @param kinds    the API's {@code downstreamAuth.schemes}
+     * @param kinds    the API's {@code upstreamAuth.schemes}
      */
     static Credential credential(RuntimeConfig.Instance instance, Map<String, String> sent, boolean publicOperation,
                                  JsonNode security, JsonNode kinds) {
@@ -118,21 +118,21 @@ final class Upstream {
             String value = sent.get(header.toLowerCase(java.util.Locale.ROOT));
             if (value != null && !value.isBlank()) {
                 if (value.length() > 16 * 1024 || value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0) {
-                    throw new ToolError("AUTH_DOWNSTREAM", "the " + header + " header isn't a usable credential", "Check the value your MCP client sends");
+                    throw new ToolError("AUTH_UPSTREAM", "the " + header + " header isn't a usable credential", "Check the value your MCP client sends");
                 }
                 return new Credential(entry, value.strip());
             }
             expected.add(header);
         }
         if (unmet != null && expected.isEmpty() && !exchange) {
-            throw new ToolError("AUTH_DOWNSTREAM", instance.id() + "'s credentials can't call this operation: it needs " + unmet,
+            throw new ToolError("AUTH_UPSTREAM", instance.id() + "'s credentials can't call this operation: it needs " + unmet,
                     "Use another instance, or ask whoever runs this server for a credential that has it");
         }
         if (expected.isEmpty()) {
-            throw new ToolError("AUTH_DOWNSTREAM", instance.id() + " calls the API as you: sign in to this server (OAuth) to use it",
+            throw new ToolError("AUTH_UPSTREAM", instance.id() + " calls the API as you: sign in to this server (OAuth) to use it",
                     "This server exchanges your sign-in for a token for the API; a request without it can't");
         }
-        throw new ToolError("AUTH_DOWNSTREAM", instance.id() + " needs your credential in the " + String.join(" or ", expected) + " header"
+        throw new ToolError("AUTH_UPSTREAM", instance.id() + " needs your credential in the " + String.join(" or ", expected) + " header"
                 + (exchange ? ", or your sign-in to this server" : ""),
                 "Set that header in your MCP client's configuration for this server (its value comes from your environment, not from the agent)");
     }
@@ -229,7 +229,7 @@ final class Upstream {
             }
             case "none" -> {
             }
-            default -> throw new ToolError("AUTH_DOWNSTREAM", "sign-in type " + credential.type() + " is not supported by this runtime");
+            default -> throw new ToolError("AUTH_UPSTREAM", "sign-in type " + credential.type() + " is not supported by this runtime");
         }
         if (cookie != null) {
             http.header("Cookie", cookie);

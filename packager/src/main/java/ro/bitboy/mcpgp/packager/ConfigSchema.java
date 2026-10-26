@@ -53,7 +53,7 @@ final class ConfigSchema {
         List<JsonNode> apis = new ArrayList<>();
         manifest.path("apis").forEach(apis::add);
         ObjectNode instanceTemplate = (ObjectNode) defs.remove("instance");
-        ObjectNode authTemplate = (ObjectNode) defs.remove("downstreamAuth");
+        ObjectNode authTemplate = (ObjectNode) defs.remove("upstreamAuth");
         for (JsonNode api : apis) {
             String id = api.path("id").asText();
             ObjectNode instance = instanceTemplate.deepCopy();
@@ -61,13 +61,13 @@ final class ConfigSchema {
             api.path("contracts").forEach(c -> versions.add(c.path("version").asText()));
             ((ObjectNode) instance.at("/properties/contract")).set("enum", versions);
             List<String> supported = new ArrayList<>();
-            api.at("/downstreamAuth/supported").forEach(s -> supported.add(s.asText()));
+            api.at("/upstreamAuth/supported").forEach(s -> supported.add(s.asText()));
             ObjectNode auth = authTemplate.deepCopy();
             ArrayNode branches = JSON.createArrayNode();
             for (JsonNode branch : auth.path("oneOf")) {
                 String type = branch.at("/properties/type/const").asText();
-                boolean fromRequest = type.equals("fromRequest") && api.at("/downstreamAuth/fromRequest").isObject();
-                boolean exchange = type.equals("tokenExchange") && api.at("/downstreamAuth/tokenExchange").isObject();
+                boolean fromRequest = type.equals("fromRequest") && api.at("/upstreamAuth/fromRequest").isObject();
+                boolean exchange = type.equals("tokenExchange") && api.at("/upstreamAuth/tokenExchange").isObject();
                 if (type.equals("none") || supported.contains(type) || fromRequest || exchange) {
                     branches.add(branch);
                 }

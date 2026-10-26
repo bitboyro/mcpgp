@@ -29,7 +29,12 @@ OAuth scope grants also apply. Each restriction has `tools` (allow/deny/readOnly
 `instances` matching `<api>/<instance>` names with `*`. Missing selections inherit; empty allow or
 instances permits none. Tool/instance exact names are validated; unknown globs warn. Separate policy
 files may use fleet-wide globs to apply across different builds. Anonymous/static/stdin preserve
-existing behavior when no identity file is supplied.
+existing behavior when no identity file is supplied. Scope restrictions apply to OAuth callers, the only
+callers whose credential carries scopes: when the file has a `scopes` section, an OAuth caller must hold at
+least one listed scope to be granted anything. Static-key, anonymous and stdio callers are governed by
+`default` and their `subjects` entry; startup warns when a file with `scopes` is used by a server whose
+callers don't sign in with OAuth, so a shared file's scope rules never silently lock such a server out. A tool a caller's policy hides is answered as unknown (`INPUT_VALIDATION`), as if it didn't
+exist; a visible tool on a target server the caller may not use answers `NOT_AVAILABLE_ON_INSTANCE`.
 
 `sessions.enabled: true` exposes a built-in `session_policy` tool. `get` reports only the caller's
 restrictions; `restrict` adds another intersection of tools/instances. Subsequent restrictions

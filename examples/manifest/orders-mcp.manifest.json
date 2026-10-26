@@ -24,7 +24,19 @@
         "pattern": "^(\\d+\\.\\d+)",
         "underBasePath": true
       },
-      "downstreamAuth": {
+      "id": "orders",
+      "pagination": null,
+      "requestBody": {
+        "multiple": "split",
+        "suffixes": {
+          "application/octet-stream": "binary",
+          "application/x-www-form-urlencoded": "form",
+          "multipart/form-data": "multipart"
+        }
+      },
+      "title": "Example Orders API",
+      "toolPrefix": "orders",
+      "upstreamAuth": {
         "apiKey": {
           "in": "header",
           "name": "X-Api-Key"
@@ -42,26 +54,14 @@
           "mtls"
         ],
         "unsatisfiedTools": "hide"
-      },
-      "id": "orders",
-      "pagination": null,
-      "requestBody": {
-        "multiple": "split",
-        "suffixes": {
-          "application/octet-stream": "binary",
-          "application/x-www-form-urlencoded": "form",
-          "multipart/form-data": "multipart"
-        }
-      },
-      "title": "Example Orders API",
-      "toolPrefix": "orders"
+      }
     }
   ],
   "build": {
     "cli": "0.1.0",
     "createdAt": "2026-10-09T10:40:00Z",
     "definition": {
-      "digest": "sha256:332ad87ffd2e8a6d54d61617a3b931c963449f76584d90c08debbd1d990beffa",
+      "digest": "sha256:3a1ebb55ec8e764a95d6111be22f14b6d66dd9d0fc253be5244ad6b88e8eb27e",
       "name": "orders-mcp",
       "source": "git+https://git.example.com/integration/mcp-defs.git#9c41e7a"
     },

@@ -54,13 +54,15 @@ class ReloadTest {
         second.close();
     }
 
-    void start(String instances) throws Exception {
+    void start(String instances, String... more) throws Exception {
         first = new MockTarget();
         second = new MockTarget();
         config = dir.resolve("orders-mcp.yaml");
         Files.writeString(config, instances);
-        Startup startup = Startup.load(new String[] {"--manifest", REPO.resolve("examples/manifest/orders-mcp.manifest.json").toString(),
-                "--config", config.toString(), "--storage.root", dir.resolve("data").toString()}, Map.of(), dir);
+        List<String> args = new ArrayList<>(List.of("--manifest", REPO.resolve("examples/manifest/orders-mcp.manifest.json").toString(),
+                "--config", config.toString(), "--storage.root", dir.resolve("data").toString()));
+        args.addAll(List.of(more));
+        Startup startup = Startup.load(args.toArray(String[]::new), Map.of(), dir);
         // nio pipes: unlike PipedInputStream, they don't fail when a writing thread ends
         java.nio.channels.Pipe in = java.nio.channels.Pipe.open();
         java.nio.channels.Pipe out = java.nio.channels.Pipe.open();
@@ -173,6 +175,68 @@ class ReloadTest {
         Files.writeString(config, instances);
         assertThat(reloader().reload("test")).isTrue();
         assertThat(instanceEnum()).containsExactly("a");
+    }
+
+    /**
+     * Whether a call goes through. The orders example uses discovery: tools that aren't pinned are called through
+     * call_tool, and a JSON-RPC error (no result) is a refusal too.
+     */
+    boolean calls(String tool, Map<String, Object> arguments) throws Exception {
+        boolean direct = tool.equals("orders_customer_get") || tool.equals("session_policy");
+        JsonNode answer = direct ? request("tools/call", Map.of("name", tool, "arguments", arguments))
+                : request("tools/call", Map.of("name", "call_tool", "arguments", Map.of("name", tool, "arguments", arguments)));
+        return answer.has("result") && !answer.at("/result/isError").asBoolean();
+    }
+
+    static final Map<String, Object> CREATE = Map.of("instance", "a", "body", Map.of("name", "x", "accountId", "acc-1"));
+    static final Map<String, Object> GET = Map.of("instance", "a", "path", Map.of("id", "1"));
+
+    @Test
+    void aSecondReloadAppliesToToolsWhoseDefinitionDidNotChange() throws Exception {
+        // regression: tools registered at start-up kept dispatching to the first reloaded configuration
+        start("instances: [{id: a, baseUrl: localhost, contract: '2.0'}]\n");
+        String instances = "instances: [{id: a, baseUrl: '" + first.address() + "', contract: '2.0'}]\n";
+        Files.writeString(config, instances);
+        assertThat(reloader().reload("test")).isTrue();
+        Files.writeString(config, instances + "tools: {deny: [orders_customer_create]}\n");
+        assertThat(reloader().reload("test")).isTrue();
+        assertThat(calls("orders_customer_create", CREATE)).isFalse();
+        assertThat(first.received).isEmpty();
+    }
+
+    @Test
+    void anIdentityPolicyFileAppliesToTheStdioCallerAndABrokenReloadKeepsItsRestrictions() throws Exception {
+        Path identity = Files.writeString(dir.resolve("identity.yaml"), "version: 1\nsubjects:\n  stdio: { tools: { allow: [orders_customer_get] } }\n");
+        start("instances: [{id: a, baseUrl: localhost, contract: '2.0'}]\n", "--identity-policy", identity.toString());
+        Files.writeString(config, "instances: [{id: a, baseUrl: '" + first.address() + "', contract: '2.0'}]\n");
+        assertThat(reloader().reload("test")).isTrue();
+        assertThat(calls("orders_customer_create", CREATE)).isFalse();
+        assertThat(calls("orders_customer_get", GET)).isTrue();
+        assertThat(first.received).hasSize(1);
+
+        Files.writeString(identity, "version: 1\nsubjects: [not, a, map]\n");
+        assertThat(reloader().reload("test")).isFalse();
+        assertThat(calls("orders_customer_create", CREATE)).isFalse();
+        assertThat(first.received).hasSize(1);
+
+        Files.writeString(identity, "version: 1\nsubjects:\n  stdio: { tools: { allow: [orders_customer_get, orders_customer_create] } }\n");
+        assertThat(reloader().reload("test")).isTrue();
+        calls("orders_customer_create", CREATE);
+        assertThat(first.received).hasSize(2);
+    }
+
+    @Test
+    void aClientNarrowsItsOwnSessionOverTheProtocolAndIsToldTheListChanged() throws Exception {
+        start("instances: [{id: a, baseUrl: localhost, contract: '2.0'}]\n");
+        Files.writeString(config, "instances: [{id: a, baseUrl: '" + first.address() + "', contract: '2.0'}]\nsessions: { enabled: true }\n");
+        assertThat(reloader().reload("test")).isTrue();
+        assertThat(request("tools/list", Map.of()).at("/result/tools").findValuesAsText("name")).contains("session_policy");
+        assertThat(calls("session_policy", Map.of("action", "restrict", "tools", Map.of("allow", List.of("orders_customer_get"))))).isTrue();
+        await(m -> m.path("method").asText().equals("notifications/tools/list_changed"), 5);
+        assertThat(calls("orders_customer_create", CREATE)).isFalse();
+        assertThat(first.received).isEmpty();
+        assertThat(calls("orders_customer_get", GET)).isTrue();
+        assertThat(first.received).hasSize(1);
     }
 
     @Test

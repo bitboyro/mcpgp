@@ -7,7 +7,8 @@ This document defines the complete extension to [runtime-config.md](runtime-conf
 and API/instance `tools.allow` / `tools.deny`, startup overrides, live reload and configured policy
 inspection are implemented in the current branch (runtime-config §4.7). Administrator policy
 inspection/preview/apply is implemented in [runtime-policy-management.md](runtime-policy-management.md).
-Organization enforcement, general configuration management, identity/session extensions and templates remain planned. Existing OAuth
+Organization and identity policy files and caller session narrowing are implemented as described in
+[policy-sources-and-sessions.md](policy-sources-and-sessions.md); general configuration management remains planned. Existing OAuth
 scope filtering is unchanged. Read-only settings retain their existing tool-list behavior and
 continue to block writes at execution.
 

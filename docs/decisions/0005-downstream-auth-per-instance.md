@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-10-09
+- Note (2026-10-25): "downstream auth" is called **upstream auth** from 0.4.0, and the definition key
+  `apis[].downstreamAuth` is `apis[].upstreamAuth` (the old key is read with a warning). The decision is unchanged.
 
 ## Context
 

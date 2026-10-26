@@ -458,3 +458,20 @@ and monitoring.
 - The activity log is append-only through the API; it records identities, never secrets.
 
 See [../security.md](../security.md).
+
+## Shared Library starter content (0.4.0)
+
+Startup creates missing examples for contracts, naming, rules, notices, packs and templates.
+Existing items and edits are never overwritten; all entries use ordinary versioned Library
+references and permissions. Nothing is applied to a server without a user action.
+`GET /library` includes additive `example` and, for known starters, `description` fields.
+`GET /library/{kind}/{name}` includes the root filename for every category so clients can inspect
+its existing version-file endpoint. Naming and notices retain their structured editing support.
+
+Templates display **Bare**, **Default**, **Basic** and **Enterprise**, preserving preset API IDs
+`blank`, `default`, `personal-use`, `enterprise-grade`. Pristine stored starter copies are omitted
+from the import catalogue to avoid duplicate choices; user-versioned Library templates are listed.
+Bare allows no API tools; Default retains generated defaults; Basic uses local stdio/read-only;
+Enterprise requires explicit tool selection and operator-provided authentication with audit and
+bounded calls. The preset is not a compliance certification. Starter rationale and upgrade limits:
+[ADR 0019](../decisions/0019-shared-library-starter-examples.md).

@@ -16,7 +16,11 @@ const paths: Record<string, ReactNode> = {
   close: <path d="M6 6l12 12M18 6L6 18" />,
   changes: <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />,
   mark: <path d="M4 7h7M4 12h16M13 17h7" />,
-  shield: <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4" />,
+  lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>,
+  pulse: <><circle cx="12" cy="12" r="9" /><path d="M7 12h3l1.5-3 3 6 1.5-3h1" /></>,
+  overview: <path d="M4 4h7v9H4zM13 4h7v5h-7zM13 11h7v9h-7zM4 15h7v5H4z" />,
+  general: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>,
+  definition: <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M10 12l-2 2 2 2M14 12l2 2-2 2" />,
 }
 
 export function Icon({ name, size = 16, stroke = 'currentColor', width = 1.8 }: { name: keyof typeof paths; size?: number; stroke?: string; width?: number }) {

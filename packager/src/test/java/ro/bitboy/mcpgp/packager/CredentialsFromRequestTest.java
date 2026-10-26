@@ -14,7 +14,7 @@ class CredentialsFromRequestTest {
     static ObjectNode orders(boolean fromRequest) throws Exception {
         ObjectNode manifest = DeliveryTest.orders();
         if (fromRequest) {
-            ((ObjectNode) manifest.at("/apis/0/downstreamAuth")).putObject("fromRequest");
+            ((ObjectNode) manifest.at("/apis/0/upstreamAuth")).putObject("fromRequest");
         }
         return manifest;
     }
@@ -46,7 +46,7 @@ class CredentialsFromRequestTest {
     @Test
     void tokenExchangeIsOfferedWhenTheDefinitionAllowsIt() throws Exception {
         ObjectNode manifest = DeliveryTest.orders();
-        ((ObjectNode) manifest.at("/apis/0/downstreamAuth")).putObject("tokenExchange");
+        ((ObjectNode) manifest.at("/apis/0/upstreamAuth")).putObject("tokenExchange");
         ObjectNode schema = ConfigSchema.generate(manifest);
         assertThat(offers(schema, "tokenExchange")).isTrue();
         assertThat(offers(ConfigSchema.generate(DeliveryTest.orders()), "tokenExchange")).isFalse();

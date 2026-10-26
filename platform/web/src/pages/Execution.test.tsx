@@ -16,12 +16,12 @@ const manifest = (policies: object) => ({
   runtime: {}, policies,
 })
 
-function page() {
+function page(path = '/servers/orders-mcp/execution') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/servers/orders-mcp/safety']}><App /></MemoryRouter></QueryClientProvider>)
+  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><App /></MemoryRouter></QueryClientProvider>)
 }
 
-describe('security and safety', () => {
+describe('execution', () => {
   it('saves batching and retention independently', async () => {
     const { calls } = fakeApi({
       'GET /me': ME, 'GET /settings': SETTINGS, 'GET /servers/orders-mcp': SERVER,
@@ -57,7 +57,7 @@ describe('security and safety', () => {
     expect((screen.getByLabelText('Cut long lists at whole items') as HTMLInputElement).checked).toBe(true)
     expect((screen.getByLabelText('Limit the size of what agents send') as HTMLInputElement).checked).toBe(true)
     expect((screen.getByLabelText('Calls per minute') as HTMLInputElement).value).toBe('120')
-    expect((screen.getByLabelText("Describe each tool's result (output schema)") as HTMLInputElement).checked).toBe(true)
+    expect(screen.queryByLabelText("Describe each tool's result (output schema)")).toBeNull()   // on Tools now
     expect(screen.getByText('Always on')).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Save as the next version' }) as HTMLButtonElement).disabled).toBe(true)
 
@@ -76,18 +76,26 @@ describe('security and safety', () => {
     ])
   })
 
-  it('turns output schemas off in the definition', async () => {
+  it('turns output schemas off in the definition, from Tools', async () => {
     const { calls } = fakeApi({
       'GET /me': ME, 'GET /settings': SETTINGS, 'GET /servers/orders-mcp': SERVER,
-      'GET /servers/orders-mcp/versions/latest/manifest': manifest({ outputSchemas: true }),
+      'GET /servers/orders-mcp/versions/latest/manifest': { ...manifest({ outputSchemas: true }), exposure: { mode: 'plain' }, diagnostics: [] },
       'POST /servers/orders-mcp/edits': SERVER,
     })
-    page()
+    page('/servers/orders-mcp/tools')
     await userEvent.click(await screen.findByLabelText("Describe each tool's result (output schema)"))
-    await userEvent.click(screen.getByRole('button', { name: 'Save as the next version' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true))
-    expect((calls.find((c) => c.method === 'POST')!.body as { changes: unknown[] }).changes)
-      .toEqual([{ op: 'set', path: '/schemas/output', value: false }])
+    expect(calls.find((c) => c.method === 'POST')!.body).toMatchObject({ base: 5, message: 'Tools: no output schemas',
+      changes: [{ op: 'set', path: '/schemas/output', value: false }] })
+  })
+
+  it('opens from the old Security and safety address', async () => {
+    fakeApi({
+      'GET /me': ME, 'GET /settings': SETTINGS, 'GET /servers/orders-mcp': SERVER,
+      'GET /servers/orders-mcp/versions/latest/manifest': manifest({}),
+    })
+    page('/servers/orders-mcp/safety')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Execution' })).toBeTruthy()
   })
 
   it('refuses numbers that make no sense', async () => {

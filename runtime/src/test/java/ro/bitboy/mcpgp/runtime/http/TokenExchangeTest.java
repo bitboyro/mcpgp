@@ -89,13 +89,13 @@ class TokenExchangeTest {
         });
         as.start();
         api = new MockTarget();
-        try (ServerSocket socket = new ServerSocket(0)) {
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) {
             port = socket.getLocalPort();
         }
         resource = "http://127.0.0.1:" + port + "/mcp";
 
         ObjectNode manifest = (ObjectNode) JSON.readTree(REPO.resolve("examples/manifest/orders-mcp.manifest.json").toFile());
-        ((ObjectNode) manifest.at("/apis/0/downstreamAuth")).putObject("tokenExchange");
+        ((ObjectNode) manifest.at("/apis/0/upstreamAuth")).putObject("tokenExchange");
         Path manifestFile = dir.resolve("orders-mcp.manifest.json");
         JSON.writeValue(manifestFile.toFile(), manifest);
         Path config = dir.resolve("orders-mcp.yaml");

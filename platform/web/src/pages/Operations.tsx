@@ -85,7 +85,7 @@ export function OperationsView({ id }: { id: string }) {
   }, [shown, before, edits.length])
   const summary = [flipped.on.length ? 'on: ' + flipped.on.join(', ') : '', flipped.off.length ? 'off: ' + flipped.off.join(', ') : '']
     .filter(Boolean).join('; ')
-  const defaultMessage = ('Tools & rules: ' + (summary || 'selection changed')).slice(0, 200)
+  const defaultMessage = ('Tools: ' + (summary || 'selection changed')).slice(0, 200)
 
   const save = useMutation({
     mutationFn: () => api.saveEdit(id, base, edits, message || defaultMessage),
@@ -161,7 +161,7 @@ export function OperationsView({ id }: { id: string }) {
       <section className="col col-wide" aria-label="Operations">
         <ErrorBox error={server.error ?? current.error} />
         {current.error instanceof ApiError && current.error.status === 422 && (
-          <p className="hint">The latest version doesn't compile; the checks on <Link to={`/servers/${id}/sources`}>Sources</Link> say why.</p>
+          <p className="hint">The latest version doesn't compile; the checks on <Link to={`/servers/${id}/apis`}>API definitions</Link> say why.</p>
         )}
         {current.isLoading && <Loading what="operations" />}
         {shown && (
@@ -231,7 +231,7 @@ export function OperationsView({ id }: { id: string }) {
                         <div key={o.key} role="listitem" className={'op-row' + (changed ? ' changed' : '')}>
                           <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label}
                             disabled={!editable || o.state === 'hidden'}
-                            title={o.state === 'hidden' ? 'A rule hides it; change the rule in the definition\'s files (Sources)' : undefined}
+                            title={o.state === 'hidden' ? 'A rule hides it; change the rule in the definition\'s files (API definitions)' : undefined}
                             onClick={() => flip(a.id, o, a.operations)} />
                           <span className="what">
                             <span className="line"><span className="method">{o.method}</span><span className="path">{o.path}</span>
@@ -274,7 +274,7 @@ export function OperationsView({ id }: { id: string }) {
               <span className="mono">select</span>. Turning one on undoes what left it out; when that reaches further than one
               operation, you're asked first.</p>
             <p className="hint">Changes are previewed before you save, and saving makes the next version, with your name in Activity.
-              Operations a rule hides change in the rule's file, on <Link to={`/servers/${id}/sources`}>Sources</Link>.</p>
+              Operations a rule hides change in the rule's file, on <Link to={`/servers/${id}/apis`}>API definitions</Link>.</p>
           </>
         ) : (
           <>

@@ -56,7 +56,7 @@ class PolicyManagementTest {
     }
 
     static int port() throws IOException {
-        try (ServerSocket socket = new ServerSocket(0)) { return socket.getLocalPort(); }
+        try (ServerSocket socket = new ServerSocket(0, 0, java.net.InetAddress.getByName("127.0.0.1"))) { return socket.getLocalPort(); }
     }
 
     void start(boolean enabled, boolean separate, Map<String, String> overrides) throws Exception {

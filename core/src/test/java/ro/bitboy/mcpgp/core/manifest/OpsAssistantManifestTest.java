@@ -89,7 +89,7 @@ class OpsAssistantManifestTest {
     @Test
     void signInTypesAreDeclaredPerApi() {
         JsonNode apis = manifest.path("apis");
-        assertThat(apis.get(1).at("/downstreamAuth/supported")).extracting(JsonNode::asText).containsExactly("basic", "bearer");
-        assertThat(apis.get(2).at("/downstreamAuth/supported")).extracting(JsonNode::asText).containsExactly("oauth2ClientCredentials");
+        assertThat(apis.get(1).at("/upstreamAuth/supported")).extracting(JsonNode::asText).containsExactly("basic", "bearer");
+        assertThat(apis.get(2).at("/upstreamAuth/supported")).extracting(JsonNode::asText).containsExactly("oauth2ClientCredentials");
     }
 }

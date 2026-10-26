@@ -105,7 +105,7 @@ public final class Bundle {
 
     /** The sign-in the dialog asks for: the first the API supports (mTLS needs files, so a config file). */
     private static String signIn(JsonNode api) {
-        for (JsonNode type : api.at("/downstreamAuth/supported")) {
+        for (JsonNode type : api.at("/upstreamAuth/supported")) {
             if (!type.asText().equals("mtls") && !type.asText().startsWith("custom:")) {
                 return type.asText();
             }
