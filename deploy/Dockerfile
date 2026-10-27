@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.m2 \
  && cp platform/target/mcpgp-platform-*-exec.jar /mcpgp-platform.jar
 
 # ---- run
-FROM eclipse-temurin:21-jre-noble
+FROM eclipse-temurin:24-jre-noble
 # the image's own name, which `setup` writes into .env (the publish workflow passes the pushed name)
 ARG MCPGP_IMAGE=mcpgp-platform:local
 LABEL org.opencontainers.image.title="mcpgp platform" \

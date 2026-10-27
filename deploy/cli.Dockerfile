@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/root/.m2 \
  && cp cli/target/mcpgp-cli-*-exec.jar /mcpgp-cli.jar
 
 # ---- run
-FROM eclipse-temurin:21-jre-noble
+FROM eclipse-temurin:24-jre-noble
 LABEL org.opencontainers.image.title="mcpgp CLI" \
       org.opencontainers.image.source="https://github.com/bitboyro/mcpgp"
 RUN apt-get update -q && apt-get install -y -q --no-install-recommends git \
