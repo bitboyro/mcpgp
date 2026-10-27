@@ -3,6 +3,7 @@ package ro.bitboy.mcpgp.schemas;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.networknt.schema.AbsoluteIri;
 import com.networknt.schema.Error;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaLocation;
@@ -10,6 +11,7 @@ import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SchemaRegistryConfig;
 import com.networknt.schema.SpecificationVersion;
 import com.networknt.schema.path.PathType;
+import com.networknt.schema.resource.InputStreamSource;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -43,7 +45,22 @@ public final class Schemas {
                 .build();
         this.registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12, builder -> builder
                 .schemaRegistryConfig(config)
-                .schemaIdResolvers(resolvers -> resolvers.mapPrefix(BASE_URI, "classpath:schemas/")));
+                .resourceLoaders(loaders -> loaders.values(list -> list.add(0, Schemas::bundled))));
+    }
+
+    /**
+     * Our schemas, read through this module's class loader. Not a {@code classpath:} mapping: the library reads those
+     * through the calling thread's class loader, and a pooled thread can carry one of a web server that has since
+     * stopped, which then refuses every lookup.
+     */
+    private static InputStreamSource bundled(AbsoluteIri iri) {
+        String id = iri.toString();
+        if (!id.startsWith(BASE_URI)) {
+            return null;
+        }
+        String path = "schemas/" + id.substring(BASE_URI.length());
+        ClassLoader loader = Schemas.class.getClassLoader();
+        return loader.getResource(path) == null ? null : () -> loader.getResourceAsStream(path);
     }
 
     /** One schema violation: a JSON pointer into the document and a message. */
