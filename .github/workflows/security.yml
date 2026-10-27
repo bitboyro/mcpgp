@@ -1,0 +1,153 @@
+name: security
+
+# The free scanners (SECURITY.md):
+#   codeql        the Java and TypeScript code (security-extended queries)
+#   dependencies  Trivy on the SBOM of what we ship (Java), the web UI's and the gate runner's lockfiles,
+#                 the Dockerfiles and compose files, and secrets committed by mistake; npm audit on the web UI
+#   images        Trivy on the platform and CLI images: base OS packages and the jars inside
+# A fixable high or critical finding fails the job. Accepted findings, each with its reason: .trivyignore.yaml.
+# Results also go to the Security tab where the repository can show them: code scanning needs a public
+# repository, or GitHub Code Security on a private one, so until then CodeQL is skipped and Trivy reports
+# in the job log only. Dependabot (dependabot.yml) opens the update pull requests.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 5 * * 1"   # Mondays: advisories published since, for code that didn't change
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TRIVY_VERSION: v0.75.0
+  # Trivy's databases (vulnerabilities, and the Java one for jars), each tried in order: its default mirror
+  # sometimes fails to serve them (404), and the GitHub registry rate-limits
+  TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2
+  TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1,ghcr.io/aquasecurity/trivy-java-db:1,public.ecr.aws/aquasecurity/trivy-java-db:1
+
+jobs:
+  codeql:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [java-kotlin, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          category: /language:${{ matrix.language }}
+
+  dependencies:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: The SBOM of what we ship (Java, runtime dependencies)
+        run: mvn -B -q -DskipTests -Dskip.installnodenpm -Dskip.npm package org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
+
+      - name: Java dependencies, from the SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: sbom
+          scan-ref: target/mcpgp-sbom.cdx.json
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      # pom.xml files are left to the SBOM: Trivy would resolve them again from Maven Central, which rate-limits
+      - name: Lockfiles, Dockerfiles, compose files and secrets
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          skip-files: "**/pom.xml,pom.xml"
+          skip-dirs: target
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore.yaml
+          exit-code: "1"
+      - name: npm audit, the web UI (what the platform image serves)
+        working-directory: platform/web
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: The same, for the Security tab
+        if: ${{ always() && !github.event.repository.private }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          skip-files: "**/pom.xml,pom.xml"
+          skip-dirs: target
+          trivyignores: .trivyignore.yaml
+          format: sarif
+          output: trivy-dependencies.sarif
+      - if: ${{ always() && !github.event.repository.private }}
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: trivy-dependencies.sarif
+          category: trivy-dependencies
+
+  images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: mcpgp-platform
+            file: deploy/Dockerfile
+          - image: mcpgp-cli
+            file: deploy/cli.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -f ${{ matrix.file }} -t ${{ matrix.image }}:scan .
+      - name: Base OS packages and the jars inside
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ matrix.image }}:scan
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: The same, for the Security tab
+        if: ${{ always() && !github.event.repository.private }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ matrix.image }}:scan
+          format: sarif
+          output: trivy-image.sarif
+      - if: ${{ always() && !github.event.repository.private }}
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-${{ matrix.image }}

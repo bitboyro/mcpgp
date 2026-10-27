@@ -15,7 +15,7 @@ mkdir -p "$dir/bin" "$dir/lib" "$out"
 cp cli/src/dist/bin/mcpgp cli/src/dist/bin/mcpgp.cmd "$dir/bin/"
 chmod 755 "$dir/bin/mcpgp"
 cp "$jar" "$dir/lib/mcpgp-cli.jar"
-cp LICENSE "$dir/"
+cp LICENSE SECURITY.md "$dir/"
 # the specs and guides the tool's messages and generated files refer to (docs/spec/..., docs/guides/...)
 mkdir -p "$dir/docs"
 cp -R docs/spec docs/guides docs/decisions "$dir/docs/"

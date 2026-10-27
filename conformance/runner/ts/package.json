@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "description": "The release gate: packaged mcpgp servers driven by an independent MCP client against a validating API mock (docs/process/release-gate.md)",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "gate": "vitest run",
     "gate:watch": "vitest",
@@ -12,7 +14,7 @@
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "13.1.0",
-    "@modelcontextprotocol/sdk": "1.31.0",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "yaml": "2.9.1"

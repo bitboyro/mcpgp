@@ -84,4 +84,5 @@ the tools it calls.
 
 ## 5. Reporting
 
-Security issues: open a private security advisory on the repository, not a public issue.
+Security issues: report them privately, as [SECURITY.md](../SECURITY.md) describes, not in a public issue.
+It also lists the scanners every change goes through and how to check what you download.

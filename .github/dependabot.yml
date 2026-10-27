@@ -1,0 +1,47 @@
+# Dependency updates (SECURITY.md): security fixes as soon as an advisory is out, everything else once a
+# week, minor and patch versions grouped into one pull request per ecosystem so the queue stays short.
+version: 2
+
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups:
+      maven-minor-and-patch:
+        update-types: [minor, patch]
+
+  # the web UI, built into the platform image
+  - package-ecosystem: npm
+    directory: /platform/web
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups:
+      web-minor-and-patch:
+        update-types: [minor, patch]
+
+  # the release gate's runner (conformance/runner/ts); never shipped
+  - package-ecosystem: npm
+    directory: /conformance/runner/ts
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 3
+    groups:
+      gate-minor-and-patch:
+        update-types: [minor, patch]
+
+  # the base images of the platform and CLI images (deploy/Dockerfile, deploy/cli.Dockerfile)
+  - package-ecosystem: docker
+    directory: /deploy
+    schedule: { interval: weekly, day: monday }
+
+  # PostgreSQL in deploy/compose.postgres.yaml
+  - package-ecosystem: docker-compose
+    directory: /deploy
+    schedule: { interval: weekly, day: monday }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    groups:
+      actions:
+        patterns: ["*"]

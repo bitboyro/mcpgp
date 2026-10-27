@@ -144,8 +144,10 @@ class ServerCommandsTest {
         assertThat(shown.find()).isTrue();
         String sha256 = shown.group(1);
 
+        // a fingerprint one byte off: the certificate is new each run, so its first byte can itself be 00
+        String wrong = (sha256.startsWith("00") ? "11" : "00") + sha256.substring(2);
         output.reset();
-        assertThat(run("", config, "instance", "trust", "secure", "--fingerprint", "00" + sha256.substring(2))).isEqualTo(1);
+        assertThat(run("", config, "instance", "trust", "secure", "--fingerprint", wrong)).isEqualTo(1);
         assertThat(out()).contains("none of the certificates above has the SHA-256");
         assertThat(dir.resolve("certs/secure.pem")).doesNotExist();
 
