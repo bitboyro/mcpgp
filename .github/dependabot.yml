@@ -33,6 +33,13 @@ updates:
   - package-ecosystem: docker
     directory: /deploy
     schedule: { interval: weekly, day: monday }
+    # Java 21, the LTS the code targets (maven.compiler.release): moving to the next LTS is a decision, not an update
+    ignore:
+      - dependency-name: eclipse-temurin
+        versions: [">= 22"]
+      - dependency-name: maven
+        versions: ["3.9-eclipse-temurin-22", "3.9-eclipse-temurin-23", "3.9-eclipse-temurin-24", "3.9-eclipse-temurin-25",
+                   "3.9-eclipse-temurin-26", "3.9-eclipse-temurin-27", "3.9-eclipse-temurin-28", "3.9-eclipse-temurin-29"]
 
   # PostgreSQL in deploy/compose.postgres.yaml
   - package-ecosystem: docker-compose
