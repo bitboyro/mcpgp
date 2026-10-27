@@ -6,6 +6,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.networknt.schema.Error;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
+import ro.bitboy.mcpgp.schemas.Schemas;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -131,7 +132,7 @@ class PackageTest {
     void theExampleConfigMatchesTheBuildsSchema() throws IOException {
         JsonNode schema = JSON.readTree(entry(zip, "server.config.schema.json"));
         JsonNode example = YAML.readTree(entry(zip, "orders-mcp.example.yaml"));
-        List<Error> errors = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12).getSchema(schema).validate(example);
+        List<Error> errors = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12).getSchema(Schemas.jackson3(schema)).validate(Schemas.jackson3(example));
         assertThat(errors).isEmpty();
         assertThat(schema.at("/$defs/instance_orders/properties/contract/enum")).extracting(JsonNode::asText).containsExactly("auto", "1.0", "2.0");
         assertThat(schema.at("/$defs/auth_orders/oneOf").findValuesAsText("const"))
@@ -139,7 +140,7 @@ class PackageTest {
         assertThat(schema.at("/properties").has("instance")).isFalse();
         // a sign-in type this build doesn't support is rejected by the schema
         JsonNode bearer = YAML.readTree("instances: [ { id: a, baseUrl: x.example, auth: { type: bearer, token: \"${env:T}\" } } ]");
-        assertThat(SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12).getSchema(schema).validate(bearer)).isNotEmpty();
+        assertThat(SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12).getSchema(Schemas.jackson3(schema)).validate(Schemas.jackson3(bearer))).isNotEmpty();
     }
 
     @Test
@@ -154,7 +155,7 @@ class PackageTest {
         assertThat(schema.at("/properties").has("instances")).isFalse();
         assertThat(schema.at("/properties").has("server")).isFalse();      // stdio only
         JsonNode example = YAML.readTree(entry(readonly, "orders-readonly.example.yaml"));
-        assertThat(SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12).getSchema(schema).validate(example)).isEmpty();
+        assertThat(SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12).getSchema(Schemas.jackson3(schema)).validate(Schemas.jackson3(example))).isEmpty();
     }
 
     @Test
