@@ -7,6 +7,9 @@ updates:
     directory: /
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 5
+    # must match the OpenTelemetry version Spring Boot ships (pom.xml); updated with Spring Boot, by hand
+    ignore:
+      - dependency-name: io.opentelemetry:opentelemetry-exporter-prometheus
     groups:
       maven-minor-and-patch:
         update-types: [minor, patch]
