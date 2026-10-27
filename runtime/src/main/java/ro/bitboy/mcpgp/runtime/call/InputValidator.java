@@ -6,6 +6,7 @@ import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
 import ro.bitboy.mcpgp.runtime.mcp.ToolError;
+import ro.bitboy.mcpgp.schemas.Schemas;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,9 +27,9 @@ final class InputValidator {
 
     void validate(JsonNode tool, JsonNode arguments, String contract, String instance) {
         String name = tool.path("name").asText();
-        Schema schema = schemas.computeIfAbsent(name, n -> registry.getSchema(tool.path("inputSchema")));
+        Schema schema = schemas.computeIfAbsent(name, n -> registry.getSchema(Schemas.jackson3(tool.path("inputSchema"))));
         List<String> problems = new ArrayList<>();
-        List<Error> errors = schema.validate(arguments);
+        List<Error> errors = schema.validate(Schemas.jackson3(arguments));
         // a failed oneOf also reports every branch that doesn't apply; keep the specific errors when there are some
         boolean specific = errors.stream().anyMatch(e -> !"oneOf".equals(e.getKeyword()) && !"additionalProperties".equals(e.getKeyword()));
         for (Error error : errors) {

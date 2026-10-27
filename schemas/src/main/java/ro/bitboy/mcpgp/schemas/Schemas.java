@@ -34,6 +34,7 @@ public final class Schemas {
 
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final tools.jackson.databind.json.JsonMapper JSON3 = tools.jackson.databind.json.JsonMapper.shared();
 
     private final SchemaRegistry registry;
     private final Map<SchemaKind, Schema> cache = new EnumMap<>(SchemaKind.class);
@@ -80,11 +81,22 @@ public final class Schemas {
     public synchronized List<Problem> problems(SchemaKind kind, JsonNode document) {
         Schema schema = cache.computeIfAbsent(kind, k -> registry.getSchema(SchemaLocation.of(k.id())));
         List<Problem> problems = new ArrayList<>();
-        for (Error error : schema.validate(document)) {
+        for (Error error : schema.validate(jackson3(document))) {
             problems.add(new Problem(error.getInstanceLocation().toString(), error.getMessage()));
         }
         problems.sort(Comparator.naturalOrder());
         return problems;
+    }
+
+    /**
+     * The same document for the schema library, which reads Jackson 3 trees; the rest of mcpgp uses Jackson 2.
+     */
+    public static tools.jackson.databind.JsonNode jackson3(JsonNode node) {
+        try {
+            return JSON3.readTree(JSON.writeValueAsBytes(node));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
     }
 
     /** Validates a parsed document; returns human-readable problems, empty when valid. */

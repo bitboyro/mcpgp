@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
 import org.junit.jupiter.api.Test;
+import ro.bitboy.mcpgp.schemas.Schemas;
 import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -13,7 +14,7 @@ class ConfigSchemaTest {
         var registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
         var manifest = json.readTree(Path.of("../examples/manifest/ops-assistant.manifest.json").toFile());
         var generated = ConfigSchema.generate(manifest);
-        var schema = registry.getSchema(generated);
+        var schema = registry.getSchema(Schemas.jackson3(generated));
         var document = json.readTree("""
                 {"tools":{"allow":[]},"apis":{
                   "orders":{"tools":{"deny":["orders_customer_create"]},"instances":[{"id":"prod","baseUrl":"https://orders.example.com","tools":{"allow":["orders_*"]}}]},
@@ -21,9 +22,9 @@ class ConfigSchemaTest {
                   "monitoring":{"instances":[{"id":"central","baseUrl":"https://monitor.example.com"}]}
                 }}
                 """);
-        assertThat(schema.validate(document)).isEmpty();
+        assertThat(schema.validate(Schemas.jackson3(document))).isEmpty();
         ((com.fasterxml.jackson.databind.node.ObjectNode) document.path("tools")).put("allow", "*");
-        assertThat(schema.validate(document)).isNotEmpty();
+        assertThat(schema.validate(Schemas.jackson3(document))).isNotEmpty();
         var single = ConfigSchema.generate(json.readTree(Path.of("../examples/manifest/orders-mcp.manifest.json").toFile()));
         assertThat(single.at("/properties/tools/$ref").asText()).isEqualTo("#/$defs/toolPolicy");
         assertThat(single.at("/$defs/instance_orders/properties/tools/$ref").asText()).isEqualTo("#/$defs/toolPolicy");

@@ -23,6 +23,8 @@ final class LenientOutputValidator implements JsonSchemaValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(LenientOutputValidator.class);
     private static final ObjectMapper JSON = new ObjectMapper();
+    // the schema library reads Jackson 3 trees
+    private static final tools.jackson.databind.json.JsonMapper JSON3 = tools.jackson.databind.json.JsonMapper.shared();
 
     private final SchemaRegistry registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
     private final Map<Map<String, Object>, Schema> schemas = new ConcurrentHashMap<>();
@@ -37,8 +39,8 @@ final class LenientOutputValidator implements JsonSchemaValidator {
             return ValidationResponse.asValid(String.valueOf(structuredContent));
         }
         try {
-            Schema compiled = schemas.computeIfAbsent(schema, s -> registry.getSchema(JSON.valueToTree(s)));
-            List<Error> errors = compiled.validate(JSON.readTree(json));
+            Schema compiled = schemas.computeIfAbsent(schema, s -> registry.getSchema(JSON3.valueToTree(s)));
+            List<Error> errors = compiled.validate(JSON3.readTree(json));
             if (!errors.isEmpty() && reported.putIfAbsent(schema, true) == null) {
                 LOG.warn("A result differs from its tool's output schema (the API's spec), and was returned as it is: {}",
                         errors.stream().limit(3).map(Error::getMessage).toList());
