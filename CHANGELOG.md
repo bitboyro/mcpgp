@@ -3,7 +3,10 @@
 All notable changes are documented here. Format: [Keep a Changelog](https://keepachangelog.com),
 versions follow [SemVer](https://semver.org).
 
-## Unreleased
+## 0.4.1 — 2026-10-27
+
+Security fixes and dependency updates. **Rebuild your packages with 0.4.1:** the runtime inside a generated
+server carries the fixed libraries only once it's built again.
 
 ### Added
 - **Security scanning** on every pull request, every push to `main` and weekly ([SECURITY.md](SECURITY.md)):
@@ -16,8 +19,23 @@ versions follow [SemVer](https://semver.org).
 ### Security
 - Spring Boot 4.1.2 (Tomcat 11.0.27: CVE-2026-65182, CVE-2026-65905, CVE-2026-68525; Jackson 3.1.7),
   Jackson 2.21.7 and json-smart 2.6.0 (CVE-2024-57699), fixing the high and critical advisories the first
-  scan found in the platform, the CLI and the runtime inside generated servers. Packages built before this
-  should be built again once it's released.
+  scan found in the platform, the CLI and the runtime inside generated servers.
+- Jackson 3 pinned to 3.1.8 in the CLI (CVE-2026-89407, CVE-2026-89425, CVE-2026-68497, CVE-2026-91776,
+  CVE-2026-91777): json-schema-validator 3 would otherwise bring 3.2.1.
+- The web UI's build and test tools: vite 6.4.5 and then 8, vitest 5 (tinypool), source-map-js 1.2.2.
+  None of them ship in the platform image; their advisories applied to the development server.
+
+### Changed
+- The web UI is built with Node 24 LTS (24.22.1) instead of 22.12.0. A checkout built with the old Node
+  needs `platform/target/node` removed once.
+- Dependencies: Jackson 2.22.4, MCP Java SDK 2.1.0, json-schema-validator 3.0.8, json-path 3.0.0,
+  nimbus-jose-jwt 10.10, slf4j 2.0.20; in the web UI, vite 8, @vitejs/plugin-react 6, jsdom 30 and
+  TypeScript 7. No change in behaviour.
+
+### Fixed
+- Schema validation, including the checks of `session_policy` restrictions, could fail on a request
+  thread that carried the class loader of a web server that had stopped; the schemas are now read through
+  mcpgp's own class loader.
 
 ## 0.4.0 — 2026-10-26
 
