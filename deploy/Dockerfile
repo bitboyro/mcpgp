@@ -5,7 +5,7 @@
 # ---- build: the platform jar, with the web UI and the runtime it packages servers with.
 # The jar is the same on every architecture, so this stage runs natively on the builder (no emulation
 # for multi-architecture images); only the run stage below is built per architecture.
-FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-21 AS build
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-26 AS build
 # the commit, recorded in the jar and shown in the UI's About panel (.git isn't copied into the build)
 ARG MCPGP_COMMIT=unknown
 WORKDIR /src

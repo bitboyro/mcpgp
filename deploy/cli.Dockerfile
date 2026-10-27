@@ -4,7 +4,7 @@
 #   docker run --rm -v "$PWD":/work mcpgp-cli validate --all
 
 # ---- build: the CLI jar (the same on every architecture, so built natively)
-FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-21 AS build
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /src
 COPY . .
 RUN --mount=type=cache,target=/root/.m2 \
