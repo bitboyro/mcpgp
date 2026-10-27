@@ -14,7 +14,7 @@ export default defineConfig({
     testTimeout: 120_000,
     hookTimeout: 240_000,
     pool: "forks",
-    poolOptions: { forks: { maxForks: 3, minForks: 1 } },
+    maxWorkers: 3,
     // a release gate never retries: a flaky test is a bug to fix
     retry: 0,
     reporters: ["default", ["junit", { outputFile: ".gate/report/junit.xml" }], "./src/report.ts"],
