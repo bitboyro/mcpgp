@@ -121,4 +121,29 @@ class SchemaRulesTest {
                 """;
         assertThat(schemas.validate(SchemaKind.AUDIT_EVENT, yaml(event))).isNotEmpty();
     }
+
+    /** A pooled thread can carry the class loader of a web server that has since stopped (in tests, an earlier one). */
+    @Test
+    void validationDoesNotDependOnTheThreadsClassLoader() throws IOException {
+        Thread thread = Thread.currentThread();
+        ClassLoader original = thread.getContextClassLoader();
+        ClassLoader stopped = new ClassLoader(original) {
+            @Override
+            public java.net.URL getResource(String name) {
+                throw new IllegalStateException("this web application instance has been stopped already");
+            }
+
+            @Override
+            public java.io.InputStream getResourceAsStream(String name) {
+                throw new IllegalStateException("this web application instance has been stopped already");
+            }
+        };
+        JsonNode policy = yaml("version: 1\nsubjects:\n  stdio: { tools: { allow: [orders_customer_get] } }\n");
+        thread.setContextClassLoader(stopped);
+        try {
+            assertThat(new Schemas().validate(SchemaKind.IDENTITY_POLICY, policy)).isEmpty();
+        } finally {
+            thread.setContextClassLoader(original);
+        }
+    }
 }
