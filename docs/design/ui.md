@@ -72,6 +72,7 @@ Built into the platform jar and served by it (`WebUi`), on the API's own origin.
 | Sign in | `/sign-in` | local and directory accounts; company SSO (OIDC) |
 | All servers | `/` | cards, duplicate / variant panel, new server (folder or zip), shared library |
 | Overview | `/servers/:id` | one card per area (API definitions, Tools, Target APIs, Access control, Execution, Observability, Delivery, General) with its purpose, state and summary, linking to the page; one "Next" step for the most important unfinished area; "Preview as agent" shows the agent, customer setup, package and validation previews. Nothing is edited here |
+| Preview | `/servers/:id/preview` | the latest revision as the agent and the customer get it: agent view, customer setup, package, validation; `?tab=` selects a view |
 | General | `/servers/:id/general` | name, title, server version; instructions for agents (`metadata.instructions`) with a live preview of what initialize sends; the latest revision, variant and base |
 | API definitions | `/servers/:id/apis` | specs, contracts shipped per API, version detection, upload a new version, saved versions, files, checks |
 | Tools | `/servers/:id/tools` | what the agent sees (exposure mode) and support packs; filters, search, the tool as the agent gets it, its provenance; output schemas; Operations view (with what tools may do per API), Naming, Notices |

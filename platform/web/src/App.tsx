@@ -9,7 +9,7 @@ import { ExecutionPage } from './pages/Execution'
 import { GeneralPage } from './pages/General'
 import { LibraryPage } from './pages/Library'
 import { ObservabilityPage } from './pages/Observability'
-import { OverviewPage } from './pages/Overview'
+import { OverviewPage, PreviewPage } from './pages/Overview'
 import { PackagingPage } from './pages/Packaging'
 import { AccountPage } from './pages/Passwords'
 import { ChangesPage } from './pages/Changes'
@@ -45,6 +45,7 @@ export function App() {
       <Route path="/cli" element={<Signed><CommandLinePage /></Signed>} />
       <Route path="/account" element={<Signed><AccountPage /></Signed>} />
       <Route path="/servers/:id" element={<Signed><OverviewPage /></Signed>} />
+      <Route path="/servers/:id/preview" element={<Signed><PreviewPage /></Signed>} />
       <Route path="/servers/:id/general" element={<Signed><GeneralPage /></Signed>} />
       <Route path="/servers/:id/apis" element={<Signed><ApiDefinitionsPage /></Signed>} />
       <Route path="/servers/:id/tools" element={<Signed><ToolsPage /></Signed>} />
