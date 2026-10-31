@@ -1,5 +1,15 @@
 # Roadmap
 
+## Current direction: 0.5.0 consolidation
+
+Agreed 2026-10-31: [0.5.0 scope](release-0.5.0.md) supersedes earlier release allocations below.
+Start with the [documentation and capability review](documentation-review.md); then address
+generated-server security, a living example project and release-gate G3–G5.
+G1 and G2 are in place. Standalone platform installation, the complete template UI workflow
+and other feature expansion move to 0.6.0 planning.
+
+## Historical milestone sequence
+
 Milestones, in order. Each ends with something demonstrable. Scope per item: see
 [../requirements.md](../requirements.md) (P0 unless noted).
 
@@ -47,7 +57,8 @@ management, and a complete brand identity. A simple logo may land if ready; bran
 | **0.2.7** (released 2026-10-13) | Per-operation security enforced (tools no credential can call hidden or explained; each call uses the credential that fits); a suffix for every tool and renaming one tool from the UI; audit defaults on Overview; `init --from-spec` copies referenced files; broken schema references are errors; Try starts its server early |
 | **0.3.0** (released 2026-10-20) | Passwords in the web UI (change, set and unlock); per-user identity by token exchange; clashing tool names chosen on upload; contract detection for `auto` instances and a Connections page for the rule; spec versions from an address with Check for updates; `mcpgp diff`, `preview`, `try`, `migrate` and the platform's Changes page; the platform's own server with Connect an agent; MCP cancellation, list pagination, resource-template completion and real progress; Security & safety protections; output schemas; `mixedContracts` and `instances.max` enforced; settings that did nothing are refused; stdio parallel-answer fix |
 | **0.4.0** (released 2026-10-26) | Batching, retained results and durable receipts; layered runtime policy with identity and organization policy files and session narrowing; the platform's navigation regrouped (General, API definitions, Tools, Target APIs, Access control, Execution, Observability, Packaging, Builds and releases), Overview area cards, 16px type and Lucide icons, plain words (Validate, API version, revision), `metadata.instructions`, version and build date, a Command line page; `upstreamAuth` (was `downstreamAuth`) and `AUTH_UPSTREAM`; masked fields in results, errors and audit; reload and import fixes. [Release scope](release-0.4.0.md) |
-| **0.5.0** (planned) | Deferred from 0.4.0: a standalone platform distribution without Docker (R09), the complete template workflow (R07), agent guidance in packages and its docs (R11), the feature-inventory review (R02) |
+| **0.5.0** (planned) | Consolidation: documentation and capability exposure, generated-server security, a living example repository, and release-gate G3–G5. [Scope](release-0.5.0.md) |
+| **0.6.0** (planning backlog) | Standalone platform distribution (R09), complete template UI workflow (R07), and other deferred feature expansion; final selection remains open. |
 | TODO, not yet scheduled | Marked TODO in the docs: `release.versionFrom` other than `contract`, `platform:` in the repository config; git sources on the platform (a spec from an address, with Check for updates: on `main`); a native CLI binary. (CLI `diff`, `preview`, `try`, `migrate` and `--no-color`, the platform's Changes page, and contract detection for `auto` instances: on `main`.) |
 
 ## Before 0.3.0: MCP 2026-07-28 and protocol utilities (added 2026-10-17)

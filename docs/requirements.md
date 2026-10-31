@@ -2,10 +2,10 @@
 
 Every configurable thing, grouped by concern.
 
-**Release allocation (agreed 2026-10-23):** [0.4.0 scope and checkpoints](process/release-0.4.0.md)
-identify the required readiness fixes, focused UX work and standalone platform delivery, plus
-explicit post-0.4.0 deferrals. The [roadmap](process/roadmap.md) carries later work; P0/P1/P2 below
-are broad priorities, not a promise that every item ships in 0.4.0.
+**Release allocation (agreed 2026-10-31):** [0.5.0 consolidation](process/release-0.5.0.md)
+covers capability exposure, documentation, generated-server security, a living example and
+release-gate G3–G5. Standalone platform delivery, the complete template UI workflow and other
+feature expansion move to 0.6.0 planning. P0/P1/P2 below are broad priorities, not release promises.
 
 **Set by**
 - **B**: build definition (`*.mcpgp.yaml`), edited by the builder.

@@ -72,4 +72,39 @@ class ManifestDiffTest {
         String md = DiffReport.markdown("orders-mcp", diff);
         assertThat(md).startsWith("### orders-mcp: ").contains("3 breaking").contains("- `orders_customer_fetch`: renamed from orders_customer_get");
     }
+
+    @Test
+    void aReplacedContractBreaksOnlyUnlessTheServerFollowsTheCurrentOne() throws Exception {
+        ObjectNode before = orders();
+        ObjectNode after = orders();
+        ArrayNode contracts = (ArrayNode) after.path("apis").get(0).path("contracts");
+        for (Iterator<JsonNode> it = contracts.iterator(); it.hasNext(); ) {
+            if (it.next().path("version").asText().equals("1.0")) {
+                it.remove();
+            }
+        }
+        for (JsonNode tool : after.path("tools")) {
+            if (tool.path("variants").has("1.0")) {
+                ((ObjectNode) tool.path("variants")).remove("1.0");
+            }
+        }
+
+        ManifestDiff.Result strict = ManifestDiff.compare(before, after);
+        assertThat(strict.breaking()).isPositive();
+
+        ManifestDiff.Result replaced = ManifestDiff.compare(before, after, true);
+        assertThat(replaced.breaking()).isZero();
+        assertThat(replaced.changes()).filteredOn(c -> c.kind().equals("contract.removed")).singleElement()
+                .satisfies(c -> {
+                    assertThat(c.impact()).isEqualTo(ManifestDiff.Impact.NOTABLE);
+                    assertThat(c.text()).contains("1.0 replaced");
+                });
+        assertThat(replaced.changes()).filteredOn(c -> c.kind().equals("tool.contract.removed"))
+                .allSatisfy(c -> assertThat(c.impact()).isEqualTo(ManifestDiff.Impact.INFO));
+
+        // a tool that is gone still breaks
+        ArrayNode tools = (ArrayNode) after.path("tools");
+        tools.remove(0);
+        assertThat(ManifestDiff.compare(before, after, true).breaking()).isEqualTo(1);
+    }
 }

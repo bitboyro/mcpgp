@@ -3,6 +3,15 @@
 All notable changes are documented here. Format: [Keep a Changelog](https://keepachangelog.com),
 versions follow [SemVer](https://semver.org).
 
+## Unreleased
+
+### Added
+- `mcpgp diff --contracts-replaced`: for a server that follows its API's current contract only, a contract
+  version that is gone is "worth a look" instead of breaking; removed tools and tightened inputs still break.
+
+### Changed
+- Documentation entry point organized by user task, with a separate contributor index.
+
 ## 0.4.1 — 2026-10-27
 
 Security fixes and dependency updates. **Rebuild your packages with 0.4.1:** the runtime inside a generated

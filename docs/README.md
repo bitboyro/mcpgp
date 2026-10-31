@@ -1,42 +1,62 @@
-# Documentation
+# MCP GP documentation
 
-| Document | Read it when |
-|---|---|
-| [concepts.md](concepts.md) | You're new. Defines every term used elsewhere. |
-| [requirements.md](requirements.md) | You need to know whether something is in scope, and when (P0/P1/P2). |
-| [architecture.md](architecture.md) | You're about to design or implement a component. |
-| [spec/definition-format.md](spec/definition-format.md) | You write or parse `*.mcpgp.yaml`. |
-| [spec/manifest.md](spec/manifest.md) | You produce or consume the compiler's output (runtimes, codegen). |
-| [spec/extensions.md](spec/extensions.md) | You write custom tools, enrichers or call filters. |
-| [spec/conformance.md](spec/conformance.md) | You add test cases or build a runtime. |
-| [spec/naming.md](spec/naming.md) | You touch tool names, titles or descriptions. |
-| [spec/runtime-config.md](spec/runtime-config.md) | You write or parse the customer's runtime config. |
-| [spec/layered-runtime-policy.md](spec/layered-runtime-policy.md) | You implement layered tool restrictions, live policy updates or configuration templates (implementation status and remaining stages). |
-| [spec/runtime-policy-management.md](spec/runtime-policy-management.md) | You administer runtime tool policies through authenticated preview/apply transactions. |
-| [spec/auth.md](spec/auth.md) | You touch inbound or upstream authentication. |
-| [spec/tools-contract.md](spec/tools-contract.md) | You need to know exactly what an agent receives. |
-| [spec/audit-and-errors.md](spec/audit-and-errors.md) | You emit audit events, errors or telemetry. |
-| [spec/packaging.md](spec/packaging.md) | You build or deliver packages, or register clients. |
-| [spec/cli.md](spec/cli.md) | You script the CLI or run it in CI. |
-| [spec/platform-api.md](spec/platform-api.md) | You work on the platform: store, builds, identities, the REST API. |
-| [guides/ci-pipeline.md](guides/ci-pipeline.md) | You want reliable builds from a git repo in CI. |
-| [deployment.md](deployment.md) | You plan a platform installation: container, store, network, sign-in, backups, upgrades. |
-| [guides/self-hosting.md](guides/self-hosting.md) | You install the platform with Docker Compose, step by step. |
-| [guides/platform.md](guides/platform.md) | You run the platform: sign-in, the web UI, the API. |
-| [guides/new-api-version.md](guides/new-api-version.md) | Your API has a new version: what you do, and what your customers do. |
-| [guides/agents.md](guides/agents.md) | An agent should build MCP servers on the platform. |
-| [guides/extensions.md](guides/extensions.md) | A server needs a bit of custom code. |
-| [spec/compatibility.md](spec/compatibility.md) | MCP or OpenAPI publish a new version, or you change one of our formats. |
-| [security.md](security.md) | You need the threat model or answer a security questionnaire. |
-| [decisions/](decisions) | You want to know *why* something is the way it is. |
-| [design/ui.md](design/ui.md) | You work on the web UI. |
-| [process/development.md](process/development.md) | Before your first change. |
-| [process/roadmap.md](process/roadmap.md) | You want to know what comes next. |
-| [process/release-0.4.0.md](process/release-0.4.0.md) | You need the agreed 0.4.0 scope, acceptance checkpoints and explicit deferrals. |
-| [process/release-gate.md](process/release-gate.md) | You are working on the release gate. |
-| [process/feature-matrix.md](process/feature-matrix.md) | You need every feature, its settings and what tests it. |
+Choose the task you want to accomplish. [Concepts and terminology](concepts.md) explains the
+builder, server operator and platform administrator roles.
 
-Examples that follow these specs live in [../examples](../examples).
+## Get started
 
-**Rule:** specs are normative. When code and a spec disagree, one of them is a bug, and the
-fix starts with a change to the spec (see [process/development.md](process/development.md)).
+- [Get started with the CLI or platform](guides/getting-started.md)
+- [Create a server in the platform](guides/platform.md)
+- [Explore working examples](../examples/README.md)
+
+## Build a server
+
+- [Define your server and select API operations](spec/definition-format.md)
+- [Choose tool names and descriptions](spec/naming.md)
+- [Configure client sign-in and target API authentication](spec/auth.md)
+- [Build and deliver packages](spec/packaging.md)
+- [Automate builds in CI](guides/ci-pipeline.md)
+- [Update an API version](guides/new-api-version.md)
+- [Let an agent build servers](guides/agents.md)
+- [Add custom behavior with an extension](guides/extensions.md)
+
+## Run a server
+
+These pages concern the generated server running at the customer.
+
+- [Configure and start a server](spec/runtime-config.md)
+- [Configure credentials and authentication](spec/auth.md)
+- [Manage tool access policies](spec/runtime-policy-management.md)
+- [Configure identity, organization and session restrictions](spec/policy-sources-and-sessions.md)
+- [Understand batching and retained results](spec/batching-and-results.md)
+- [Understand audit events and troubleshoot errors](spec/audit-and-errors.md)
+- [Check security updates and report vulnerabilities](../SECURITY.md)
+
+## Run the platform
+
+These pages concern the service used to author and build servers.
+
+- [Install with Docker Compose](guides/self-hosting.md)
+- [Plan storage, networking, sign-in, backups and upgrades](deployment.md)
+- [Use the platform and its API](guides/platform.md)
+- [Connect an agent to the platform](guides/agents.md)
+
+## Reference
+
+- [Definition format](spec/definition-format.md) and [naming](spec/naming.md)
+- [Runtime configuration](spec/runtime-config.md) and [authentication](spec/auth.md)
+- [CLI commands](spec/cli.md) and [platform API](spec/platform-api.md)
+- [MCP tool inputs and results](spec/tools-contract.md)
+- [Batching and results](spec/batching-and-results.md)
+- [Policy management](spec/runtime-policy-management.md) and [policy sources and sessions](spec/policy-sources-and-sessions.md)
+- [Audit events and errors](spec/audit-and-errors.md)
+- [Package contents](spec/packaging.md), [extensions](spec/extensions.md) and [compatibility](spec/compatibility.md)
+
+## Contribute
+
+[Contributor documentation](contributors/README.md) contains architecture, decisions, development
+process, implementation specifications and release-gate internals.
+
+This navigation begins the [0.5.0 documentation review](process/documentation-review.md).
+Some task links currently lead to detailed references; shorter task guides will follow during
+that review. Existing document paths remain valid.

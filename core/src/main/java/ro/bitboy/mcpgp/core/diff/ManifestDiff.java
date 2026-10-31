@@ -46,6 +46,15 @@ public final class ManifestDiff {
     }
 
     public static Result compare(JsonNode before, JsonNode after) {
+        return compare(before, after, false);
+    }
+
+    /**
+     * @param contractsReplaced the server follows its API's current contract only, so a contract version that
+     *                          is gone is a replacement, not a break: {@code contract.removed} becomes notable and
+     *                          {@code tool.contract.removed} informational. Everything else keeps its impact.
+     */
+    public static Result compare(JsonNode before, JsonNode after, boolean contractsReplaced) {
         List<Change> changes = new ArrayList<>();
         server(before, after, changes);
         Map<String, JsonNode> was = tools(before);
@@ -65,6 +74,14 @@ public final class ManifestDiff {
                 String name = e.getValue().path("name").asText();
                 changes.add(new Change(Impact.BREAKING, name, "tool.removed", "tool " + name + " removed" + describeOperation(e.getValue())));
             }
+        }
+        if (contractsReplaced) {
+            changes.replaceAll(c -> switch (c.kind()) {
+                case "contract.removed" -> new Change(Impact.NOTABLE, c.tool(), c.kind(), c.text().replace(
+                        "removed: target servers on it can't be used any more", "replaced: target servers on it can't be used any more"));
+                case "tool.contract.removed" -> new Change(Impact.INFO, c.tool(), c.kind(), c.text());
+                default -> c;
+            });
         }
         changes.sort((a, b) -> a.impact() != b.impact() ? a.impact().compareTo(b.impact())
                 : Objects.toString(a.tool(), "").compareTo(Objects.toString(b.tool(), "")));
