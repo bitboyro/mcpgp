@@ -57,7 +57,7 @@ sign:
 | `mcpgp validate <def…\|--all>` | Schema + compiler checks; no output files |
 | `mcpgp preview <def> [--tools] [--customer] [--format md\|json]` | What the agent gets (the tools, listed or found by search, what they do, their inputs) and what the customer configures (the example config) (§3.6) |
 | `mcpgp explain <def> <tool>` | Provenance of a tool's name, title, description |
-| `mcpgp diff <def…\|--all> [--against <last-release\|tag\|ref\|manifest.json\|dir>] [--format text\|md\|json] [--fail-on-breaking]` | What changed since the last release or another build: tools added, removed and renamed, inputs and outputs, annotations, contracts, the server's settings; breaking changes first (§3.5) |
+| `mcpgp diff <def…\|--all> [--against <last-release\|tag\|ref\|manifest.json\|dir>] [--format text\|md\|json] [--fail-on-breaking] [--contracts-replaced]` | What changed since the last release or another build: tools added, removed and renamed, inputs and outputs, annotations, contracts, the server's settings; breaking changes first (§3.5) |
 | `mcpgp names accept <def> <tool…\|--all>` | Write the names the policy gives now into `mcp-names.lock`: accepts renames (a breaking change for clients) and locks names the file doesn't have yet; tools by current name, new name or operation id. Existing entries keep their order, and entries of tools not in the build stay |
 | `mcpgp build <def…\|--all> [--version <v>] [--build-number <n>] [--source <uri>] [--frozen-lock] [--no-output-schemas] [--include-excluded-diagnostics] [--manifest-only] [--out <dir>]` | Compile + package: `dist/<name>-<version>.zip` and `dist/<name>-<version>.manifest.json`; `--manifest-only` writes only the manifest; `--include-excluded-diagnostics` adds exclusion reasons to the manifest (omitted by default); `--no-output-schemas` leaves tools without output schemas whatever `schemas.output` says |
 | `mcpgp test <def…\|--all> [--suite tests/]` | Start the server against a mock made from the specs; run a smoke check and the test cases (§3.2). With several definitions each uses its own `tests/` |
@@ -167,7 +167,9 @@ sign-in type no longer offered, an input removed or now required or of another t
 input, an output field removed, the instance mode changed. **Worth a look**: annotations,
 confirmation, exposure, the default contract, a support pack removed. **Other**: new tools, optional
 inputs, contracts, texts. `--format text` (default), `md` (a pull-request comment) or `json`;
-`--fail-on-breaking` exits 6 when anything breaks. The platform shows the same on a server's
+`--fail-on-breaking` exits 6 when anything breaks. `--contracts-replaced` is for a server that follows its
+API's current contract only (a catalogue tracking a provider's newest version): a contract version that is
+gone is then "worth a look", not breaking; removed tools and tightened inputs still break. The platform shows the same on a server's
 Changes page.
 
 ### 3.6 `preview`

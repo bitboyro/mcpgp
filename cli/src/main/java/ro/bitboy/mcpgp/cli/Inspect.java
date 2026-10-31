@@ -81,6 +81,11 @@ final class Inspect {
         @Option(names = "--fail-on-breaking", description = "Exit with code 6 when a change breaks agents or clients of the earlier build.")
         boolean failOnBreaking;
 
+        @Option(names = "--contracts-replaced",
+                description = "The server follows its API's current contract only: a contract version that is gone is a replacement, "
+                        + "not a break (shown as worth a look). Other breaking changes still count.")
+        boolean contractsReplaced;
+
         @Override
         public Integer call() throws IOException {
             List<Path> chosen = Main.definitions(common, all, definitions);
@@ -117,7 +122,7 @@ final class Inspect {
                     // the server didn't exist then: everything is new
                     before = JSON.createObjectNode();
                 }
-                ManifestDiff.Result diff = ManifestDiff.compare(before, after);
+                ManifestDiff.Result diff = ManifestDiff.compare(before, after, contractsReplaced);
                 breaking += diff.breaking();
                 switch (format) {
                     case "md" -> out.println(DiffReport.markdown(server, diff));
