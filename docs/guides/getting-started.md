@@ -27,4 +27,4 @@ docker compose up -d --wait                  # then open the address you gave, u
 PostgreSQL, TLS, company sign-in and backups: [self-hosting.md](self-hosting.md).
 
 
-Return to the [documentation](../README.md).
+Return to the [documentation](https://github.com/bitboyro/mcpgp/blob/main/docs/README.md).
