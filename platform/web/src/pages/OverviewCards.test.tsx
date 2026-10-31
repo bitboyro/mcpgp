@@ -58,10 +58,16 @@ describe('overview', () => {
     expect(within(developers).getByRole('link', { name: 'Connect an agent' }).getAttribute('href')).toBe('/agents?connect')
   })
 
-  it('shows the agent preview on request', async () => {
+  it('links to the preview page', async () => {
     page('/servers/orders-mcp')
-    await userEvent.click(await screen.findByRole('button', { name: 'Preview as agent' }))
-    expect(screen.getByRole('region', { name: 'Preview' })).toBeTruthy()
+    expect((await screen.findByRole('link', { name: 'Preview as agent' })).getAttribute('href')).toBe('/servers/orders-mcp/preview')
+    expect(screen.queryByRole('region', { name: 'Preview' })).toBeNull()
+  })
+
+  it('shows the preview as a page, on the tab in the address', async () => {
+    page('/servers/orders-mcp/preview?tab=checks')
+    expect(await screen.findByRole('region', { name: 'Preview' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Validation' }).getAttribute('aria-selected')).toBe('true')
   })
 })
 

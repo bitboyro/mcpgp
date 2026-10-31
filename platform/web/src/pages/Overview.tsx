@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, ApiError, type Build, type Diagnostic, type Manifest, type Tool } from '../api'
 import { access, diffLines } from '../choices'
 import { AUTH_LABELS, EXPOSURE, counts, listedTools, useManifest, useServer } from '../serverData'
@@ -114,8 +113,6 @@ export function OverviewPage() {
   const server = useServer(id)
   const manifest = useManifest(id, 'latest', server.data?.latestVersion != null)
   const builds = useQuery({ queryKey: ['builds', id], queryFn: () => api.builds(id), enabled: !!server.data })
-  const [previewing, setPreviewing] = useState(false)
-  const [tab, setTab] = useState<Tab>('agent')
   const compileError = manifest.error instanceof ApiError ? manifest.error : null
   const latest = server.data?.versions.at(-1)
   const lastBuild = [...(builds.data?.items ?? [])].sort((a, b) => b.created.localeCompare(a.created))[0]
@@ -129,8 +126,7 @@ export function OverviewPage() {
         {server.data?.system
           ? <Link to="/agents?connect" className="btn btn-primary"><Icon name="zap" />Connect an agent</Link>
           : <Link to={`/servers/${id}/apis`} className="btn"><Icon name="upload" />Upload API definition</Link>}
-        {manifest.data && <button type="button" className="btn" aria-pressed={previewing} onClick={() => setPreviewing(!previewing)}>
-          <Icon name="eye" />{previewing ? 'Hide preview' : 'Preview as agent'}</button>}
+        {manifest.data && <Link to={`/servers/${id}/preview`} className="btn"><Icon name="eye" />Preview as agent</Link>}
         <BuildButton id={id} />
       </PageHead>
       <div className="body" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
@@ -166,11 +162,40 @@ export function OverviewPage() {
             ))}
           </section>
         )}
-        {previewing && manifest.data && (
+      </div>
+    </>
+  )
+}
+
+const TABS: [Tab, string][] = [['agent', 'Agent'], ['customer', 'Customer setup'], ['package', 'Package'], ['checks', 'Validation']]
+
+/** What the latest revision gives agents and customers. The tab is in the address, so a view can be linked. */
+export function PreviewPage() {
+  const { id = '' } = useParams()
+  const server = useServer(id)
+  const manifest = useManifest(id, 'latest', server.data?.latestVersion != null)
+  const [params, setParams] = useSearchParams()
+  const tab = TABS.find(([key]) => key === params.get('tab'))?.[0] ?? 'agent'
+  const compileError = manifest.error instanceof ApiError ? manifest.error : null
+  return (
+    <>
+      <PageHead title="Preview" sub="What the latest revision gives agents and customers.">
+        <Link to={`/servers/${id}`} className="btn">Back to overview</Link>
+      </PageHead>
+      <div className="body" style={{ flexDirection: 'column', flexWrap: 'nowrap', alignItems: 'stretch' }}>
+        <ErrorBox error={server.error ?? (compileError ? null : manifest.error)} />
+        {(server.isLoading || manifest.isLoading) && <Loading />}
+        {compileError && (
+          <div className="card">
+            <h2>This revision doesn't compile</h2>
+            <p className="hint">{compileError.message}. Validation on <Link to={`/servers/${id}/apis`}>API definitions</Link> says why.</p>
+          </div>
+        )}
+        {manifest.data && (
           <section className="stage" aria-label="Preview">
             <div className="card-head">
-              <Segmented role="tab" label="Preview" value={tab} onChange={setTab}
-                options={[['agent', 'Agent'], ['customer', 'Customer setup'], ['package', 'Package'], ['checks', 'Validation']]} />
+              <Segmented role="tab" label="Preview" value={tab} options={TABS}
+                onChange={(next) => setParams(next === 'agent' ? {} : { tab: next }, { replace: true })} />
             </div>
             {tab === 'agent' && <AgentPreview manifest={manifest.data} />}
             {tab === 'customer' && <CustomerPreview id={id} />}
@@ -226,13 +251,12 @@ function AgentPreview({ manifest }: { manifest: Manifest }) {
       </div>
       {manifest.server.instructions && <div className="stage-card"><span className="eyebrow">Instructions</span><p>{manifest.server.instructions}</p></div>}
       <div className="list">
-        {listed.slice(0, 8).map((t) => (
-          <div key={t.name} className="stage-card" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        {listed.map((t) => (
+          <div key={t.name} className="stage-card" style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="mono" style={{ color: 'var(--stage-bright)', fontSize: 14 }}>{t.name}</span>
             <span className="meta">{t.title}</span>
           </div>
         ))}
-        {listed.length > 8 && <span className="hint">+ {listed.length - 8} more</span>}
       </div>
       {first && <pre className="code" aria-label={`${first.name} as the agent gets it`}>{JSON.stringify(agentView(first), null, 2)}</pre>}
     </>
